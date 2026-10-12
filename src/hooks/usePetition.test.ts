@@ -1,4 +1,5 @@
-import { renderHook, waitFor, act } from '@testing-library/react';
+import { render, renderHook, waitFor, act } from '@testing-library/react';
+import { createElement, useLayoutEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePetition, usePetitionList } from './usePetition';
 
@@ -135,5 +136,25 @@ describe('usePetition auto-refetch', () => {
     });
 
     await waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(afterMount));
+  });
+
+  it('does not show the previous petition while a new route is loading', async () => {
+    fetchMock.mockImplementation(async (url) => {
+      if (String(url).endsWith('/petitions/next')) return new Promise(() => {});
+      return { ok: true, json: async () => ({ _id: 'first', petitionNo: 'P-1' }) };
+    });
+    const seen: Array<{ route: string; petitionId?: string }> = [];
+    function Probe({ id }: { id: string }) {
+      const { data } = usePetition(id, { refetchOnFocus: false, pollMs: 0 });
+      useLayoutEffect(() => {
+        seen.push({ route: id, petitionId: data?._id });
+      }, [id, data]);
+      return null;
+    }
+
+    const view = render(createElement(Probe, { id: 'first' }));
+    await waitFor(() => expect(seen.some((entry) => entry.petitionId === 'first')).toBe(true));
+    view.rerender(createElement(Probe, { id: 'next' }));
+    expect(seen.filter((entry) => entry.route === 'next').map((entry) => entry.petitionId)).not.toContain('first');
   });
 });

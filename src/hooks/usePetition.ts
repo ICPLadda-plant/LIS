@@ -111,7 +111,13 @@ export function usePetition(id: string | undefined, options: PetitionRefreshOpti
     };
   }, [id, reloadKey]);
 
-  return { data, loading, error, refresh };
+  const isCurrentPetition = lastIdRef.current === id;
+  return {
+    data: isCurrentPetition ? data : null,
+    loading: !isCurrentPetition || loading,
+    error: isCurrentPetition ? error : null,
+    refresh,
+  };
 }
 
 // ===== Petition list =====
