@@ -36,6 +36,10 @@ function isVideoUrl(url: string) {
   return VIDEO_EXT_RE.test(url);
 }
 
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function PhotoField({ field, value, onChange, disabled = false }: PhotoFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -51,8 +55,8 @@ export function PhotoField({ field, value, onChange, disabled = false }: PhotoFi
     try {
       const { url } = await uploadQcPhoto(file);
       onChange([...value, url]);
-    } catch (err: any) {
-      toast.error(err.message || 'อัปโหลดล้มเหลว');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'อัปโหลดล้มเหลว'));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -65,8 +69,8 @@ export function PhotoField({ field, value, onChange, disabled = false }: PhotoFi
     try {
       await deleteQcPhoto(url);
       onChange(value.filter((u) => u !== url));
-    } catch (err: any) {
-      toast.error(err.message || 'ลบไม่สำเร็จ');
+    } catch (err: unknown) {
+      toast.error(errorMessage(err, 'ลบไม่สำเร็จ'));
     } finally {
       setDeletingUrl(null);
     }
