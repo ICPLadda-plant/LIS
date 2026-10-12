@@ -154,25 +154,72 @@ describe("buildApprovalGroups", () => {
     expect(groups[0].params.find((p) => p.parameterId === "l1")).toBeUndefined();
   });
 
-  it("แสดงค่าที่ Lab บันทึกไว้แม้ field เก่าไม่มีใน parameter แล้ว", () => {
-    const labParam = param({ _id: "l1", name: "%AI", scope: "lab", valueFields: [{ label: "%AI", type: "float", unit: "%" }] });
+  it("เรียงผล %AI ตามแบบฟอร์มและไม่แสดงแถวรวมซ้ำ", () => {
+    const labParam = param({
+      _id: "l1",
+      name: "%AI",
+      scope: "lab",
+      valueFields: [{
+        label: "%AI",
+        type: "float",
+        unit: "%",
+        labelToleranceMode: true,
+        labelToleranceStandards: [{
+          substance: "IMIDACLOPRID",
+          autoPct: null,
+          headPct: null,
+          mode: "range",
+          autoMode: "none",
+          headMode: "range",
+          passLow: 68.13,
+          passHigh: 71.88,
+          failLow: 67.5,
+          failHigh: 72.5,
+        }],
+      }],
+    });
     const labPetition = {
       ...petition(),
-      items: [{ seq: 1, sampleName: "ตัวอย่าง A", commonName: "A 1%", sampleId: "S1", batchNo: "B1", testItems: "%AI" }],
+      items: [{ seq: 1, sampleName: "ตัวอย่าง A", commonName: "IMIDACLOPRID 70%", sampleId: "S1", batchNo: "B1", testItems: "%AI" }],
     } as unknown as Petition;
     const labResult = {
       itemSeq: 1,
       parameterId: "l1",
       parameterName: "%AI",
-      values: { "Area Inj.1": 100, "% Sample Average": 1.2, "%AI": 1.1 },
+      values: {
+        "Area Inj.1": 3.545,
+        "Area Inj.2": 3.545,
+        "Area Inj.3": 3.545,
+        "Area Average": 3.54,
+        "Area %RSD": 0,
+        "% Sample Average": 68.72,
+        "% Sample %RSD": 2.22,
+        "%AI": 68.72,
+        "% Sample 1": 69.0548,
+        "% Sample 2": 67.0587,
+        "% Sample 3": 70.0587,
+        "%AI::imidacloprid": 68.72,
+      },
     } as unknown as QCTestResult;
 
-    const groups = buildApprovalGroups(labPetition, [labParam], [labResult], new Map(), { includeResultOnlyFields: true });
+    const groups = buildApprovalGroups(labPetition, [labParam], [labResult], new Map(), {
+      includeResultOnlyFields: true,
+      showAutoPassRange: false,
+    });
     expect(groups[0].params[0].rows.map((row) => row.label)).toEqual([
-      "%AI",
       "Area Inj.1",
+      "Area Inj.2",
+      "Area Inj.3",
+      "Area Average",
+      "Area %RSD",
+      "% Sample 1",
+      "% Sample 2",
+      "% Sample 3",
       "% Sample Average",
+      "% Sample %RSD",
+      "%AI — IMIDACLOPRID",
     ]);
+    expect(groups[0].params[0].rows.at(-1)?.standardText).toBe("เกณฑ์กรม 67.50–72.50 %");
   });
 
   it("หน้า QC เลือกผล Lab ของ %AI เฉพาะค่าสรุป", () => {
