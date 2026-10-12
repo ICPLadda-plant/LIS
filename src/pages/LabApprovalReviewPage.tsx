@@ -133,7 +133,9 @@ export default function LabApprovalReviewPage() {
     );
   }
 
-  const groups = buildApprovalGroups(petition, parameters, results, groupMembership);
+  const groups = buildApprovalGroups(petition, parameters, results, groupMembership, {
+    includeResultOnlyFields: true,
+  });
 
   return (
     <AppLayout title={petition.petitionNo}>

@@ -171,7 +171,7 @@ describe("RoleDashboard overlays", () => {
     act(() => assignClick?.("pendingAssign"));
     expect(state.kpiProps.at(-1).activeKpi).toBe("pendingAssign");
     expect(state.actionTableProps.at(-1).title).toBe("รอ assign");
-    expect(state.actionTableProps.at(-1).statusBadge?.({ status: "sampleSent" } as Petition).label).toBe("รอ assign");
+    expect(state.actionTableProps.at(-1).statusBadge?.({ status: "sampleSent" } as Petition).label).toBe("รอรับ");
     expect(state.actionTableProps.at(-1).statusBadge?.({
       status: "sampleSent",
       assignedTo: { employeeId: "E1", name: "Analyst A" },

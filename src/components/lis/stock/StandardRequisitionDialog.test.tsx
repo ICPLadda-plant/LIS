@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ConfirmProvider } from "@/context/ConfirmDialog";
 import StandardRequisitionDialog from "./StandardRequisitionDialog";
 import type { StockStandardItem, StockUnitItem } from "@/types/stock";
 
@@ -73,7 +74,9 @@ function renderDialog(machinePrefix: "GC" | "HPLC", standards = [standard], unit
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <StandardRequisitionDialog initialQrId="qr-1" onClose={vi.fn()} onSaved={vi.fn()} />
+      <ConfirmProvider>
+        <StandardRequisitionDialog initialQrId="qr-1" onClose={vi.fn()} onSaved={vi.fn()} />
+      </ConfirmProvider>
     </QueryClientProvider>,
   );
 }

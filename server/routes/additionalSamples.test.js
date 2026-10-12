@@ -286,7 +286,7 @@ test('pending request waits for an in-flight saved result before snapshotting it
   context.mock.method(QCTestResult, 'findOneAndUpdate', async (filter, update) => {
     entered();
     await barrier;
-    saved = { ...saved, values: { value: update.$set['values.value'] } };
+    saved = { ...saved, values: update.$set.values };
     return saved;
   });
   const writing = invoke(results, '/', 'put', { petitionId, itemSeq: 1, parameterId, fieldLabel: 'value', value: 18 });

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
+import { formatDateTime } from "@/lib/dateTime";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -303,7 +304,7 @@ const AdminData = () => {
                             onClick={() => navigate(`/petition/${entry.petitionId}`)}
                           >
                             <TableCell className="hidden md:table-cell text-muted-foreground whitespace-nowrap text-xs">
-                              {new Date(entry.createdAt).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}
+                              {formatDateTime(entry.createdAt)}
                             </TableCell>
                             <TableCell className="font-semibold text-primary">{entry.petitionNo}</TableCell>
                             <TableCell>

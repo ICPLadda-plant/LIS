@@ -200,6 +200,21 @@ test('isRelevant: audience ตัดกัน → true', () => {
   assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: 'E999' }), false);
 });
 
+test('bellDescribe/isRelevant: แจ้งการแก้ผลหลังปิดงานให้ QC Head ทุกคนเท่านั้น', () => {
+  const log = {
+    event: 'updated',
+    note: 'QC Head แก้ไขผล pH · เหตุผล: กรอกผลผิด',
+    metadata: { audience: 'qc', recipientRoles: ['qc-head'] },
+  };
+  const desc = bellDescribe(petition, log);
+
+  assert.deepStrictEqual(desc.recipientRoles, ['qc-head']);
+  assert.strictEqual(isRelevant(desc, petition, { audiences: ['qc'], roles: ['qc-head'] }), true);
+  assert.strictEqual(isRelevant(desc, petition, { audiences: ['qc'], roles: ['qc-staff'] }), false);
+  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], roles: ['qc-head'] }), true);
+  assert.strictEqual(toNotification(petition, log, desc).link, '/record-results/p1');
+});
+
 test('isRelevant: assigned notification ที่ระบุ targetEmployeeId เห็นเฉพาะคนถูกมอบหมาย', () => {
   const desc = { audiences: ['lab'], title: 't', targetEmployeeId: 'E200' };
   assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: 'E200' }), true);
@@ -263,10 +278,10 @@ test('toNotification: sampleSent sentToLab=true เล่นเสียงใ�
   const sentToLabDesc = bellDescribe(sentToLab, log);
   const qcOnlyDesc = bellDescribe(qcOnly, log);
 
-  assert.deepStrictEqual(sentToLabDesc.audiences, ['qc', 'lab']);
+  assert.deepStrictEqual(sentToLabDesc.audiences, ['qc', 'lab', 'production']);
   assert.strictEqual(toNotification(sentToLab, log, sentToLabDesc, { audiences: ['qc'] }).playSound, true);
   assert.strictEqual(toNotification(sentToLab, log, sentToLabDesc, { audiences: ['lab'] }).playSound, true);
-  assert.deepStrictEqual(qcOnlyDesc.audiences, ['qc']);
+  assert.deepStrictEqual(qcOnlyDesc.audiences, ['qc', 'production']);
   assert.strictEqual(toNotification(qcOnly, log, qcOnlyDesc, { audiences: ['qc'] }).playSound, true);
   assert.strictEqual(toNotification(qcOnly, log, qcOnlyDesc, { audiences: ['lab'] }).playSound, undefined);
 });

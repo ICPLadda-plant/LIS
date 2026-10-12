@@ -7,6 +7,7 @@ const Parameter = require('../models/Parameter');
 const QCTestResult = require('../models/QCTestResult');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
 const { getLisSessionUserId } = require('../lib/lisSessionCookie');
+const { syntheticDevRolesFromEmail } = require('../lib/syntheticDevRoles');
 const { normalizeRoles } = require('../lib/roles');
 const { serializePetitionWrite } = require('../lib/petitionWriteQueue');
 const { computeAbnormalFlags } = require('../lib/abnormalFlags');
@@ -20,6 +21,10 @@ const fail = (res, status, message) => res.status(status).json({ error: { messag
 async function currentUser(req) {
   const sessionId = getLisSessionUserId(req);
   const email = String(req.get?.('X-LIS-User') || '').trim().toLowerCase();
+  if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_DEV_STATUS === 'true' && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.ip)) {
+    const roles = syntheticDevRolesFromEmail(email);
+    if (roles.length) return { email, name: email, roles, status: 'active' };
+  }
   const user = sessionId ? await User.findById(sessionId).lean() : email ? await User.findOne({ email }).lean() : null;
   return user && user.status !== 'inactive' ? user : null;
 }

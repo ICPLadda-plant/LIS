@@ -1,10 +1,11 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParameterItem } from "@/lib/api";
 import type { Petition, QCTestResult } from "@/types/petition.types";
 import LabTestingDetailPage from "./LabTestingDetailPage";
 
 const mockNavigate = vi.hoisted(() => vi.fn());
+const mockSaveQCResult = vi.hoisted(() => vi.fn());
 
 const fixtures = vi.hoisted(() => {
   const petition: Petition = {
@@ -185,6 +186,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       getInstrumentSources: vi.fn().mockResolvedValue([]),
       getQCResults: vi.fn().mockImplementation(() => Promise.resolve(mockState.activeFixtures.results)),
       getReturnedFlags: vi.fn().mockResolvedValue({}),
+      saveQCResult: mockSaveQCResult,
       patch: vi.fn().mockResolvedValue({ data: { data: mockState.activeFixtures.petition } }),
     },
   };
@@ -195,6 +197,8 @@ describe("LabTestingDetailPage", () => {
     mockNavigate.mockClear();
     mockState.activeFixtures = fixtures;
     mockState.parametersError = false;
+    mockSaveQCResult.mockReset();
+    mockSaveQCResult.mockResolvedValue({});
   });
 
   it("shows label-tolerance criteria and saved-by metadata beside the parameter field name", async () => {
@@ -230,6 +234,25 @@ describe("LabTestingDetailPage", () => {
     expect(screen.queryByText(/ยังไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่างนี้/)).not.toBeInTheDocument();
   });
 
+  it("shows the sent quantity beside the Lab sample, including individual quantities", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          { ...fixtures.petition.items[0], labelQuantity: "100 ml" },
+          { ...fixtures.petition.items[0], seq: 2, labelQuantity: "5 g, 6 g", labelQuantities: ["5 g", "6 g"] },
+        ],
+      },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByText("ปริมาณที่ส่ง: 100 ml")).toBeInTheDocument();
+    expect(screen.getByText("ปริมาณที่ส่ง: ตัวอย่างที่ 1: 5 g · ตัวอย่างที่ 2: 6 g")).toBeInTheDocument();
+    expect(await screen.findAllByText("Area Inj.1")).toHaveLength(2);
+  });
+
   it("expands a legacy %AI parameter into input, average, and RSD fields", async () => {
     render(<LabTestingDetailPage />);
 
@@ -239,6 +262,67 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("% Sample 3")).toBeInTheDocument();
     expect(screen.getByText("Area Average")).toBeInTheDocument();
     expect(screen.getByText("% Sample %RSD")).toBeInTheDocument();
+  });
+
+  it("enables final save and persists calculated %AI with the substance key", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      parameters: fixtures.parameters.map((parameter) => ({
+        ...parameter,
+        valueFields: parameter.valueFields.map((field) => ({ ...field, required: true })),
+      })),
+      results: [],
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByRole("button", { name: "บันทึกแบบร่าง" })).toBeInTheDocument();
+    const inputs = screen.getAllByRole("spinbutton");
+    ["3.545", "3.545", "3.545", "69.0548", "67.0587", "70.0587"].forEach((value, index) => {
+      fireEvent.change(inputs[index], { target: { value } });
+    });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "บันทึก" })).toBeInTheDocument());
+    await waitFor(() => {
+      expect(mockSaveQCResult).toHaveBeenCalledWith(expect.objectContaining({ fieldLabel: "%AI::abamectin" }));
+    }, { timeout: 2000 });
+  });
+
+  it("locks Lab inputs until QC selects and saves a density value", async () => {
+    const densityParameter: ParameterItem = {
+      _id: "density-param",
+      name: "ค่า ถพ.",
+      scope: "qc",
+      shareWithLab: true,
+      applyAll: true,
+      valueFields: [{ label: "ค่าถพ.", type: "number", unit: "g/cm³" }],
+    };
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: fixtures.petition.items.map((item) => ({ ...item, testItems: "Active Ingredient, ค่า ถพ." })),
+      },
+      parameters: [...fixtures.parameters, densityParameter],
+      results: fixtures.results,
+    };
+
+    render(<LabTestingDetailPage />);
+    expect((await screen.findAllByRole("spinbutton"))[0]).toBeDisabled();
+    expect(screen.getByText(/รอ QC เลือกและบันทึกค่าถพ/)).toBeInTheDocument();
+
+    mockState.activeFixtures = {
+      ...mockState.activeFixtures,
+      results: [...fixtures.results, {
+        petitionId: "petition-1",
+        itemSeq: 1,
+        parameterId: "density-param",
+        values: { "ค่าถพ.": "1.005" },
+      }],
+    };
+    fireEvent.click(screen.getByRole("button", { name: "ตรวจค่าอีกครั้ง" }));
+    await waitFor(() => expect((screen.getAllByRole("spinbutton"))[0]).not.toBeDisabled());
+    expect(screen.queryByText(/รอ QC เลือกและบันทึกค่าถพ/)).not.toBeInTheDocument();
   });
 
   it("shows only Lab-scope parameters for R&D petitions", async () => {

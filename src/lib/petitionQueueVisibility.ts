@@ -25,9 +25,5 @@ export function isVisibleInAssignQueue(petition: Petition): boolean {
 }
 
 export function isWaitingForAssignment(petition: Petition): boolean {
-  return !petition.assignedTo && (
-    petition.status === 'sampleSent' ||
-    petition.status === 'pendingReview' ||
-    isReceivedBeforeStatusAdvance(petition)
-  );
+  return !!labReceivedAt(petition) && !petition.assignedTo && isVisibleInAssignQueue(petition);
 }

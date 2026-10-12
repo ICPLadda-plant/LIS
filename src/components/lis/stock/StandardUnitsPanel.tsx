@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { standardLabelCodeFromStockUnit } from "@/lib/standardLabelCode";
 import { formatStockQuantityWithUnit } from "@/lib/stockQuantity";
 import { buildStockLabelHtml } from "@/lib/stockLabel";
+import { formatDate } from "@/lib/dateTime";
 import { unitDerivedStatus, visibleBottles } from "@/lib/stockUnit";
 import type { StockStandardItem, StockUnitItem } from "@/types/stock";
 import EditUnitDialog from "./EditUnitDialog";
@@ -217,7 +218,7 @@ export default function StandardUnitsPanel({ standard, onEdit }: { standard: Sto
                   <TableCell className="px-2 py-3"><Badge variant="outline">{unit.type || "primary"}</Badge></TableCell>
                   <TableCell className="px-2 py-3 font-mono text-xs">{unitLabelCode(unit)}</TableCell>
                   <TableCell className="whitespace-nowrap px-2 py-3 text-right">{formatStockQuantityWithUnit(unit.volume?.remaining, unit.volume?.unit)}</TableCell>
-                  <TableCell className="whitespace-nowrap px-2 py-3 text-xs">{unit.exp ? new Date(unit.exp).toLocaleDateString("th-TH") : "-"}</TableCell>
+                  <TableCell className="whitespace-nowrap px-2 py-3 text-xs">{formatDate(unit.exp)}</TableCell>
                   <TableCell className="px-2 py-3"><Badge className={`text-xs ${STATUS_BADGE[status]}`}>{STATUS_LABEL[status]}</Badge></TableCell>
                   <TableCell className="px-1 py-2">
                     <div className="flex justify-end gap-0.5">

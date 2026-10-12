@@ -196,6 +196,23 @@ router.get('/', async (req, res) => {
       return res.json({ items, total: items.length, page: 1, limit: items.length });
     }
 
+    if (req.query.awaitingQcApproval === 'true') {
+      q.status = { $nin: ['approved', 'rejected'] };
+      const completedTrack = {
+        $or: [
+          { qcCompletedAt: { $ne: null } },
+          { labCompletedAt: { $ne: null } },
+        ],
+      };
+      if (q.$or) {
+        q.$and = [...(q.$and || []), { $or: q.$or }, completedTrack];
+        delete q.$or;
+      } else if (q.$and) {
+        q.$and.push(completedTrack);
+      } else {
+        Object.assign(q, completedTrack);
+      }
+    }
     if (req.query.awaitingLabApproval === 'true') {
       q.labCompletedAt = { $ne: null };
       q.labApprovedAt = null;
@@ -441,6 +458,7 @@ router.get('/notifications', async (req, res) => {
       .filter(Boolean);
     const viewer = {
       audiences,
+      roles: String(req.query.roles || '').split(',').map((s) => s.trim()).filter(Boolean),
       employeeId: String(req.query.employeeId || '').trim(),
       seeAll: String(req.query.all || '') === '1',
     };
@@ -618,7 +636,7 @@ router.get('/status-log/:id', async (req, res) => {
       PetitionAuditLog.find({ petitionId: petition._id }).sort({ createdAt: 1 }).lean(),
       // QCTestResult.petitionId is stored as a String of _id (not ObjectId) — keep the cast
       QCTestResult.find({ petitionId: String(petition._id) }).lean(),
-      Parameter.find({ status: 'active' }).lean(),
+      Parameter.find().lean(),
     ]);
 
     // labDone: Lab track finished — explicit completion flag, or (legacy) every lab
@@ -1037,6 +1055,9 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(q);
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (!doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt)) {
+      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้' } });
+    }
 
     const prevStatus = doc.status;
     doc.assignedTo = {
@@ -1090,7 +1111,7 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 router.patch('/:id', serializePetitionWrite(async (req, res) => {
   try {
     const updates = { ...req.body };
-    const managedFields = ['additionalSampleRequests', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
+    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
     if (Object.keys(updates).some(key => key.startsWith('$') || key.includes('.') || managedFields.includes(key))) return badRequest(res, 'ข้อมูลสถานะและรอบตัวอย่างต้องเปลี่ยนผ่านขั้นตอนที่กำหนด');
     let actor = updates.actor;
     delete updates.actor;

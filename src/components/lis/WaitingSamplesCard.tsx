@@ -3,12 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Petition } from "@/types/petition.types";
+import { formatDateTime } from "@/lib/dateTime";
 
 const MAX_VISIBLE = 6;
-
-const formatDate = (value: string) => new Date(value).toLocaleDateString("th-TH");
-const formatTime = (value: string) =>
-  new Date(value).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
 export default function WaitingSamplesCard({ petitions }: { petitions: Petition[] }) {
   const navigate = useNavigate();
@@ -66,7 +63,7 @@ export default function WaitingSamplesCard({ petitions }: { petitions: Petition[
                         <span className="font-semibold text-primary text-sm">{petition.petitionNo}</span>
                         <p className="truncate text-xs text-foreground/80 mt-0.5">{sampleNames}</p>
                         <p className="text-[11px] text-muted-foreground mt-1">
-                          {petition.submittedBy?.name ?? "-"} · {formatDate(submittedAt)} {formatTime(submittedAt)}
+                          {petition.submittedBy?.name ?? "-"} · {formatDateTime(submittedAt)}
                         </p>
                       </div>
                     </button>

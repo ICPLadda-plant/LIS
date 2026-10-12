@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePetitionAuditLogList } from '@/hooks/usePetition';
+import { formatDateTime } from '@/lib/dateTime';
 import {
   PETITION_AUDIT_EVENT_LABELS,
   PETITION_STATUSES,
@@ -218,10 +219,7 @@ export default function PetitionAuditLogPage() {
                       onClick={() => navigate(`/petition/${entry.petitionId}`)}
                     >
                       <TableCell className="text-grey-500 whitespace-nowrap">
-                        {new Date(entry.createdAt).toLocaleString('th-TH', {
-                          dateStyle: 'short',
-                          timeStyle: 'short',
-                        })}
+                        {formatDateTime(entry.createdAt)}
                       </TableCell>
                       <TableCell className="font-medium text-primary-500">{entry.petitionNo}</TableCell>
                       <TableCell>

@@ -76,8 +76,10 @@ vi.mock('@/hooks/useItemGroupMembership', () => ({
 
 vi.mock('@/hooks/usePetition', () => ({
   usePetitionList: (params: { assignedToEmployeeId?: string; assignedToNames?: string[] }) => {
-    const items = params.assignedToEmployeeId === 'DEV-lab-analyze-dept-lab-2s2'
+    const items = !params.assignedToEmployeeId || (
+      params.assignedToEmployeeId === 'DEV-lab-analyze-dept-lab-2s2'
       && params.assignedToNames?.includes('Dev Lab Analyst')
+    )
       ? [mocks.assignedPetition]
       : [];
     return {
@@ -100,6 +102,9 @@ vi.mock('@/lib/api', () => ({
 describe('LabTestingPage assignment visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.assignedPetition.labCompletedAt = undefined;
+    mocks.assignedPetition.labApprovedAt = undefined;
+    mocks.user.roles = ['lab-analyze'];
   });
 
   it('loads petitions assigned to the current lab user before rendering the list', async () => {
@@ -123,4 +128,22 @@ describe('LabTestingPage assignment visibility', () => {
     expect(await screen.findByText('ไม่มีคำร้อง Lab ที่รอตรวจ')).toBeInTheDocument();
     expect(screen.queryByText('P-LAB-ASSIGNED')).not.toBeInTheDocument();
   });
+
+  it.each(['lab-analyze', 'lab-head', 'admin'])(
+    'keeps the edit button while waiting for QC for %s',
+    async (role) => {
+      mocks.user.roles = [role];
+      mocks.assignedPetition.labCompletedAt = '2026-09-16T03:00:00.000Z';
+      mocks.assignedPetition.labApprovedAt = '2026-09-16T04:00:00.000Z';
+
+      render(
+        <MemoryRouter>
+          <LabTestingPage />
+        </MemoryRouter>,
+      );
+
+      expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'แก้ไขผล Lab' })).toBeInTheDocument();
+    },
+  );
 });

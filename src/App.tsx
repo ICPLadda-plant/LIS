@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -80,6 +80,13 @@ const LabTestingPage = lazy(() => import("./pages/LabTestingPage"));
 const LabTestingDetailPage = lazy(() => import("./pages/LabTestingDetailPage"));
 const DensityResultPage = lazy(() => import('./pages/DensityResultPage'));
 
+const ResultDetailRoute = () => {
+  const [searchParams] = useSearchParams();
+  return searchParams.get("edit") === "1"
+    ? <QCTestingDetailPage />
+    : <PetitionDetailPage mode="result" />;
+};
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -130,7 +137,7 @@ const App = () => (
               <Route path="/validation" element={<PrivateRoute><ValidationPage /></PrivateRoute>} />
               <Route path="/stock-deduction" element={<PrivateRoute><StockDeduction /></PrivateRoute>} />
               <Route path="/record-results" element={<PrivateRoute><AnalysisResults /></PrivateRoute>} />
-              <Route path="/record-results/:id" element={<PrivateRoute><PetitionDetailPage mode="result" /></PrivateRoute>} />
+              <Route path="/record-results/:id" element={<PrivateRoute><ResultDetailRoute /></PrivateRoute>} />
               <Route path="/lab-results" element={<PrivateRoute><LabResults /></PrivateRoute>} />
               <Route path="/lab-results/:id" element={<PrivateRoute><LabResultDetailPage /></PrivateRoute>} />
               <Route path="/coa" element={<PrivateRoute><CoaCenterPage /></PrivateRoute>} />

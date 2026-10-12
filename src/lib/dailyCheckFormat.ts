@@ -1,5 +1,6 @@
 import { getRoomBySlug } from "@/lib/dailyCheckRooms";
 import { getRoomCatalog } from "@/lib/roomEquipment";
+import { formatTime } from "@/lib/dateTime";
 
 export type DailyCheckDisplayReading = {
   label: string;
@@ -7,8 +8,7 @@ export type DailyCheckDisplayReading = {
   unit: string;
 };
 
-export const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+export const fmtTime = (iso: string) => formatTime(iso, "—");
 
 export const fmtDate = (s: string) => {
   if (!s) return "—";

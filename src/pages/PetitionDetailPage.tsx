@@ -48,6 +48,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSamples } from '@/context/SampleContext';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { normalizeRoles } from "@/lib/roles";
+import { formatDateTime } from '@/lib/dateTime';
 import { api, type ParameterItem } from '@/lib/api';
 import type { QCTestResult } from '@/types/petition.types';
 import { findSgParameter, type SgParameter } from '@/lib/formSpecificGravity';
@@ -55,12 +56,14 @@ import { buildApprovalGroups } from '@/lib/qcApprovalRows';
 import { buildLaLisAssistant, type LaLisIssue } from '@/lib/laLisAssistant';
 import { buildLabResultReportPages } from '@/lib/labResultReport';
 import { canPrintSampleLabel, canPrintPreReport, canPrintLabResult } from '@/lib/petitionPrintability';
-import { isWaitingForAssignment } from '@/lib/petitionQueueVisibility';
+import { isVisibleInAssignQueue, isWaitingForAssignment } from '@/lib/petitionQueueVisibility';
+import { labReceivedAt } from '@/lib/receiveStatus';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { cn } from '@/lib/utils';
 
 function detailBannerText(petition: Petition) {
   if (petition.status === 'rejected') return 'คำร้องนี้ถูกส่งกลับเพื่อแก้ไข';
+  if (isVisibleInAssignQueue(petition) && !labReceivedAt(petition)) return 'คำร้องนี้รอ Lab รับตัวอย่างก่อนมอบหมายผู้รับงาน';
   if (isWaitingForAssignment(petition)) {
     return 'คำร้องนี้รอการมอบหมายผู้รับงาน';
   }
@@ -287,10 +290,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                         <>
                           <p className="text-xs text-orange-700">
                             ผู้ตรวจสอบ: {rejectEntry.reviewedBy} · เมื่อ{' '}
-                            {new Date(rejectEntry.reviewedAt).toLocaleString('th-TH', {
-                              dateStyle: 'medium',
-                              timeStyle: 'short',
-                            })}
+                            {formatDateTime(rejectEntry.reviewedAt)}
                           </p>
                           {rejectEntry.note && (
                             <p className="text-sm text-black-700 whitespace-pre-wrap rounded border border-orange-200 bg-white px-3 py-2">
@@ -414,10 +414,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                       <div>
                         <p className="text-xs uppercase tracking-wide text-grey-500">วัน-เวลาที่ส่งคำร้อง</p>
                         <p className="mt-1 text-sm text-black-500">
-                          {new Date(data.submittedBy?.submittedAt ?? data.createdAt).toLocaleString('th-TH', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
+                          {formatDateTime(data.submittedBy?.submittedAt ?? data.createdAt)}
                         </p>
                       </div>
                       <div>
@@ -435,12 +432,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                       <div>
                         <p className="text-xs uppercase tracking-wide text-grey-500">วันที่นำส่ง</p>
                         <p className="mt-1 text-sm text-black-500">
-                          {data.sampleSentAt
-                            ? new Date(data.sampleSentAt).toLocaleString('th-TH', {
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              })
-                            : '-'}
+                          {formatDateTime(data.sampleSentAt)}
                         </p>
                       </div>
                     </CardContent>
@@ -459,10 +451,10 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                         <p>ผู้รับผิดชอบ QC: <span className="font-medium text-black-500">{displayPerson(data.qcReceivedBy)}</span></p>
                         <p>ผู้รับผิดชอบ Lab: <span className="font-medium text-black-500">{displayPerson(data.labReceivedBy)}</span></p>
                       </div>
-                      {!isResultMode && isWaitingForAssignment(data) && (
+                      {!isResultMode && !data.assignedTo && isVisibleInAssignQueue(data) && (
                         <Button className="w-full" onClick={() => navigate('/petition/assign')}>
                           <UserCheck className="h-4 w-4" />
-                          Assign ผู้รับงาน
+                          {labReceivedAt(data) ? 'Assign ผู้รับงาน' : 'รับตัวอย่าง Lab'}
                         </Button>
                       )}
                       {!isResultMode && canEdit && (
@@ -531,7 +523,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                       <AlertDialogAction disabled={editReasonType === 'อื่นๆ' && !editReasonOther.trim()} onClick={() => {
                         const reason = editReasonType === 'อื่นๆ' ? editReasonOther.trim() : editReasonType;
                         setEditReasonOpen(false);
-                        navigate(`/qc-testing/${data._id}?edit=1&reason=${encodeURIComponent(reason)}`);
+                        navigate(`/record-results/${data._id}?edit=1&reason=${encodeURIComponent(reason)}`);
                       }}>ดำเนินการแก้ไข</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -542,10 +534,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                   <Badge variant="blue-soft">{petitionDepartmentLabel(data)}</Badge>
                   <span className="text-xs text-grey-500">
                     ยื่นเมื่อ{' '}
-                    {new Date(data.createdAt).toLocaleString('th-TH', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                    {formatDateTime(data.createdAt)}
                   </span>
                 </div>
                 <PetitionStatusTimeline petition={data} />

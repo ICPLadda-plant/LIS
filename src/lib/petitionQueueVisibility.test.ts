@@ -29,7 +29,7 @@ describe('petitionQueueVisibility', () => {
   it('keeps stale received deliveringQC petitions visible in QC testing and Assign queues', () => {
     expect(isVisibleInQcTestingQueue(receivedStalePetition)).toBe(true);
     expect(isVisibleInAssignQueue(receivedStalePetition)).toBe(true);
-    expect(isWaitingForAssignment(receivedStalePetition)).toBe(true);
+    expect(isWaitingForAssignment(receivedStalePetition)).toBe(false);
   });
 
   it('hides QC-only sample-sent petitions from Assign queue', () => {
@@ -73,5 +73,6 @@ describe('petitionQueueVisibility', () => {
 
     expect(isVisibleInAssignQueue(labReceivedWithoutAssignee)).toBe(true);
     expect(isWaitingForAssignment(labReceivedWithoutAssignee)).toBe(true);
+    expect(isWaitingForAssignment({ ...labReceivedWithoutAssignee, status: 'inProgress' })).toBe(true);
   });
 });

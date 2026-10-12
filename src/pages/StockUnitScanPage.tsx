@@ -6,6 +6,7 @@ import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/dateTime";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatStockQuantityWithUnit } from "@/lib/stockQuantity";
@@ -39,7 +40,7 @@ export default function StockUnitScanPage() {
             <div className="flex gap-2 text-sm">
               <Badge variant="outline">{unit.type || "primary"}</Badge>
               <span>เหลือ {formatStockQuantityWithUnit(unit.volume?.remaining, unit.volume?.unit)}</span>
-              <span>EXP {unit.exp ? new Date(unit.exp).toLocaleDateString("th-TH") : "-"}</span>
+              <span>EXP {formatDate(unit.exp)}</span>
             </div>
             <div className="pt-3 flex flex-col gap-2">
               {st === "discarded" ? (

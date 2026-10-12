@@ -11,11 +11,8 @@ import { api } from "@/lib/api";
 import { deductionAmount } from "@/lib/stockDeduction";
 import { formatStockQuantity, formatStockQuantityWithUnit } from "@/lib/stockQuantity";
 import { parseScannedQrId } from "@/lib/stockUnit";
+import { formatDate, formatDateTime } from "@/lib/dateTime";
 import type { StockPublicScanItem, StockTransactionItem } from "@/types/stock";
-
-function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleDateString("th-TH") : "-";
-}
 
 function formatLotBottleLabel(value?: number | null) {
   const bottleNo = Number(value);
@@ -39,10 +36,6 @@ function remainingText(item: StockPublicScanItem) {
     return formatStockQuantityWithUnit(item.volume?.remaining, item.volume?.unit);
   }
   return String(item.qty ?? "-") + " ขวด";
-}
-
-function formatDateTime(value?: string | null) {
-  return value ? new Date(value).toLocaleString("th-TH") : "-";
 }
 
 function transactionAmountText(transaction: StockTransactionItem) {

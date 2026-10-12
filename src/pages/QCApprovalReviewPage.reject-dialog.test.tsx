@@ -98,6 +98,10 @@ vi.mock("@/lib/qcApprovalRows", () => ({
       unmatched: false,
     },
   ],
+  filterApprovalGroupsByScope: (groups: Array<{ params: Array<{ scope: string }> }>, scope: string) =>
+    groups
+      .map((group) => ({ ...group, params: group.params.filter((param) => param.scope === scope) }))
+      .filter((group) => group.params.length > 0),
 }));
 
 vi.mock("sonner", () => ({

@@ -6,6 +6,7 @@ import {
 } from "@/types/petition.types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Activity } from "lucide-react";
+import { formatTime } from "@/lib/dateTime";
 
 function describe(e: PetitionAuditLogEntry): string {
   const base = PETITION_AUDIT_EVENT_LABELS[e.event] ?? e.event;
@@ -39,7 +40,7 @@ export default function ActivityTimeline({ kind }: { kind: "audit" | "statusChan
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm"><span className="font-medium text-primary">{e.petitionNo}</span> · {describe(e)}</span>
                   <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
-                    {new Date(e.createdAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}
+                    {formatTime(e.createdAt)}
                   </span>
                 </div>
                 {e.actor ? <p className="text-[11px] text-muted-foreground">โดย {e.actor}</p> : null}

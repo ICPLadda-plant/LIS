@@ -1,4 +1,4 @@
-const test = require('node:test');
+const { describe, it, test } = require('node:test');
 const assert = require('node:assert');
 const {
   DEFAULTS,
@@ -74,17 +74,17 @@ describe('docType ใหม่ของฟอร์ม F-WAR-03', () => {
   const { DEFAULTS, DOC_TYPES, buildScanPrefix } = require('./documentNumber');
 
   it('มี goodsReceipt และ rawMaterialInspection อยู่ใน DOC_TYPES', () => {
-    expect(DOC_TYPES).toContain('goodsReceipt');
-    expect(DOC_TYPES).toContain('rawMaterialInspection');
+    assert.ok(DOC_TYPES.includes('goodsReceipt'));
+    assert.ok(DOC_TYPES.includes('rawMaterialInspection'));
   });
 
   it('ใบรับสินค้าเดินเลขเป็น GR-YYMM-####', () => {
     const prefix = buildScanPrefix(DEFAULTS.goodsReceipt, new Date(2026, 6, 20));
-    expect(prefix).toBe('GR-2607-');
+    assert.strictEqual(prefix, 'GR-2607-');
   });
 
   it('ใบตรวจสอบวัตถุดิบเดินเลขเป็น RMI-YYMM-####', () => {
     const prefix = buildScanPrefix(DEFAULTS.rawMaterialInspection, new Date(2026, 6, 20));
-    expect(prefix).toBe('RMI-2607-');
+    assert.strictEqual(prefix, 'RMI-2607-');
   });
 });

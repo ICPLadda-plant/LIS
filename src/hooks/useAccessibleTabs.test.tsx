@@ -17,7 +17,6 @@ describe("useAccessibleTabs (deny model)", () => {
       "standard",
       "solvent",
       "glassware",
-      "receive",
       "history",
     ]);
   });

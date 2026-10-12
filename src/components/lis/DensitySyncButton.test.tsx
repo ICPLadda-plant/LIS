@@ -45,6 +45,26 @@ describe('DensitySyncButton', () => {
     expect(api.triggerDensitySync).not.toHaveBeenCalled();
   });
 
+  it('does not report the same options again when its parent rerenders', async () => {
+    const onOptions = vi.fn();
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(
+      <QueryClientProvider client={qc}>
+        <DensitySyncButton batchNo="009" onRows={vi.fn()} onOptions={onOptions} />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(onOptions).toHaveBeenCalled());
+    const calls = onOptions.mock.calls.length;
+
+    view.rerender(
+      <QueryClientProvider client={qc}>
+        <DensitySyncButton batchNo="009" onRows={vi.fn()} onOptions={(docs) => onOptions(docs)} />
+      </QueryClientProvider>,
+    );
+
+    expect(onOptions).toHaveBeenCalledTimes(calls);
+  });
+
   it('auto applies the density row without showing a chooser', async () => {
     const docs = [
       { _id: 'a', 'Sample name': 'Batch 009 A', 'Measurement status': 'valid', 'Density (3 ตำแหน่ง)': '1.156', 'T(block) [°C]': '30.20' },

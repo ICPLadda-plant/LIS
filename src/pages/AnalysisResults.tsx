@@ -4,6 +4,7 @@ import AppLayout from "@/components/lis/AppLayout";
 import { usePetitionList } from "@/hooks/usePetition";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { rankSearchResults } from "@/lib/searchRanking";
+import { formatDate } from "@/lib/dateTime";
 import type { Petition } from "@/types/petition.types";
 
 type ConclusionKey = "pass" | "accepted-oos" | "returned-to-requester";
@@ -103,7 +104,7 @@ export default function AnalysisResults() {
                     <td className="px-3 py-2 font-medium">{p.petitionNo}</td>
                     <td className="px-3 py-2">{petitionDepartmentLabel(p)}</td>
                     <td className="px-3 py-2">{p.submittedBy?.name ?? "-"}</td>
-                    <td className="px-3 py-2">{doneAt ? new Date(doneAt).toLocaleDateString("th-TH") : "-"}</td>
+                    <td className="px-3 py-2">{formatDate(doneAt)}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${meta.cls}`}>{meta.label}</span>
                     </td>

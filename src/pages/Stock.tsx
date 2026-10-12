@@ -28,6 +28,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 
 import { api } from "@/lib/api";
 import { rankSearchResults } from "@/lib/searchRanking";
+import { formatDate, formatDateTime, formatMonth } from "@/lib/dateTime";
 import { useAuth } from "@/context/AuthContext";
 import { normalizeRoles, type RoleHolder } from "@/lib/roles";
 import { requisitionUser } from "@/lib/standardRequisition";
@@ -84,23 +85,10 @@ function dateFromInputValue(value: string) {
 function formatExportDateRangeLabel(startDate: string, endDate: string) {
   const start = dateFromInputValue(startDate);
   const end = dateFromInputValue(endDate);
-  const formatter = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" });
   if (start && end) {
-    const sameYear = start.getFullYear() === end.getFullYear();
-    const sameMonth = sameYear && start.getMonth() === end.getMonth();
-    const startLabel = new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: sameYear ? undefined : "numeric",
-    }).format(start);
-    const endLabel = new Intl.DateTimeFormat("en-US", {
-      month: sameMonth ? undefined : "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(end);
-    return `${startLabel} – ${endLabel}`;
+    return `${formatDate(start)} – ${formatDate(end)}`;
   }
-  if (start) return `${formatter.format(start)} – เลือกวันสิ้นสุด`;
+  if (start) return `${formatDate(start)} – เลือกวันสิ้นสุด`;
   return "เลือกช่วงวันที่ export";
 }
 
@@ -109,16 +97,14 @@ function safeDownloadSegment(value: string | undefined) {
 }
 
 function formatStockDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatDate(value);
 }
 
 function formatStockMonth(value: string | undefined) {
   if (!value) return "-";
   const date = new Date(`${value}-01T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+  return formatMonth(date);
 }
 
 function downloadStockExport(blob: Blob, filename: string) {
@@ -1140,7 +1126,7 @@ function HistoryTab() {
                 <TableRow><TableCell colSpan={8} className="text-center py-6 text-muted-foreground">ไม่มีประวัติ</TableCell></TableRow>
               ) : data.map(t => (
                 <TableRow key={t._id}>
-                  <TableCell className="text-xs whitespace-nowrap">{new Date(t.createdAt).toLocaleString("th-TH")}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{formatDateTime(t.createdAt)}</TableCell>
                   <TableCell><Badge variant="outline">{t.itemType}</Badge></TableCell>
                   <TableCell>
                     <div className="font-medium">{t.itemName || t.itemId}</div>

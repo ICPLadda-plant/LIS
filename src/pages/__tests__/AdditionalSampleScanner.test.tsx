@@ -10,6 +10,11 @@ const auth = vi.hoisted(() => ({ user: { name: 'Tester', email: 'tester@test', r
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => auth }));
 vi.mock('@/lib/api', () => ({ api: { get: vi.fn(), patch: vi.fn() } }));
+vi.mock('@/components/petition/wizard/SubmitterPicker', () => ({
+  default: ({ onChange }: { onChange: (value: { employeeId: string; name: string }) => void }) => (
+    <button type="button" onClick={() => onChange({ employeeId: 'E001', name: 'Delivery Tester' })}>เลือกผู้นำส่งทดสอบ</button>
+  ),
+}));
 vi.mock('react-router-dom', async (original) => ({ ...await original<typeof import('react-router-dom')>(), useNavigate: () => navigate }));
 vi.mock('html5-qrcode', () => ({
   Html5Qrcode: class { start = vi.fn().mockRejectedValue(new Error('no camera')); static getCameras = vi.fn().mockResolvedValue([]); },
@@ -97,7 +102,8 @@ describe('round-specific scanners', () => {
     vi.mocked(api.patch).mockResolvedValue({ data: { data: { ...found, additionalSampleRequests: [{ ...found.additionalSampleRequests[0], status: 'received' }] } } } as never);
     openScanner(kind);
     scan(found.scannedAdditionalSampleCode, kind);
-    await screen.findByText(/ตัวอย่างเพิ่ม.*QC|ตัวอย่างเพิ่ม.*LAB/);
+    await screen.findAllByText(/ตัวอย่างเพิ่ม.*QC|ตัวอย่างเพิ่ม.*LAB/);
+    if (kind === 'deliver') fireEvent.click(screen.getByRole('button', { name: 'เลือกผู้นำส่งทดสอบ' }));
     const confirm = screen.getByRole('button', { name: kind === 'deliver' ? 'ยืนยัน' : kind === 'qc' ? 'ยืนยันรับตัวอย่าง' : 'รับงาน' });
     fireEvent.click(confirm);
     fireEvent.click(confirm);
@@ -142,7 +148,8 @@ describe('round-specific scanners', () => {
     vi.mocked(api.get).mockResolvedValue({ data: { data: found } } as never);
     vi.mocked(api.patch).mockRejectedValue(new Error('delivery blocked'));
     openScanner('deliver'); scan(found.scannedAdditionalSampleCode, 'deliver');
-    await screen.findByText(/ตัวอย่างเพิ่ม.*QC/);
+    await screen.findAllByText(/ตัวอย่างเพิ่ม.*QC/);
+    fireEvent.click(screen.getByRole('button', { name: 'เลือกผู้นำส่งทดสอบ' }));
     fireEvent.click(screen.getByRole('button', { name: 'ยืนยัน' }));
     await screen.findByText(/delivery blocked|เกิดข้อผิดพลาด/);
     expect(api.patch).toHaveBeenCalledTimes(1);

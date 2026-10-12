@@ -262,6 +262,13 @@ test('audiencesForEvent: updated with side → that side only, without side → 
   );
 });
 
+test('audiencesForEvent: updated can target QC explicitly', () => {
+  assert.deepStrictEqual(
+    audiencesForEvent({ items: [labItem] }, { event: 'updated', metadata: { audience: 'qc' } }),
+    ['qc'],
+  );
+});
+
 test('describeEvent: created builds message + audiences', () => {
   const d = describeEvent(
     { petitionNo: 'P-2606-0018', dept: 'rm', items: [labItem], submittedBy: { name: 'สมชาย' } },

@@ -14,6 +14,7 @@ import { useConfirm } from "@/context/ConfirmDialog";
 import { api } from "@/lib/api";
 import { isUsableBottle } from "@/lib/stockStatus";
 import { formatStockQuantityWithUnit } from "@/lib/stockQuantity";
+import { formatDate } from "@/lib/dateTime";
 import {
   defaultWeightCount,
   findStandardBottleBySearch,
@@ -385,7 +386,7 @@ export default function StandardRequisitionDialog({ initialQrId, initialUnit, on
                             <span className="min-w-0">
                               <span className="block text-xs font-medium text-foreground">เลขขวด {labelCode || u.qrId}</span>
                               <span className="block text-xs text-muted-foreground">
-                                Lot {u.lotNo || "-"} · เหลือ {formatStockQuantityWithUnit(u.volume?.remaining, u.volume?.unit)} · EXP {u.exp ? new Date(u.exp).toLocaleDateString("th-TH") : "-"}
+                                Lot {u.lotNo || "-"} · เหลือ {formatStockQuantityWithUnit(u.volume?.remaining, u.volume?.unit)} · EXP {formatDate(u.exp)}
                               </span>
                             </span>
                           </label>

@@ -1,3 +1,5 @@
+import { formatDate } from "@/lib/dateTime";
+
 export const SHIFT_SWITCH_HOUR = 12;
 
 export function greetForHour(h: number): string {
@@ -11,7 +13,5 @@ export function currentShift(d: Date): "กะเช้า" | "กะบ่า�
 }
 
 export function formatThaiDate(d: Date): string {
-  return d.toLocaleDateString("th-TH", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
+  return formatDate(d);
 }

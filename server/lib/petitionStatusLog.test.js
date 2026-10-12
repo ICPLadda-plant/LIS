@@ -438,6 +438,58 @@ test('buildStatusLog: combines dual-track current + timeline', () => {
   assert.deepStrictEqual(out.timeline.map((t) => t.label), ['ยื่นคำขอ']);
 });
 
+test('buildStatusLog: sends density and %AI from original and additional Lab sample rounds', () => {
+  const originalLab = {
+    itemSeq: 1, parameterId: 'ai', parameterName: 'Active Ingredient',
+    values: { '%AI': '9.80', 'Area Average': '123' },
+  };
+  const petition = {
+    status: 'inProgress', qcReceivedAt: 'T', labReceivedAt: 'T',
+    items: [{ seq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', batchNo: 'B-1' }],
+    additionalSampleRequests: [{
+      _id: 'round-lab-1', side: 'lab', status: 'received',
+      items: [{ itemSeq: 1 }], previousResults: [originalLab],
+    }],
+  };
+  const parameters = [
+    { _id: 'density', name: 'ค่า ถพ.', scope: 'qc', status: 'active', valueFields: [] },
+    { _id: 'ai', name: 'Active Ingredient', scope: 'lab', status: 'active', valueFields: [] },
+  ];
+  const results = [
+    {
+      itemSeq: 1, parameterId: 'density', parameterName: 'ค่า ถพ.',
+      values: { 'ค่าถพ.::สาร A': 1.052, 'ค่าถพ.::สาร A__source': { source: 'instrument' }, อุณหภูมิ: 30 },
+    },
+    {
+      itemSeq: 1, parameterId: 'ai', parameterName: 'Active Ingredient', sampleRoundId: 'round-lab-1',
+      values: { '%AI': '10.10' }, valuesPhase2: { '%AI': '10.20' },
+      entries: [{ '%AI': '10.30' }],
+    },
+  ];
+
+  const { testResults } = buildStatusLog(petition, [], results, parameters, false);
+  assert.deepStrictEqual(testResults, [
+    { itemSeq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', side: 'lab', sampleRoundId: '', parameterName: 'Active Ingredient', fieldLabel: '%AI', value: '9.80', phase: 1 },
+    { itemSeq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', side: 'qc', sampleRoundId: '', parameterName: 'ค่า ถพ.', fieldLabel: 'ค่าถพ.::สาร A', value: 1.052, phase: 1 },
+    { itemSeq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', side: 'lab', sampleRoundId: 'round-lab-1', parameterName: 'Active Ingredient', fieldLabel: '%AI', value: '10.10', phase: 1 },
+    { itemSeq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', side: 'lab', sampleRoundId: 'round-lab-1', parameterName: 'Active Ingredient', fieldLabel: '%AI', value: '10.20', phase: 2 },
+    { itemSeq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', side: 'lab', sampleRoundId: 'round-lab-1', parameterName: 'Active Ingredient', fieldLabel: '%AI', value: '10.30', phase: 1, entryIndex: 0 },
+  ]);
+});
+
+test('buildStatusLog: keeps each Lab reading once while a new sample is pending', () => {
+  const oldResult = { itemSeq: 1, parameterId: 'ai', values: { '%AI': 9.8 } };
+  const petition = {
+    status: 'inProgress', items: [{ seq: 1, batchNo: 'B-1' }],
+    additionalSampleRequests: [{ side: 'lab', status: 'requested', previousResults: [oldResult] }],
+  };
+  const parameters = [{ _id: 'ai', name: 'AI', scope: 'lab', status: 'active', valueFields: [] }];
+  const { testResults } = buildStatusLog(petition, [], [oldResult], parameters, false);
+  assert.deepStrictEqual(testResults.map(({ value, sampleRoundId }) => ({ value, sampleRoundId })), [
+    { value: 9.8, sampleRoundId: '' },
+  ]);
+});
+
 // ─── isPetitionComplete (success gate) ───────────────────────────────────────
 const { isPetitionComplete } = require('./petitionStatusLog');
 

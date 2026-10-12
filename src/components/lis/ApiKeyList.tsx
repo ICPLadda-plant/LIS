@@ -1,6 +1,7 @@
 import { Ban, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatDate, formatDateTime } from "@/lib/dateTime";
 import {
   API_KEY_STATUS_LABEL,
   isExpiringSoon,
@@ -16,11 +17,9 @@ interface Props {
   onDelete: (item: ApiKeyItem) => void;
 }
 
-const fmt = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "—";
+const fmt = (iso: string | null) => formatDateTime(iso, "—");
 
-const fmtDate = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleDateString("th-TH", { dateStyle: "medium" }) : "ไม่หมดอายุ";
+const fmtDate = (iso: string | null) => formatDate(iso, "ไม่หมดอายุ");
 
 const statusVariant = (status: ApiKeyItem["status"]) =>
   status === "active" ? "default" : status === "expired" ? "secondary" : "destructive";

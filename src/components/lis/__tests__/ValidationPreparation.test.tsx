@@ -86,7 +86,7 @@ it("เลือกใช้ Stock โดยตรงโดยไม่ต้อ
  }
  render(<DirectStockFixture />);
  fireEvent.click(screen.getByLabelText("ใช้ Stock โดยตรง ระดับ 1"));
- expect(screen.getByText("1.044")).toBeInTheDocument();
+ expect(screen.getByText("1.04417")).toBeInTheDocument();
  expect(screen.getByLabelText("aliquot ระดับ 1")).toHaveTextContent("1000.0");
  expect(screen.queryByLabelText("ปิเปตจริง ระดับ 1")).not.toBeInTheDocument();
  fireEvent.click(screen.getByLabelText("ใช้ Stock โดยตรง ระดับ 1"));

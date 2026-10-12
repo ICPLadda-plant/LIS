@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { api, type DailyCheckRecord } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
+import { formatDate, formatTime } from "@/lib/dateTime";
 
 interface ScaleDraft {
   weights100: [string, string, string];
@@ -36,8 +37,7 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+const fmtTime = (iso: string) => formatTime(iso);
 
 const emptyDraft = (): ScaleDraft => ({
   weights100: ["", "", ""],
@@ -49,7 +49,7 @@ const emptyDraft = (): ScaleDraft => ({
 const BalanceRoomPage = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const todayLabel = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
+  const todayLabel = formatDate(new Date());
   const currentPeriod = getCurrentDailyCheckPeriod();
   const currentPeriodLabel = getDailyCheckPeriodLabel(currentPeriod);
   const currentPeriodHint = currentPeriod === "morning"

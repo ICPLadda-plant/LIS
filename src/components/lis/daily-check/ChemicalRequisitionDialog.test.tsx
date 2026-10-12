@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { ConfirmProvider } from "@/context/ConfirmDialog";
 import ChemicalRequisitionDialog from "./ChemicalRequisitionDialog";
 
 const apiMock = vi.hoisted(() => ({ getSolvents: vi.fn() }));
@@ -18,7 +19,9 @@ describe("ChemicalRequisitionDialog search ranking", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <ChemicalRequisitionDialog roomSlug="analysis" instruments={[]} onClose={vi.fn()} onSaved={vi.fn()} />
+        <ConfirmProvider>
+          <ChemicalRequisitionDialog roomSlug="analysis" instruments={[]} onClose={vi.fn()} onSaved={vi.fn()} />
+        </ConfirmProvider>
       </QueryClientProvider>,
     );
 

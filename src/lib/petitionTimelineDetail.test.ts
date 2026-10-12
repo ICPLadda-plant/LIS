@@ -852,7 +852,7 @@ describe("buildTimelineDetailModel", () => {
       scope: "qc",
       status: "active",
       applyAll: false,
-      commonNames: ["ABAMECTIN 1.8% EC"],
+      fullCommonNames: ["ABAMECTIN 1.8% EC"],
       valueFields: [
         { label: "Viscosity", type: "number", required: true },
         { label: "Color", type: "text", required: true },
@@ -864,7 +864,7 @@ describe("buildTimelineDetailModel", () => {
       scope: "qc",
       status: "active",
       applyAll: false,
-      commonNames: ["EMAMECTIN 1.9% EC"],
+      fullCommonNames: ["EMAMECTIN 1.9% EC"],
       valueFields: [
         { label: "Viscosity", type: "number", required: true },
         { label: "Color", type: "text", required: true },

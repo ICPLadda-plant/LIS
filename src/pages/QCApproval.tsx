@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { ShieldCheck, AlertTriangle, RotateCcw, Sparkles, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { usePetitionList } from "@/hooks/usePetition";
 import type { Petition } from "@/types/petition.types";
+import { formatDateTime } from "@/lib/dateTime";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/lis/PageHeader";
 import { DataTable, type DataTableColumn } from "@/components/lis/DataTable";
 import { getAiStatus, streamDraftNote } from "@/lib/aiApi";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const API_BASE = import.meta.env.BASE_URL + "api";
 
@@ -34,10 +36,11 @@ function priorityScore(
 const QCApproval = () => {
   const navigate = useNavigate();
   const { data: petitionData, loading: petitionLoading } = usePetitionList({
-    status: "success",
+    awaitingQcApproval: true,
     limit: 100,
   });
-  const successPetitions = petitionData?.items ?? [];
+  const petitions = useMemo(() => petitionData?.items ?? [], [petitionData?.items]);
+  const petitionIds = useMemo(() => petitions.map((petition) => petition._id).join(","), [petitions]);
 
   const [testersMap, setTestersMap] = useState<Record<string, string[]>>({});
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
@@ -48,24 +51,26 @@ const QCApproval = () => {
 
   const sortedPetitions = useMemo(
     () =>
-      [...successPetitions].sort(
+      [...petitions].sort(
         (a, b) => priorityScore(b, abnormalMap, returnedMap) - priorityScore(a, abnormalMap, returnedMap),
       ),
-    [successPetitions, abnormalMap, returnedMap],
+    [petitions, abnormalMap, returnedMap],
   );
+  const qcPetitions = sortedPetitions.filter((petition) => !!petition.qcCompletedAt);
+  const labPetitions = sortedPetitions.filter((petition) => !!petition.labCompletedAt);
 
   useEffect(() => {
     getAiStatus().then((s) => setOllamaAvailable(s.available));
   }, []);
 
   useEffect(() => {
-    if (successPetitions.length === 0) {
+    if (petitions.length === 0) {
       setTestersMap({});
       setAbnormalMap({});
       setReturnedMap({});
       return;
     }
-    const ids = successPetitions.map((p) => p._id);
+    const ids = petitions.map((p) => p._id);
     const idsParam = ids.join(",");
     let alive = true;
     fetch(`${API_BASE}/qc-results/testers?petitionIds=${encodeURIComponent(idsParam)}`, {
@@ -95,9 +100,11 @@ const QCApproval = () => {
     return () => {
       alive = false;
     };
-  }, [successPetitions.map((p) => p._id).join(",")]);
+    // petitionIds is the stable trigger; depending on the array itself would refetch on identical poll responses.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [petitionIds]);
 
-  const columns: DataTableColumn<Petition>[] = [
+  const columns = (side: "qc" | "lab"): DataTableColumn<Petition>[] => [
     {
       key: "no",
       header: "เลขที่คำร้อง",
@@ -158,10 +165,18 @@ const QCApproval = () => {
     },
     { key: "count", header: "จำนวนรายการ", cell: (p) => `${p.items?.length ?? 0} รายการ` },
     {
+      key: "submittedAt",
+      header: "ยืนยันผลเมื่อ",
+      cell: (p) => {
+        const value = side === "qc" ? p.qcCompletedAt : p.labCompletedAt;
+        return formatDateTime(value);
+      },
+    },
+    {
       key: "action",
       header: "คำสั่ง",
       className: "text-right",
-      cell: (p) => (
+      cell: (p) => p.status === "success" ? (
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -170,7 +185,7 @@ const QCApproval = () => {
               className="gap-1.5"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/qc-approval/${p._id}?decision=approve`);
+                navigate(`/qc-approval/${p._id}?tab=${side}&decision=approve`);
               }}
             >
               <CheckCircle2 className="h-4 w-4" />
@@ -182,7 +197,7 @@ const QCApproval = () => {
               className="gap-1.5"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/qc-approval/${p._id}?decision=reject`);
+                navigate(`/qc-approval/${p._id}?tab=${side}&decision=reject`);
               }}
             >
               <XCircle className="h-4 w-4" />
@@ -231,6 +246,17 @@ const QCApproval = () => {
             </div>
           )}
         </div>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/qc-approval/${p._id}?tab=${side}`);
+          }}
+        >
+          ตรวจสอบ
+        </Button>
       ),
     },
   ];
@@ -245,18 +271,37 @@ const QCApproval = () => {
               ออก Final Result
             </span>
           }
-          description={`ตรวจสอบและออก Final Result จากผลการทดสอบ QC · ${sortedPetitions.length} รายการรอออกผล`}
+          description={`ตรวจสอบผลที่ QC หรือ Lab ยืนยันแล้ว · ${sortedPetitions.length} คำร้อง`}
         />
 
-        <DataTable
-          columns={columns}
-          data={sortedPetitions}
-          rowKey={(p) => p._id}
-          isLoading={petitionLoading}
-          onRowClick={(p) => navigate(`/qc-approval/${p._id}`)}
-          emptyTitle="ไม่มีคำร้องที่รอออก Final Result"
-          tableClassName="min-w-[700px]"
-        />
+        <Tabs defaultValue="qc" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="qc">ผล QC ({qcPetitions.length})</TabsTrigger>
+            <TabsTrigger value="lab">ผล Lab ({labPetitions.length})</TabsTrigger>
+          </TabsList>
+          <TabsContent value="qc">
+            <DataTable
+              columns={columns("qc")}
+              data={qcPetitions}
+              rowKey={(p) => p._id}
+              isLoading={petitionLoading}
+              onRowClick={(p) => navigate(`/qc-approval/${p._id}?tab=qc`)}
+              emptyTitle="ไม่มีผล QC ที่ยืนยันแล้ว"
+              tableClassName="min-w-[800px]"
+            />
+          </TabsContent>
+          <TabsContent value="lab">
+            <DataTable
+              columns={columns("lab")}
+              data={labPetitions}
+              rowKey={(p) => p._id}
+              isLoading={petitionLoading}
+              onRowClick={(p) => navigate(`/qc-approval/${p._id}?tab=lab`)}
+              emptyTitle="ไม่มีผล Lab ที่ยืนยันแล้ว"
+              tableClassName="min-w-[800px]"
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

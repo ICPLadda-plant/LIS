@@ -52,7 +52,7 @@ describe('petition receive route', () => {
     }));
     Petition.findOneAndUpdate = jest.fn(async (_query, update) => {
       updatePayload = update;
-      return { ...beforePetition, ...update };
+      return { ...beforePetition, ...update.$set };
     });
     PetitionAuditLog.create = jest.fn().mockResolvedValue({});
 
@@ -65,7 +65,7 @@ describe('petition receive route', () => {
     await handler(request, response);
 
     expect(response.statusCode).toBe(200);
-    expect(updatePayload).toEqual(expect.objectContaining({
+    expect(updatePayload.$set).toEqual(expect.objectContaining({
       status: 'pendingReview',
       sampleSentAt: expect.any(Date),
       receivedAt: expect.any(Date),

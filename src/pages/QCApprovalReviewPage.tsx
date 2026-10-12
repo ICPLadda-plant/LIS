@@ -18,15 +18,17 @@ import { usePetition } from "@/hooks/usePetition";
 import { api, type ParameterItem } from "@/lib/api";
 import { useItemGroupMembership } from "@/hooks/useItemGroupMembership";
 import { qcReceivedBy } from "@/lib/receiveStatus";
-import { cn } from "@/lib/utils";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import type { QCTestResult } from "@/types/petition.types";
-import { buildApprovalGroups } from "@/lib/qcApprovalRows";
+import { buildApprovalGroups, filterApprovalGroupsByScope } from "@/lib/qcApprovalRows";
+import LabResultGroups from "@/components/petition/LabResultGroups";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { releaseBodyPointerLock, useConfirm } from "@/context/ConfirmDialog";
 import { RevisionRequestDialog } from "@/components/petition/RevisionRequestDialog";
 import { normalizeRoles } from "@/lib/roles";
+import { formatDateTime as formatDateTimeValue } from "@/lib/dateTime";
 
 type RejectTarget = "requester" | "qc" | "lab";
 
@@ -34,6 +36,8 @@ interface ParameterReferenceOption {
   id: string;
   label: string;
 }
+
+const formatDateTime = (value?: string | null) => formatDateTimeValue(value, "ยังไม่ยืนยันผล");
 
 interface RejectDecisionDialogProps {
   open: boolean;
@@ -346,8 +350,12 @@ export default function QCApprovalReviewPage() {
 
   const groups = buildApprovalGroups(petition, parameters, results, groupMembership, {
     includeRestrictedStandards: canSeeRestrictedStandards,
+    includeResultOnlyFields: true,
   });
-  const parameterReferences: ParameterReferenceOption[] = groups.flatMap((g) =>
+  const qcGroups = filterApprovalGroupsByScope(groups, "qc");
+  const labGroups = filterApprovalGroupsByScope(groups, "lab", { aiSummaryOnly: true });
+  const defaultTab = searchParams.get("tab") === "lab" ? "lab" : "qc";
+  const parameterReferences: ParameterReferenceOption[] = [...qcGroups, ...labGroups].flatMap((g) =>
     g.params.flatMap((param) =>
       param.rows.map((row) => ({
         id: `${g.seq}__${param.parameterId}__${row.key}`,
@@ -398,78 +406,34 @@ export default function QCApprovalReviewPage() {
           </div>
         )}
 
-        {groups.map((g) => (
-          <Card key={g.seq} className="overflow-hidden">
-            <CardHeader className="pb-3 bg-grey-50">
-              <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-                <span>รายการที่ {g.seq}: {g.sampleName}</span>
-                {g.batchNo && <Badge variant="gray-soft" className="font-normal">Batch: {g.batchNo}</Badge>}
-                {g.sampleId && <Badge variant="primary-soft" className="font-normal text-xs">{g.sampleId}</Badge>}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 space-y-5">
-              {g.unmatched ? (
-                <p className="text-sm text-grey-400 italic">ไม่พบพารามิเตอร์ที่ตรงกับรายการทดสอบ</p>
-              ) : (
-                g.params.map((param) => (
-                  <div key={param.parameterId} className="space-y-2">
-                    <h3 className="text-sm font-semibold text-grey-800 border-b pb-1 flex items-center gap-2 flex-wrap">
-                      <span>{param.parameterName}</span>
-                      {param.scope === "lab" && (
-                        <Badge variant="primary-soft" className="font-normal text-[10px]">ผล Lab</Badge>
-                      )}
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm table-fixed">
-                        <colgroup>
-                          <col style={{ width: "24%" }} />
-                          <col style={{ width: "16%" }} />
-                          <col style={{ width: "26%" }} />
-                          <col style={{ width: "14%" }} />
-                          <col style={{ width: "20%" }} />
-                        </colgroup>
-                        <thead className="text-left text-xs text-grey-500">
-                          <tr>
-                            <th className="py-1 pr-3 font-medium">ช่อง</th>
-                            <th className="py-1 pr-3 font-medium">ค่าที่บันทึก</th>
-                            <th className="py-1 pr-3 font-medium">เกณฑ์มาตรฐาน</th>
-                            <th className="py-1 pr-3 font-medium">สถานะ</th>
-                            <th className="py-1 font-medium">หมายเหตุ</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {param.rows.map((row) => (
-                            <tr key={row.key} className={cn("border-t align-top", row.abnormal && "bg-red-50")}>
-                              <td className="py-1.5 pr-3 break-words">
-                                {row.label}{row.unit ? <span className="text-grey-400"> ({row.unit})</span> : null}
-                                {param.hasPhases && <span className="ml-1 text-[10px] text-amber-600">P{row.phase}</span>}
-                              </td>
-                              <td className="py-1.5 pr-3 font-mono font-semibold break-words">{row.value || "-"}</td>
-                              <td className="py-1.5 pr-3 text-grey-500 break-words whitespace-pre-line">{row.standardText || "-"}</td>
-                              <td className="py-1.5 pr-3">
-                                {row.abnormal ? (
-                                  <span className="inline-flex items-center gap-1 text-red-600">
-                                    <AlertTriangle className="h-3.5 w-3.5" /> ผิดปกติ
-                                  </span>
-                                ) : (
-                                  <span className="text-green-600">ปกติ</span>
-                                )}
-                              </td>
-                              <td className="py-1.5 text-grey-600 break-words">{row.note || "-"}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        ))}
+        <Tabs key={defaultTab} defaultValue={defaultTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="qc">ผล QC</TabsTrigger>
+            <TabsTrigger value="lab">ผล Lab</TabsTrigger>
+          </TabsList>
+          <TabsContent value="qc" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-base">การยืนยันผล QC</CardTitle></CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                {petition.qcCompletedBy ? `${petition.qcCompletedBy} · ` : ""}{formatDateTime(petition.qcCompletedAt)}
+              </CardContent>
+            </Card>
+            {petition.qcCompletedAt && qcGroups.length > 0 ? <LabResultGroups groups={qcGroups} /> : <p className="text-sm text-muted-foreground">QC ยังไม่ยืนยันผล</p>}
+          </TabsContent>
+          <TabsContent value="lab" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-base">การยืนยันผล Lab</CardTitle></CardHeader>
+              <CardContent className="space-y-1 text-sm text-muted-foreground">
+                <p>{petition.labCompletedBy ? `${petition.labCompletedBy} · ` : ""}{formatDateTime(petition.labCompletedAt)}</p>
+                {petition.labApprovedAt && <p>หัวหน้า Lab ออกผล: {petition.labApprovedBy ? `${petition.labApprovedBy} · ` : ""}{formatDateTime(petition.labApprovedAt)}</p>}
+              </CardContent>
+            </Card>
+            {petition.labCompletedAt && labGroups.length > 0 ? <LabResultGroups groups={labGroups} /> : <p className="text-sm text-muted-foreground">Lab ยังไม่ยืนยันผล</p>}
+          </TabsContent>
+        </Tabs>
 
         {/* แผงตัดสิน — fixed bottom */}
-        {abnormalLoaded && (<div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] bg-white border-t shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        {petition.status === "success" && abnormalLoaded && (<div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] bg-background border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="flex flex-col items-end gap-2">
             {!petitionHasAbnormal ? (
               <div className="flex flex-wrap items-center justify-end gap-3">

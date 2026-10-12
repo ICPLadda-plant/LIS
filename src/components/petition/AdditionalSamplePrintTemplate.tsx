@@ -1,6 +1,7 @@
 import QRCode from 'qrcode';
 import type { AdditionalSampleRequest, Petition } from '@/types/petition.types';
 import { A4_PRINT_FONT_FAMILY } from '@/lib/printConfig';
+import { formatDateTime } from '@/lib/dateTime';
 
 export default function AdditionalSamplePrintTemplate({ petition, request }: {
   petition: Petition;
@@ -30,7 +31,7 @@ export default function AdditionalSamplePrintTemplate({ petition, request }: {
             <p className="font-bold">ฝั่ง {request.side.toUpperCase()} · รอบ {round}</p>
             <p>ผู้ยื่น: {petition.submittedBy?.name || '-'}</p>
             <p>ผู้ขอเพิ่ม: {request.requestedBy.name}</p>
-            <p>ขอเพิ่มเมื่อ: {new Date(request.requestedAt).toLocaleString('th-TH')}</p>
+            <p>ขอเพิ่มเมื่อ: {formatDateTime(request.requestedAt)}</p>
           </div>
           <svg role="img" aria-label={`QR ${request.qrCode}`} viewBox={`-4 -4 ${size + 8} ${size + 8}`} className="shrink-0" style={{ width: '36mm', height: '36mm' }} shapeRendering="crispEdges">
             <rect x="-4" y="-4" width={size + 8} height={size + 8} fill="#fff" />

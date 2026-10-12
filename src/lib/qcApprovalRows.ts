@@ -58,7 +58,11 @@ export function buildApprovalGroups(
   parameters: ParameterItem[],
   results: QCTestResult[],
   groupMembership: Map<string, string[]>,
-  options?: { includeRestrictedStandards?: boolean; showAutoPassRange?: boolean },
+  options?: {
+    includeRestrictedStandards?: boolean;
+    showAutoPassRange?: boolean;
+    includeResultOnlyFields?: boolean;
+  },
 ): ApprovalItemGroup[] {
   const includeRestrictedStandards = options?.includeRestrictedStandards ?? false;
   const showAutoPassRange = options?.showAutoPassRange ?? true;
@@ -106,6 +110,7 @@ export function buildApprovalGroups(
           : { values: v1[k] ?? {}, entries: resultByKey[k]?.entries };
         const entryList = getEntryValues(phaseResult, param);
         entryList.forEach((entryValues, ei) => {
+          const handledKeys = new Set<string>();
           const entryLabel = param.multiEntry ? `รายการที่ ${ei + 1}` : "";
           (param.valueFields ?? []).forEach((field) => {
             const fPhase = field.phase ?? "both";
@@ -114,6 +119,8 @@ export function buildApprovalGroups(
             // reference fields are auto-resolved from substance standards elsewhere and intentionally omitted from approval rows
             if (field.type === "reference") return;
             expandFieldForItem(field, item.commonName, { includeRestrictedStandards, category: petitionCategory }).forEach((unit) => {
+              handledKeys.add(unit.key);
+              handledKeys.add(noteLabelFor(unit.key));
               const effectiveField = unit.field.conditionalMode
                 ? resolveFieldStandard(unit.field, ctx)
                 : unit.field;
@@ -173,6 +180,20 @@ export function buildApprovalGroups(
               });
             });
           });
+          if (options?.includeResultOnlyFields) {
+            Object.entries(entryValues).forEach(([key, raw]) => {
+              if (handledKeys.has(key) || key.endsWith("__note")) return;
+              rows.push({
+                key: `${k}__extra__${key}__p${phase}__e${ei}`,
+                label: [key.replace("::", " — "), entryLabel].filter(Boolean).join(" · "),
+                value: asStr(raw),
+                standardText: "",
+                abnormal: false,
+                note: "",
+                phase,
+              });
+            });
+          }
         });
       };
 
@@ -197,5 +218,28 @@ export function buildApprovalGroups(
       params,
       unmatched: matched.length === 0,
     };
+  });
+}
+
+export function filterApprovalGroupsByScope(
+  groups: ApprovalItemGroup[],
+  scope: ApprovalParamGroup["scope"],
+  options?: { aiSummaryOnly?: boolean },
+): ApprovalItemGroup[] {
+  return groups.flatMap((group) => {
+    const params = group.params
+      .filter((param) => param.scope === scope)
+      .map((param) => {
+        if (!options?.aiSummaryOnly || !/%\s*ai/i.test(param.parameterName)) return param;
+        const aiRows = param.rows.filter((row) => /^%\s*ai\b/i.test(row.label.trim()));
+        const filledRows = aiRows.filter((row) => row.value !== "");
+        const filledSubstanceRows = filledRows.filter((row) => /^%\s*ai\s+[—-]/i.test(row.label.trim()));
+        return {
+          ...param,
+          rows: filledSubstanceRows.length > 0 ? filledSubstanceRows : (filledRows.length > 0 ? filledRows : aiRows),
+        };
+      })
+      .filter((param) => param.rows.length > 0);
+    return params.length > 0 ? [{ ...group, params, unmatched: false }] : [];
   });
 }

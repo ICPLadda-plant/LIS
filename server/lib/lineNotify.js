@@ -102,6 +102,7 @@ function audiencesForEvent(petition, payload) {
     case 'updated': {
       if (payload?.metadata?.audience) {
         const selected = payload.metadata.audience;
+        if (selected === 'qc') return ['qc'];
         if (selected === 'lab') return ['lab'];
         if (selected === 'requester') return [petition?.dept].filter(Boolean);
         if (selected === 'all') return [...new Set([...bothSides, petition?.dept, 'all'].filter(Boolean))];

@@ -111,7 +111,13 @@ export function usePetition(id: string | undefined, options: PetitionRefreshOpti
     };
   }, [id, reloadKey]);
 
-  return { data, loading, error, refresh };
+  const isCurrentPetition = lastIdRef.current === id;
+  return {
+    data: isCurrentPetition ? data : null,
+    loading: !isCurrentPetition || loading,
+    error: isCurrentPetition ? error : null,
+    refresh,
+  };
 }
 
 // ===== Petition list =====
@@ -124,6 +130,7 @@ interface PetitionListParams {
   assignedToEmployeeId?: string;
   assignedToName?: string;
   assignedToNames?: string[];
+  awaitingQcApproval?: boolean;
   awaitingLabApproval?: boolean;
   labApproved?: boolean;
 }
@@ -155,6 +162,7 @@ export function usePetitionList(params: PetitionListParams, options: PetitionRef
     if (params.assignedToEmployeeId) sp.set('assignedToEmployeeId', params.assignedToEmployeeId);
     if (params.assignedToName) sp.set('assignedToName', params.assignedToName);
     params.assignedToNames?.filter(Boolean).forEach((name) => sp.append('assignedToName', name));
+    if (params.awaitingQcApproval) sp.set('awaitingQcApproval', 'true');
     if (params.awaitingLabApproval) sp.set('awaitingLabApproval', 'true');
     if (params.labApproved) sp.set('labApproved', 'true');
     return sp.toString();

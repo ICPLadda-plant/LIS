@@ -1,4 +1,5 @@
 import type { LabAgreementReview } from '@/types/labRequest.types';
+import { formatDateTime } from '@/lib/dateTime';
 import {
   PERSONNEL_ABLE_REASON_LABELS, PERSONNEL_UNABLE_REASON_LABELS,
   WORKLOAD_LABELS, EQUIP_READY_REASON_LABELS, EQUIP_NOT_READY_REASON_LABELS,
@@ -49,9 +50,7 @@ export default function LabAgreementReviewView({ data }: { data: LabAgreementRev
       <Line label="หมายเหตุ" value={data.remark} />
       <p className="text-xs text-grey-500 pt-2">
         โดย {data.reviewedBy} ·{' '}
-        {data.reviewedAt
-          ? new Date(data.reviewedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })
-          : '-'}
+        {formatDateTime(data.reviewedAt)}
       </p>
     </div>
   );

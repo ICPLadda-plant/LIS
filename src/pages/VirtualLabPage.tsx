@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { api, type MachineItem, type VirtualLabInstrument, type VirtualLabStatus } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/dateTime";
 import type { Petition } from "@/types/petition.types";
 
 const STATUS: Record<VirtualLabStatus, { label: string; className: string }> = {
@@ -25,8 +26,7 @@ const STATUS_KEYS = Object.keys(STATUS) as VirtualLabStatus[];
 const machineLabel = (machine: MachineItem) =>
   [machine.code, machine.name].filter(Boolean).join(" - ");
 
-const fmt = (iso?: string) =>
-  iso ? new Date(iso).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "-";
+const fmt = (iso?: string) => formatDateTime(iso);
 
 const todayStr = () => {
   const d = new Date();

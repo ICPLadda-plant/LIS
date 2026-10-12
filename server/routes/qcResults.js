@@ -1,5 +1,21 @@
 const express = require("express");
 const router = express.Router();
+
+function flattenLegacyDottedValues(values = {}) {
+  const flattened = {};
+  const visit = (key, value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const entries = Object.entries(value);
+      if (entries.length > 0) {
+        entries.forEach(([nestedKey, nestedValue]) => visit(`${key}.${nestedKey}`, nestedValue));
+        return;
+      }
+    }
+    flattened[key] = value;
+  };
+  Object.entries(values || {}).forEach(([key, value]) => visit(key, value));
+  return flattened;
+}
 const mongoose = require('mongoose');
 const QCTestResult = require("../models/QCTestResult");
 const Parameter = require("../models/Parameter");
@@ -201,7 +217,11 @@ router.get("/last-values", async (req, res) => {
 router.get("/:petitionId", async (req, res) => {
   try {
     const results = await QCTestResult.find({ petitionId: req.params.petitionId }).lean();
-    res.json(results);
+    res.json(results.map((result) => ({
+      ...result,
+      values: flattenLegacyDottedValues(result.values),
+      valuesPhase2: flattenLegacyDottedValues(result.valuesPhase2),
+    })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -288,9 +308,10 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       entries[entryIndex][fieldLabel] = value;
       update.$set.entries = entries;
     } else {
-      existingFieldValue = newRound ? undefined : existing?.[valuesKey]?.[fieldLabel];
-      if (newRound) update.$set[valuesKey] = { [fieldLabel]: value };
-      else update.$set[`${valuesKey}.${fieldLabel}`] = value;
+      const nextValues = flattenLegacyDottedValues(newRound ? {} : existing?.[valuesKey]);
+      existingFieldValue = nextValues[fieldLabel];
+      nextValues[fieldLabel] = value;
+      update.$set[valuesKey] = nextValues;
     }
 
     const doc = await QCTestResult.findOneAndUpdate(filter, update, {
@@ -308,10 +329,10 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       PetitionAuditLog.create({
         petitionId: petitionObjId,
         petitionNo,
-        event: auditEvent,
+        event: isClosed ? 'updated' : auditEvent,
         actor: enteredBy?.name || enteredBy?.email || 'system',
         note: isClosed ? `แก้ไขผลหลังปิดงาน: ${String(overrideReason).trim()} · ${qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName })}` : qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName }),
-        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined },
+        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
       }).catch((err) => {
         console.error('[audit-log] qc-result write failed:', err.message);
       });
@@ -322,7 +343,7 @@ router.put("/", serializePetitionWrite(async (req, res) => {
         event: 'updated',
         actor: enteredBy?.name || enteredBy?.email || 'QC Head',
         note: `QC Head แก้ไขผล ${parameterName || parameterId} · เหตุผล: ${String(overrideReason).trim()}`,
-        metadata: { audience: 'all' },
+        metadata: { audience: 'qc' },
       });
     }
 
@@ -403,15 +424,15 @@ router.put("/entries", serializePetitionWrite(async (req, res) => {
       PetitionAuditLog.create({
         petitionId: petitionObjId,
         petitionNo,
-        event: 'resultUpdated',
+        event: isClosed ? 'updated' : 'resultUpdated',
         actor: enteredBy?.name || enteredBy?.email || 'system',
         note: `${isClosed ? `แก้ไขผลหลังปิดงาน: ${String(overrideReason).trim()} · ` : ''}QC ปรับรายการหลายค่า ${parameterName || parameterId}: ${entries.length} รายการ${sampleName ? ` (${sampleName})` : ''}`,
-        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, entryCount: entries.length, overrideReason: isClosed ? String(overrideReason).trim() : undefined },
+        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, entryCount: entries.length, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
       }).catch((err) => {
         console.error('[audit-log] qc-result entries write failed:', err.message);
       });
     }
-    if (isClosed) notifyPetitionEvent(petitionForEdit, { event: 'updated', actor: enteredBy?.name || enteredBy?.email || 'QC Head', note: `QC Head แก้ไขผล ${parameterName || parameterId} · เหตุผล: ${String(overrideReason).trim()}`, metadata: { audience: 'all' } });
+    if (isClosed) notifyPetitionEvent(petitionForEdit, { event: 'updated', actor: enteredBy?.name || enteredBy?.email || 'QC Head', note: `QC Head แก้ไขผล ${parameterName || parameterId} · เหตุผล: ${String(overrideReason).trim()}`, metadata: { audience: 'qc' } });
 
     res.json(doc);
   } catch (err) {

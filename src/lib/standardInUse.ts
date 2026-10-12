@@ -1,6 +1,7 @@
 // สถานะของ standard ที่ "กำลังใช้งานอยู่" — ตัดสินจาก dueAt ที่ server คำนวณมาให้เท่านั้น
 // ฝั่ง server ตั้งใจไม่ส่งสถานะมา เพื่อให้กติกาอยู่ที่เดียว (กันสองสำเนาที่ต้องคอย sync กัน)
 import type { StandardInUseItem } from "@/types/stock";
+import { formatDateTime } from "@/lib/dateTime";
 
 export const IN_USE_SOON_MS = 24 * 60 * 60 * 1000;
 export const IN_USE_NOTIFICATION_PREFIX = "std-inuse:";
@@ -88,8 +89,7 @@ export interface InUseNotificationPlan {
   dismiss: string[];
 }
 
-const thaiDateTime = (iso: string | null) =>
-  iso ? new Date(iso).toLocaleString("th-TH") : "-";
+const thaiDateTime = (iso: string | null) => formatDateTime(iso);
 
 /**
  * เทียบรายการที่ยังกำลังใช้งาน กับ id ที่ค้างอยู่ในกระดิ่ง แล้วบอกว่าต้อง push อะไร / ลบอะไร
