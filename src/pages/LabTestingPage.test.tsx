@@ -100,6 +100,8 @@ vi.mock('@/lib/api', () => ({
 describe('LabTestingPage assignment visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.assignedPetition.labCompletedAt = undefined;
+    mocks.assignedPetition.labApprovedAt = undefined;
   });
 
   it('loads petitions assigned to the current lab user before rendering the list', async () => {
@@ -122,5 +124,19 @@ describe('LabTestingPage assignment visibility', () => {
 
     expect(await screen.findByText('ไม่มีคำร้อง Lab ที่รอตรวจ')).toBeInTheDocument();
     expect(screen.queryByText('P-LAB-ASSIGNED')).not.toBeInTheDocument();
+  });
+
+  it('hides the edit button after the Lab result is issued', async () => {
+    mocks.assignedPetition.labCompletedAt = '2026-09-16T03:00:00.000Z';
+    mocks.assignedPetition.labApprovedAt = '2026-09-16T04:00:00.000Z';
+
+    render(
+      <MemoryRouter>
+        <LabTestingPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'แก้ไขผล Lab' })).not.toBeInTheDocument();
   });
 });

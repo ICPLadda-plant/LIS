@@ -167,15 +167,17 @@ export default function LabTestingPage() {
       className: 'text-right align-top',
       cell: (p) =>
         labReceivedAt(p) ? (
-          <Button
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/lab-testing/${p._id}`);
-            }}
-          >
-            {p.labCompletedAt ? 'แก้ไขผล Lab' : 'เข้าตรวจ'}
-          </Button>
+          p.labApprovedAt ? null : (
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/lab-testing/${p._id}`);
+              }}
+            >
+              {p.labCompletedAt ? 'แก้ไขผล Lab' : 'เข้าตรวจ'}
+            </Button>
+          )
         ) : (
           <span className="text-xs text-grey-400">รอสแกนรับ</span>
         ),
