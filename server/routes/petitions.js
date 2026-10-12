@@ -618,7 +618,7 @@ router.get('/status-log/:id', async (req, res) => {
       PetitionAuditLog.find({ petitionId: petition._id }).sort({ createdAt: 1 }).lean(),
       // QCTestResult.petitionId is stored as a String of _id (not ObjectId) — keep the cast
       QCTestResult.find({ petitionId: String(petition._id) }).lean(),
-      Parameter.find({ status: 'active' }).lean(),
+      Parameter.find().lean(),
     ]);
 
     // labDone: Lab track finished — explicit completion flag, or (legacy) every lab

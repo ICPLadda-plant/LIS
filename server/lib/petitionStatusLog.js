@@ -270,6 +270,51 @@ function buildTimeline(auditLogs, petition) {
   return out;
 }
 
+// Keep readings from earlier additional-sample rounds alongside the current results.
+function buildTestResults(petition, qcResults, parameters) {
+  const paramById = new Map((parameters ?? []).map((param) => [String(param._id), param]));
+  const itemsBySeq = new Map((petition.items ?? []).map((item) => [item.seq, item]));
+  const output = [];
+  const snapshotted = new Set();
+  const resultKey = (result) => `${result.itemSeq}:${result.parameterId}:${result.sampleRoundId || ''}`;
+  const append = (result, side, sampleRoundId) => {
+    const item = itemsBySeq.get(result.itemSeq);
+    const base = {
+      itemSeq: result.itemSeq,
+      sampleId: result.sampleId || item?.sampleId || null,
+      sampleName: result.sampleName || item?.sampleName || null,
+      side,
+      sampleRoundId: String(sampleRoundId || ''),
+      parameterName: result.parameterName || paramById.get(String(result.parameterId))?.name || '',
+    };
+    const addValues = (values, phase, entryIndex) => {
+      for (const [fieldLabel, value] of Object.entries(values ?? {})) {
+        if (value == null || String(value).trim() === '' || /__source$/.test(fieldLabel)) continue;
+        const label = fieldLabel.split('::')[0].trim();
+        if (!/^(?:ค่าถพ\.|density)$/i.test(label) && !/^%\s*ai(?:$|\s|[-—:])/i.test(label)) continue;
+        output.push({ ...base, fieldLabel, value, phase, ...(entryIndex == null ? {} : { entryIndex }) });
+      }
+    };
+    addValues(result.values, 1);
+    addValues(result.valuesPhase2, 2);
+    for (const [index, values] of (result.entries ?? []).entries()) addValues(values, 1, index);
+  };
+
+  for (const round of petition.additionalSampleRequests ?? []) {
+    for (const result of round.previousResults ?? []) {
+      snapshotted.add(resultKey(result));
+      append(result, round.side, result.sampleRoundId);
+    }
+  }
+  for (const result of qcResults ?? []) {
+    if (snapshotted.has(resultKey(result))) continue;
+    const param = paramById.get(String(result.parameterId));
+    if (!param) continue;
+    append(result, param.scope === 'lab' ? 'lab' : 'qc', result.sampleRoundId);
+  }
+  return output;
+}
+
 // Success gate — true when every REQUIRED track has recorded completion.
 // QC is required on EVERY petition; Lab is required only when the petition has a
 // lab-batch item. A petition may transition to `success` only when this holds —
@@ -288,7 +333,8 @@ function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone) {
   const fieldLabels = enteredFieldLabels(qcResults);
   const current = buildCurrent(petition, qc, fieldLabels, !!labDone);
   const timeline = buildTimeline(auditLogs, petition);
-  return { current, timeline };
+  const testResults = buildTestResults(petition, qcResults, parameters);
+  return { current, timeline, testResults };
 }
 
 module.exports = {
@@ -304,6 +350,7 @@ module.exports = {
   buildCurrent,
   timelineLabel,
   buildTimeline,
+  buildTestResults,
   buildStatusLog,
   isPetitionComplete,
 };
