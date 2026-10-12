@@ -20,7 +20,7 @@ import {
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { SG_FIELD_LABEL } from '@/lib/formSpecificGravity';
 
-interface Props { petition: Petition; }
+interface Props { petition: Petition; hideMissingStandardBadge?: boolean; }
 
 function formatResultValue(value: unknown): string {
   if (value == null || value === '') return '-';
@@ -39,7 +39,7 @@ function Field({ label, value }: { label: string; value?: React.ReactNode }) {
   );
 }
 
-export default function PetitionView({ petition: p }: Props) {
+export default function PetitionView({ petition: p, hideMissingStandardBadge = false }: Props) {
   const { user } = useAuth();
   const roles = normalizeRoles(user);
   const canSeeTestItems = roles.length > 0 && roles.some((r) => r !== 'viewer');
@@ -228,7 +228,7 @@ export default function PetitionView({ petition: p }: Props) {
                                             <span className={`inline-block rounded border px-1.5 py-0.5 text-[11px] ${entry.labelBadge.cls}`}>
                                               {entry.labelBadge.text}
                                             </span>
-                                          ) : (
+                                          ) : !entry.hasStandard && hideMissingStandardBadge ? null : (
                                             <Badge variant={entry.hideStandard || !entry.hasStandard ? 'gray-soft' : entry.abnormal ? 'red-soft' : 'green-soft'}>
                                               {entry.hideStandard ? 'ไม่แสดงเกณฑ์' : !entry.hasStandard ? 'ไม่มีเกณฑ์' : entry.abnormal ? 'ไม่ผ่านเกณฑ์' : 'ผ่านเกณฑ์'}
                                             </Badge>

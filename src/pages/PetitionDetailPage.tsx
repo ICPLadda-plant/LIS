@@ -545,7 +545,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
 
                 {laLisSummary && <LaLisAssistantPanel summary={laLisSummary} />}
 
-                <PetitionView petition={data} />
+                <PetitionView petition={data} hideMissingStandardBadge={isResultMode} />
 
               </div>
 
