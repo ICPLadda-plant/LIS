@@ -230,6 +230,25 @@ describe("LabTestingDetailPage", () => {
     expect(screen.queryByText(/ยังไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่างนี้/)).not.toBeInTheDocument();
   });
 
+  it("shows the sent quantity beside the Lab sample, including individual quantities", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          { ...fixtures.petition.items[0], labelQuantity: "100 ml" },
+          { ...fixtures.petition.items[0], seq: 2, labelQuantity: "5 g, 6 g", labelQuantities: ["5 g", "6 g"] },
+        ],
+      },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByText("ปริมาณที่ส่ง: 100 ml")).toBeInTheDocument();
+    expect(screen.getByText("ปริมาณที่ส่ง: ตัวอย่างที่ 1: 5 g · ตัวอย่างที่ 2: 6 g")).toBeInTheDocument();
+    expect(await screen.findAllByText("Area Inj.1")).toHaveLength(2);
+  });
+
   it("expands a legacy %AI parameter into input, average, and RSD fields", async () => {
     render(<LabTestingDetailPage />);
 

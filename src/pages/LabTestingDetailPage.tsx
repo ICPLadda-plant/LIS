@@ -1118,6 +1118,13 @@ export default function LabTestingDetailPage() {
                 {item.testItems && (
                   <p className="text-xs text-muted-foreground mt-1">รายการทดสอบ: {item.testItems}</p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  ปริมาณที่ส่ง: {item.labelQuantities?.some((quantity) => quantity.trim())
+                    ? item.labelQuantities.length === 1
+                      ? item.labelQuantities[0]
+                      : item.labelQuantities.map((quantity, index) => `ตัวอย่างที่ ${index + 1}: ${quantity.trim() || '-'}`).join(' · ')
+                    : item.labelQuantity?.trim() || '-'}
+                </p>
               </CardHeader>
 
               <CardContent className="pt-4 space-y-5">
