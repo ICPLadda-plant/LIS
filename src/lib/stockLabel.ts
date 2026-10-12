@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import type { StockUnitItem } from "@/types/stock";
+import { formatDate } from "@/lib/dateTime";
 
 const STOCK_PUBLIC_VIEW_QR_BASE_URL = "https://app-plant.icpladda.com/LIS/stock/view";
 
@@ -18,7 +19,7 @@ export async function buildStockLabelHtml(unit: StockUnitItem): Promise<string> 
     width: 512,
     errorCorrectionLevel: "M",
   });
-  const exp = unit.exp ? new Date(unit.exp).toLocaleDateString("th-TH") : "-";
+  const exp = formatDate(unit.exp);
   const purity = formatPurityLabel(unit);
   const labelRun = formatStandardLabelMarker(unit);
   return `
@@ -84,17 +85,11 @@ export async function buildSolventLabelHtml(payload: {
 </div>`.trim();
 }
 function formatThaiDateOrDash(value?: string | null): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("th-TH");
+  return formatDate(value);
 }
 
 function formatThaiDateOrBlank(value?: string | null): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("th-TH");
+  return formatDate(value, "");
 }
 function solventLabelRow(label: string, value: string): string {
   return `<div style="display:flex;align-items:end;padding:0 .8mm;min-width:0;"><span style="white-space:nowrap;">${escapeHtml(label)}</span><span style="flex:1;border-bottom:0.2mm solid #000;margin-left:.6mm;min-width:0;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(value)}</span></div>`;

@@ -20,6 +20,7 @@ import { isVisibleInQcTestingQueue } from "@/lib/petitionQueueVisibility";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { calculateQueueItemsPerColumn } from "@/lib/queueDisplayRows";
 import { isNotificationSoundEnabled } from "@/lib/appPreferences";
+import { formatDate, formatTime } from "@/lib/dateTime";
 
 type QueueMode = "lab" | "qc";
 
@@ -137,10 +138,9 @@ const QUEUE_STATUS_QUERIES: Record<QueueMode, Record<QueueGroup["id"], string>> 
 };
 
 function formatDateTime(value: string) {
-  const date = new Date(value);
   return {
-    date: date.toLocaleDateString("th-TH", { day: "2-digit", month: "short" }),
-    time: date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }),
+    date: formatDate(value),
+    time: formatTime(value),
   };
 }
 
@@ -554,13 +554,8 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
     };
   }, []);
 
-  const currentTime = now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-  const currentDate = now.toLocaleDateString("th-TH", {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
+  const currentTime = formatTime(now);
+  const currentDate = formatDate(now);
 
   const renderQueueCard = (petition: Petition) => {
     const queueStatus = queueStatusFor(petition, mode);

@@ -5,6 +5,7 @@ import type { Petition, QCTestResult } from "@/types/petition.types";
 import LabTestingDetailPage from "./LabTestingDetailPage";
 
 const mockNavigate = vi.hoisted(() => vi.fn());
+const mockSaveQCResult = vi.hoisted(() => vi.fn());
 
 const fixtures = vi.hoisted(() => {
   const petition: Petition = {
@@ -185,6 +186,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
       getInstrumentSources: vi.fn().mockResolvedValue([]),
       getQCResults: vi.fn().mockImplementation(() => Promise.resolve(mockState.activeFixtures.results)),
       getReturnedFlags: vi.fn().mockResolvedValue({}),
+      saveQCResult: mockSaveQCResult,
       patch: vi.fn().mockResolvedValue({ data: { data: mockState.activeFixtures.petition } }),
     },
   };
@@ -195,6 +197,8 @@ describe("LabTestingDetailPage", () => {
     mockNavigate.mockClear();
     mockState.activeFixtures = fixtures;
     mockState.parametersError = false;
+    mockSaveQCResult.mockReset();
+    mockSaveQCResult.mockResolvedValue({});
   });
 
   it("shows label-tolerance criteria and saved-by metadata beside the parameter field name", async () => {
@@ -258,6 +262,30 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("% Sample 3")).toBeInTheDocument();
     expect(screen.getByText("Area Average")).toBeInTheDocument();
     expect(screen.getByText("% Sample %RSD")).toBeInTheDocument();
+  });
+
+  it("enables final save and persists calculated %AI with the substance key", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      parameters: fixtures.parameters.map((parameter) => ({
+        ...parameter,
+        valueFields: parameter.valueFields.map((field) => ({ ...field, required: true })),
+      })),
+      results: [],
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByRole("button", { name: "บันทึกแบบร่าง" })).toBeInTheDocument();
+    const inputs = screen.getAllByRole("spinbutton");
+    ["3.545", "3.545", "3.545", "69.0548", "67.0587", "70.0587"].forEach((value, index) => {
+      fireEvent.change(inputs[index], { target: { value } });
+    });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "บันทึก" })).toBeInTheDocument());
+    await waitFor(() => {
+      expect(mockSaveQCResult).toHaveBeenCalledWith(expect.objectContaining({ fieldLabel: "%AI::abamectin" }));
+    }, { timeout: 2000 });
   });
 
   it("locks Lab inputs until QC selects and saves a density value", async () => {

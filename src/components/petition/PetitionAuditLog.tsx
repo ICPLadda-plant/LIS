@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { formatDateTime } from '@/lib/dateTime';
 import {
   PETITION_AUDIT_EVENT_LABELS,
   PETITION_STATUS_CONFIG,
@@ -72,10 +73,7 @@ export default function PetitionAuditLog({
                 </span>
               )}
               <span className="text-xs text-grey-500 ml-auto">
-                {new Date(entry.createdAt).toLocaleString('th-TH', {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                })}
+                {formatDateTime(entry.createdAt)}
               </span>
             </div>
             <p className="text-xs text-grey-500">

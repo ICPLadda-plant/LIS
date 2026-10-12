@@ -1,5 +1,21 @@
 const express = require("express");
 const router = express.Router();
+
+function flattenLegacyDottedValues(values = {}) {
+  const flattened = {};
+  const visit = (key, value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const entries = Object.entries(value);
+      if (entries.length > 0) {
+        entries.forEach(([nestedKey, nestedValue]) => visit(`${key}.${nestedKey}`, nestedValue));
+        return;
+      }
+    }
+    flattened[key] = value;
+  };
+  Object.entries(values || {}).forEach(([key, value]) => visit(key, value));
+  return flattened;
+}
 const mongoose = require('mongoose');
 const QCTestResult = require("../models/QCTestResult");
 const Parameter = require("../models/Parameter");
@@ -201,7 +217,11 @@ router.get("/last-values", async (req, res) => {
 router.get("/:petitionId", async (req, res) => {
   try {
     const results = await QCTestResult.find({ petitionId: req.params.petitionId }).lean();
-    res.json(results);
+    res.json(results.map((result) => ({
+      ...result,
+      values: flattenLegacyDottedValues(result.values),
+      valuesPhase2: flattenLegacyDottedValues(result.valuesPhase2),
+    })));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -288,9 +308,10 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       entries[entryIndex][fieldLabel] = value;
       update.$set.entries = entries;
     } else {
-      existingFieldValue = newRound ? undefined : existing?.[valuesKey]?.[fieldLabel];
-      if (newRound) update.$set[valuesKey] = { [fieldLabel]: value };
-      else update.$set[`${valuesKey}.${fieldLabel}`] = value;
+      const nextValues = flattenLegacyDottedValues(newRound ? {} : existing?.[valuesKey]);
+      existingFieldValue = nextValues[fieldLabel];
+      nextValues[fieldLabel] = value;
+      update.$set[valuesKey] = nextValues;
     }
 
     const doc = await QCTestResult.findOneAndUpdate(filter, update, {

@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { formatDateTime } from "@/lib/dateTime";
 import {
   Select,
   SelectContent,
@@ -71,10 +72,7 @@ export default function ApiRequestLogTable({
               {logs.map((log) => (
                 <tr key={log.id} className="border-t">
                   <td className="p-2 whitespace-nowrap text-muted-foreground">
-                    {new Date(log.at).toLocaleString("th-TH", {
-                      dateStyle: "short",
-                      timeStyle: "medium",
-                    })}
+                    {formatDateTime(log.at)}
                   </td>
                   <td className="p-2">
                     <code className="text-xs">{log.method} {log.path}</code>

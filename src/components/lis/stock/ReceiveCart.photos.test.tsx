@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ConfirmProvider } from "@/context/ConfirmDialog";
 import ReceiveCart from "./ReceiveCart";
 
 const apiMock = vi.hoisted(() => ({
@@ -43,7 +44,9 @@ function renderCart() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ReceiveCart />
+      <ConfirmProvider>
+        <ReceiveCart />
+      </ConfirmProvider>
     </QueryClientProvider>,
   );
 }
@@ -79,6 +82,7 @@ async function closeReceiveRowEditor(dialog: HTMLElement) {
 describe("ReceiveCart receive flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem("lis.stock.receive-cart-draft");
     apiMock.getStandardLabelCodeDefaults.mockResolvedValue({ prefix: "01", buddhistYear: 69, nextBottleNo: 1, codes: ["016901", "016902"] });
     apiMock.registerStockBarcode.mockResolvedValue({ barcode: "654694", category: "standard", itemId: "std1" });
     buildSolventLabelHtmlMock.mockClear();

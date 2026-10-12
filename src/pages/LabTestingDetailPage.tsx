@@ -1359,7 +1359,9 @@ export default function LabTestingDetailPage() {
                                         const derived = calculateAi(nextValues, aiDensity(nextValues, condCtx));
                                         fields.forEach((candidate) => {
                                           const kind = calculatedAiFieldKind(candidate.label);
-                                          if (kind) onUnitChange(candidate.label, formatCalculatedAi(derived[kind]));
+                                          if (!kind) return;
+                                          expandFieldForItem(candidate, item.commonName, { category: petitionCategory })
+                                            .forEach((derivedUnit) => onUnitChange(derivedUnit.key, formatCalculatedAi(derived[kind])));
                                         });
                                       }
                                       // Manual edit after a pull → mark provenance as edited (once).

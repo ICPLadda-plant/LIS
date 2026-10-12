@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const { parseCommand, extractPetitionNo } = require('./line');
 const line = require('../lib/line');
 const lineNotify = require('../lib/lineNotify');
-const testHandler = require('./line').stack.find((layer) => layer.route?.path === '/test').route.stack[0].handle;
+const testHandler = require('./line').stack.find((layer) => layer.route?.path === '/test').route.stack.at(-1).handle;
 
 for (const [label, results, expectedStatus, expectedSent] of [
   ['success', [{ ok: true }, { ok: true }], 200, 2],

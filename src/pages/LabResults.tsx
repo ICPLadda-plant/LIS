@@ -4,6 +4,7 @@ import AppLayout from "@/components/lis/AppLayout";
 import { usePetitionList } from "@/hooks/usePetition";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { rankSearchResults } from "@/lib/searchRanking";
+import { formatDate } from "@/lib/dateTime";
 import type { Petition } from "@/types/petition.types";
 
 export default function LabResults() {
@@ -73,7 +74,7 @@ export default function LabResults() {
                   <td className="px-3 py-2">{petitionDepartmentLabel(p)}</td>
                   <td className="px-3 py-2">{p.submittedBy?.name ?? "-"}</td>
                   <td className="px-3 py-2">
-                    {p.labApprovedAt ? new Date(p.labApprovedAt).toLocaleDateString("th-TH") : "-"}
+                    {formatDate(p.labApprovedAt)}
                   </td>
                 </tr>
               ))}

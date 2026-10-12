@@ -1,5 +1,6 @@
 // อ่านอย่างเดียว — ฟิลด์ที่ว่างจะไม่แสดง (pattern เดียวกับ LabAgreementReviewView)
 import type { GoodsReceipt } from '@/types/goodsReceipt.types';
+import { formatDate } from '@/lib/dateTime';
 import {
   APPEARANCE_LABELS, CONTAINER_CONDITION_LABELS, CONTAINER_TYPE_LABELS,
   LATE_DELIVERY_LABELS, PRESENCE_LABELS, QUANTITY_UNIT_LABELS,
@@ -17,7 +18,7 @@ const Line = ({ label, value }: { label: string; value?: string | number | null 
   );
 };
 
-const thDate = (iso?: string) => (iso ? new Date(iso).toLocaleDateString('th-TH') : undefined);
+const thDate = (iso?: string) => (iso ? formatDate(iso) : undefined);
 
 export default function GoodsReceiptView({ doc }: { doc: GoodsReceipt }) {
   const r = doc.receipt ?? {};

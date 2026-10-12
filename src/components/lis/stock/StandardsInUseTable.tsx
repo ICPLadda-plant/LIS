@@ -12,6 +12,7 @@ import DeductionResolutionDialog from "@/components/lis/stock/DeductionResolutio
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { requisitionUser } from "@/lib/standardRequisition";
+import { formatDate, formatDateTime } from "@/lib/dateTime";
 import {
   canAcknowledge,
   dueDistanceLabel,
@@ -114,7 +115,7 @@ export default function StandardsInUseTable() {
       key: "withdrawn",
       header: "เบิกเมื่อ",
       className: "text-xs whitespace-nowrap",
-      cell: (r) => (r.withdrawnAt ? new Date(r.withdrawnAt).toLocaleString("th-TH") : "-"),
+      cell: (r) => formatDateTime(r.withdrawnAt),
     },
     {
       key: "due",
@@ -122,7 +123,7 @@ export default function StandardsInUseTable() {
       className: "text-xs whitespace-nowrap",
       cell: (r) => (
         <>
-          <div>{r.dueAt ? new Date(r.dueAt).toLocaleDateString("th-TH") : "-"}</div>
+          <div>{formatDate(r.dueAt)}</div>
           <div className="text-muted-foreground">{dueDistanceLabel(r.dueAt, now)}</div>
         </>
       ),

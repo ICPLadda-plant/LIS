@@ -28,6 +28,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { releaseBodyPointerLock, useConfirm } from "@/context/ConfirmDialog";
 import { RevisionRequestDialog } from "@/components/petition/RevisionRequestDialog";
 import { normalizeRoles } from "@/lib/roles";
+import { formatDateTime as formatDateTimeValue } from "@/lib/dateTime";
 
 type RejectTarget = "requester" | "qc" | "lab";
 
@@ -36,7 +37,7 @@ interface ParameterReferenceOption {
   label: string;
 }
 
-const formatDateTime = (value?: string | null) => value ? new Date(value).toLocaleString("th-TH") : "ยังไม่ยืนยันผล";
+const formatDateTime = (value?: string | null) => formatDateTimeValue(value, "ยังไม่ยืนยันผล");
 
 interface RejectDecisionDialogProps {
   open: boolean;

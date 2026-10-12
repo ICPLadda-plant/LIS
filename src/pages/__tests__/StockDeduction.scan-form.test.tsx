@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
+import { ConfirmProvider } from "@/context/ConfirmDialog";
 import StockDeduction from "../StockDeduction";
 
 const apiMock = vi.hoisted(() => ({
@@ -117,8 +118,10 @@ function renderPage(initialEntry = "/stock-deduction") {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <QueryClientProvider client={client}>
-        <LocationProbe />
-        <StockDeduction />
+        <ConfirmProvider>
+          <LocationProbe />
+          <StockDeduction />
+        </ConfirmProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -291,6 +294,7 @@ describe("StockDeduction scan form", () => {
     expect(apiMock.getPendingStockDeductions).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: /^เบิก$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "ยืนยันการเบิก" }));
 
     await waitFor(() => expect(apiMock.createChemicalRequisition).toHaveBeenCalledWith(expect.objectContaining({
       instrumentId: "LD-003",

@@ -38,7 +38,7 @@ export function getScannedAdditionalSample(petition: Petition, code: string, sid
   const requests = petition.additionalSampleRequests ?? [];
   if (!code.startsWith('LIS-EXTRA-') && !petition.scannedAdditionalSampleId && !petition.scannedAdditionalSampleCode) {
     const pending = requests.find((request) => request.status !== 'received' && (!side || request.side === side));
-    if (pending) return pending;
+    if (pending) throw new Error('มีตัวอย่างเพิ่มรอรับ กรุณาสแกน QR รอบเพิ่ม');
     return undefined;
   }
   const request = requests.find((entry) => entry._id === petition.scannedAdditionalSampleId);

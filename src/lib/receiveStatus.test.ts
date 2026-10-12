@@ -12,6 +12,7 @@ import {
   qcTrackStatusSteps,
 } from './receiveStatus';
 import type { Petition } from '@/types/petition.types';
+import { statusBadge } from './statusBadge';
 
 const T1 = '2026-06-08T01:00:00.000Z';
 const T2 = '2026-06-10T02:00:00.000Z';
@@ -131,7 +132,7 @@ describe('qcTrackStatusBadge', () => {
 
   it('approved → config label, no QC-track wording', () => {
     const p = { status: 'approved' as const, qcReceivedAt: T1, qcCompletedAt: T2 };
-    expect(qcTrackStatusBadge(p).label).toBe('ออก Final Result แล้ว');
+    expect(qcTrackStatusBadge(p).label).toBe(statusBadge('approved').label);
   });
 
   it('legacy received (receivedAt only) counts as QC received', () => {

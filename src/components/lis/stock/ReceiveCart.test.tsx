@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ConfirmProvider } from "@/context/ConfirmDialog";
 import ReceiveCart from "./ReceiveCart";
 
 const apiMock = vi.hoisted(() => ({
@@ -30,7 +31,9 @@ function renderReceiveCart() {
 
   return render(
     <QueryClientProvider client={client}>
-      <ReceiveCart />
+      <ConfirmProvider>
+        <ReceiveCart />
+      </ConfirmProvider>
     </QueryClientProvider>,
   );
 }
@@ -38,6 +41,7 @@ function renderReceiveCart() {
 describe("ReceiveCart Thai copy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.removeItem("lis.stock.receive-cart-draft");
     apiMock.getStandardLabelCodeDefaults.mockResolvedValue({ prefix: "01", buddhistYear: 69, nextBottleNo: 1, codes: ["016901", "016902"] });
     apiMock.getStandards.mockResolvedValue([]);
     apiMock.getSolvents.mockResolvedValue([]);

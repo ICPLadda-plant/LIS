@@ -48,6 +48,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSamples } from '@/context/SampleContext';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { normalizeRoles } from "@/lib/roles";
+import { formatDateTime } from '@/lib/dateTime';
 import { api, type ParameterItem } from '@/lib/api';
 import type { QCTestResult } from '@/types/petition.types';
 import { findSgParameter, type SgParameter } from '@/lib/formSpecificGravity';
@@ -289,10 +290,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                         <>
                           <p className="text-xs text-orange-700">
                             ผู้ตรวจสอบ: {rejectEntry.reviewedBy} · เมื่อ{' '}
-                            {new Date(rejectEntry.reviewedAt).toLocaleString('th-TH', {
-                              dateStyle: 'medium',
-                              timeStyle: 'short',
-                            })}
+                            {formatDateTime(rejectEntry.reviewedAt)}
                           </p>
                           {rejectEntry.note && (
                             <p className="text-sm text-black-700 whitespace-pre-wrap rounded border border-orange-200 bg-white px-3 py-2">
@@ -416,10 +414,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                       <div>
                         <p className="text-xs uppercase tracking-wide text-grey-500">วัน-เวลาที่ส่งคำร้อง</p>
                         <p className="mt-1 text-sm text-black-500">
-                          {new Date(data.submittedBy?.submittedAt ?? data.createdAt).toLocaleString('th-TH', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
+                          {formatDateTime(data.submittedBy?.submittedAt ?? data.createdAt)}
                         </p>
                       </div>
                       <div>
@@ -437,12 +432,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                       <div>
                         <p className="text-xs uppercase tracking-wide text-grey-500">วันที่นำส่ง</p>
                         <p className="mt-1 text-sm text-black-500">
-                          {data.sampleSentAt
-                            ? new Date(data.sampleSentAt).toLocaleString('th-TH', {
-                                dateStyle: 'medium',
-                                timeStyle: 'short',
-                              })
-                            : '-'}
+                          {formatDateTime(data.sampleSentAt)}
                         </p>
                       </div>
                     </CardContent>
@@ -544,10 +534,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                   <Badge variant="blue-soft">{petitionDepartmentLabel(data)}</Badge>
                   <span className="text-xs text-grey-500">
                     ยื่นเมื่อ{' '}
-                    {new Date(data.createdAt).toLocaleString('th-TH', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
+                    {formatDateTime(data.createdAt)}
                   </span>
                 </div>
                 <PetitionStatusTimeline petition={data} />

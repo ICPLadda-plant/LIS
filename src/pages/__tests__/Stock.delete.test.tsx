@@ -200,7 +200,7 @@ describe("StockPage delete actions", () => {
   it("does not show the six-month medicine tab on the stock page", async () => {
     renderStock();
 
-    expect(await screen.findByText("Pesticide Standard")).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "Pesticide Standard" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "List ยา 6 เดือน" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "แจ้งเตือนส่งตรวจคุณภาพ" })).not.toBeInTheDocument();
     expect(apiMock.getSixMonthMedicineStock).not.toHaveBeenCalled();

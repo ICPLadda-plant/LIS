@@ -42,6 +42,7 @@ import { petitionStatusBadge } from '@/lib/statusBadge';
 import { formatStockQuantityWithUnit } from '@/lib/stockQuantity';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { rankSearchResults } from '@/lib/searchRanking';
+import { formatDate, formatDateTime, formatMonth } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
 import {
   PETITION_STATUS_CONFIG,
@@ -95,26 +96,21 @@ function petitionMetaLine(petition: Petition) {
   return [
     petition.submittedBy?.name,
     petitionDepartmentLabel(petition),
-    new Date(petition.createdAt).toLocaleString('th-TH', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    }),
+    formatDateTime(petition.createdAt),
   ]
     .filter(Boolean)
     .join(' • ');
 }
 
 function formatSixMonthStockDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '-';
-  return date.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDate(value);
 }
 
 function formatSixMonthReferenceMonth(value?: string) {
   if (!value) return '-';
   const date = new Date(`${value}-01T00:00:00Z`);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+  return formatMonth(date);
 }
 
 function sixMonthStockRowKey(item: SixMonthMedicineStockItem) {

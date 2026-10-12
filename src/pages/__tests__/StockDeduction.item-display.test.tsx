@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
+import { ConfirmProvider } from "@/context/ConfirmDialog";
 import StockDeduction from "../StockDeduction";
 
 const apiMock = vi.hoisted(() => ({
@@ -77,7 +78,9 @@ function renderPage(initialEntries = ["/stock-deduction"]) {
   return render(
     <MemoryRouter initialEntries={initialEntries}>
       <QueryClientProvider client={client}>
-        <StockDeduction />
+        <ConfirmProvider>
+          <StockDeduction />
+        </ConfirmProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -85,7 +88,6 @@ function renderPage(initialEntries = ["/stock-deduction"]) {
 
 function openCameraScanner() {
   fireEvent.click(screen.getByRole("button", { name: /สแกน QR ข้างขวด/ }));
-  fireEvent.click(screen.getByRole("button", { name: "เปิดกล้อง" }));
 }
 
 function currentMonthParts() {

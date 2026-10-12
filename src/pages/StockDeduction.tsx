@@ -30,6 +30,7 @@ import { formatStockQuantity } from "@/lib/stockQuantity";
 import { isLikelyHardwareStockScan, parseScannedQrId } from "@/lib/stockUnit";
 import { getRoomCatalog } from "@/lib/roomEquipment";
 import { normalizeRoles } from "@/lib/roles";
+import { formatDate, formatDateTime } from "@/lib/dateTime";
 import type { StockTransactionItem } from "@/types/stock";
 
 const analysisInstruments =
@@ -63,7 +64,7 @@ function bangkokDayWindow(value: string) {
 function formatSelectedDate(value: string) {
   const date = dateFromInputValue(value);
   if (!date) return "เลือกวันที่ดูยอดเบิก";
-  return new Intl.DateTimeFormat("th-TH", { dateStyle: "medium" }).format(date);
+  return formatDate(date);
 }
 
 function deductionAmountNumber(transaction: StockTransactionItem) {
@@ -332,7 +333,7 @@ const StockDeduction = () => {
       key: "time",
       header: "เวลา",
       className: "text-xs whitespace-nowrap",
-      cell: (t) => new Date(t.createdAt).toLocaleString("th-TH"),
+      cell: (t) => formatDateTime(t.createdAt),
     },
     { key: "type", header: "หมวด", cell: (t) => <Badge variant="outline">{t.itemType}</Badge> },
     {
@@ -788,7 +789,7 @@ function DeductionDetailSheet({
             <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <DetailItem label="รายการ" value={transaction.itemName || "-"} />
               <DetailItem label="รหัส" value={transaction.itemCode || "-"} />
-              <DetailItem label="เวลา" value={new Date(transaction.createdAt).toLocaleString("th-TH")} />
+              <DetailItem label="เวลา" value={formatDateTime(transaction.createdAt)} />
               <DetailItem label="จำนวนที่ตัด" value={amount.sub ? `${amount.text} (${amount.sub})` : amount.text} />
               <DetailItem
                 label="คงเหลือ"

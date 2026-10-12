@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ShieldCheck, AlertTriangle, RotateCcw, Sparkles, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { usePetitionList } from "@/hooks/usePetition";
 import type { Petition } from "@/types/petition.types";
+import { formatDateTime } from "@/lib/dateTime";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/lis/PageHeader";
 import { DataTable, type DataTableColumn } from "@/components/lis/DataTable";
@@ -168,7 +169,7 @@ const QCApproval = () => {
       header: "ยืนยันผลเมื่อ",
       cell: (p) => {
         const value = side === "qc" ? p.qcCompletedAt : p.labCompletedAt;
-        return value ? new Date(value).toLocaleString("th-TH") : "-";
+        return formatDateTime(value);
       },
     },
     {

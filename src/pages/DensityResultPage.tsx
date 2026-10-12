@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { formatDensity3 } from '@/lib/densitySync';
+import { formatDateTime } from '@/lib/dateTime';
 import { Gauge, RefreshCw, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import AppLayout from '@/components/lis/AppLayout';
 
@@ -239,7 +240,7 @@ export default function DensityResultPage() {
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{String(row['T (block) [°C]'] ?? '')}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-muted-foreground">{String(row['T (set) [°C]'] ?? '')}</td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{String(row['Date & time'] ?? '')}</td>
+                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{formatDateTime(String(row['Date & time'] ?? ''))}</td>
                   <td className="px-4 py-2.5 text-center">{statusBadge(String(row['Measurement status'] ?? ''))}</td>
                 </tr>
               ))

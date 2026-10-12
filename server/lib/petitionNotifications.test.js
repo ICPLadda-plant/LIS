@@ -278,10 +278,10 @@ test('toNotification: sampleSent sentToLab=true เล่นเสียงใ�
   const sentToLabDesc = bellDescribe(sentToLab, log);
   const qcOnlyDesc = bellDescribe(qcOnly, log);
 
-  assert.deepStrictEqual(sentToLabDesc.audiences, ['qc', 'lab']);
+  assert.deepStrictEqual(sentToLabDesc.audiences, ['qc', 'lab', 'production']);
   assert.strictEqual(toNotification(sentToLab, log, sentToLabDesc, { audiences: ['qc'] }).playSound, true);
   assert.strictEqual(toNotification(sentToLab, log, sentToLabDesc, { audiences: ['lab'] }).playSound, true);
-  assert.deepStrictEqual(qcOnlyDesc.audiences, ['qc']);
+  assert.deepStrictEqual(qcOnlyDesc.audiences, ['qc', 'production']);
   assert.strictEqual(toNotification(qcOnly, log, qcOnlyDesc, { audiences: ['qc'] }).playSound, true);
   assert.strictEqual(toNotification(qcOnly, log, qcOnlyDesc, { audiences: ['lab'] }).playSound, undefined);
 });

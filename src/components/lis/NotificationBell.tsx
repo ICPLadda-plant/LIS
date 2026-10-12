@@ -9,6 +9,7 @@ import { useNotifications, type NotificationLevel } from "@/context/Notification
 import { useAuth } from "@/context/AuthContext";
 import { normalizeRoles } from "@/lib/roles";
 import { readSeeAll, writeSeeAll, SEE_ALL_EVENT } from "@/lib/petitionAudience";
+import { formatDateTime } from "@/lib/dateTime";
 
 const levelColor: Record<NotificationLevel, string> = {
   info: "bg-blue-500",
@@ -22,12 +23,7 @@ const formatTime = (ts: number) => {
   if (diff < 60_000) return "เมื่อสักครู่";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} นาทีที่แล้ว`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} ชั่วโมงที่แล้ว`;
-  return new Date(ts).toLocaleString("th-TH", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(ts);
 };
 
 interface NotificationBellProps {

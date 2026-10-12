@@ -62,7 +62,7 @@ describe("AppSidebar scroll containment", () => {
     const aside = container.querySelector("aside");
     const nav = container.querySelector("nav");
 
-    expect(aside).toHaveClass("min-h-0", "overflow-hidden");
+    expect(aside).toHaveClass("min-h-0", "overflow-visible");
     expect(nav).toHaveClass("min-h-0", "touch-pan-y", "overscroll-y-contain");
     expect(nav?.className).toContain("[-webkit-overflow-scrolling:touch]");
   });

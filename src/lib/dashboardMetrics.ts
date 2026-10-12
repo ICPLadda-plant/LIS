@@ -14,6 +14,7 @@ import type {
   StockUnitItem,
 } from "@/types/stock";
 import { summarizeStandard } from "@/lib/stockStatus";
+import { formatDate } from "@/lib/dateTime";
 
 export interface MetricsCtx {
   petitions: Petition[];
@@ -150,7 +151,7 @@ export function requestTrendData(petitions: Petition[], now: number, days: numbe
   for (let i = days - 1; i >= 0; i -= 1) {
     const start = startOfLocalDay(now, i);
     const end = startOfLocalDay(now, i - 1);
-    const label = new Date(start).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+    const label = formatDate(start);
     const count = petitions.filter((p) => {
       const t = new Date(p.createdAt).getTime();
       return t >= start && t < end;
@@ -547,7 +548,7 @@ function unitsByItemCode(units: StockUnitItem[]): Map<string, StockUnitItem[]> {
 }
 
 function localDayLabel(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+  return formatDate(timestamp);
 }
 
 export function labInventorySummaryData(input: LabInventorySummaryInput): LabInventorySummary {

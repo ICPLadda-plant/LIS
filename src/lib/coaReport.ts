@@ -1,5 +1,6 @@
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
 import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { formatDate as formatDisplayDate } from "@/lib/dateTime";
 
 export type CoaReportTemplateKind = "standard" | "grWpSp" | "liquid" | "bromadiolone0005";
 
@@ -31,10 +32,7 @@ export type CoaReportPage = {
 };
 
 function formatDate(iso?: string): string {
-  if (!iso) return "-";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("th-TH");
+  return formatDisplayDate(iso);
 }
 
 function formatGregorianDate(value?: string): string {

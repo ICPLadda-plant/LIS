@@ -1,10 +1,11 @@
 import type { TimelineDetailModel } from "@/lib/petitionTimelineDetail";
+import { formatDateTime as formatDisplayDateTime } from "@/lib/dateTime";
 
 export type TimelineMetricTone = "default" | "warning" | "danger";
 export type TimelineMetric = { label: string; value: string; hint?: string; tone?: TimelineMetricTone };
 
 export function formatDateTime(value: string): string {
-  return new Date(value).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
+  return formatDisplayDateTime(value);
 }
 
 export function estimateMetric(header: TimelineDetailModel["header"]): TimelineMetric {

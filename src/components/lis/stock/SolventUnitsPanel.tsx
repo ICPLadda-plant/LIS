@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { buildSolventLabelHtml } from "@/lib/stockLabel";
+import { formatDate as formatDisplayDate } from "@/lib/dateTime";
 import { unitDerivedStatus, visibleBottles, type UnitDerivedStatus } from "@/lib/stockUnit";
 import type { StockSolventItem, StockTransactionItem, StockUnitItem } from "@/types/stock";
 
@@ -62,10 +63,7 @@ function parseSolventReceiveNote(note = "") {
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("th-TH");
+  return formatDisplayDate(value);
 }
 
 function formatLiter(value?: number | null): string {

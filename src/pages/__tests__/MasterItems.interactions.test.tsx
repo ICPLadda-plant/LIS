@@ -237,10 +237,11 @@ describe("MasterItems interactions", () => {
     expect(commonNameTable).not.toBeNull();
 
     expect(within(commonNameTable!).getByText("ABAMECTIN 1.8% EC")).toBeInTheDocument();
+    expect(within(commonNameTable!).getByText("DIURON 46.8% WG + HEXAZINONE 13.2% WG")).toBeInTheDocument();
     expect(within(commonNameTable!).getByText("DIURON 46.8% WG")).toBeInTheDocument();
     expect(within(commonNameTable!).getByText("HEXAZINONE 13.2% WG")).toBeInTheDocument();
     expect(within(commonNameTable!).getByText("พบ 2 ครั้ง")).toBeInTheDocument();
-    expect(within(commonNameTable!).getAllByText("พบ 1 ครั้ง")).toHaveLength(2);
+    expect(within(commonNameTable!).getAllByText("พบ 1 ครั้ง")).toHaveLength(3);
     expect(within(commonNameTable!).queryByText("SHOULD NOT DISPLAY")).not.toBeInTheDocument();
     expect(screen.queryByText("รวบรวมจาก common_name ของ Master Item และแยกชื่อที่คั่นด้วย +")).not.toBeInTheDocument();
   });

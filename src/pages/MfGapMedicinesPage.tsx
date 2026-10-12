@@ -29,6 +29,7 @@ import { api } from "@/lib/api";
 import { rankSearchResults } from "@/lib/searchRanking";
 import { buildMfGapMedicineRows, type MfGapMedicineRow } from "@/lib/mfGapMedicines";
 import { MF_CURRENT_API_URL, MF_HISTORICAL_API_URL } from "@/lib/mfItemDates";
+import { formatDate as formatDisplayDate } from "@/lib/dateTime";
 
 type MedicineKindFilter = "all" | "rm" | "fg";
 
@@ -53,10 +54,7 @@ async function fetchMfGapMedicines(): Promise<MfGapMedicineRow[]> {
 }
 
 function formatDate(value: string): string {
-  if (!value) return "-";
-  const date = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" });
+  return formatDisplayDate(value, value || "-");
 }
 
 function itemKind(itemNo: string): "RM" | "FG" | "" {

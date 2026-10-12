@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
 import { useAuth } from '@/hooks/useAuth';
 import { canPrintAdditionalSamples } from '@/lib/additionalSampleQr';
+import { formatDateTime } from '@/lib/dateTime';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
 import { normalizeRoles } from '@/lib/roles';
 import type { Petition, QCTestResult } from '@/types/petition.types';
@@ -14,7 +15,7 @@ import SampleLabelPrintTemplate from './SampleLabelPrintTemplate';
 const statusLabels = { requested: 'รอนำส่ง', sent: 'นำส่งแล้ว รอรับ', received: 'รับแล้ว' };
 
 function timestamp(value?: string) {
-  return value ? new Date(value).toLocaleString('th-TH') : 'ยังไม่มี';
+  return formatDateTime(value, 'ยังไม่มี');
 }
 
 function displayValue(value: unknown): string {

@@ -1,4 +1,5 @@
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
+import { formatDate } from "@/lib/dateTime";
 import type { Petition } from "@/types/petition.types";
 
 export type TimelineTone = "intake" | "receive" | "testing" | "lab" | "final" | "closed" | "blocked";
@@ -124,7 +125,7 @@ export function buildTimelineTicks(window: TimelineWindow): TimelineTick[] {
   const ticks: TimelineTick[] = [];
   for (let offset = 0; offset <= totalDays; offset += step) {
     const at = addDays(start, offset);
-    ticks.push({ key: iso(at), at: iso(at), label: at.toLocaleDateString("th-TH", totalDays <= 45 ? { day: "2-digit", month: "short" } : { month: "short", year: "2-digit" }), major: at.getDate() === 1 || offset === 0 });
+    ticks.push({ key: iso(at), at: iso(at), label: formatDate(at), major: at.getDate() === 1 || offset === 0 });
   }
   return ticks;
 }

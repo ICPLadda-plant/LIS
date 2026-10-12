@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { ParameterValueField } from "@/lib/api";
 import { isNotificationSoundEnabled } from "@/lib/appPreferences";
 import { timerDurationMs, timerRemainingMs, isTimerDone, formatTimerHuman } from "@/lib/parameterValidation";
+import { formatTime } from "@/lib/dateTime";
 
 interface TimerFieldProps {
   field: ParameterValueField;
@@ -28,10 +29,6 @@ function formatRemaining(ms: number): string {
   const d = Math.floor(ms / 86_400_000);
   const h = Math.floor((ms % 86_400_000) / 3_600_000);
   return `${d}d ${h}h`;
-}
-
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 }
 
 export function TimerField({ field, value, onChange, disabled = false }: TimerFieldProps) {

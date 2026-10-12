@@ -15,6 +15,7 @@ import { evaluateEnv, isReadingStale, type EnvRoom } from "@/lib/dailyCheckEnv";
 import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
 import { useAuth } from "@/context/AuthContext";
 import { useEnvRooms } from "@/hooks/useEnvRooms";
+import { formatDate, formatTime } from "@/lib/dateTime";
 
 interface EnvDraft {
   temperature: string;
@@ -27,15 +28,14 @@ const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+const fmtTime = (iso: string) => formatTime(iso);
 const emptyDraft = (): EnvDraft => ({ temperature: "", humidity: "", note: "" });
 
 const EnvironmentCheckPage = () => {
   const { user } = useAuth();
   const { rooms } = useEnvRooms();
   const queryClient = useQueryClient();
-  const todayLabel = new Date().toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
+  const todayLabel = formatDate(new Date());
   const currentPeriod = getCurrentDailyCheckPeriod();
   const currentPeriodLabel = getDailyCheckPeriodLabel(currentPeriod);
   const currentPeriodHint = currentPeriod === "morning"

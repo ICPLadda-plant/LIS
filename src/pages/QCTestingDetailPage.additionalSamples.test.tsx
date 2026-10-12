@@ -6,7 +6,14 @@ import QCTestingDetailPage from './QCTestingDetailPage';
 import LabTestingDetailPage from './LabTestingDetailPage';
 
 const state = vi.hoisted(() => ({ petition: null as Petition | null, parameters: [] as ParameterItem[], results: [] as QCTestResult[] }));
-vi.mock('react-router-dom', () => ({ useParams: () => ({ id: 'petition-1' }), useNavigate: () => vi.fn(), Navigate: () => null }));
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...await importOriginal<typeof import('react-router-dom')>(),
+  useParams: () => ({ id: 'petition-1' }),
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/qc-testing/petition-1', search: '', hash: '', state: null, key: 'test' }),
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  Navigate: () => null,
+}));
 vi.mock('@tanstack/react-query', () => ({ useQueries: () => [] }));
 vi.mock('@/components/lis/AppLayout', () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock('@/components/lis/PageHeader', () => ({ default: () => <header>คำร้อง</header> }));
@@ -85,7 +92,7 @@ describe.each(['qc', 'lab'] as const)('%s additional sample integration', (side)
     fireEvent.click(await screen.findByRole('button', { name: 'ขอตัวอย่างเพิ่ม' }));
     fireEvent.change(screen.getByLabelText('เหตุผลที่ขอตัวอย่างเพิ่ม'), { target: { value: 'ค่าสูงกว่าเกณฑ์' } });
     fireEvent.click(screen.getByRole('checkbox', { name: /ตัวอย่าง A/ }));
-    fireEvent.change(screen.getByRole('combobox', { name: 'น้ำหนักตัวอย่างที่ 1 รายการที่ 1' }), { target: { value: '500' } });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'น้ำหนักตัวอย่างที่ 1 รายการที่ 1' }), { target: { value: '500' } });
     fireEvent.click(screen.getByRole('button', { name: 'ส่งคำขอ' }));
     await waitFor(() => expect(api.saveQCResult).toHaveBeenCalled());
     expect(api.post).not.toHaveBeenCalled();

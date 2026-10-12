@@ -145,5 +145,6 @@ describe('LabResultDetailPage print action', () => {
     });
     const groupParameters = mocks.buildApprovalGroups.mock.calls.at(-1)?.[1] as ParameterItem[];
     expect(groupParameters.map((parameter) => parameter._id)).toEqual(['lab-1']);
+    expect(mocks.buildApprovalGroups.mock.calls.at(-1)?.[4]).toMatchObject({ includeResultOnlyFields: true });
   });
 });

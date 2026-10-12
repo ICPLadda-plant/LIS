@@ -2,6 +2,7 @@ import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from '@/lib/printConfig';
 import type { LabRequest } from '@/types/labRequest.types';
 import type { Petition, PetitionItem, QCTestResult } from '@/types/petition.types';
+import { formatDate } from '@/lib/dateTime';
 
 type ReportKind = 'pre' | 'final';
 
@@ -15,7 +16,7 @@ interface Props {
 function buddhistDate(iso?: string | null): string {
   const d = iso ? new Date(iso) : new Date();
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDate(d, '');
 }
 
 function valueText(value: unknown): string {

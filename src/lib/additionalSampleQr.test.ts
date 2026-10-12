@@ -26,13 +26,13 @@ describe('additional sample QR boundaries', () => {
     expect(() => getScannedAdditionalSample({ ...petition, scannedAdditionalSampleId: undefined }, request.qrCode, 'qc')).toThrow(/ไม่ตรง/);
   });
 
-  it('rejects wrong side and received rounds, while allowing original QR for pending rounds', () => {
+  it('rejects wrong side, received rounds, and original QR while an extra round is pending', () => {
     expect(() => getScannedAdditionalSample(petition, request.qrCode, 'lab')).toThrow(/QC/);
     expect(() => getScannedAdditionalSample({ ...petition, additionalSampleRequests: [{ ...request, status: 'received' }] } as Petition, request.qrCode, 'qc')).toThrow(/รับ.*แล้ว/);
     const oldScan = { ...petition, scannedAdditionalSampleId: undefined, scannedAdditionalSampleCode: undefined };
-    expect(getScannedAdditionalSample(oldScan, petition._id, 'qc')).toEqual(request);
+    expect(() => getScannedAdditionalSample(oldScan, petition._id, 'qc')).toThrow(/QR รอบเพิ่ม/);
     expect(getScannedAdditionalSample(oldScan, petition._id, 'lab')).toBeUndefined();
-    expect(getScannedAdditionalSample(oldScan, petition._id)).toEqual(request);
+    expect(() => getScannedAdditionalSample(oldScan, petition._id)).toThrow(/QR รอบเพิ่ม/);
   });
 
   it('allows print by employee ID, workflow email or admin, never by matching name alone', () => {

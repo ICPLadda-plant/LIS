@@ -1485,7 +1485,9 @@ export default function QCTestingDetailPage() {
                               const derived = calculateAi(nextValues, aiDensity(nextValues, condCtx));
                               fields.forEach((candidate) => {
                                 const kind = calculatedAiFieldKind(candidate.label);
-                                if (kind) onUnitChange(candidate.label, formatCalculatedAi(derived[kind]));
+                                if (!kind) return;
+                                expandFieldForItem(candidate, item.commonName, { includeRestrictedStandards: canSeeRestrictedStandards, category: petitionCategory })
+                                  .forEach((derivedUnit) => onUnitChange(derivedUnit.key, formatCalculatedAi(derived[kind])));
                               });
                             }
                             handleOutlierCheck(

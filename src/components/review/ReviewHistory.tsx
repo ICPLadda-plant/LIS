@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import type { ReviewEntry } from '@/types/petition.types';
+import { formatDateTime } from '@/lib/dateTime';
 
 const ACTION_LABEL = {
   note: 'บันทึก QC',
@@ -30,10 +31,7 @@ export default function ReviewHistory({ history }: { history: ReviewEntry[] }) {
             </Badge>
             <span className="text-xs text-grey-500">
               โดย {entry.reviewedBy} ·{' '}
-              {new Date(entry.reviewedAt).toLocaleString('th-TH', {
-                dateStyle: 'medium',
-                timeStyle: 'short',
-              })}
+              {formatDateTime(entry.reviewedAt)}
             </span>
           </div>
           {entry.note && (

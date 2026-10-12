@@ -17,6 +17,7 @@ import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLab
 import { getRoomBySlug } from "@/lib/dailyCheckRooms";
 import { api, type EquipmentCheckRecord, type EquipmentReading } from "@/lib/api";
 import { getRoomCatalog } from "@/lib/roomEquipment";
+import { formatDate, formatTime } from "@/lib/dateTime";
 
 type StatusVal = "normal" | "abnormal" | "";
 
@@ -31,8 +32,7 @@ const todayStr = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const fmtTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
+const fmtTime = (iso: string) => formatTime(iso);
 
 const emptyDraft = (): CheckDraft => ({ status: "", readingValues: {}, note: "" });
 
@@ -43,11 +43,7 @@ interface RoomEquipmentCheckPageProps {
 const RoomEquipmentCheckPage = ({ roomSlug }: RoomEquipmentCheckPageProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const todayLabel = new Date().toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const todayLabel = formatDate(new Date());
   const currentPeriod = getCurrentDailyCheckPeriod();
   const currentPeriodLabel = getDailyCheckPeriodLabel(currentPeriod);
   const currentPeriodHint = currentPeriod === "morning"
