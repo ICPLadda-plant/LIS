@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import { AlertCircle, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -35,7 +34,6 @@ interface Props {
 
 export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOnly = false }: Props) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const isFullAccess = normalizeRoles(user).some((r) => FULL_ACCESS_ROLES.has(r));
 
   const [phase, setPhase] = useState<Phase>('scanning');
@@ -96,10 +94,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
         return;
       }
 
-      // Already received by Lab — navigate directly (status อาจ pendingReview จากฝั่ง QC รับก่อน)
+      // Already received by Lab
       if (!request && found.labReceivedAt) {
         onAccepted();
-        navigate(`/lab-testing/${found._id}`);
         return;
       }
 
@@ -111,7 +108,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [isFullAccess, navigate, onAccepted, user]);
+  }, [isFullAccess, onAccepted, user]);
 
   useEffect(() => {
     if (!open || phase !== 'scanning' || manualOnly) return;
@@ -183,7 +180,6 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setPetition(updated);
       setPhase('success');
       onAccepted();
-      navigate(`/lab-testing/${updated._id}`);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'เกิดข้อผิดพลาด กรุณาลองใหม่';
       setErrorMsg(msg);

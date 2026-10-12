@@ -1037,6 +1037,9 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(q);
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (!doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt)) {
+      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้' } });
+    }
 
     const prevStatus = doc.status;
     doc.assignedTo = {
@@ -1090,7 +1093,7 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 router.patch('/:id', serializePetitionWrite(async (req, res) => {
   try {
     const updates = { ...req.body };
-    const managedFields = ['additionalSampleRequests', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
+    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
     if (Object.keys(updates).some(key => key.startsWith('$') || key.includes('.') || managedFields.includes(key))) return badRequest(res, 'ข้อมูลสถานะและรอบตัวอย่างต้องเปลี่ยนผ่านขั้นตอนที่กำหนด');
     let actor = updates.actor;
     delete updates.actor;

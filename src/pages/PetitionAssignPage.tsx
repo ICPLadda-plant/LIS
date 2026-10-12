@@ -42,7 +42,7 @@ import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { api, type MachineItem } from '@/lib/api';
 import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
-import { labAssignBoardStatusBadge } from '@/lib/receiveStatus';
+import { labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import { getMachineSuggestions, type MachineSuggestion } from '@/lib/aiApi';
 import { DEV_MODE, synthesizeDevAssignees } from '@/config/dev';
@@ -542,6 +542,10 @@ export default function PetitionAssignPage() {
   }, [activeTab, normalPetitions, phase2Petitions, search]);
 
   async function assignPetition(petition: Petition, employeeIdOverride?: string): Promise<boolean> {
+    if (!labReceivedAt(petition)) {
+      toast.error('Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้');
+      return false;
+    }
     if (!hasAssignableLabParameter(petition, labParameters, groupMembership)) {
       toast.error('คำร้องนี้ไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่าง');
       return false;
@@ -649,7 +653,7 @@ export default function PetitionAssignPage() {
         <div className="space-y-5">
           <PageHeader
             title="Assign คำร้องให้เจ้าหน้าที่"
-            description="ลากคำร้องจากกอง “งานรอมอบหมาย” ไปวางบนการ์ดเจ้าหน้าที่ เพื่อเลือกเครื่องและ assign"
+            description="รับตัวอย่าง Lab ก่อน แล้วลากคำร้องไปวางบนการ์ดเจ้าหน้าที่เพื่อเลือกเครื่องและ assign"
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
@@ -677,8 +681,8 @@ export default function PetitionAssignPage() {
               </CardHeader>
               <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
                 <div className="rounded-xl bg-muted px-3 py-3">
-                  <p className="font-medium text-foreground">1. เลือกคำร้อง</p>
-                  <p className="mt-1 text-xs">เริ่มจากกองงานที่ยังไม่ถูก assign หรือรอทำ Phase 2</p>
+                  <p className="font-medium text-foreground">1. รับตัวอย่าง Lab</p>
+                  <p className="mt-1 text-xs">สแกน QR หรือกรอกเลขคำร้องเพื่อรับตัวอย่างก่อน</p>
                 </div>
                 <div className="rounded-xl bg-muted px-3 py-3">
                   <p className="font-medium text-foreground">2. เลือกผู้รับงาน</p>
@@ -795,7 +799,7 @@ export default function PetitionAssignPage() {
                 }}
                 right={
                   <div className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-                    คลิกการ์ดคำร้องเพื่อดูรายละเอียดก่อน assign ได้
+                    คำร้องที่ยังไม่รับตัวอย่างจะลากเพื่อ assign ไม่ได้
                   </div>
                 }
               />
@@ -1088,19 +1092,22 @@ function PetitionCard({
     .map((m) => m.code)
     .filter(Boolean) as string[];
   const blocked = groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode));
+  const canDrag = !!labReceivedAt(petition);
 
   return (
     <Card
       onOpen={onClick}
-      draggable
+      draggable={canDrag}
       onDragStart={(e) => {
+        if (!canDrag) { e.preventDefault(); return; }
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', petition._id);
         onDragStart();
       }}
       onDragEnd={onDragEnd}
       className={cn(
-        'group cursor-grab rounded-lg border-border bg-card p-2.5 text-card-foreground shadow-sm transition active:cursor-grabbing hover:border-primary/40 hover:bg-accent/40 hover:shadow',
+        'group rounded-lg border-border bg-card p-2.5 text-card-foreground shadow-sm transition hover:border-primary/40 hover:bg-accent/40 hover:shadow',
+        canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
         dragging && 'opacity-40',
       )}
     >

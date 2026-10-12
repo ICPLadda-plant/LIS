@@ -61,9 +61,9 @@ describe('labTrackStatusBadge', () => {
     expect(labTrackStatusBadge(p).label).toBe('รอรับ');
   });
 
-  it('sampleSent without assignee shows waiting assign on the Lab track', () => {
+  it('sampleSent without assignee shows waiting receive on the Lab track', () => {
     const p = { status: 'sampleSent' as const };
-    expect(labTrackStatusBadge(p).label).toBe('รอ assign');
+    expect(labTrackStatusBadge(p).label).toBe('รอรับ');
   });
 
   it('sampleSent with assignee but not Lab-received shows waiting receive on the Lab track', () => {
@@ -72,17 +72,21 @@ describe('labTrackStatusBadge', () => {
   });
 
   it('Lab received + global inProgress → Lab track in progress, not QC status', () => {
-    const p = { status: 'inProgress' as const, labReceivedAt: T1, labReceivedBy: 'Lab Tech' };
+    const p = { status: 'inProgress' as const, labReceivedAt: T1, labReceivedBy: 'Lab Tech', assignedTo: { name: 'Analyst' } };
     expect(labTrackStatusBadge(p).label).toBe('Lab กำลังตรวจ');
   });
 
+  it('Lab received but not assigned shows waiting assign', () => {
+    expect(labTrackStatusBadge({ status: 'pendingReview', labReceivedAt: T1 }).label).toBe('รอ assign');
+  });
+
   it('legacy received (receivedAt only) counts as Lab received → Lab track in progress', () => {
-    const p = { status: 'inProgress' as const, receivedAt: T1, receivedBy: 'Dev Administrator' };
+    const p = { status: 'inProgress' as const, receivedAt: T1, receivedBy: 'Dev Administrator', assignedTo: { name: 'Analyst' } };
     expect(labTrackStatusBadge(p).label).toBe('Lab กำลังตรวจ');
   });
 
   it('Lab completed shows pending result while petition waits for other gates', () => {
-    const p = { status: 'inProgress' as const, labReceivedAt: T1, labCompletedAt: T2 };
+    const p = { status: 'inProgress' as const, labReceivedAt: T1, labCompletedAt: T2, assignedTo: { name: 'Analyst' } };
     expect(labTrackStatusBadge(p).label).toBe('รอออกผล');
   });
 });
@@ -137,24 +141,24 @@ describe('qcTrackStatusBadge', () => {
 });
 
 describe('labTrackStatusSteps', () => {
-  it('4 steps in Lab-only order: Assign → รับตัวอย่าง → Lab → ออกผล Lab', () => {
+  it('4 steps in Lab-only order: รับตัวอย่าง → Assign → Lab → ออกผล Lab', () => {
     const steps = labTrackStatusSteps({ status: 'sampleSent' } as Petition);
-    expect(steps.map((s) => s.label)).toEqual(['Assign', 'รับตัวอย่าง', 'Lab', 'ออกผล Lab']);
+    expect(steps.map((s) => s.label)).toEqual(['รับตัวอย่าง', 'Assign', 'Lab', 'ออกผล Lab']);
   });
 
-  it('nothing done → assigned is the current step', () => {
+  it('nothing done → receive is the current step', () => {
     const steps = labTrackStatusSteps({ status: 'sampleSent' } as Petition);
     expect(steps.every((s) => !s.done)).toBe(true);
-    expect(steps.find((s) => s.current)?.key).toBe('assigned');
+    expect(steps.find((s) => s.current)?.key).toBe('received');
   });
 
-  it('assigned but not received → received is the current step', () => {
+  it('received but not assigned → assign is the current step', () => {
     const steps = labTrackStatusSteps({
-      status: 'sampleSent',
-      assignedTo: { userId: 'u1' },
+      status: 'pendingReview',
+      labReceivedAt: T1,
     } as unknown as Petition);
-    expect(steps.filter((s) => s.done).map((s) => s.key)).toEqual(['assigned']);
-    expect(steps.find((s) => s.current)?.key).toBe('received');
+    expect(steps.filter((s) => s.done).map((s) => s.key)).toEqual(['received']);
+    expect(steps.find((s) => s.current)?.key).toBe('assigned');
   });
 
   it('received + assigned + labCompleted, not approved → lab-approval is current', () => {
@@ -165,7 +169,7 @@ describe('labTrackStatusSteps', () => {
       labCompletedAt: T2,
     } as unknown as Petition;
     const steps = labTrackStatusSteps(p);
-    expect(steps.filter((s) => s.done).map((s) => s.key)).toEqual(['assigned', 'received', 'lab']);
+    expect(steps.filter((s) => s.done).map((s) => s.key)).toEqual(['received', 'assigned', 'lab']);
     expect(steps.find((s) => s.current)?.key).toBe('lab-approval');
   });
 

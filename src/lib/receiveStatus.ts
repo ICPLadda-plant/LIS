@@ -51,12 +51,11 @@ export function qcReceivedBy(p: ReceiveFields): string | undefined {
  *
  * petition.status เป็นตัวเดียวใช้ร่วมทั้ง Lab/QC พอ QC รับ+assign จะกลายเป็น
  * `inProgress` ("QC กำลังตรวจ") ทั้งที่ Lab ยังไม่ได้รับตัวอย่าง ถ้าโชว์ตรงๆ
- * ฝั่ง Lab จะเห็น "QC กำลังตรวจ" ผิด — ถ้ายังไม่ assign ให้โชว์ "รอ assign"; หลัง assign แล้วจึงเป็น "รอรับ"
+ * ฝั่ง Lab จะเห็น "QC กำลังตรวจ" ผิด — ต้องรับตัวอย่างก่อน assign
  */
 export function labTrackStatusBadge(p: ReceiveFields & { status: PetitionStatus }): StatusBadge {
-  // Lab flow starts with assignment; assigned sample-sent work then waits for receive.
-  if (p.status === 'sampleSent' && !p.assignedTo) return toneBadge('info', 'รอ assign');
   if (!labReceivedAt(p)) return toneBadge('warning', 'รอรับ');
+  if (!p.assignedTo) return toneBadge('info', 'รอ assign');
   if (['success', 'approved', 'rejected'].includes(p.status)) return statusBadge(p.status);
   if (p.status === 'deliveringQC') return statusBadge('pendingReview');
   if (p.labApprovedAt) return toneBadge('warning', 'ผล Lab ออกแล้ว · รอ QC');
@@ -100,15 +99,14 @@ function withCurrentStep(steps: PetitionStatusStep[]): PetitionStatusStep[] {
 
 /**
  * Timeline เฉพาะ track Lab สำหรับหน้า /lab-testing:
- *   Assign → รับตัวอย่าง → Lab → ออกผล Lab
+ *   รับตัวอย่าง → Assign → Lab → ออกผล Lab
  * step กลางนับ done เมื่อ field ตัวเองมีหรือใบปิดแล้ว; step ออกผลผูกกับ labApprovedAt ล้วน
  */
 export function labTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
   const closed = isClosedStatus(petition.status);
-  // Lab ownership is assigned before the analyst receives the sample.
   return withCurrentStep([
-    { key: 'assigned', label: 'Assign', done: !!petition.assignedTo || closed },
     { key: 'received', label: 'รับตัวอย่าง', done: !!labReceivedAt(petition) || closed },
+    { key: 'assigned', label: 'Assign', done: !!petition.assignedTo || closed },
     { key: 'lab', label: 'Lab', done: !!petition.labCompletedAt || closed },
     { key: 'lab-approval', label: 'ออกผล Lab', done: !!petition.labApprovedAt },
   ]);

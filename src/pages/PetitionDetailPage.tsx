@@ -55,12 +55,14 @@ import { buildApprovalGroups } from '@/lib/qcApprovalRows';
 import { buildLaLisAssistant, type LaLisIssue } from '@/lib/laLisAssistant';
 import { buildLabResultReportPages } from '@/lib/labResultReport';
 import { canPrintSampleLabel, canPrintPreReport, canPrintLabResult } from '@/lib/petitionPrintability';
-import { isWaitingForAssignment } from '@/lib/petitionQueueVisibility';
+import { isVisibleInAssignQueue, isWaitingForAssignment } from '@/lib/petitionQueueVisibility';
+import { labReceivedAt } from '@/lib/receiveStatus';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { cn } from '@/lib/utils';
 
 function detailBannerText(petition: Petition) {
   if (petition.status === 'rejected') return 'คำร้องนี้ถูกส่งกลับเพื่อแก้ไข';
+  if (isVisibleInAssignQueue(petition) && !labReceivedAt(petition)) return 'คำร้องนี้รอ Lab รับตัวอย่างก่อนมอบหมายผู้รับงาน';
   if (isWaitingForAssignment(petition)) {
     return 'คำร้องนี้รอการมอบหมายผู้รับงาน';
   }
@@ -459,10 +461,10 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                         <p>ผู้รับผิดชอบ QC: <span className="font-medium text-black-500">{displayPerson(data.qcReceivedBy)}</span></p>
                         <p>ผู้รับผิดชอบ Lab: <span className="font-medium text-black-500">{displayPerson(data.labReceivedBy)}</span></p>
                       </div>
-                      {!isResultMode && isWaitingForAssignment(data) && (
+                      {!isResultMode && !data.assignedTo && isVisibleInAssignQueue(data) && (
                         <Button className="w-full" onClick={() => navigate('/petition/assign')}>
                           <UserCheck className="h-4 w-4" />
-                          Assign ผู้รับงาน
+                          {labReceivedAt(data) ? 'Assign ผู้รับงาน' : 'รับตัวอย่าง Lab'}
                         </Button>
                       )}
                       {!isResultMode && canEdit && (

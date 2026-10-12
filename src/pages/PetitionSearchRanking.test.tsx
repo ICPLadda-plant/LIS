@@ -130,6 +130,17 @@ describe('petition search ranking', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('รับตัวอย่าง Lab');
   });
 
+  it('allows dragging to assign only after Lab receives the sample', async () => {
+    mocks.items = [
+      petition('ROW-waiting', 'R100', { status: 'sampleSent' }),
+      petition('ROW-received', 'R100', { status: 'pendingReview', labReceivedAt: '2026-09-19T01:00:00.000Z' }),
+    ];
+    renderPage(<PetitionAssignPage />);
+
+    expect((await screen.findByText('ROW-waiting')).parentElement?.closest('[draggable]')).toHaveAttribute('draggable', 'false');
+    expect(screen.getByText('ROW-received').parentElement?.closest('[draggable]')).toHaveAttribute('draggable', 'true');
+  });
+
   it('does not show the sample receive action on the Lab testing queue', async () => {
     renderPage(<LabTestingPage />);
 
@@ -286,7 +297,7 @@ describe('petition search ranking', () => {
   });
 
   it('ranks machine codes without admitting retired or incompatible machines', async () => {
-    mocks.items = [petition('ROW-picker', 'R100')];
+    mocks.items = [petition('ROW-picker', 'R100', { labReceivedAt: '2026-09-19T01:00:00.000Z' })];
     mocks.items[0].items[0].commonName = 'Compound';
     mocks.machines = ['OTHER', 'GC100-Z', 'XXGC100', 'XGC100', 'GC100', 'GC100-A'].map((code) => ({
       code, name: 'GC analyzer', location: 'GC100',

@@ -74,6 +74,34 @@ test('GET / filters assigned petitions by current assignee before pagination', a
   }
 });
 
+test('PATCH /:id/assign requires Lab receipt, not QC receipt', async () => {
+  const originalFindOne = Petition.findOne;
+  const originalSave = Petition.prototype.save;
+  try {
+    let saved = false;
+    Petition.findOne = async () => ({ status: 'pendingReview', qcReceivedAt: new Date(), receivedAt: new Date() });
+    Petition.prototype.save = async () => { saved = true; };
+    const res = await invoke('/:id/assign', 'patch', {
+      params: { id: 'P-2609-0001' },
+      body: { employeeId: 'E1', name: 'Analyst' },
+    });
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body.error.message, /Lab ต้องรับตัวอย่างก่อน/);
+    assert.equal(saved, false);
+  } finally {
+    Petition.findOne = originalFindOne;
+    Petition.prototype.save = originalSave;
+  }
+});
+
+test('PATCH /:id cannot bypass Lab receipt through a general update', async () => {
+  const res = await invoke('/:id', 'patch', {
+    params: { id: 'P-2609-0001' },
+    body: { assignedTo: { employeeId: 'E1', name: 'Analyst' } },
+  });
+  assert.equal(res.statusCode, 400);
+});
+
 test('POST / rejects sendToLab override without item note before creating petition', async () => {
   const originals = {
     configFindOne: DocumentNumberConfig.findOne,
