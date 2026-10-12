@@ -14,6 +14,7 @@ import {
   type ConditionContext,
 } from "@/lib/parameterValidation";
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange } from "@/lib/standardOperators";
+import { calculatedAiFieldKind } from "@/lib/aiCalculation";
 
 export interface ApprovalFieldRow {
   key: string;
@@ -48,6 +49,28 @@ const resultKey = (itemSeq: number, parameterId: string) => `${itemSeq}__${param
 const noteLabelFor = (unitKey: string) => `${unitKey}__note`;
 
 const asStr = (v: unknown) => (v == null ? "" : String(v));
+
+const AI_APPROVAL_ROW_ORDER = [
+  "area inj.1",
+  "area inj.2",
+  "area inj.3",
+  "area average",
+  "area %rsd",
+  "% sample 1",
+  "% sample 2",
+  "% sample 3",
+  "% sample average",
+  "% sample %rsd",
+] as const;
+
+const aiApprovalRowRank = (label: string) => {
+  const normalized = label.split(" · ")[0].trim().toLowerCase();
+  const rank = AI_APPROVAL_ROW_ORDER.indexOf(normalized as (typeof AI_APPROVAL_ROW_ORDER)[number]);
+  if (rank >= 0) return rank;
+  return calculatedAiFieldKind(normalized) === "ai"
+    ? AI_APPROVAL_ROW_ORDER.length
+    : AI_APPROVAL_ROW_ORDER.length + 1;
+};
 
 /**
  * แปลง petition + parameters (scope qc) + ผลที่บันทึก → โครงสร้างแถวสรุปแบบ read-only
@@ -118,6 +141,7 @@ export function buildApprovalGroups(
             if (phase === 2 && fPhase === "before") return;
             // reference fields are auto-resolved from substance standards elsewhere and intentionally omitted from approval rows
             if (field.type === "reference") return;
+            handledKeys.add(field.label);
             expandFieldForItem(field, item.commonName, { includeRestrictedStandards, category: petitionCategory }).forEach((unit) => {
               handledKeys.add(unit.key);
               handledKeys.add(noteLabelFor(unit.key));
@@ -199,6 +223,9 @@ export function buildApprovalGroups(
 
       pushFields(1);
       if (param.hasPhases) pushFields(2);
+      if ((param.valueFields ?? []).some((field) => calculatedAiFieldKind(field.label) === "ai")) {
+        rows.sort((a, b) => aiApprovalRowRank(a.label) - aiApprovalRowRank(b.label));
+      }
 
       return {
         parameterId: String(param._id),

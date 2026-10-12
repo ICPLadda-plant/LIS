@@ -135,6 +135,7 @@ export default function LabApprovalReviewPage() {
 
   const groups = buildApprovalGroups(petition, parameters, results, groupMembership, {
     includeResultOnlyFields: true,
+    showAutoPassRange: false,
   });
 
   return (
