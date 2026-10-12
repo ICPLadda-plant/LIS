@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -70,6 +70,14 @@ function resultRowsFromForm(itemSeq: number, values: ResultForm): CoaResultSnaps
   ];
 }
 
+type LabAiLookupStatus = "idle" | "waiting" | "searching" | "found" | "not-found" | "error";
+
+type AutoFilledResultValues = {
+  batchNo: string;
+  aiResult?: string;
+  analysisDate?: string;
+};
+
 export default function CoaManualDialog({ open, onOpenChange, request, onSaved }: {
   open: boolean; onOpenChange: (open: boolean) => void; request: CoaDocument; onSaved: (doc: CoaDocument) => void;
 }) {
@@ -77,11 +85,20 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   const [sample, setSample] = useState<CoaSampleSnapshot>({ itemSeq: 1 });
   const [resultForm, setResultForm] = useState<ResultForm>(emptyResultForm);
   const [remark, setRemark] = useState("");
+  const [labAiLookupKey, setLabAiLookupKey] = useState({ batchNo: "", commonName: "", sampleName: "" });
+  const [labAiLookupStatus, setLabAiLookupStatus] = useState<LabAiLookupStatus>("idle");
+  const autoFilledResultValues = useRef<AutoFilledResultValues | null>(null);
   const editing = request.sourceType === "erpManual";
   const autofill = useQuery({
     queryKey: ["coa", "erp-autofill", request.externalRequestId || request._id],
     queryFn: () => api.getErpCoaAutofill(request.externalRequestId || request._id),
     enabled: open && !editing,
+  });
+  const labAiLookup = useQuery({
+    queryKey: ["coa", "lab-ai-lookup", labAiLookupKey],
+    queryFn: () => api.getCoaLabAiByBatch(labAiLookupKey),
+    enabled: open && Boolean(labAiLookupKey.batchNo && labAiLookupKey.commonName),
+    retry: false,
   });
   const save = useMutation({
     mutationFn: () => {
@@ -99,13 +116,74 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
     setSample({ ...source, productionDate: source.productionDate?.slice(0, 10) || "" });
     setResultForm(resultFormFromRows(request.resultSnapshots));
     setRemark(request.remark || "");
+    autoFilledResultValues.current = null;
+    setLabAiLookupKey({ batchNo: "", commonName: "", sampleName: "" });
+    setLabAiLookupStatus("idle");
     reset();
   }, [open, request, reset]);
   useEffect(() => {
     if (!open || editing || !autofill.data) return;
     setSample((current) => ({ ...current, ...autofill.data.sample, productionDate: autofill.data.sample.productionDate?.slice(0, 10) || "" }));
-    setResultForm(resultFormFromRows(autofill.data.results));
+    const nextResultForm = resultFormFromRows(autofill.data.results);
+    setResultForm(nextResultForm);
+    autoFilledResultValues.current = {
+      batchNo: String(autofill.data.sample.batchNo || "").trim(),
+      ...(nextResultForm.aiResult ? { aiResult: nextResultForm.aiResult } : {}),
+      ...(nextResultForm.analysisDate ? { analysisDate: nextResultForm.analysisDate } : {}),
+    };
   }, [autofill.data, editing, open]);
+  useEffect(() => {
+    if (!open) {
+      setLabAiLookupKey({ batchNo: "", commonName: "", sampleName: "" });
+      setLabAiLookupStatus("idle");
+      return;
+    }
+    const batchNo = String(sample.batchNo || "").trim();
+    const commonName = String(sample.commonName || "").trim();
+    const sampleName = String(sample.sampleName || "").trim();
+    if (!batchNo || !commonName) {
+      setLabAiLookupKey({ batchNo: "", commonName: "", sampleName: "" });
+      setLabAiLookupStatus("idle");
+      return;
+    }
+    setLabAiLookupStatus("waiting");
+    const timer = window.setTimeout(() => {
+      setLabAiLookupKey({ batchNo, commonName, sampleName });
+      setLabAiLookupStatus("searching");
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [open, sample.batchNo, sample.commonName, sample.sampleName]);
+  useEffect(() => {
+    if (!labAiLookupKey.batchNo || !labAiLookupKey.commonName || labAiLookup.isFetching) return;
+    if (labAiLookup.isError) {
+      setLabAiLookupStatus("error");
+      return;
+    }
+    const data = labAiLookup.data;
+    if (!data) return;
+    const aiResult = String(data.ai?.result || "").trim();
+    const analysisDate = String(data.analysisDate || "").trim();
+    setResultForm((current) => {
+      const previousAuto = autoFilledResultValues.current;
+      const batchChanged = Boolean(previousAuto?.batchNo && previousAuto.batchNo !== labAiLookupKey.batchNo);
+      const canReplaceAi = !current.aiResult.trim() || previousAuto?.aiResult === current.aiResult;
+      const canReplaceAnalysisDate = !current.analysisDate.trim() || previousAuto?.analysisDate === current.analysisDate;
+      const updateAi = canReplaceAi && (Boolean(aiResult) || batchChanged);
+      const updateAnalysisDate = canReplaceAnalysisDate && (Boolean(analysisDate) || batchChanged);
+      const next = {
+        ...current,
+        ...(updateAi ? { aiResult } : {}),
+        ...(updateAnalysisDate ? { analysisDate } : {}),
+      };
+      autoFilledResultValues.current = {
+        batchNo: labAiLookupKey.batchNo,
+        ...(updateAi && aiResult ? { aiResult } : (!batchChanged && previousAuto?.aiResult ? { aiResult: previousAuto.aiResult } : {})),
+        ...(updateAnalysisDate && analysisDate ? { analysisDate } : (!batchChanged && previousAuto?.analysisDate ? { analysisDate: previousAuto.analysisDate } : {})),
+      };
+      return next;
+    });
+    setLabAiLookupStatus(aiResult ? "found" : "not-found");
+  }, [labAiLookup.data, labAiLookup.isError, labAiLookup.isFetching, labAiLookupKey]);
   const valid = [sample.sampleName, sample.commonName, sample.batchNo, sample.productionDate].every((value) => value?.trim())
     && resultFields.every(([field]) => resultForm[field].trim());
   function selectStockLot(lotNo: string) {
@@ -173,9 +251,25 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
             {resultFields.map(([key, label, type]) => <div key={key} className="space-y-1">
               <Label htmlFor={`manual-result-${key}`}>{label} *</Label>
               <Input id={`manual-result-${key}`} type={type} required maxLength={1000} value={resultForm[key]}
-                onChange={(event) => setResultForm((current) => ({ ...current, [key]: event.target.value }))} />
+                onChange={(event) => setResultForm((current) => {
+                  const value = event.target.value;
+                  const previousAuto = autoFilledResultValues.current;
+                  if ((key === "aiResult" || key === "analysisDate") && previousAuto?.[key] !== undefined && value !== current[key]) {
+                    const nextAuto = { ...previousAuto };
+                    delete nextAuto[key];
+                    autoFilledResultValues.current = nextAuto.aiResult || nextAuto.analysisDate ? nextAuto : null;
+                  }
+                  return { ...current, [key]: value };
+                })} />
             </div>)}
           </div>
+          {labAiLookupStatus !== "idle" && <p role="status" className="text-sm text-muted-foreground">
+            {labAiLookupStatus === "waiting" && "กำลังเตรียมค้นหาผล %AI..."}
+            {labAiLookupStatus === "searching" && "กำลังค้นหาผล %AI จาก Batch No...."}
+            {labAiLookupStatus === "found" && `พบผล %AI จาก Batch No. ${labAiLookupKey.batchNo}`}
+            {labAiLookupStatus === "not-found" && "ไม่พบผล %AI ที่ตรงกับชื่อสามัญและ Batch No."}
+            {labAiLookupStatus === "error" && "ค้นหาผล %AI ไม่สำเร็จ สามารถกรอกค่าเองได้"}
+          </p>}
         </div>
         <div className="space-y-1"><Label htmlFor="manual-remark">หมายเหตุ</Label>
           <Textarea id="manual-remark" maxLength={3000} value={remark} onChange={(event) => setRemark(event.target.value)} /></div>

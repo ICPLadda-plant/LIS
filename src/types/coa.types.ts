@@ -175,6 +175,25 @@ export type CoaErpAutofill = {
   dataSources: { erp: boolean; stock: boolean; mf: boolean; lab: boolean; density: boolean };
 };
 
+export type CoaLabAiLookup = {
+  batchNo: string;
+  commonName: string;
+  ai: {
+    testItem?: string;
+    result?: string;
+    criteria?: string;
+    method?: string;
+    unit?: string;
+  } | null;
+  analysisDate: string;
+  match: {
+    petitionId: string;
+    petitionNo?: string;
+    itemSeq: number;
+    batchNo?: string;
+  } | null;
+};
+
 export type EligibleCoaPetition = {
   _id: string;
   petitionNo: string;

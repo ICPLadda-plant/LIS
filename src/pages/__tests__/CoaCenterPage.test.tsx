@@ -126,6 +126,9 @@ vi.mock("@/lib/api", () => ({
       form: { template: "standard", aiCriteria: "", needsDensity: false }, warnings: [],
       dataSources: { erp: true, stock: false, mf: false, lab: false, density: false },
     }),
+    getCoaLabAiByBatch: vi.fn().mockImplementation(({ batchNo, commonName }: { batchNo: string; commonName: string }) => Promise.resolve({
+      batchNo, commonName, ai: null, analysisDate: "", match: null,
+    })),
     createCoaDocument: vi.fn().mockResolvedValue({}),
     createManualCoaDocument: vi.fn().mockResolvedValue({}),
     createErpManualCoaDocument: vi.fn().mockResolvedValue({}),
@@ -482,6 +485,52 @@ describe("CoaCenterPage", () => {
     expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-09-02");
     expect(screen.getByLabelText("%AI content (W/V) *")).toHaveValue("48.35%");
     expect(screen.getByText("แบบฟอร์ม: ยาน้ำ")).toBeInTheDocument();
+  });
+
+  it("refreshes %AI from the entered batch in real time", async () => {
+    vi.mocked(api.getCoaDocuments).mockResolvedValueOnce({
+      items: [{
+        _id: "external-coa-request-SO-AI-LOOKUP-10000", coaNo: null, coaYear: 2026, revision: 0, status: "requested",
+        petitionId: "external-coa-request-SO-AI-LOOKUP-10000", petitionNoSnapshot: "SO-AI-LOOKUP", selectedItemSeqs: [10000],
+        customerSnapshot: { name: "Customer AI" },
+        sampleSnapshots: [{ itemSeq: 10000, sampleName: "ช้างมาร์กี้", commonName: "GLYPHOSATE 48% W/V SL" }],
+        resultSnapshots: [], externalRequestId: "external-coa-request-SO-AI-LOOKUP-10000",
+        externalCoaRequest: { saleOrderNo: "SO-AI-LOOKUP", line: 10000 },
+      }],
+    });
+    vi.mocked(api.getErpCoaAutofill).mockResolvedValueOnce({
+      externalRequestId: "external-coa-request-SO-AI-LOOKUP-10000", source: {},
+      sample: { itemSeq: 10000, sampleName: "ช้างมาร์กี้", commonName: "GLYPHOSATE 48% W/V SL", batchNo: "080", productionDate: "2026-10-01" },
+      results: [], match: null, candidates: [], stockCandidates: [], mfCandidates: [],
+      form: { template: "liquid", aiCriteria: "48% ± 2.40", needsDensity: true }, warnings: [],
+      dataSources: { erp: true, stock: false, mf: false, lab: false, density: false },
+    });
+    vi.mocked(api.getCoaLabAiByBatch).mockImplementation(async ({ batchNo, commonName }) => ({
+      batchNo, commonName,
+      ai: batchNo === "080" ? { testItem: "%AI content", result: "48.15%", criteria: "48% ± 2.40", unit: "%" } : null,
+      analysisDate: batchNo === "080" ? "2026-10-08" : "",
+      match: batchNo === "080" ? { petitionId: "p-ai", petitionNo: "P-AI-LOOKUP", itemSeq: 1, batchNo: "080" } : null,
+    }));
+
+    renderPage();
+    const statusButton = await waitFor(() => {
+      const button = screen.getAllByRole("button").find((candidate) => {
+        const label = candidate.getAttribute("aria-label") || "";
+        return label.includes("COA") && !label.includes("คำขอ") && !label.includes("แจ้งเตือน");
+      });
+      expect(button).toBeTruthy();
+      return button as HTMLElement;
+    });
+    fireEvent.click(statusButton);
+    fireEvent.click(await screen.findByRole("row", { name: /SO-AI-LOOKUP/ }));
+    await waitFor(() => expect(screen.getByLabelText("Batch No. *")).toHaveValue("080"));
+    await waitFor(() => expect(api.getCoaLabAiByBatch).toHaveBeenCalledWith(expect.objectContaining({ batchNo: "080", commonName: "GLYPHOSATE 48% W/V SL" })));
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/V) *")).toHaveValue("48.15%"));
+    expect(screen.getByLabelText("Date of analysis *")).toHaveValue("2026-10-08");
+
+    fireEvent.change(screen.getByLabelText("Batch No. *"), { target: { value: "081" } });
+    await waitFor(() => expect(api.getCoaLabAiByBatch).toHaveBeenCalledWith(expect.objectContaining({ batchNo: "081" })));
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/V) *")).toHaveValue(""));
   });
 
   it("opens the clicked COA request with its common name and parameter sources selected", async () => {

@@ -33,7 +33,7 @@ import type { DashboardId, StoredLayout, DashboardLayout } from "@/lib/dashboard
 import type { MethodDoc, MethodInput } from './methodRegistry';
 import type { ChemicalRequisition } from "@/lib/chemicalRequisition";
 import type { GoodsReceipt, GoodsReceiptInput } from "@/types/goodsReceipt.types";
-import type { CoaDocument, CoaErpAutofill, CoaFormSelection, CoaSourceResult, EligibleCoaPetition, ManualCoaInput } from "@/types/coa.types";
+import type { CoaDocument, CoaErpAutofill, CoaFormSelection, CoaLabAiLookup, CoaSourceResult, EligibleCoaPetition, ManualCoaInput } from "@/types/coa.types";
 import type { PetitionAuditEvent, PetitionStatus } from "@/types/petition.types";
 import type {
   ApiKeyItem,
@@ -963,6 +963,11 @@ export const api = {
     request<CoaDocument>("/coa-documents/erp-manual", { method: "POST", body: JSON.stringify(body) }),
   getErpCoaAutofill: (externalRequestId: string) =>
     request<CoaErpAutofill>(`/coa-documents/erp-autofill/${encodeURIComponent(externalRequestId)}`),
+  getCoaLabAiByBatch: (params: { batchNo: string; commonName: string; sampleName?: string }) => {
+    const query = new URLSearchParams({ batchNo: params.batchNo, commonName: params.commonName });
+    if (params.sampleName) query.set("sampleName", params.sampleName);
+    return request<CoaLabAiLookup>(`/coa-documents/lab-ai-lookup?${query.toString()}`);
+  },
   getCoaSourceData: (petitionId: string, itemSeqs: number[]) =>
     request<{ results: CoaSourceResult[]; customerSnapshot?: CoaDocument["customerSnapshot"]; sampleSnapshots?: CoaDocument["sampleSnapshots"] }>("/coa-documents/source-data/" + encodeURIComponent(petitionId) + "?itemSeqs=" + encodeURIComponent(itemSeqs.join(","))),
   createCoaDocument: (body: {
