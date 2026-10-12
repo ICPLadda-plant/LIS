@@ -23,6 +23,8 @@ export default function DensitySyncButton({
   batchNo, onRows, onOptions, disabled = false,
 }: DensitySyncButtonProps) {
   const appliedKeyRef = useRef('');
+  const onOptionsRef = useRef(onOptions);
+  onOptionsRef.current = onOptions;
 
   const { data, isError, error } = useQuery({
     queryKey: ['density-by-batch', batchNo],
@@ -34,8 +36,8 @@ export default function DensitySyncButton({
   const docs = data?.docs ?? EMPTY_DENSITY_DOCS;
 
   useEffect(() => {
-    onOptions?.(docs);
-  }, [docs, onOptions]);
+    onOptionsRef.current?.(docs);
+  }, [docs]);
 
   useEffect(() => {
     appliedKeyRef.current = '';
