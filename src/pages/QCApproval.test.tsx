@@ -38,6 +38,8 @@ vi.mock("@/hooks/usePetition", () => ({
           dept: "rm",
           status: "success",
           submittedBy: { name: "ผู้ยื่น A" },
+          qcCompletedAt: "2026-08-05T01:00:00.000Z",
+          labCompletedAt: "2026-08-05T02:00:00.000Z",
           completedAt: "2026-08-05T00:00:00.000Z",
           items: [{ seq: 1, sampleName: "ตัวอย่าง A" }],
           createdAt: "2026-08-05T00:00:00.000Z",
@@ -88,7 +90,19 @@ describe("QCApproval", () => {
     fireEvent.click(within(row).getByRole("button", { name: "ไม่อนุมัติ" }));
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/qc-approval/p1?decision=reject");
+      expect(navigateMock).toHaveBeenCalledWith("/qc-approval/p1?tab=qc&decision=reject");
     });
+  });
+
+  it("separates submitted QC and Lab results into tabs", async () => {
+    render(
+      <MemoryRouter>
+        <QCApproval />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("tab", { name: "ผล QC (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "ผล Lab (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "ยืนยันผลเมื่อ" })).toBeInTheDocument();
   });
 });

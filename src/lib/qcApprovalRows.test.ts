@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildApprovalGroups } from "./qcApprovalRows";
+import { buildApprovalGroups, filterApprovalGroupsByScope } from "./qcApprovalRows";
 import type { ParameterItem } from "@/lib/api";
 import type { Petition, QCTestResult } from "@/types/petition.types";
 
@@ -152,6 +152,49 @@ describe("buildApprovalGroups", () => {
     } as unknown as Petition;
     const groups = buildApprovalGroups(nonLabPetition, [labParam], [], new Map());
     expect(groups[0].params.find((p) => p.parameterId === "l1")).toBeUndefined();
+  });
+
+  it("แสดงค่าที่ Lab บันทึกไว้แม้ field เก่าไม่มีใน parameter แล้ว", () => {
+    const labParam = param({ _id: "l1", name: "%AI", scope: "lab", valueFields: [{ label: "%AI", type: "float", unit: "%" }] });
+    const labPetition = {
+      ...petition(),
+      items: [{ seq: 1, sampleName: "ตัวอย่าง A", commonName: "A 1%", sampleId: "S1", batchNo: "B1", testItems: "%AI" }],
+    } as unknown as Petition;
+    const labResult = {
+      itemSeq: 1,
+      parameterId: "l1",
+      parameterName: "%AI",
+      values: { "Area Inj.1": 100, "% Sample Average": 1.2, "%AI": 1.1 },
+    } as unknown as QCTestResult;
+
+    const groups = buildApprovalGroups(labPetition, [labParam], [labResult], new Map(), { includeResultOnlyFields: true });
+    expect(groups[0].params[0].rows.map((row) => row.label)).toEqual([
+      "%AI",
+      "Area Inj.1",
+      "% Sample Average",
+    ]);
+  });
+
+  it("หน้า QC เลือกผล Lab ของ %AI เฉพาะค่าสรุป", () => {
+    const groups = [{
+      seq: 1,
+      sampleName: "ตัวอย่าง A",
+      params: [{
+        parameterId: "l1",
+        parameterName: "%AI",
+        scope: "lab" as const,
+        hasPhases: false,
+        rows: [
+          { key: "area", label: "Area Inj.1", value: "100", standardText: "", abnormal: false, note: "", phase: 1 as const },
+          { key: "ai-empty", label: "%AI — A", value: "", standardText: "", abnormal: false, note: "", phase: 1 as const },
+          { key: "ai", label: "%AI", value: "1.1", standardText: "", abnormal: false, note: "", phase: 1 as const },
+        ],
+      }],
+      unmatched: false,
+    }];
+
+    const filtered = filterApprovalGroupsByScope(groups, "lab", { aiSummaryOnly: true });
+    expect(filtered[0].params[0].rows.map((row) => row.label)).toEqual(["%AI"]);
   });
 
   // Fix 2 — phase-2 test

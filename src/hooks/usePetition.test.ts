@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePetition, usePetitionList } from './usePetition';
 
 function mockFetchOk() {
-  const fn = vi.fn(async () => ({
+  const fn = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit): Promise<{ ok: boolean; json: () => Promise<unknown> }> => ({
     ok: true,
     json: async () => ({ items: [], total: 0, page: 1, limit: 100 }),
   }));
@@ -111,6 +111,17 @@ describe('usePetitionList auto-refetch', () => {
     const requestedUrl = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost');
     expect(requestedUrl.searchParams.get('assignedToEmployeeId')).toBe('E123');
     expect(requestedUrl.searchParams.getAll('assignedToName')).toEqual(['Analyst A', 'Analyst Alias']);
+  });
+
+  it('requests the QC approval queue without waiting for both tracks', async () => {
+    const { result } = renderHook(() =>
+      usePetitionList({ awaitingQcApproval: true, limit: 100 }),
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const requestedUrl = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost');
+    expect(requestedUrl.searchParams.get('awaitingQcApproval')).toBe('true');
   });
 });
 

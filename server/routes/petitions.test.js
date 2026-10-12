@@ -74,6 +74,42 @@ test('GET / filters assigned petitions by current assignee before pagination', a
   }
 });
 
+test('GET / awaitingQcApproval returns petitions after either track confirms results', async () => {
+  const originals = {
+    petitionFind: Petition.find,
+    petitionCountDocuments: Petition.countDocuments,
+    petitionAggregate: Petition.aggregate,
+  };
+  let findQuery;
+  try {
+    Petition.find = (query) => {
+      findQuery = query;
+      return {
+        sort: () => ({
+          skip: () => ({
+            limit: async () => [],
+          }),
+        }),
+      };
+    };
+    Petition.countDocuments = async () => 0;
+    Petition.aggregate = async () => [];
+
+    const res = await invoke('/', 'get', { query: { awaitingQcApproval: 'true' } });
+
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(findQuery.status, { $nin: ['approved', 'rejected'] });
+    assert.deepEqual(findQuery.$or, [
+      { qcCompletedAt: { $ne: null } },
+      { labCompletedAt: { $ne: null } },
+    ]);
+  } finally {
+    Petition.find = originals.petitionFind;
+    Petition.countDocuments = originals.petitionCountDocuments;
+    Petition.aggregate = originals.petitionAggregate;
+  }
+});
+
 test('PATCH /:id/assign requires Lab receipt, not QC receipt', async () => {
   const originalFindOne = Petition.findOne;
   const originalSave = Petition.prototype.save;

@@ -196,6 +196,23 @@ router.get('/', async (req, res) => {
       return res.json({ items, total: items.length, page: 1, limit: items.length });
     }
 
+    if (req.query.awaitingQcApproval === 'true') {
+      q.status = { $nin: ['approved', 'rejected'] };
+      const completedTrack = {
+        $or: [
+          { qcCompletedAt: { $ne: null } },
+          { labCompletedAt: { $ne: null } },
+        ],
+      };
+      if (q.$or) {
+        q.$and = [...(q.$and || []), { $or: q.$or }, completedTrack];
+        delete q.$or;
+      } else if (q.$and) {
+        q.$and.push(completedTrack);
+      } else {
+        Object.assign(q, completedTrack);
+      }
+    }
     if (req.query.awaitingLabApproval === 'true') {
       q.labCompletedAt = { $ne: null };
       q.labApprovedAt = null;
