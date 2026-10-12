@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FlaskConical, AlertTriangle, QrCode, RotateCcw } from 'lucide-react';
+import { FlaskConical, AlertTriangle, RotateCcw } from 'lucide-react';
 import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,7 +32,6 @@ import PageToolbar from '@/components/lis/PageToolbar';
 import { DataTable, type DataTableColumn } from '@/components/lis/DataTable';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
 import { labReceivedAt, labReceivedBy, labTrackStatusBadge } from '@/lib/receiveStatus';
-import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import { normalizeRoles } from '@/lib/roles';
 import { assigneeNamesForUser, isAssignedTo } from '@/lib/assignment';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
@@ -71,7 +70,6 @@ export default function LabTestingPage() {
   const assignedToNames = !isFullAccess ? assigneeNamesForUser(user) : undefined;
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState<PetitionDept | ''>('');
-  const [scanOpen, setScanOpen] = useState(false);
   const [labParams, setLabParams] = useState<ParameterItem[]>([]);
   const [paramsLoaded, setParamsLoaded] = useState(false);
   const groupMembership = useItemGroupMembership();
@@ -91,7 +89,7 @@ export default function LabTestingPage() {
       .finally(() => setParamsLoaded(true));
   }, []);
 
-  const { data, loading, refresh } = usePetitionList({
+  const { data, loading } = usePetitionList({
     status: 'sampleSent,pendingReview,inProgress,success',
     search,
     dept: dept || undefined,
@@ -232,11 +230,6 @@ export default function LabTestingPage() {
 
   return (
     <AppLayout title="การทดสอบ Lab">
-      <LabScanAcceptModal
-        open={scanOpen}
-        onClose={() => setScanOpen(false)}
-        onAccepted={() => { setScanOpen(false); refresh(); }}
-      />
       <div className="space-y-6">
         <PageHeader
           title={
@@ -246,12 +239,6 @@ export default function LabTestingPage() {
             </span>
           }
           description={`${petitions.length} รายการ`}
-          actions={
-            <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
-              <QrCode className="h-4 w-4" />
-              รับตัวอย่าง
-            </Button>
-          }
         />
 
         <PageToolbar

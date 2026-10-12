@@ -36,7 +36,9 @@ vi.mock('@/hooks/useItemGroupMembership', () => ({ useItemGroupMembership: () =>
 vi.mock('@/context/NotificationContext', () => ({ useNotifications: () => ({ push: mocks.push }) }));
 vi.mock('@/lib/aiApi', () => ({ getMachineSuggestions: async () => [] }));
 vi.mock('@/components/petition/QrReceiveModal', () => ({ default: () => null }));
-vi.mock('@/components/petition/LabScanAcceptModal', () => ({ default: () => null }));
+vi.mock('@/components/petition/LabScanAcceptModal', () => ({
+  default: ({ open }: { open: boolean }) => open ? <div role="dialog">รับตัวอย่าง Lab</div> : null,
+}));
 vi.mock('@/hooks/usePetition', () => ({
   usePetitionList: (params: { status?: string }) => {
     const items = mocks.items.filter((petition) => !params.status || params.status.split(',').includes(petition.status));
@@ -108,6 +110,21 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('petition search ranking', () => {
+  it('moves the Lab sample receive action to the assignment board', () => {
+    renderPage(<PetitionAssignPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'รับตัวอย่าง' }));
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('รับตัวอย่าง Lab');
+  });
+
+  it('does not show the sample receive action on the Lab testing queue', async () => {
+    renderPage(<LabTestingPage />);
+
+    await screen.findByText('ROW-exact');
+    expect(screen.queryByRole('button', { name: 'รับตัวอย่าง' })).not.toBeInTheDocument();
+  });
+
   it.each([
     ['assignment board', <PetitionAssignPage />, '/'],
     ['Lab results', <LabResults />, '/'],

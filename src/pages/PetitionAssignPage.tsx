@@ -9,6 +9,7 @@ import {
   GripVertical,
   Hourglass,
   Inbox,
+  QrCode,
   RefreshCw,
   Search,
   UserCheck,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
+import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
 import { Badge } from '@/components/ui/badge';
@@ -233,6 +235,7 @@ export default function PetitionAssignPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('normal');
+  const [scanOpen, setScanOpen] = useState(false);
   const [machineSuggestions, setMachineSuggestions] = useState<Record<string, MachineSuggestion[]>>({});
   // A petition dragged onto a staff card → open the machine-picking dialog.
   const [dropTarget, setDropTarget] = useState<{ petitionId: string; employeeId: string } | null>(null);
@@ -623,21 +626,35 @@ export default function PetitionAssignPage() {
 
   return (
     <AppLayout>
+        <LabScanAcceptModal
+          open={scanOpen}
+          onClose={() => setScanOpen(false)}
+          onAccepted={() => {
+            setScanOpen(false);
+            refreshPetitions();
+          }}
+        />
         <div className="space-y-5">
           <PageHeader
             title="Assign คำร้องให้เจ้าหน้าที่"
             description="ลากคำร้องจากกอง “งานรอมอบหมาย” ไปวางบนการ์ดเจ้าหน้าที่ เพื่อเลือกเครื่องและ assign"
             actions={
-              <Button
-                variant="primary-outline"
-                onClick={() => {
-                  refreshPetitions();
-                  toast.info('กำลังโหลดรายการคำร้องล่าสุด');
-                }}
-              >
-                <RefreshCw className="h-4 w-4" />
-                รีเฟรช
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
+                  <QrCode className="h-4 w-4" />
+                  รับตัวอย่าง
+                </Button>
+                <Button
+                  variant="primary-outline"
+                  onClick={() => {
+                    refreshPetitions();
+                    toast.info('กำลังโหลดรายการคำร้องล่าสุด');
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  รีเฟรช
+                </Button>
+              </div>
             }
           />
 
