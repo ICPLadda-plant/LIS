@@ -183,8 +183,7 @@ const App = () => (
               <Route path="/petitions/new" element={<PrivateRoute><PetitionNewPage /></PrivateRoute>} />
               <Route path="/qc-testing" element={<PrivateRoute><QCTestingPage /></PrivateRoute>} />
               <Route path="/qc-testing/:id" element={<PrivateRoute><QCTestingDetailPage /></PrivateRoute>} />
-              {/* The Lab queue moved to the petition assignment workflow. Keep the old URL as a migration redirect. */}
-              <Route path="/lab-testing" element={<PrivateRoute><Navigate to="/petition/assign" replace /></PrivateRoute>} />
+              <Route path="/lab-testing" element={<PrivateRoute><LabTestingPage /></PrivateRoute>} />
               <Route path="/lab-testing/:id" element={<PrivateRoute><LabTestingDetailPage /></PrivateRoute>} />
               <Route path="/density-results" element={<PrivateRoute><DensityResultPage /></PrivateRoute>} />
               <Route path="*" element={<NotFound />} />
