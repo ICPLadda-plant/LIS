@@ -800,6 +800,54 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
   }
 });
 
+router.get('/lab-ai-lookup', async (req, res) => {
+  try {
+    const batchNo = manualText(req.query.batchNo);
+    const commonName = manualText(req.query.commonName);
+    const sampleName = manualText(req.query.sampleName);
+    if (!batchNo || !commonName) {
+      throw errorWithStatus('กรุณาระบุ Batch No. และชื่อสามัญเพื่อค้นหาผล %AI', 400);
+    }
+
+    const petitions = await Petition.find({
+      items: {
+        $elemMatch: {
+          commonName: commonNameRegex(commonName),
+          $or: [
+            { batchNo: exactTrimmedRegex(batchNo) },
+            { lotNo: exactTrimmedRegex(batchNo) },
+          ],
+        },
+      },
+    }).sort({ updatedAt: -1 }).limit(200).lean();
+    const lab = findBestLabItem(petitions, { batchNo, commonName, sampleName });
+    if (!lab.best) {
+      return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
+    }
+
+    const qcResults = await QCTestResult.find({
+      petitionId: String(lab.best.petition._id),
+      itemSeq: Number(lab.best.item.seq),
+    }).sort({ updatedAt: -1 }).lean();
+    const resultData = resultRowsFromQc(qcResults, commonName);
+    const ai = resultData.rows.find((row) => isAiContentTestItem(row.testItem)) || null;
+    return res.json({
+      batchNo,
+      commonName,
+      ai,
+      analysisDate: resultData.analysisDate || '',
+      match: {
+        petitionId: String(lab.best.petition._id),
+        petitionNo: lab.best.petition.petitionNo,
+        itemSeq: Number(lab.best.item.seq),
+        batchNo: lab.best.item.batchNo || lab.best.item.lotNo || batchNo,
+      },
+    });
+  } catch (error) {
+    res.status(errorStatus(error)).json({ error: error.message });
+  }
+});
+
 router.get('/eligible-petitions', async (_req, res) => {
   try {
     const petitions = await Petition.find({ labApprovedAt: { $exists: true, $ne: null } })

@@ -1099,3 +1099,35 @@ test('ERP autofill only uses Lab results when common name and batch both match',
     ResultDensity.find = originals.densityFind;
   }
 });
+
+test('real-time Lab AI lookup returns the result for an exact batch and rejects another batch', async () => {
+  const originals = { petitionFind: Petition.find, qcFind: QCTestResult.find };
+  const petition = {
+    _id: 'petition-ai-lookup', petitionNo: 'P-AI-LOOKUP', updatedAt: '2026-10-08T00:00:00.000Z',
+    items: [{ seq: 1, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '080' }],
+  };
+  try {
+    Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
+      { parameterName: '%AI', values: { '%AI::glyphosate': '48.15' }, updatedAt: '2026-10-08T00:00:00.000Z' },
+    ] }) });
+
+    const found = await invoke('/lab-ai-lookup', 'get', {
+      query: { batchNo: '080', commonName: 'GLYPHOSATE 48% W/V SL', sampleName: 'ช้างมาร์กี้' },
+    });
+    assert.equal(found.statusCode, 200);
+    assert.equal(found.body.ai.result, '48.15%');
+    assert.equal(found.body.analysisDate, '2026-10-08');
+    assert.equal(found.body.match.batchNo, '080');
+
+    const missing = await invoke('/lab-ai-lookup', 'get', {
+      query: { batchNo: '081', commonName: 'GLYPHOSATE 48% W/V SL', sampleName: 'ช้างมาร์กี้' },
+    });
+    assert.equal(missing.statusCode, 200);
+    assert.equal(missing.body.ai, null);
+    assert.equal(missing.body.match, null);
+  } finally {
+    Petition.find = originals.petitionFind;
+    QCTestResult.find = originals.qcFind;
+  }
+});

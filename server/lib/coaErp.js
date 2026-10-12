@@ -43,7 +43,99 @@ function pick(row, keys) {
     const value = text(row?.[key]);
     if (value) return value;
   }
+  if (!row || typeof row !== 'object' || Array.isArray(row)) return '';
+  const aliases = new Map(Object.keys(row).map((key) => [key.toLowerCase().replace(/[^a-z0-9]/g, ''), key]));
+  for (const key of keys) {
+    const actualKey = aliases.get(String(key).toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const value = text(actualKey ? row[actualKey] : '');
+    if (value) return value;
+  }
   return '';
+}
+
+function itemCode(value) {
+  return text(value).toUpperCase();
+}
+
+function rowValues(row) {
+  if (Array.isArray(row)) return row;
+  if (Array.isArray(row?.values)) return row.values;
+  if (!row || typeof row !== 'object') return [];
+  const keys = Object.keys(row);
+  if (keys.length && keys.every((key) => /^\d+$/.test(key))) {
+    return keys.sort((left, right) => Number(left) - Number(right)).map((key) => row[key]);
+  }
+  return Object.values(row);
+}
+
+function isDateValue(value) {
+  const source = text(value);
+  return /^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[T\s]|$)/.test(source)
+    || /^\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:[T\s]|$)/.test(source);
+}
+
+function positionalDateFromRow(row) {
+  return rowValues(row).map((value) => text(value)).find(isDateValue) || '';
+}
+
+function positionalBatchFromRow(row) {
+  const values = rowValues(row);
+  if (!values.length) return '';
+  const productName = pick(row, [
+    'prod_descript', 'product_name', 'item_name', 'trade_name', 'name',
+    'description', 'prod_descript2', 'TradeName', 'Trade Name',
+  ]);
+  let productIndex = productName ? values.findIndex((value) => text(value) === productName) : -1;
+  if (productIndex < 0) {
+    productIndex = values.findIndex((value) => /[^\x00-\x7F]/.test(text(value)));
+  }
+  const dateIndex = values.findIndex((value, index) => index > productIndex && isDateValue(value));
+  if (productIndex < 0 || productIndex >= dateIndex - 1) return '';
+
+  // The source contract places Batch immediately after the product name and
+  // before the production date. Keep leading zeroes such as 080 and 081.
+  const candidate = text(values[productIndex + 1]);
+  if (!candidate || isDateValue(candidate) || /^MF[A-Z0-9-]+$/i.test(candidate)) return '';
+  if (/^\d+(?:\.\d+)?$/.test(candidate) && !/^0\d{2,}$/.test(candidate)) return '';
+  return candidate;
+}
+
+// MF rows expose the production order separately from the finished-product
+// batch. Never use prod_order_no as the COA Batch No. fallback.
+function batchFromRow(row) {
+  return pick(row, [
+    'batch_no', 'batchNo', 'BatchNo', 'Batch No.', 'Batch No',
+    'batch', 'Batch', 'batch_number', 'batchNumber',
+    'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
+    'production_batch_no', 'productionBatchNo', 'prod_batch_no', 'prodBatchNo',
+  ]) || positionalBatchFromRow(row);
+}
+
+function itemCodeFromRow(row) {
+  return pick(row, ['item_no', 'itemNo', 'code', 'short_dm1_code'])
+    || rowValues(row).map(text).find((value) => /^[A-Z][A-Z0-9]*-[A-Z0-9-]+$/i.test(value))
+    || '';
+}
+
+function productionDateFromRow(row, fallback = '') {
+  const explicit = pick(row, [
+    'create_date', 'createDate', 'production_date', 'productionDate',
+    'mfg_date', 'manufacture_date', 'registering_date', 'registeringDate',
+  ]);
+  return normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
+}
+
+function lotFromRow(row) {
+  return pick(row, [
+    'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
+    'batch_no', 'batchNo', 'BatchNo', 'Batch No.', 'Batch No',
+  ]) || batchFromRow(row);
+}
+
+function rowMatchesItem(row, normalizedItemNo) {
+  if (!normalizedItemNo) return false;
+  const explicit = itemCodeFromRow(row);
+  return itemCode(explicit) === normalizedItemNo;
 }
 
 function normalizeIsoDate(value) {
@@ -178,31 +270,37 @@ function findBestLabItem(petitions, sample) {
 function sampleFromSources(source, stockRows, mfRows) {
   const itemNo = text(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
   const commonName = text(source?.sampleSnapshots?.[0]?.commonName);
-  const productRows = stockRows.filter((row) => itemNo && text(row.item_no || row.itemNo) === itemNo);
-  const commonRows = stockRows.filter((row) => !itemNo && normalizeText(row.common_name || row.commonName) === normalizeText(commonName));
+  const normalizedItemNo = itemCode(itemNo);
+  const productRows = stockRows.filter((row) => rowMatchesItem(row, normalizedItemNo));
+  const commonRows = stockRows.filter((row) => !normalizedItemNo && normalizeText(row.common_name || row.commonName) === normalizeText(commonName));
   const stockCandidates = [...productRows, ...commonRows]
-    .filter((row) => text(row.lot_no || row.lotNo))
+    .filter((row) => lotFromRow(row))
     .sort((left, right) => {
-      const rightDate = lotSnapshot(right.lot_no || right.lotNo, right.registering_date).productionDate;
-      const leftDate = lotSnapshot(left.lot_no || left.lotNo, left.registering_date).productionDate;
+      const rightLot = lotFromRow(right);
+      const leftLot = lotFromRow(left);
+      const rightDate = lotSnapshot(rightLot, productionDateFromRow(right)).productionDate;
+      const leftDate = lotSnapshot(leftLot, productionDateFromRow(left)).productionDate;
       return rightDate.localeCompare(leftDate)
-        || String(right.registering_date || '').localeCompare(String(left.registering_date || ''))
+        || productionDateFromRow(right).localeCompare(productionDateFromRow(left))
         || Number(right.stock_qty_base || right.stock_qty || 0) - Number(left.stock_qty_base || left.stock_qty || 0);
     });
   const stock = stockCandidates[0];
   const mfCandidates = mfRows.filter((row) => {
-    const rowItem = text(row.item_no || row.itemNo);
-    return itemNo ? rowItem === itemNo : normalizeText(row.common_name || row.commonName) === normalizeText(commonName);
+    return normalizedItemNo
+      ? rowMatchesItem(row, normalizedItemNo)
+      : normalizeText(row.common_name || row.commonName) === normalizeText(commonName);
   });
   const mf = mfCandidates[0];
   const sourceBatch = text(source?.sampleSnapshots?.[0]?.batchNo || source?.sampleSnapshots?.[0]?.lotNo);
+  const mfBatch = batchFromRow(mf);
+  const mfDate = productionDateFromRow(mf);
   const lot = sourceBatch
     ? lotSnapshot(sourceBatch, source?.sampleSnapshots?.[0]?.productionDate)
-    : stock ? lotSnapshot(stock.lot_no || stock.lotNo, stock.registering_date) : { lotNo: '', batchNo: '', productionDate: '' };
-  if (!lot.batchNo && mf) {
-    lot.batchNo = pick(mf, ['prod_order_no', 'prodOrderNo']);
-    lot.productionDate = normalizeIsoDate(pick(mf, ['create_date', 'createDate']));
-  }
+    : stock
+      ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
+      : mfBatch
+        ? lotSnapshot(mfBatch, mfDate)
+        : { lotNo: '', batchNo: '', productionDate: mfDate };
   return {
     sample: {
       itemSeq: Number(source.selectedItemSeqs?.[0] || 1),
@@ -215,15 +313,15 @@ function sampleFromSources(source, stockRows, mfRows) {
       condition: text(source.externalCoaRequest?.packingSize || source.sampleSnapshots?.[0]?.condition),
     },
     stockCandidates: stockCandidates.slice(0, 10).map((row) => ({
-      lotNo: text(row.lot_no || row.lotNo),
-      productionDate: lotSnapshot(row.lot_no || row.lotNo, row.registering_date).productionDate,
+      lotNo: lotFromRow(row),
+      productionDate: lotSnapshot(lotFromRow(row), productionDateFromRow(row)).productionDate,
       quantity: Number(row.stock_qty_base || row.stock_qty || 0),
-      itemNo: text(row.item_no || row.itemNo),
+      itemNo: itemCodeFromRow(row),
     })),
     mfCandidates: mfCandidates.slice(0, 10).map((row) => ({
-      batchNo: pick(row, ['prod_order_no', 'prodOrderNo']),
-      productionDate: normalizeIsoDate(pick(row, ['create_date', 'createDate'])),
-      itemNo: text(row.item_no || row.itemNo),
+      batchNo: batchFromRow(row),
+      productionDate: productionDateFromRow(row),
+      itemNo: itemCodeFromRow(row),
     })),
   };
 }
@@ -299,4 +397,5 @@ module.exports = {
   resultRowsFromQc,
   rowsFromPayload,
   sampleFromSources,
+  batchFromRow,
 };

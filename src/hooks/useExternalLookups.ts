@@ -42,6 +42,9 @@ export interface EmployeeOption {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value.map((entry, index) => [String(index), entry]));
+  }
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
@@ -66,6 +69,23 @@ function pickString(row: Record<string, unknown>, keys: string[]): string {
   return '';
 }
 
+function positionalBatch(row: Record<string, unknown>): string {
+  const values = Array.isArray(row.values)
+    ? row.values
+    : Object.keys(row).every((key) => /^\d+$/.test(key))
+      ? Object.keys(row).sort((a, b) => Number(a) - Number(b)).map((key) => row[key])
+      : [];
+  const productName = pickString(row, ['prod_descript', 'product_name', 'item_name', 'trade_name', 'name', 'description']);
+  const productIndex = productName ? values.findIndex((value) => String(value ?? '').trim() === productName) : -1;
+  const dateIndex = values.findIndex((value, index) => index > productIndex && /^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[T\s]|$)/.test(String(value ?? '').trim()));
+  if (dateIndex < 1) return '';
+  const candidateIndex = productIndex >= 0 ? productIndex + 1 : dateIndex - 1;
+  const candidate = String(values[candidateIndex] ?? '').trim();
+  if (!candidate || candidateIndex >= dateIndex || /^MF[A-Z0-9-]+$/i.test(candidate)) return '';
+  if (/^\d+(?:\.\d+)?$/.test(candidate) && !/^0\d{2,}$/.test(candidate)) return '';
+  return candidate;
+}
+
 function normalizeDate(value: string): string | null {
   return normalizeMfDate(value);
 }
@@ -87,18 +107,16 @@ function normalizeLotOptions(payload: unknown, source: string, cnMap: Map<string
       const commonName = normalizeCommonName(rawCommonName, cnMap);
       const sampleName = [productName, packsize, commonName].filter(Boolean).join(' · ');
       const batchNo = pickString(row, [
+        'batch_no',
+        'batchNo',
+        'batch',
+        'batch_number',
+        'batchNumber',
         'lot_no',
         'lotNo',
         'lot',
         'LOT_NO',
-        'prod_order_no',
-        'prodOrderNo',
-        'mf_no',
-        'mfNo',
-        'batch_no',
-        'batchNo',
-        'batch',
-      ]);
+      ]) || positionalBatch(row);
       const rowProductionDate = normalizeDate(
         pickString(row, ['productionDate', 'production_date', 'mfg_date', 'manufacture_date', 'create_date']),
       );
