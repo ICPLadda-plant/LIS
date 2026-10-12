@@ -197,6 +197,27 @@ describe("buildApprovalGroups", () => {
     expect(filtered[0].params[0].rows.map((row) => row.label)).toEqual(["%AI"]);
   });
 
+  it("หน้า QC ไม่แสดง %AI แถวรวมซ้ำเมื่อมีค่ารายสารแล้ว", () => {
+    const groups = [{
+      seq: 1,
+      sampleName: "ตัวอย่าง A",
+      params: [{
+        parameterId: "l1",
+        parameterName: "%AI",
+        scope: "lab" as const,
+        hasPhases: false,
+        rows: [
+          { key: "substance", label: "%AI — A", value: "1.1", standardText: "0.9 - 1.2", abnormal: false, note: "", phase: 1 as const },
+          { key: "generic", label: "%AI", value: "1.1", standardText: "", abnormal: false, note: "", phase: 1 as const },
+        ],
+      }],
+      unmatched: false,
+    }];
+
+    const filtered = filterApprovalGroupsByScope(groups, "lab", { aiSummaryOnly: true });
+    expect(filtered[0].params[0].rows.map((row) => row.label)).toEqual(["%AI — A"]);
+  });
+
   // Fix 2 — phase-2 test
   it("phase-2: สร้าง row phase:2 จาก valuesPhase2 และไม่สับสนกับ phase 1", () => {
     const phasedParam = param({

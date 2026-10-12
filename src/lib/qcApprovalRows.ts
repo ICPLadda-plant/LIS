@@ -233,7 +233,11 @@ export function filterApprovalGroupsByScope(
         if (!options?.aiSummaryOnly || !/%\s*ai/i.test(param.parameterName)) return param;
         const aiRows = param.rows.filter((row) => /^%\s*ai\b/i.test(row.label.trim()));
         const filledRows = aiRows.filter((row) => row.value !== "");
-        return { ...param, rows: filledRows.length > 0 ? filledRows : aiRows };
+        const filledSubstanceRows = filledRows.filter((row) => /^%\s*ai\s+[—-]/i.test(row.label.trim()));
+        return {
+          ...param,
+          rows: filledSubstanceRows.length > 0 ? filledSubstanceRows : (filledRows.length > 0 ? filledRows : aiRows),
+        };
       })
       .filter((param) => param.rows.length > 0);
     return params.length > 0 ? [{ ...group, params, unmatched: false }] : [];
