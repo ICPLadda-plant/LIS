@@ -10,4 +10,11 @@ describe("App routes", () => {
       '<Route path="/lab-testing" element={<PrivateRoute><LabTestingPage /></PrivateRoute>} />',
     );
   });
+
+  it("keeps QC Head result editing under /record-results/:id", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/App.tsx"), "utf8");
+
+    expect(source).toContain('searchParams.get("edit") === "1"');
+    expect(source).toContain('<Route path="/record-results/:id" element={<PrivateRoute><ResultDetailRoute /></PrivateRoute>} />');
+  });
 });

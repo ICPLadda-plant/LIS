@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { isNotificationSoundEnabled } from "@/lib/appPreferences";
 import { audiencesForUser, readSeeAll, SEE_ALL_EVENT } from "@/lib/petitionAudience";
+import { normalizeRoles } from "@/lib/roles";
 import {
   PETITION_NOTIFICATIONS_REFRESH_EVENT,
   cursorKey,
@@ -135,16 +136,18 @@ const PetitionFlowWatcher = () => {
   }, []);
 
   const audiences = useMemo(() => audiencesForUser(user), [user]);
+  const roles = useMemo(() => normalizeRoles(user), [user]);
   const employeeId = user?.employeeId;
   const enabled = !!user && (audiences.length > 0 || !!employeeId || seeAll);
 
   const { data, refetch } = useQuery({
-    queryKey: ["petition-notifications", employeeId ?? "", audiences.join(","), seeAll],
+    queryKey: ["petition-notifications", employeeId ?? "", audiences.join(","), roles.join(","), seeAll],
     queryFn: () => {
       shouldMarkBackfilledRef.current = shouldBackfillPetitionNotifications(employeeId, user);
       return api.getPetitionNotifications({
         since: petitionNotificationSince(employeeId, user),
         audiences,
+        roles,
         employeeId,
         all: seeAll,
       });

@@ -441,6 +441,7 @@ router.get('/notifications', async (req, res) => {
       .filter(Boolean);
     const viewer = {
       audiences,
+      roles: String(req.query.roles || '').split(',').map((s) => s.trim()).filter(Boolean),
       employeeId: String(req.query.employeeId || '').trim(),
       seeAll: String(req.query.all || '') === '1',
     };

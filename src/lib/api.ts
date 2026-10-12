@@ -600,12 +600,14 @@ export const api = {
   getPetitionNotifications: (params: {
     since: string;
     audiences: string[];
+    roles?: string[];
     employeeId?: string;
     all?: boolean;
     limit?: number;
   }) => {
     const qs = new URLSearchParams({ since: params.since });
     if (params.audiences.length) qs.set("audiences", params.audiences.join(","));
+    if (params.roles?.length) qs.set("roles", params.roles.join(","));
     if (params.employeeId) qs.set("employeeId", params.employeeId);
     if (params.all) qs.set("all", "1");
     if (params.limit) qs.set("limit", String(params.limit));

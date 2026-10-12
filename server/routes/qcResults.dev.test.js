@@ -11,7 +11,7 @@ const qcResults = require('./qcResults');
 const petitionId = '507f1f77bcf86cd799439011';
 const parameterId = '507f1f77bcf86cd799439012';
 
-async function saveAs(context, email, ip = '127.0.0.1', cookie) {
+async function saveAs(context, email, ip = '127.0.0.1', cookie, onAudit = () => {}) {
   context.mock.method(User, 'findOne', () => ({ lean: async () => null }));
   context.mock.method(Petition, 'findById', () => ({ lean: async () => ({
     _id: petitionId, status: 'approved', petitionNo: 'P-1', items: [{ seq: 1 }],
@@ -23,7 +23,7 @@ async function saveAs(context, email, ip = '127.0.0.1', cookie) {
     sampleRoundId: '', values: { สี: 'เดิม' }, enteredBy: { name: 'Tester' },
   }));
   context.mock.method(QCTestResult, 'findOneAndUpdate', async () => ({ values: { สี: 'แดง' } }));
-  context.mock.method(PetitionAuditLog, 'create', async () => ({}));
+  context.mock.method(PetitionAuditLog, 'create', async (entry) => { onAudit(entry); return {}; });
 
   const layer = qcResults.stack.find((entry) => entry.route?.path === '/' && entry.route.methods.put);
   const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
@@ -40,6 +40,22 @@ test('dev Admin บันทึกผลคำร้องที่อนุม�
   try {
     const allowed = await saveAs(context, 'admin-dept-dept-123.dev@icpladda.com');
     assert.equal(allowed.statusCode, 200, JSON.stringify(allowed.body));
+  } finally {
+    if (previous === undefined) delete process.env.ALLOW_DEV_STATUS;
+    else process.env.ALLOW_DEV_STATUS = previous;
+  }
+});
+
+test('การแก้ผลที่ปิดงานสร้าง notification สำหรับ QC Head ทุกคน', async (context) => {
+  const previous = process.env.ALLOW_DEV_STATUS;
+  process.env.ALLOW_DEV_STATUS = 'true';
+  let audit;
+  try {
+    const response = await saveAs(context, 'admin-dept-dept-123.dev@icpladda.com', '127.0.0.1', undefined, (entry) => { audit = entry; });
+    assert.equal(response.statusCode, 200, JSON.stringify(response.body));
+    assert.equal(audit.event, 'updated');
+    assert.equal(audit.metadata.audience, 'qc');
+    assert.deepEqual(audit.metadata.recipientRoles, ['qc-head']);
   } finally {
     if (previous === undefined) delete process.env.ALLOW_DEV_STATUS;
     else process.env.ALLOW_DEV_STATUS = previous;

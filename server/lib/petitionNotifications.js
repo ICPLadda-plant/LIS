@@ -41,7 +41,7 @@ function bellDescribe(petition, log) {
       message: `ตัวอย่าง: ${itemsSummary(petition)}`,
     };
   }
-  if (shared) return { audiences: shared.audiences, ...splitText(shared.text) };
+  if (shared) return { audiences: shared.audiences, recipientRoles: log?.metadata?.recipientRoles, ...splitText(shared.text) };
 
   const no = petition?.petitionNo || log?.petitionNo || '(ไม่ทราบเลข)';
   const side = log?.metadata?.side;
@@ -118,6 +118,9 @@ function isCollapsibleDuplicate(log, seenPetitionIds) {
 // Does this viewer care? Audience match OR it is their own job.
 function isRelevant(desc, petition, viewer) {
   if (viewer?.seeAll) return true;
+  if (desc?.recipientRoles) {
+    return desc.recipientRoles.some((role) => (viewer?.roles || []).includes(role));
+  }
   if (desc?.recipientEmployeeIds) {
     const employeeId = String(viewer?.employeeId || '').trim();
     return (desc.audiences || []).some((audience) => (viewer?.audiences || []).includes(audience)) ||
@@ -178,7 +181,7 @@ function toNotification(petition, log, desc, viewer) {
     title: desc.title,
     message: desc.message,
     level: levelForEvent(log),
-    link: `/petition/${petitionId}`,
+    link: desc?.recipientRoles?.includes('qc-head') ? `/record-results/${petitionId}` : `/petition/${petitionId}`,
     createdAt: log?.createdAt,
   };
   if (shouldPlaySampleArrivalSound(petition, log, viewer, desc)) {

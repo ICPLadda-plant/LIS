@@ -308,10 +308,10 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       PetitionAuditLog.create({
         petitionId: petitionObjId,
         petitionNo,
-        event: auditEvent,
+        event: isClosed ? 'updated' : auditEvent,
         actor: enteredBy?.name || enteredBy?.email || 'system',
         note: isClosed ? `แก้ไขผลหลังปิดงาน: ${String(overrideReason).trim()} · ${qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName })}` : qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName }),
-        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined },
+        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
       }).catch((err) => {
         console.error('[audit-log] qc-result write failed:', err.message);
       });
@@ -322,7 +322,7 @@ router.put("/", serializePetitionWrite(async (req, res) => {
         event: 'updated',
         actor: enteredBy?.name || enteredBy?.email || 'QC Head',
         note: `QC Head แก้ไขผล ${parameterName || parameterId} · เหตุผล: ${String(overrideReason).trim()}`,
-        metadata: { audience: 'all' },
+        metadata: { audience: 'qc' },
       });
     }
 
@@ -403,15 +403,15 @@ router.put("/entries", serializePetitionWrite(async (req, res) => {
       PetitionAuditLog.create({
         petitionId: petitionObjId,
         petitionNo,
-        event: 'resultUpdated',
+        event: isClosed ? 'updated' : 'resultUpdated',
         actor: enteredBy?.name || enteredBy?.email || 'system',
         note: `${isClosed ? `แก้ไขผลหลังปิดงาน: ${String(overrideReason).trim()} · ` : ''}QC ปรับรายการหลายค่า ${parameterName || parameterId}: ${entries.length} รายการ${sampleName ? ` (${sampleName})` : ''}`,
-        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, entryCount: entries.length, overrideReason: isClosed ? String(overrideReason).trim() : undefined },
+        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, entryCount: entries.length, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
       }).catch((err) => {
         console.error('[audit-log] qc-result entries write failed:', err.message);
       });
     }
-    if (isClosed) notifyPetitionEvent(petitionForEdit, { event: 'updated', actor: enteredBy?.name || enteredBy?.email || 'QC Head', note: `QC Head แก้ไขผล ${parameterName || parameterId} · เหตุผล: ${String(overrideReason).trim()}`, metadata: { audience: 'all' } });
+    if (isClosed) notifyPetitionEvent(petitionForEdit, { event: 'updated', actor: enteredBy?.name || enteredBy?.email || 'QC Head', note: `QC Head แก้ไขผล ${parameterName || parameterId} · เหตุผล: ${String(overrideReason).trim()}`, metadata: { audience: 'qc' } });
 
     res.json(doc);
   } catch (err) {

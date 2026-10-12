@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, Navigate, useLocation, useSearchParams } from 'react-router-dom';
 import { FlaskConical, CheckCircle2, Loader2, AlertCircle, AlertTriangle, RotateCcw, Save, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
@@ -343,9 +343,11 @@ function TestField({
 export default function QCTestingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const editOverride = searchParams.get('edit') === '1';
   const overrideReason = searchParams.get('reason') || '';
+  const returnPath = location.pathname.includes('/record-results/') ? `/record-results/${id}` : '/qc-testing';
   const { user } = useAuth();
   const canSeeRestrictedStandards = normalizeRoles(user).some((role) => role === 'admin' || role === 'qc-head');
   const confirm = useConfirm();
@@ -1050,7 +1052,7 @@ export default function QCTestingDetailPage() {
     try {
       await autosaves.flush();
       toast.success(petition.qcCompletedAt ? 'บันทึกการแก้ไขผล QC เรียบร้อย' : 'บันทึกแบบร่างเรียบร้อย');
-      navigate('/qc-testing');
+      navigate(returnPath);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'บันทึกผลไม่สำเร็จ');
     } finally {
@@ -1085,7 +1087,7 @@ export default function QCTestingDetailPage() {
           ? 'บันทึกผล QC เรียบร้อย — ส่งให้หัวหน้า QC ยืนยัน'
           : 'บันทึกผล QC เรียบร้อย — รอ Lab ตรวจให้ครบ',
       );
-      navigate('/qc-testing');
+      navigate(returnPath);
     } catch {
       toast.error('บันทึกผลไม่สำเร็จ');
     } finally {
@@ -1102,7 +1104,7 @@ export default function QCTestingDetailPage() {
     <div className={`space-y-6 pb-20 ${flashClass}`}>
       {/* Header */}
       <PageHeader
-        onBack={() => navigate('/qc-testing')}
+        onBack={() => navigate(returnPath)}
         title={
           <span className="inline-flex items-center gap-2">
             <FlaskConical className="h-5 w-5 text-primary-500" />

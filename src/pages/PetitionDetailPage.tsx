@@ -533,7 +533,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                       <AlertDialogAction disabled={editReasonType === 'อื่นๆ' && !editReasonOther.trim()} onClick={() => {
                         const reason = editReasonType === 'อื่นๆ' ? editReasonOther.trim() : editReasonType;
                         setEditReasonOpen(false);
-                        navigate(`/qc-testing/${data._id}?edit=1&reason=${encodeURIComponent(reason)}`);
+                        navigate(`/record-results/${data._id}?edit=1&reason=${encodeURIComponent(reason)}`);
                       }}>ดำเนินการแก้ไข</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
