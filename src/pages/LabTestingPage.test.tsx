@@ -112,15 +112,15 @@ describe('LabTestingPage assignment visibility', () => {
     expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
   });
 
-  it('keeps assigned Lab petitions visible without a matching parameter', async () => {
+  it('hides assigned Lab petitions without a matching Lab parameter', async () => {
+    mocks.getParameters.mockResolvedValueOnce([]);
     render(
       <MemoryRouter>
         <LabTestingPage />
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
-    expect(screen.getByText('1 รายการ Lab')).toBeInTheDocument();
-    expect(mocks.getParameters).not.toHaveBeenCalled();
+    expect(await screen.findByText('ไม่มีคำร้อง Lab ที่รอตรวจ')).toBeInTheDocument();
+    expect(screen.queryByText('P-LAB-ASSIGNED')).not.toBeInTheDocument();
   });
 });

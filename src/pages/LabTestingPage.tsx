@@ -5,6 +5,8 @@ import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
+import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
+import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import {
   PETITION_DEPT_LABELS,
   type Petition,
@@ -45,6 +47,17 @@ export default function LabTestingPage() {
   const assignedToNames = !isFullAccess ? assigneeNamesForUser(user) : undefined;
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState<PetitionDept | ''>('');
+  const [labParameters, setLabParameters] = useState<Awaited<ReturnType<typeof api.getParameters>>>([]);
+  const [parametersLoaded, setParametersLoaded] = useState(false);
+  const [parametersError, setParametersError] = useState(false);
+  const groupMembership = useItemGroupMembership();
+
+  useEffect(() => {
+    api.getParameters()
+      .then(setLabParameters)
+      .catch(() => setParametersError(true))
+      .finally(() => setParametersLoaded(true));
+  }, []);
 
   const { data, loading } = usePetitionList({
     status: 'sampleSent,pendingReview,inProgress,success',
@@ -56,7 +69,7 @@ export default function LabTestingPage() {
   });
 
   const petitions: Petition[] = (data?.items ?? [])
-    .filter((p) => labItemsFor(p).length > 0)
+    .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
@@ -203,11 +216,13 @@ export default function LabTestingPage() {
           }
         />
 
+        {parametersError && <p role="alert" className="text-sm text-destructive">โหลดพารามิเตอร์ Lab ไม่สำเร็จ กรุณารีเฟรชหน้า</p>}
+
         <DataTable
           columns={columns}
           data={petitions}
           rowKey={(p) => p._id}
-          isLoading={loading}
+          isLoading={loading || !parametersLoaded}
           rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
           onRowClick={(p) => {
             if (labReceivedAt(p)) navigate(`/lab-testing/${p._id}`);

@@ -4,11 +4,12 @@ import {
   getItemWarehouseCategory,
   getItemSubCategory,
   getPetitionCategory,
+  hasAssignableLabParameter,
   matchParametersForItem,
   visibleEnumOptions,
 } from './petitionTestItems';
 import type { ParameterItem, ParameterValueField } from './api';
-import type { PetitionItem } from '@/types/petition.types';
+import type { Petition, PetitionItem } from '@/types/petition.types';
 
 const makeItem = (overrides: Partial<PetitionItem> = {}): PetitionItem => ({
   seq: 1,
@@ -66,6 +67,24 @@ describe('matchParametersForItem — lab-scope gating', () => {
       labParam,
       qcParam,
     ]);
+  });
+});
+
+describe('assignable Lab work', () => {
+  it('requires an active matching Lab parameter, not only Lab routing or a shared QC parameter', () => {
+    const petition = { dept: 'production', submittedBy: {}, items: [makeItem({ batchNo: '26S-FPNO.3-156', testItems: '' })] } as Petition;
+    const lab = makeParam({ scope: 'lab', categories: ['FG'] });
+
+    expect(hasAssignableLabParameter(petition, [])).toBe(false);
+    expect(hasAssignableLabParameter(petition, [{ ...lab, scope: 'qc', shareWithLab: true }])).toBe(false);
+    expect(hasAssignableLabParameter(petition, [{ ...lab, status: 'inactive' }])).toBe(false);
+    expect(hasAssignableLabParameter(petition, [lab])).toBe(true);
+    expect(hasAssignableLabParameter({ ...petition, items: [...petition.items, makeItem({ seq: 2, batchNo: 'B-6', testItems: 'Other' })] }, [lab])).toBe(false);
+  });
+
+  it('accepts an R&D Lab parameter without a Lab batch number', () => {
+    const petition = { dept: 'production', submittedBy: { department: 'R & D' }, items: [makeItem({ batchNo: '' })] } as Petition;
+    expect(hasAssignableLabParameter(petition, [makeParam({ scope: 'lab' })])).toBe(true);
   });
 });
 

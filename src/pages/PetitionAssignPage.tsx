@@ -38,7 +38,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { usePetitionList } from '@/hooks/usePetition';
+import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { api, type MachineItem } from '@/lib/api';
+import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
 import { labAssignBoardStatusBadge } from '@/lib/receiveStatus';
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
@@ -309,13 +311,19 @@ export default function PetitionAssignPage() {
     queryFn: () => api.getMethods(),
     staleTime: 5 * 60_000,
   });
+  const { data: labParameters = [], isPending: parametersLoading, error: parametersError } = useQuery({
+    queryKey: ['assign-lab-parameters'],
+    queryFn: () => api.getParameters(),
+    staleTime: 5 * 60_000,
+  });
+  const groupMembership = useItemGroupMembership();
   const methodByCode = useMemo(
     () => new Map(registryMethods.map((m) => [m.code, m])),
     [registryMethods],
   );
 
-  const loading = pendingLoading || inProgressLoading || staleReceivedLoading;
-  const error = pendingError || inProgressError || staleReceivedError;
+  const loading = pendingLoading || inProgressLoading || staleReceivedLoading || parametersLoading;
+  const error = pendingError || inProgressError || staleReceivedError || (parametersError instanceof Error ? parametersError.message : null);
 
   const { data: masterItems = [] } = useQuery<MasterItemRaw[]>({
     queryKey: ['master-items-for-petition-assign'],
@@ -385,8 +393,8 @@ export default function PetitionAssignPage() {
       ...(pendingData?.items ?? []),
       ...(inProgressData?.items ?? []),
       ...(staleReceivedData?.items ?? []),
-    ].filter(isVisibleInAssignQueue),
-    [inProgressData?.items, pendingData?.items, staleReceivedData?.items],
+    ].filter((petition) => isVisibleInAssignQueue(petition) && hasAssignableLabParameter(petition, labParameters, groupMembership)),
+    [inProgressData?.items, pendingData?.items, staleReceivedData?.items, labParameters, groupMembership],
   );
 
   // Cache substance groups per petition
@@ -534,6 +542,10 @@ export default function PetitionAssignPage() {
   }, [activeTab, normalPetitions, phase2Petitions, search]);
 
   async function assignPetition(petition: Petition, employeeIdOverride?: string): Promise<boolean> {
+    if (!hasAssignableLabParameter(petition, labParameters, groupMembership)) {
+      toast.error('คำร้องนี้ไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่าง');
+      return false;
+    }
     const employeeId = employeeIdOverride || petition.assignedTo?.employeeId || '';
     const employee = employeeById.get(employeeId);
     if (!employee) {

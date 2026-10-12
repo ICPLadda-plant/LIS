@@ -1,6 +1,6 @@
 import type { ParameterApplyRule, ParameterItem, ParameterValueField } from '@/lib/api';
 import type { PetitionItem, Petition } from '@/types/petition.types';
-import { shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
 import { getClassification, getCommonName } from '@/lib/productClassification';
 
 function extractItemNoPrefix(itemNo: string | undefined | null): string {
@@ -303,6 +303,21 @@ export function matchParametersForItem(
     (p) =>
       names.includes((p.name ?? '').toLowerCase()) &&
       parameterAppliesToItem(p, item, itemGroupIds, petitionCategory),
+  );
+}
+
+export function hasAssignableLabParameter(
+  petition: Petition,
+  params: ParameterItem[],
+  membership?: Map<string, string[]>,
+): boolean {
+  const research = isResearchAndDevelopmentPetition(petition);
+  const labItems = (petition.items ?? []).filter((item) => research || shouldSendItemToLab(item));
+  return labItems.length > 0 && labItems.every((item) =>
+    matchParametersForItem(item, params, membership?.get(itemGroupKey(item)) ?? [], {
+      forceLabTrack: research,
+      petitionCategory: getPetitionCategory(petition),
+    }).some((parameter) => parameter.scope === 'lab'),
   );
 }
 

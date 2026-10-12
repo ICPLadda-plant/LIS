@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import type { MachineItem } from '@/lib/api';
+import type { MachineItem, ParameterItem } from '@/lib/api';
 import type { Petition, PetitionAuditLogEntry } from '@/types/petition.types';
 import type { SixMonthMedicineStockItem } from '@/types/stock';
 import PetitionListPage from './PetitionListPage';
@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   machines: [] as MachineItem[],
   user: { employeeId: 'E1', name: 'Reviewer', roles: ['admin'] },
   groups: new Map<string, string[]>(),
+  parameters: [{ _id: 'lab', name: 'Lab test', scope: 'lab', applyAll: true, valueFields: [] }] as ParameterItem[],
   refresh: vi.fn(),
   push: vi.fn(),
 }));
@@ -50,7 +51,7 @@ vi.mock('@/hooks/usePetition', () => ({
 }));
 vi.mock('@/lib/api', () => ({
   api: {
-    getParameters: async () => [{ _id: 'lab', name: 'Lab test', scope: 'lab', applyAll: true, valueFields: [] }],
+    getParameters: async () => mocks.parameters,
     getAbnormalFlags: async () => ({}),
     getReturnedFlags: async () => ({}),
     getMachines: async () => mocks.machines,
@@ -98,6 +99,7 @@ beforeEach(() => {
   mocks.logs = [];
   mocks.stock = [];
   mocks.machines = [];
+  mocks.parameters = [{ _id: 'lab', name: 'Lab test', scope: 'lab', applyAll: true, valueFields: [] }];
   mocks.items = [
     petition('ROW-name', 'OTHER'),
     petition('ROW-prefix-first', 'R100-Z'),
@@ -110,6 +112,16 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('petition search ranking', () => {
+  it('does not offer assignment when a Lab petition has no matching parameter', async () => {
+    mocks.items = [petition('ROW-no-parameter', 'R100')];
+    mocks.parameters = [];
+
+    renderPage(<PetitionAssignPage />);
+
+    expect(await screen.findByText('ไม่มีคำร้องที่รอ assign')).toBeInTheDocument();
+    expect(screen.queryByText('ROW-no-parameter')).not.toBeInTheDocument();
+  });
+
   it('moves the Lab sample receive action to the assignment board', () => {
     renderPage(<PetitionAssignPage />);
 
