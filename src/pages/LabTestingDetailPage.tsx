@@ -446,6 +446,7 @@ export default function LabTestingDetailPage() {
   const idsFor = (it: Parameters<typeof itemGroupKey>[0]) =>
     groupMembership.get(itemGroupKey(it)) ?? [];
   const [paramsLoaded, setParamsLoaded] = useState(false);
+  const [paramsLoadError, setParamsLoadError] = useState(false);
   const [savedResults, setSavedResults] = useState<QCTestResult[]>([]);
   const [values, setValues] = useState<Record<string, Record<string, unknown>>>({});
   const [valuesPhase2, setValuesPhase2] = useState<Record<string, Record<string, unknown>>>({});
@@ -472,7 +473,7 @@ export default function LabTestingDetailPage() {
         );
         setAllParameters(labParams);
       })
-      .catch(() => {})
+      .catch(() => setParamsLoadError(true))
       .finally(() => setParamsLoaded(true));
   }, []);
 
@@ -735,17 +736,17 @@ export default function LabTestingDetailPage() {
     );
   }
 
-  // Show only Lab items: lab-batch (batchNo 1/6) AND have at least one
-  // lab-scope or QC-shared-with-lab parameter matching the item's classification.
-  // Items with no Lab-readable params should not appear here.
+  // Keep routed Lab items visible even when their parameters are missing.
   const allLabBatchItems = isResearchAndDevelopmentPetition(petition)
     ? (petition.items ?? [])
     : (petition.items ?? []).filter((it) => shouldSendItemToLab(it));
-  const labItems = paramsLoaded
-    ? allLabBatchItems.filter(
-        (it) => matchLabParametersForItem(petition, it, allParameters, idsFor(it)).length > 0,
-      )
-    : allLabBatchItems;
+  const labItems = allLabBatchItems;
+  const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
+    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((param) => param.scope === 'lab'),
+  );
+  const hasAllLabOwnedParams = hasLabOwnedParams && labItems.every((item) =>
+    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((param) => param.scope === 'lab'),
+  );
 
   // 2-phase support: does any matched parameter use hasPhases?
   const hasAnyPhasedParam = labItems.some((item) =>
@@ -907,7 +908,7 @@ export default function LabTestingDetailPage() {
   };
 
   // required ครบทุกช่องของ phase ปัจจุบัน → ปุ่มเปลี่ยนจาก "บันทึกแบบร่าง" เป็น "บันทึก" (ปิด track)
-  const isComplete = validate().length === 0;
+  const isComplete = hasAllLabOwnedParams && validate().length === 0;
 
   const handleSaveDraft = async () => {
     if (pendingSample || submitting) return;
@@ -937,7 +938,7 @@ export default function LabTestingDetailPage() {
   };
 
   const handleSubmitResult = async () => {
-    if (pendingSample || submitting || additionalSampleOpen || loadedResultsKey !== resultsKey) return;
+    if (!hasAllLabOwnedParams || pendingSample || submitting || additionalSampleOpen || loadedResultsKey !== resultsKey) return;
     const missing = validate();
     if (missing.length > 0) {
       toast.error('กรอกข้อมูลไม่ครบ', {
@@ -1073,7 +1074,7 @@ export default function LabTestingDetailPage() {
         )}
 
         {labItems.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">ไม่มีรายการ Lab ในคำร้องนี้</div>
+          <div className="text-center py-12 text-muted-foreground">ไม่มีตัวอย่างที่ส่งเข้า Lab ในคำร้องนี้</div>
         )}
 
         {hasAnyPhasedParam && labItems.some((item) => !sampleRoundFor(petition, 'lab', item.seq)) && (
@@ -1130,9 +1131,13 @@ export default function LabTestingDetailPage() {
                     triggeredByName={round.phase2TriggeredBy?.parameterName}
                   />
                 )}
-                {matchedParams.length === 0 ? (
+                {!paramsLoaded ? (
+                  <p role="status" className="text-sm text-muted-foreground">กำลังโหลดพารามิเตอร์ Lab...</p>
+                ) : paramsLoadError ? (
+                  <p role="alert" className="text-sm text-destructive">โหลดพารามิเตอร์ Lab ไม่สำเร็จ กรุณารีเฟรชหน้า</p>
+                ) : matchedParams.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic">
-                    ไม่พบพารามิเตอร์ Lab ที่ตรงกับรายการทดสอบ
+                    ยังไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่างนี้ กรุณาตรวจการตั้งค่าพารามิเตอร์และรายการทดสอบ
                   </p>
                 ) : (
                   <>
@@ -1724,7 +1729,7 @@ export default function LabTestingDetailPage() {
         )}
 
         {/* Action buttons stay available until Lab approval. */}
-        {labItems.length > 0 && !isLocked && (
+        {hasLabOwnedParams && !isLocked && (
           <div className="fixed bottom-0 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 py-3 border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             {abnormalCount > 0 && labReceivedAt(petition) && (
               <Button variant="outline" onClick={() => setAdditionalSampleOpen(true)} disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}>ขอตัวอย่างเพิ่ม</Button>

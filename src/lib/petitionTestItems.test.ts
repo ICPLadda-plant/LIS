@@ -3,11 +3,13 @@ import {
   getItemProductType,
   getItemWarehouseCategory,
   getItemSubCategory,
+  getPetitionCategory,
+  hasAssignableLabParameter,
   matchParametersForItem,
   visibleEnumOptions,
 } from './petitionTestItems';
 import type { ParameterItem, ParameterValueField } from './api';
-import type { PetitionItem } from '@/types/petition.types';
+import type { Petition, PetitionItem } from '@/types/petition.types';
 
 const makeItem = (overrides: Partial<PetitionItem> = {}): PetitionItem => ({
   seq: 1,
@@ -65,6 +67,24 @@ describe('matchParametersForItem — lab-scope gating', () => {
       labParam,
       qcParam,
     ]);
+  });
+});
+
+describe('assignable Lab work', () => {
+  it('requires an active matching Lab parameter, not only Lab routing or a shared QC parameter', () => {
+    const petition = { dept: 'production', submittedBy: {}, items: [makeItem({ batchNo: '26S-FPNO.3-156', testItems: '' })] } as Petition;
+    const lab = makeParam({ scope: 'lab', categories: ['FG'] });
+
+    expect(hasAssignableLabParameter(petition, [])).toBe(false);
+    expect(hasAssignableLabParameter(petition, [{ ...lab, scope: 'qc', shareWithLab: true }])).toBe(false);
+    expect(hasAssignableLabParameter(petition, [{ ...lab, status: 'inactive' }])).toBe(false);
+    expect(hasAssignableLabParameter(petition, [lab])).toBe(true);
+    expect(hasAssignableLabParameter({ ...petition, items: [...petition.items, makeItem({ seq: 2, batchNo: 'B-6', testItems: 'Other' })] }, [lab])).toBe(false);
+  });
+
+  it('accepts an R&D Lab parameter without a Lab batch number', () => {
+    const petition = { dept: 'production', submittedBy: { department: 'R & D' }, items: [makeItem({ batchNo: '' })] } as Petition;
+    expect(hasAssignableLabParameter(petition, [makeParam({ scope: 'lab' })])).toBe(true);
   });
 });
 
@@ -171,6 +191,15 @@ describe('full common name matching', () => {
 });
 
 describe('warehouse category (RM/FG) scoping', () => {
+  it('treats production petitions without a master item code as FG', () => {
+    const param = makeParam({ scope: 'lab', applyAll: false, categories: ['FG'] });
+    const item = makeItem({ itemNo: '', sampleId: 'P-2610-0003', batchNo: '26S-FPNO.3-156', testItems: '' });
+
+    expect(getPetitionCategory({ dept: 'production' })).toBe('FG');
+    expect(matchParametersForItem(item, [param], [], { petitionCategory: getPetitionCategory({ dept: 'production' }) })).toEqual([param]);
+    expect(matchParametersForItem({ ...item, itemNo: 'R-1000' }, [param], [], { petitionCategory: 'FG' })).toEqual([]);
+  });
+
   // หมวดหมู่ทำหน้าที่เป็น "ประตู" (AND) ไม่ใช่มิติ OR ตัวที่หก — ตรงกับหน้าจอ
   // ที่ให้เลือกหมวดหมู่ย่อยได้ต่อเมื่อเลือก RM/FG แล้ว
   it('matches a category-only param by item code warehouse', () => {

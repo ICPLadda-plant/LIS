@@ -9,6 +9,7 @@ import {
   GripVertical,
   Hourglass,
   Inbox,
+  QrCode,
   RefreshCw,
   Search,
   UserCheck,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
+import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
 import { Badge } from '@/components/ui/badge';
@@ -36,7 +38,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { usePetitionList } from '@/hooks/usePetition';
+import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { api, type MachineItem } from '@/lib/api';
+import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
 import { labAssignBoardStatusBadge } from '@/lib/receiveStatus';
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
@@ -233,6 +237,7 @@ export default function PetitionAssignPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('normal');
+  const [scanOpen, setScanOpen] = useState(false);
   const [machineSuggestions, setMachineSuggestions] = useState<Record<string, MachineSuggestion[]>>({});
   // A petition dragged onto a staff card → open the machine-picking dialog.
   const [dropTarget, setDropTarget] = useState<{ petitionId: string; employeeId: string } | null>(null);
@@ -306,13 +311,19 @@ export default function PetitionAssignPage() {
     queryFn: () => api.getMethods(),
     staleTime: 5 * 60_000,
   });
+  const { data: labParameters = [], isPending: parametersLoading, error: parametersError } = useQuery({
+    queryKey: ['assign-lab-parameters'],
+    queryFn: () => api.getParameters(),
+    staleTime: 5 * 60_000,
+  });
+  const groupMembership = useItemGroupMembership();
   const methodByCode = useMemo(
     () => new Map(registryMethods.map((m) => [m.code, m])),
     [registryMethods],
   );
 
-  const loading = pendingLoading || inProgressLoading || staleReceivedLoading;
-  const error = pendingError || inProgressError || staleReceivedError;
+  const loading = pendingLoading || inProgressLoading || staleReceivedLoading || parametersLoading;
+  const error = pendingError || inProgressError || staleReceivedError || (parametersError instanceof Error ? parametersError.message : null);
 
   const { data: masterItems = [] } = useQuery<MasterItemRaw[]>({
     queryKey: ['master-items-for-petition-assign'],
@@ -382,8 +393,8 @@ export default function PetitionAssignPage() {
       ...(pendingData?.items ?? []),
       ...(inProgressData?.items ?? []),
       ...(staleReceivedData?.items ?? []),
-    ].filter(isVisibleInAssignQueue),
-    [inProgressData?.items, pendingData?.items, staleReceivedData?.items],
+    ].filter((petition) => isVisibleInAssignQueue(petition) && hasAssignableLabParameter(petition, labParameters, groupMembership)),
+    [inProgressData?.items, pendingData?.items, staleReceivedData?.items, labParameters, groupMembership],
   );
 
   // Cache substance groups per petition
@@ -531,6 +542,10 @@ export default function PetitionAssignPage() {
   }, [activeTab, normalPetitions, phase2Petitions, search]);
 
   async function assignPetition(petition: Petition, employeeIdOverride?: string): Promise<boolean> {
+    if (!hasAssignableLabParameter(petition, labParameters, groupMembership)) {
+      toast.error('คำร้องนี้ไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่าง');
+      return false;
+    }
     const employeeId = employeeIdOverride || petition.assignedTo?.employeeId || '';
     const employee = employeeById.get(employeeId);
     if (!employee) {
@@ -623,21 +638,35 @@ export default function PetitionAssignPage() {
 
   return (
     <AppLayout>
+        <LabScanAcceptModal
+          open={scanOpen}
+          onClose={() => setScanOpen(false)}
+          onAccepted={() => {
+            setScanOpen(false);
+            refreshPetitions();
+          }}
+        />
         <div className="space-y-5">
           <PageHeader
             title="Assign คำร้องให้เจ้าหน้าที่"
             description="ลากคำร้องจากกอง “งานรอมอบหมาย” ไปวางบนการ์ดเจ้าหน้าที่ เพื่อเลือกเครื่องและ assign"
             actions={
-              <Button
-                variant="primary-outline"
-                onClick={() => {
-                  refreshPetitions();
-                  toast.info('กำลังโหลดรายการคำร้องล่าสุด');
-                }}
-              >
-                <RefreshCw className="h-4 w-4" />
-                รีเฟรช
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
+                  <QrCode className="h-4 w-4" />
+                  รับตัวอย่าง
+                </Button>
+                <Button
+                  variant="primary-outline"
+                  onClick={() => {
+                    refreshPetitions();
+                    toast.info('กำลังโหลดรายการคำร้องล่าสุด');
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  รีเฟรช
+                </Button>
+              </div>
             }
           />
 
