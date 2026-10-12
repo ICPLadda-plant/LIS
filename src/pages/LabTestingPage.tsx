@@ -4,19 +4,11 @@ import { FlaskConical, AlertTriangle, RotateCcw } from 'lucide-react';
 import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
-import { api, type ParameterItem } from '@/lib/api';
-import {
-  getPetitionCategory,
-  itemGroupKey,
-  matchParametersForItem,
-  type PetitionCategory,
-} from '@/lib/petitionTestItems';
-import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
+import { api } from '@/lib/api';
 import {
   PETITION_DEPT_LABELS,
   type Petition,
   type PetitionDept,
-  type PetitionItem,
 } from '@/types/petition.types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,26 +32,9 @@ import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
 
-const isLabReadableItem = (
-  it: PetitionItem,
-  params: ParameterItem[],
-  itemGroupIds: string[] = [],
-  petitionCategory: PetitionCategory = '',
-) =>
-  shouldSendItemToLab(it) && matchParametersForItem(it, params, itemGroupIds, { petitionCategory }).length > 0;
-
-const isResearchLabReadableItem = (
-  it: PetitionItem,
-  params: ParameterItem[],
-  itemGroupIds: string[] = [],
-  petitionCategory: PetitionCategory = '',
-) => params.length === 0
-  || matchParametersForItem(it, params, itemGroupIds, { forceLabTrack: true, petitionCategory }).length > 0;
-
-const labParametersForPetition = (petition: Petition, params: ParameterItem[]) =>
-  isResearchAndDevelopmentPetition(petition)
-    ? params.filter((p) => p.scope === 'lab')
-    : params;
+const labItemsFor = (petition: Petition) => (petition.items ?? []).filter(
+  (item) => isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(item),
+);
 
 export default function LabTestingPage() {
   const navigate = useNavigate();
@@ -70,24 +45,6 @@ export default function LabTestingPage() {
   const assignedToNames = !isFullAccess ? assigneeNamesForUser(user) : undefined;
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState<PetitionDept | ''>('');
-  const [labParams, setLabParams] = useState<ParameterItem[]>([]);
-  const [paramsLoaded, setParamsLoaded] = useState(false);
-  const groupMembership = useItemGroupMembership();
-  const idsFor = (it: Parameters<typeof itemGroupKey>[0]) =>
-    groupMembership.get(itemGroupKey(it)) ?? [];
-
-  useEffect(() => {
-    api.getParameters()
-      .then((all) =>
-        setLabParams(
-          all.filter(
-            (p) => p.scope === 'lab' || (p.scope === 'qc' && p.shareWithLab === true),
-          ),
-        ),
-      )
-      .catch(() => {})
-      .finally(() => setParamsLoaded(true));
-  }, []);
 
   const { data, loading } = usePetitionList({
     status: 'sampleSent,pendingReview,inProgress,success',
@@ -99,15 +56,7 @@ export default function LabTestingPage() {
   });
 
   const petitions: Petition[] = (data?.items ?? [])
-    .filter((p) =>
-      isResearchAndDevelopmentPetition(p)
-        ? (p.items ?? []).some((it) =>
-          paramsLoaded ? isResearchLabReadableItem(it, labParametersForPetition(p, labParams), idsFor(it), getPetitionCategory(p)) : true,
-        )
-        : (paramsLoaded
-          ? (p.items ?? []).some((it) => isLabReadableItem(it, labParams, idsFor(it), getPetitionCategory(p)))
-          : (p.items ?? []).some((it) => shouldSendItemToLab(it))),
-    )
+    .filter((p) => labItemsFor(p).length > 0)
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
@@ -138,11 +87,7 @@ export default function LabTestingPage() {
       header: 'คำร้อง',
       className: 'align-top',
       cell: (p) => {
-        const labItems = (p.items ?? []).filter((it) =>
-          isResearchAndDevelopmentPetition(p)
-            ? (paramsLoaded ? isResearchLabReadableItem(it, labParametersForPetition(p, labParams), idsFor(it), getPetitionCategory(p)) : true)
-            : (paramsLoaded ? isLabReadableItem(it, labParams, idsFor(it), getPetitionCategory(p)) : shouldSendItemToLab(it)),
-        );
+        const labItems = labItemsFor(p);
         return (
           <>
             <div className="flex items-center gap-1.5">
@@ -170,11 +115,7 @@ export default function LabTestingPage() {
       header: 'รายการตัวอย่าง (Lab)',
       className: 'max-w-[280px] text-sm text-grey-600 align-top',
       cell: (p) => {
-        const labItems = (p.items ?? []).filter((it) =>
-          isResearchAndDevelopmentPetition(p)
-            ? (paramsLoaded ? isResearchLabReadableItem(it, labParametersForPetition(p, labParams), idsFor(it), getPetitionCategory(p)) : true)
-            : (paramsLoaded ? isLabReadableItem(it, labParams, idsFor(it), getPetitionCategory(p)) : shouldSendItemToLab(it)),
-        );
+        const labItems = labItemsFor(p);
         return labItems.length > 0 ? (
           <div className="space-y-1">
             {labItems.map((it) => (

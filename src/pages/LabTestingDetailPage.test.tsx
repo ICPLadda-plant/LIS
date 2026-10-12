@@ -123,6 +123,7 @@ const researchFixtures = vi.hoisted(() => {
 
 const mockState = vi.hoisted(() => ({
   activeFixtures: fixtures,
+  parametersError: false,
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -178,7 +179,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
     ...actual,
     api: {
       ...actual.api,
-      getParameters: vi.fn().mockImplementation(() => Promise.resolve(mockState.activeFixtures.parameters)),
+      getParameters: vi.fn().mockImplementation(() => mockState.parametersError
+        ? Promise.reject(new Error('Parameter unavailable'))
+        : Promise.resolve(mockState.activeFixtures.parameters)),
       getInstrumentSources: vi.fn().mockResolvedValue([]),
       getQCResults: vi.fn().mockImplementation(() => Promise.resolve(mockState.activeFixtures.results)),
       getReturnedFlags: vi.fn().mockResolvedValue({}),
@@ -191,6 +194,7 @@ describe("LabTestingDetailPage", () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockState.activeFixtures = fixtures;
+    mockState.parametersError = false;
   });
 
   it("shows label-tolerance criteria and saved-by metadata beside the parameter field name", async () => {
@@ -244,5 +248,45 @@ describe("LabTestingDetailPage", () => {
 
     expect((await screen.findAllByRole("spinbutton"))[0]).not.toBeDisabled();
     expect(screen.getByRole("button", { name: /บันทึกการแก้ไข/ })).toBeEnabled();
+  });
+
+  it("keeps an assigned Lab item visible and prevents completion when no parameter matches", async () => {
+    mockState.activeFixtures = { ...fixtures, parameters: [] };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByText(/ยังไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่างนี้/)).toBeInTheDocument();
+    expect(screen.getByText(/รายการที่ 1: ABAMECTIN/)).toBeInTheDocument();
+    expect(screen.queryByText("ไม่มีตัวอย่างที่ส่งเข้า Lab ในคำร้องนี้")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "บันทึก" })).not.toBeInTheDocument();
+  });
+
+  it("explains a parameter loading failure without hiding the assigned item", async () => {
+    mockState.parametersError = true;
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByText(/โหลดพารามิเตอร์ Lab ไม่สำเร็จ/)).toBeInTheDocument();
+    expect(screen.getByText(/รายการที่ 1: ABAMECTIN/)).toBeInTheDocument();
+  });
+
+  it("does not complete Lab while another routed item has no Lab parameter", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          ...(fixtures.petition.items ?? []),
+          { seq: 2, sampleName: "FIPRONIL 0.3% GR", batchNo: "26S-FPNO.3-156", testItems: "Unconfigured" },
+        ],
+      },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByText(/ยังไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่างนี้/)).toBeInTheDocument();
+    expect(screen.getByText(/รายการที่ 2: FIPRONIL/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "บันทึก" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "บันทึกแบบร่าง" })).toBeInTheDocument();
   });
 });

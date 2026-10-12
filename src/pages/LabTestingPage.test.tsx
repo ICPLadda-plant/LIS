@@ -111,4 +111,16 @@ describe('LabTestingPage assignment visibility', () => {
 
     expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
   });
+
+  it('keeps assigned Lab petitions visible without a matching parameter', async () => {
+    render(
+      <MemoryRouter>
+        <LabTestingPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
+    expect(screen.getByText('1 รายการ Lab')).toBeInTheDocument();
+    expect(mocks.getParameters).not.toHaveBeenCalled();
+  });
 });
