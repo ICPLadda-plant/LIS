@@ -559,6 +559,20 @@ export default function LabTestingDetailPage() {
     return () => { resultLoad.current += 1; };
   }, [id, loadResults, allParameters.length]);
 
+  const pendingDensity = !!petition && !isResearchAndDevelopmentPetition(petition) &&
+    (petition.items ?? []).filter(shouldSendItemToLab).some((item) => {
+      const sgParam = matchLabParametersForItem(petition, item, allParameters, idsFor(item)).find(
+        (param) => param.scope === 'qc' && param.shareWithLab &&
+          param.valueFields?.some((field) => field.label === SG_FIELD_LABEL),
+      );
+      if (!sgParam) return false;
+      const result = savedResults.find((row) => row.itemSeq === item.seq && row.parameterId === sgParam._id);
+      return !getEntryValues(result ?? {}, sgParam).some((entry) => {
+        const value = Number(readSpecificGravityEntryValue(entry));
+        return Number.isFinite(value) && value > 0;
+      });
+    });
+
   const handleFieldChange = useCallback(
     (
       petition: Petition,
@@ -568,7 +582,7 @@ export default function LabTestingDetailPage() {
       newVal: unknown,
       phase: PetitionPhase = 1,
     ) => {
-      if (pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
+      if (pendingDensity || pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
       if (phase === 2 && ((sampleRoundFor(petition, 'lab', item.seq) ?? petition).currentPhase ?? 1) === 1) return;
       const k = resultKey(item.seq, param._id!);
 
@@ -628,7 +642,7 @@ export default function LabTestingDetailPage() {
         }
       }, k);
     },
-    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting],
+    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity],
   );
 
   // multiEntry write: field write into entry `entryIndex` of a multiEntry param.
@@ -642,7 +656,7 @@ export default function LabTestingDetailPage() {
       fieldLabel: string,
       newVal: unknown,
     ) => {
-      if (pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
+      if (pendingDensity || pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
       const k = resultKey(item.seq, param._id!);
       advanceToInProgress();
 
@@ -677,7 +691,7 @@ export default function LabTestingDetailPage() {
         }
       }, k);
     },
-    [user, advanceToInProgress, id, loadResults, autosaves, additionalSampleOpen, submitting],
+    [user, advanceToInProgress, id, loadResults, autosaves, additionalSampleOpen, submitting, pendingDensity],
   );
 
   // multiEntry remove: trim entry `entryIndex` then persist the whole array.
@@ -688,7 +702,7 @@ export default function LabTestingDetailPage() {
       param: ParameterItem,
       entryIndex: number,
     ) => {
-      if (pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
+      if (pendingDensity || pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
       const k = resultKey(item.seq, param._id!);
       const current = getEntryValues({ entries: entriesByKey[k] }, param);
       const trimmed = current.filter((_, i) => i !== entryIndex);
@@ -713,7 +727,7 @@ export default function LabTestingDetailPage() {
         toast.error('ลบรายการไม่สำเร็จ');
       }
     },
-    [user, entriesByKey, id, loadResults, autosaves, additionalSampleOpen, submitting],
+    [user, entriesByKey, id, loadResults, autosaves, additionalSampleOpen, submitting, pendingDensity],
   );
 
   if (petitionLoading) {
@@ -938,7 +952,7 @@ export default function LabTestingDetailPage() {
   };
 
   const handleSubmitResult = async () => {
-    if (!hasAllLabOwnedParams || pendingSample || submitting || additionalSampleOpen || loadedResultsKey !== resultsKey) return;
+    if (!hasAllLabOwnedParams || pendingDensity || pendingSample || submitting || additionalSampleOpen || loadedResultsKey !== resultsKey) return;
     const missing = validate();
     if (missing.length > 0) {
       toast.error('กรอกข้อมูลไม่ครบ', {
@@ -986,7 +1000,7 @@ export default function LabTestingDetailPage() {
   const isAssigned = isFullAccess || isAssignedTo(petition.assignedTo, user);
   // ผล Lab ที่ออกแล้วแก้ไขได้จนกว่าคำร้องจะปิด Final Result; การกด
   // "แก้ไขผล Lab" จากหน้ารายการจึงต้องเปิดช่องกรอกจริงตามชื่อปุ่ม.
-  const isLocked = ['approved', 'rejected'].includes(petition.status) || !isAssigned || !!pendingSample;
+  const isLocked = ['approved', 'rejected'].includes(petition.status) || !isAssigned || !!pendingSample || pendingDensity;
   const hasSubmittedLab = !!petition.labCompletedAt;
   const switchablePetitions = (worklistData?.items ?? []).filter((p) =>
     !!labReceivedAt(p) && (p.items ?? []).some(
@@ -1042,6 +1056,18 @@ export default function LabTestingDetailPage() {
             <AlertDescription>
               คุณไม่ได้ถูก assign งานนี้
               {petition.assignedTo?.name && ` — มอบหมายให้: ${petition.assignedTo.name}`}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {pendingDensity && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex flex-wrap items-center gap-2">
+              รอ QC เลือกและบันทึกค่าถพ. ก่อน จึงจะกรอกผล Lab ได้
+              <Button type="button" variant="outline" size="sm" onClick={() => void loadResults(petition._id)}>
+                ตรวจค่าอีกครั้ง
+              </Button>
             </AlertDescription>
           </Alert>
         )}

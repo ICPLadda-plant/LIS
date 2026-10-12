@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ParameterItem } from "@/lib/api";
 import type { Petition, QCTestResult } from "@/types/petition.types";
@@ -258,6 +258,43 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("% Sample 3")).toBeInTheDocument();
     expect(screen.getByText("Area Average")).toBeInTheDocument();
     expect(screen.getByText("% Sample %RSD")).toBeInTheDocument();
+  });
+
+  it("locks Lab inputs until QC selects and saves a density value", async () => {
+    const densityParameter: ParameterItem = {
+      _id: "density-param",
+      name: "ค่า ถพ.",
+      scope: "qc",
+      shareWithLab: true,
+      applyAll: true,
+      valueFields: [{ label: "ค่าถพ.", type: "number", unit: "g/cm³" }],
+    };
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: fixtures.petition.items.map((item) => ({ ...item, testItems: "Active Ingredient, ค่า ถพ." })),
+      },
+      parameters: [...fixtures.parameters, densityParameter],
+      results: fixtures.results,
+    };
+
+    render(<LabTestingDetailPage />);
+    expect((await screen.findAllByRole("spinbutton"))[0]).toBeDisabled();
+    expect(screen.getByText(/รอ QC เลือกและบันทึกค่าถพ/)).toBeInTheDocument();
+
+    mockState.activeFixtures = {
+      ...mockState.activeFixtures,
+      results: [...fixtures.results, {
+        petitionId: "petition-1",
+        itemSeq: 1,
+        parameterId: "density-param",
+        values: { "ค่าถพ.": "1.005" },
+      }],
+    };
+    fireEvent.click(screen.getByRole("button", { name: "ตรวจค่าอีกครั้ง" }));
+    await waitFor(() => expect((screen.getAllByRole("spinbutton"))[0]).not.toBeDisabled());
+    expect(screen.queryByText(/รอ QC เลือกและบันทึกค่าถพ/)).not.toBeInTheDocument();
   });
 
   it("shows only Lab-scope parameters for R&D petitions", async () => {
