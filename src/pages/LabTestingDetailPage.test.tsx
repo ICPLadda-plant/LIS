@@ -213,6 +213,23 @@ describe("LabTestingDetailPage", () => {
     expect(screen.queryByText(/เกณฑ์กลาง 1\.7100–1\.8900 %/)).not.toBeInTheDocument();
   });
 
+  it("shows the FG %AI parameter for a production petition without an item code", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        dept: "production",
+        items: (fixtures.petition.items ?? []).map((item) => ({ ...item, itemNo: "", sampleId: "P-2610-0003", testItems: "" })),
+      },
+      parameters: fixtures.parameters.map((parameter) => ({ ...parameter, name: "%AI", applyAll: false, categories: ["FG"] })),
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByText("Area Inj.1")).toBeInTheDocument();
+    expect(screen.queryByText(/ยังไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่างนี้/)).not.toBeInTheDocument();
+  });
+
   it("expands a legacy %AI parameter into input, average, and RSD fields", async () => {
     render(<LabTestingDetailPage />);
 

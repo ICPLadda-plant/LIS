@@ -3,6 +3,7 @@ import {
   getItemProductType,
   getItemWarehouseCategory,
   getItemSubCategory,
+  getPetitionCategory,
   matchParametersForItem,
   visibleEnumOptions,
 } from './petitionTestItems';
@@ -171,6 +172,15 @@ describe('full common name matching', () => {
 });
 
 describe('warehouse category (RM/FG) scoping', () => {
+  it('treats production petitions without a master item code as FG', () => {
+    const param = makeParam({ scope: 'lab', applyAll: false, categories: ['FG'] });
+    const item = makeItem({ itemNo: '', sampleId: 'P-2610-0003', batchNo: '26S-FPNO.3-156', testItems: '' });
+
+    expect(getPetitionCategory({ dept: 'production' })).toBe('FG');
+    expect(matchParametersForItem(item, [param], [], { petitionCategory: getPetitionCategory({ dept: 'production' }) })).toEqual([param]);
+    expect(matchParametersForItem({ ...item, itemNo: 'R-1000' }, [param], [], { petitionCategory: 'FG' })).toEqual([]);
+  });
+
   // หมวดหมู่ทำหน้าที่เป็น "ประตู" (AND) ไม่ใช่มิติ OR ตัวที่หก — ตรงกับหน้าจอ
   // ที่ให้เลือกหมวดหมู่ย่อยได้ต่อเมื่อเลือก RM/FG แล้ว
   it('matches a category-only param by item code warehouse', () => {

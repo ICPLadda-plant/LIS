@@ -45,7 +45,7 @@ function subCategoryMatches(prefixes: string[] | undefined, subCategory: string)
 
 export function getPetitionCategory(petition?: Pick<Petition, 'dept'> | null): 'RM' | 'FG' | '' {
   if (petition?.dept === 'rm') return 'RM';
-  if (petition?.dept === 'fg') return 'FG';
+  if (petition?.dept === 'fg' || petition?.dept === 'production') return 'FG';
   return '';
 }
 
