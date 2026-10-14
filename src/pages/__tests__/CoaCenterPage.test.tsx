@@ -391,7 +391,7 @@ describe("CoaCenterPage", () => {
         petitionNoSnapshot: "SO26040020",
         customerSnapshot: { name: "Customer A", company: "ICPL" },
         selectedItemSeqs: [10000],
-        sampleSnapshots: [{ itemSeq: 10000, sampleName: "Carval", commonName: "SPIRODICLOFEN 24 % W/V SC", sampleId: "FC-CAVAL-1X16", condition: "16*1 L" }],
+        sampleSnapshots: [{ itemSeq: 10000, sampleName: "Carval", commonName: "THIAMETHOXAM 25% WG", sampleId: "FC-CAVAL-1X16", condition: "16*1 L" }],
         resultSnapshots: [],
         print: { printCount: 0 },
         createdAt: new Date().toISOString(),
@@ -413,16 +413,16 @@ describe("CoaCenterPage", () => {
 
     expect(await screen.findByRole("dialog")).toHaveTextContent("สร้าง COA แบบกรอกเอง");
     expect(screen.getByLabelText("ชื่อการค้า *")).toHaveValue("Carval");
-    expect(screen.getByLabelText("ชื่อสามัญ *")).toHaveValue("SPIRODICLOFEN 24 % W/V SC");
+    expect(screen.getByLabelText("ชื่อสามัญ *")).toHaveValue("THIAMETHOXAM 25% WG");
     expect(screen.getByRole("button", { name: "บันทึกร่าง COA" })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText("Batch No. *"), { target: { value: "B-ERP-1" } });
     fireEvent.change(screen.getByLabelText("วันที่ผลิต *"), { target: { value: "2026-10-01" } });
     fireEvent.change(screen.getByLabelText("Date of analysis *"), { target: { value: "2026-10-08" } });
-    fireEvent.change(screen.getByLabelText("เกณฑ์ความคลาดเคลื่อน *"), { target: { value: "24% ± 1.20" } });
+    fireEvent.change(screen.getByLabelText("เกณฑ์ความคลาดเคลื่อน *"), { target: { value: "25% ± 1.30" } });
     fireEvent.change(screen.getByLabelText("Density at 30°C (g/cm³) *"), { target: { value: "1.100" } });
-    fireEvent.change(screen.getByLabelText("%AI content (W/V) *"), { target: { value: "24" } });
-    fireEvent.change(screen.getByLabelText("Appearance *"), { target: { value: "Clear liquid" } });
+    fireEvent.change(screen.getByLabelText("%AI content (W/W) *"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Appearance *"), { target: { value: "Off-white cylinder granule" } });
     vi.mocked(api.createErpManualCoaDocument).mockRejectedValueOnce(new Error("บันทึกไม่สำเร็จ"));
     fireEvent.click(screen.getByRole("button", { name: "บันทึกร่าง COA" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("บันทึกไม่สำเร็จ");
@@ -430,8 +430,8 @@ describe("CoaCenterPage", () => {
       externalRequestId: "external-coa-request-SO26040020-10000",
       sample: expect.objectContaining({ batchNo: "B-ERP-1", productionDate: "2026-10-01" }),
       results: expect.arrayContaining([
-        expect.objectContaining({ testItem: "Appearance", criteria: "Clear liquid", result: "Conform" }),
-        expect.objectContaining({ testItem: "%AI content (W/V)", criteria: "24% ± 1.20", result: "24%" }),
+        expect.objectContaining({ testItem: "Appearance", criteria: "Off-white cylinder granule", result: "Conform" }),
+        expect.objectContaining({ testItem: "%AI content (W/W)", criteria: "25% ± 1.30", result: "25%" }),
         expect.objectContaining({ testItem: "Density at 30°C (g/cm³)", result: "1.100" }),
         expect.objectContaining({ testItem: "Date of analysis", result: "2026-10-08" }),
       ]),

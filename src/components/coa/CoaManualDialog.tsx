@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { aiContentTestItemForCommonName } from "@/lib/coaFormulation";
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
 
 const formLabels = {
   standard: "มาตรฐาน",
-  grWpSp: "GR / WP / SP",
+  grWpSp: "WG / WP / ST / GR / DS / SP / GB",
   liquid: "ยาน้ำ",
   bromadiolone0005: "Bromadiolone 0.005%",
 } as const;
@@ -27,13 +28,15 @@ type ResultForm = {
   appearance: string;
 };
 
-const resultFields: Array<[keyof ResultForm, string, "date" | "text"]> = [
-  ["analysisDate", "Date of analysis", "date"],
-  ["aiCriteria", "เกณฑ์ความคลาดเคลื่อน", "text"],
-  ["density", "Density at 30°C (g/cm³)", "text"],
-  ["aiResult", "%AI content (W/V)", "text"],
-  ["appearance", "Appearance", "text"],
-];
+function resultFieldsForCommonName(commonName?: string): Array<[keyof ResultForm, string, "date" | "text"]> {
+  return [
+    ["analysisDate", "Date of analysis", "date"],
+    ["aiCriteria", "เกณฑ์ความคลาดเคลื่อน", "text"],
+    ["density", "Density at 30°C (g/cm³)", "text"],
+    ["aiResult", aiContentTestItemForCommonName(commonName), "text"],
+    ["appearance", "Appearance", "text"],
+  ];
+}
 
 function emptyResultForm(): ResultForm {
   return { analysisDate: "", aiCriteria: "", density: "", aiResult: "", appearance: "" };
@@ -60,11 +63,11 @@ function resultFormFromRows(rows: CoaResultSnapshot[]): ResultForm {
   };
 }
 
-function resultRowsFromForm(itemSeq: number, values: ResultForm): CoaResultSnapshot[] {
+function resultRowsFromForm(itemSeq: number, values: ResultForm, commonName?: string): CoaResultSnapshot[] {
   const aiResult = values.aiResult.trim();
   return [
     { itemSeq, testItem: "Appearance", result: "Conform", criteria: values.appearance.trim(), method: "Visual", unit: "" },
-    { itemSeq, testItem: "%AI content (W/V)", result: aiResult && /%$/.test(aiResult) ? aiResult : aiResult ? `${aiResult}%` : "", criteria: values.aiCriteria.trim(), unit: "%", method: "" },
+    { itemSeq, testItem: aiContentTestItemForCommonName(commonName), result: aiResult && /%$/.test(aiResult) ? aiResult : aiResult ? `${aiResult}%` : "", criteria: values.aiCriteria.trim(), unit: "%", method: "" },
     { itemSeq, testItem: "Density at 30°C (g/cm³)", result: values.density.trim(), criteria: "-", unit: "g/cm³", method: "DMA 501" },
     { itemSeq, testItem: "Date of analysis", result: values.analysisDate.trim(), criteria: "-", unit: "", method: "" },
   ];
@@ -102,7 +105,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   });
   const save = useMutation({
     mutationFn: () => {
-      const results = resultRowsFromForm(sample.itemSeq, resultForm);
+      const results = resultRowsFromForm(sample.itemSeq, resultForm, sample.commonName);
       const body = { externalRequestId: request.externalRequestId || request._id, sample, results, remark,
         _user: { name: user?.name, email: user?.email, role: user?.role, activeRole: user?.role } };
       return editing ? api.updateCoaDocument(request._id, body) : api.createErpManualCoaDocument(body);
@@ -184,6 +187,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
     });
     setLabAiLookupStatus(aiResult ? "found" : "not-found");
   }, [labAiLookup.data, labAiLookup.isError, labAiLookup.isFetching, labAiLookupKey]);
+  const resultFields = resultFieldsForCommonName(sample.commonName);
   const valid = [sample.sampleName, sample.commonName, sample.batchNo, sample.productionDate].every((value) => value?.trim())
     && resultFields.every(([field]) => resultForm[field].trim());
   function selectStockLot(lotNo: string) {

@@ -6,6 +6,7 @@ const MF_URLS = [
   'https://n8n-plant.icpladda.com/webhook/item-MF-CLOSE',
 ];
 const STOCK_URL = 'https://n8n-plant.icpladda.com/webhook/api/stock-all-item';
+const GR_WP_SP_FORMULATIONS = new Set(['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'GB']);
 const PHYSICAL_ENGLISH = {
   'ของเหลวใส': 'Clear liquid', 'ของเหลวขุ่น': 'Cloudy liquid', 'ของเหลวหนืด': 'Viscous liquid',
   'เม็ดทรงกระบอก': 'Cylindrical granules', 'เกล็ด': 'Flakes', 'ผงละเอียด': 'Fine powder',
@@ -359,8 +360,9 @@ function resultRowsFromQc(qcResults, commonName) {
 
 function formKindForCommonName(commonName) {
   const value = text(commonName).toUpperCase();
+  const formulation = value.match(/\b([A-Z]{2,3})$/)?.[1] || '';
   if (/^BROMADIOLONE\s+0\.005%(?:\s|$)/.test(value)) return 'bromadiolone0005';
-  if (/\b(GR|DS|WP|WG|GB|ST|SP)$/.test(value)) return 'grWpSp';
+  if (GR_WP_SP_FORMULATIONS.has(formulation)) return 'grWpSp';
   if (/\b(SC|EW|EC|ZC|SL)$/.test(value)) return 'liquid';
   return 'standard';
 }

@@ -3,11 +3,19 @@ const assert = require('node:assert/strict');
 const {
   batchFromRow,
   batchSimilarity,
+  formKindForCommonName,
   lotSnapshot,
   physicalFromQc,
   resultRowsFromQc,
   sampleFromSources,
 } = require('./coaErp');
+
+test('uses the attached dry-product COA form for every requested common-name suffix', () => {
+  for (const suffix of ['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'GB']) {
+    assert.equal(formKindForCommonName(`THIAMETHOXAM 25% ${suffix}`), 'grWpSp');
+  }
+  assert.equal(formKindForCommonName('GLYPHOSATE 48% W/V SL'), 'liquid');
+});
 
 test('LOT No. FGYYMMDD-NNN supplies the COA batch and production date', () => {
   assert.deepEqual(lotSnapshot('FG260902-008'), {

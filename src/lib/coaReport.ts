@@ -1,5 +1,6 @@
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
 import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { formatDate as formatDisplayDate } from "@/lib/dateTime";
 
 export type CoaReportTemplateKind = "standard" | "grWpSp" | "liquid" | "bromadiolone0005";
@@ -57,10 +58,6 @@ function addYears(value: string | undefined, years: number): string {
   if (Number.isNaN(date.getTime())) return "-";
   date.setFullYear(date.getFullYear() + years);
   return formatGregorianDate(date.toISOString());
-}
-
-function isGrWpSpCommonName(commonName?: string): boolean {
-  return /\b(GR|DS|WP|WG|GB|ST|SP)$/i.test(commonName?.trim() ?? "");
 }
 
 function isLiquidCommonName(commonName?: string): boolean {
