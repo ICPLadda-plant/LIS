@@ -176,7 +176,7 @@ const QCApproval = () => {
       key: "action",
       header: "คำสั่ง",
       className: "text-right",
-      cell: (p) => p.status === "success" ? (
+      cell: (p) => (
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap justify-end gap-2">
             <Button
@@ -246,17 +246,6 @@ const QCApproval = () => {
             </div>
           )}
         </div>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/qc-approval/${p._id}?tab=${side}`);
-          }}
-        >
-          ตรวจสอบ
-        </Button>
       ),
     },
   ];

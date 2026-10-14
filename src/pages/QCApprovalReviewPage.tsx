@@ -433,7 +433,7 @@ export default function QCApprovalReviewPage() {
         </Tabs>
 
         {/* แผงตัดสิน — fixed bottom */}
-        {petition.status === "success" && abnormalLoaded && (<div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] bg-background border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        {(petition.status === "success" || petition.qcCompletedAt || petition.labCompletedAt) && abnormalLoaded && (<div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] bg-background border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="flex flex-col items-end gap-2">
             {!petitionHasAbnormal ? (
               <div className="flex flex-wrap items-center justify-end gap-3">

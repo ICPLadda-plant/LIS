@@ -36,10 +36,10 @@ vi.mock("@/hooks/usePetition", () => ({
           _id: "p1",
           petitionNo: "P-2608-0001",
           dept: "rm",
-          status: "success",
+          status: "inProgress",
           submittedBy: { name: "ผู้ยื่น A" },
           qcCompletedAt: "2026-08-05T01:00:00.000Z",
-          labCompletedAt: "2026-08-05T02:00:00.000Z",
+          labCompletedAt: null,
           completedAt: "2026-08-05T00:00:00.000Z",
           items: [{ seq: 1, sampleName: "ตัวอย่าง A" }],
           createdAt: "2026-08-05T00:00:00.000Z",
@@ -72,7 +72,7 @@ describe("QCApproval", () => {
     })));
   });
 
-  it("shows command choices instead of a status column", async () => {
+  it("shows command choices after QC confirms before Lab is complete", async () => {
     render(
       <MemoryRouter>
         <QCApproval />
@@ -102,7 +102,7 @@ describe("QCApproval", () => {
     );
 
     expect(await screen.findByRole("tab", { name: "ผล QC (1)" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "ผล Lab (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "ผล Lab (0)" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ยืนยันผลเมื่อ" })).toBeInTheDocument();
   });
 });
