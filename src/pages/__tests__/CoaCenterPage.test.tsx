@@ -472,7 +472,12 @@ describe("CoaCenterPage", () => {
       },
       results: [{ itemSeq: 10000, testItem: "%AI content", criteria: "48% ± 2.40", result: "48.35%", unit: "%" }],
       match: { petitionId: "p1", petitionNo: "P-AUTO-1", itemSeq: 1, batchNo: "FG260902-008", matchKind: "exact", batchScore: 1 },
-      candidates: [], stockCandidates: [], mfCandidates: [], form: { template: "liquid", aiCriteria: "48% ± 2.40", needsDensity: true },
+      candidates: [],
+      stockCandidates: [{
+        lotNo: "26S-PCB25-480-091069", batchNo: "480", productionDate: "2026-10-09",
+        quantity: 100, itemNo: "F-TWI25-1000X12",
+      }],
+      mfCandidates: [], form: { template: "liquid", aiCriteria: "48% ± 2.40", needsDensity: true },
       warnings: [], dataSources: { erp: true, stock: true, mf: true, lab: true, density: false },
     });
 
@@ -485,6 +490,13 @@ describe("CoaCenterPage", () => {
     expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-09-02");
     expect(screen.getByLabelText("%AI content (W/V) *")).toHaveValue("48.35%");
     expect(screen.getByText("แบบฟอร์ม: ยาน้ำ")).toBeInTheDocument();
+
+    fireEvent.change(within(screen.getByRole("dialog")).getByRole("combobox"), {
+      target: { value: "26S-PCB25-480-091069" },
+    });
+    expect(screen.getByLabelText("Batch No. *")).toHaveValue("480");
+    expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-10-09");
+    expect(screen.getByLabelText("Lot No.")).toHaveValue("26S-PCB25-480-091069");
   });
 
   it("refreshes %AI from the entered batch in real time", async () => {

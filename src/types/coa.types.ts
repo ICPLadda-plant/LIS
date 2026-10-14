@@ -168,7 +168,7 @@ export type CoaErpAutofill = {
     matchKind: "exact" | "close" | "none";
     labApprovedAt?: string | null;
   }>;
-  stockCandidates: Array<{ lotNo: string; productionDate: string; quantity: number; itemNo: string }>;
+  stockCandidates: Array<{ lotNo: string; batchNo: string; productionDate: string; quantity: number; itemNo: string }>;
   mfCandidates: Array<{ batchNo: string; productionDate: string; itemNo: string }>;
   form: { template: "standard" | "grWpSp" | "liquid" | "bromadiolone0005"; aiCriteria: string; needsDensity: boolean };
   warnings: string[];

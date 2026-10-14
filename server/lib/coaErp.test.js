@@ -17,6 +17,32 @@ test('LOT No. FGYYMMDD-NNN supplies the COA batch and production date', () => {
   });
 });
 
+test('finished-product LOT supplies the batch segment and Buddhist production date', () => {
+  assert.deepEqual(lotSnapshot('26S-PCB25-480-091069'), {
+    lotNo: '26S-PCB25-480-091069',
+    batchNo: '480',
+    productionDate: '2026-10-09',
+  });
+});
+
+test('stock LOT autofill preserves the full LOT while using its real batch and production date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'PACLOBUTRAZOL 25% SC' }],
+    externalCoaRequest: { itemNo: 'F-TWI25-1000X12' },
+  }, [{
+    item_no: 'F-TWI25-1000X12',
+    lot_no: '26S-PCB25-480-091069',
+    registering_date: '2026-10-10T00:00:00.000Z',
+    stock_qty: 100,
+  }], []);
+
+  assert.equal(result.sample.lotNo, '26S-PCB25-480-091069');
+  assert.equal(result.sample.batchNo, '480');
+  assert.equal(result.sample.productionDate, '2026-10-09');
+  assert.equal(result.stockCandidates[0].batchNo, '480');
+});
+
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {
   assert.equal(batchSimilarity('26S-GLY48-005', '26S-GLY48-005'), 1);
   assert.ok(batchSimilarity('26S-GLY48-005', '26S-GLY48-006') > batchSimilarity('26S-GLY48-005', '26S-OMT50-515'));
@@ -42,7 +68,7 @@ test('reads the batch field between the product name and production date', () =>
   assert.equal(result.mfCandidates[0].batchNo, 'FG260518-019');
 });
 
-test('does not use the MF production order as a Batch No.', () => {
+test('does not use an MF row without a real batch for Batch No. or production date', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [1],
     sampleSnapshots: [{ commonName: 'COMMON A' }],
@@ -55,7 +81,8 @@ test('does not use the MF production order as a Batch No.', () => {
   }]);
 
   assert.equal(result.sample.batchNo, '');
-  assert.equal(result.sample.productionDate, '2026-05-18');
+  assert.equal(result.sample.productionDate, '');
+  assert.equal(result.mfCandidates.length, 0);
 });
 
 test('reads positional Batch values after the product name and before production date', () => {

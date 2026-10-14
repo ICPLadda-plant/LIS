@@ -189,7 +189,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   function selectStockLot(lotNo: string) {
     const selected = autofill.data?.stockCandidates.find((candidate) => candidate.lotNo === lotNo);
     if (!selected) return;
-    setSample((current) => ({ ...current, lotNo: selected.lotNo, batchNo: selected.lotNo, productionDate: selected.productionDate }));
+    setSample((current) => ({ ...current, lotNo: selected.lotNo, batchNo: selected.batchNo, productionDate: selected.productionDate }));
   }
   const sampleFields: Array<[keyof CoaSampleSnapshot, string, string?]> = [
     ["sampleName", "ชื่อการค้า *"], ["commonName", "ชื่อสามัญ *"], ["batchNo", "Batch No. *"],
