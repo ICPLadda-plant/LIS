@@ -440,8 +440,8 @@ test('buildStatusLog: combines dual-track current + timeline', () => {
 
 test('buildStatusLog: track result is empty before receive and waiting after receive', () => {
   const parameters = [
-    { _id: 'density', name: 'ค่า ถพ.', scope: 'qc', status: 'active', valueFields: [] },
-    { _id: 'ai', name: '%AI', scope: 'lab', status: 'active', valueFields: [] },
+    { _id: 'density', name: 'ค่า ถพ.', scope: 'qc', status: 'active', applyAll: true, valueFields: [] },
+    { _id: 'ai', name: '%AI', scope: 'lab', status: 'active', applyAll: true, valueFields: [] },
   ];
   const petition = { status: 'inProgress', items: [{ seq: 1, batchNo: 'B-1' }] };
 
@@ -462,6 +462,16 @@ test('buildStatusLog: track result is empty before receive and waiting after rec
   );
   assert.strictEqual(afterReceive.current.tracks.qc.density, 'รอ QC ใส่ผล');
   assert.strictEqual(afterReceive.current.tracks.lab['%AI'], 'รอ LAB ใส่ผล');
+
+  const notRequested = buildStatusLog(
+    { ...petition, items: [{ seq: 1, batchNo: 'B-1', testItems: 'pH' }], qcReceivedAt: 'T', labReceivedAt: 'T' },
+    [],
+    [],
+    parameters,
+    false,
+  );
+  assert.strictEqual(notRequested.current.tracks.qc.density, '');
+  assert.strictEqual(notRequested.current.tracks.lab['%AI'], '');
 });
 
 test('buildStatusLog: sends density and %AI from original and additional Lab sample rounds', () => {

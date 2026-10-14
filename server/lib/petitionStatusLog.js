@@ -323,6 +323,20 @@ function latestTrackValue(testResults, side, fieldPattern) {
   return undefined;
 }
 
+function hasApplicableTrackField(petition, parameters, side, fieldPattern) {
+  return (parameters ?? []).some((param) => {
+    if (param.status !== 'active' || (param.scope === 'lab' ? 'lab' : 'qc') !== side) return false;
+    const labels = [param.name, ...(param.valueFields ?? []).map((field) => field.label)];
+    if (!labels.some((label) => fieldPattern.test(String(label ?? '').trim()))) return false;
+    return (petition.items ?? []).some((item) => {
+      if (side === 'lab' && !shouldSendItemToLab(item)) return false;
+      const selected = String(item.testItems ?? '').split(',').map((name) => name.trim().toLowerCase()).filter(Boolean);
+      if (selected.length > 0 && !selected.includes(String(param.name ?? '').trim().toLowerCase())) return false;
+      return qcParamAppliesToItem(param, item);
+    });
+  });
+}
+
 // Success gate — true when every REQUIRED track has recorded completion.
 // QC is required on EVERY petition; Lab is required only when the petition has a
 // lab-batch item. A petition may transition to `success` only when this holds —
@@ -344,13 +358,19 @@ function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone) {
   const testResults = buildTestResults(petition, qcResults, parameters);
   if (current.tracks?.qc) {
     const density = latestTrackValue(testResults, 'qc', /^(?:ค่าถพ\.|density)$/i);
-    current.tracks.qc.density = petition.qcReceivedAt
+    const needsDensity = density != null || hasApplicableTrackField(
+      petition, parameters, 'qc', /^(?:ค่า\s*ถพ\.|ค่าถพ\.|density)$/i,
+    );
+    current.tracks.qc.density = petition.qcReceivedAt && needsDensity
       ? (density == null ? 'รอ QC ใส่ผล' : String(density))
       : '';
   }
   if (current.tracks?.lab) {
     const ai = latestTrackValue(testResults, 'lab', /^%\s*ai(?:$|\s|[-—:])/i);
-    current.tracks.lab['%AI'] = petition.labReceivedAt
+    const needsAi = ai != null || hasApplicableTrackField(
+      petition, parameters, 'lab', /^%\s*ai(?:$|\s|[-—:])/i,
+    );
+    current.tracks.lab['%AI'] = petition.labReceivedAt && needsAi
       ? (ai == null ? 'รอ LAB ใส่ผล' : String(ai))
       : '';
   }
