@@ -1137,15 +1137,18 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
       return res.status(409).json({ error: { message: 'ต้องบันทึกผลผ่านแต่ละส่วน (Lab/QC) — สถานะ "เสร็จสิ้น" ตั้งตรงไม่ได้' } });
     }
 
-    // Approve transition: success → approved (conclusion = pass | accepted-oos)
+    const hasCompletedTrack = before.status === 'success' || Boolean(before.qcCompletedAt || before.labCompletedAt);
+
+    // Approve after either QC or Lab has confirmed results.
     if (updates.status === 'approved') {
       actor = await additionalActor(req, res, before, 'qc', true);
       if (!actor) return;
       const additionalError = await additionalCompletionError(before, ['qc', 'lab']);
       if (additionalError) return res.status(409).json({ error: { message: additionalError } });
-      if (before.status !== 'success') {
-        return res.status(409).json({ error: { message: 'ออก Final Result ได้เฉพาะคำร้องสถานะ "ทดสอบเสร็จสิ้น"' } });
+      if (!hasCompletedTrack) {
+        return res.status(409).json({ error: { message: 'ต้องมีผลจาก QC หรือ Lab ก่อนออก Final Result' } });
       }
+      const prevStatus = before.status;
       const conclusion = ['pass', 'accepted-oos'].includes(req.body.conclusion)
         ? req.body.conclusion
         : 'pass';
@@ -1165,7 +1168,7 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
       await before.save();
       logAudit(before, {
         event: 'statusChanged',
-        fromStatus: 'success',
+        fromStatus: prevStatus,
         toStatus: 'approved',
         actor: actor || 'system',
         note: conclusion === 'accepted-oos' ? 'ยอมรับผลไม่ปกติ' : 'ออก Final Result (ผลถูกต้อง)',
@@ -1174,13 +1177,14 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
       return res.json(before);
     }
 
-    // Reject transition: success → (requester=ปิดงาน | lab|qc|both=ส่งกลับทดสอบใหม่)
+    // Reject after either QC or Lab has confirmed results.
     if (updates.status === 'rejected') {
       actor = await additionalActor(req, res, before, 'qc', true);
       if (!actor) return;
-      if (before.status !== 'success') {
-        return res.status(409).json({ error: { message: 'ส่งกลับให้แก้ไขได้เฉพาะคำร้องสถานะ "ทดสอบเสร็จสิ้น"' } });
+      if (!hasCompletedTrack) {
+        return res.status(409).json({ error: { message: 'ต้องมีผลจาก QC หรือ Lab ก่อนส่งกลับให้แก้ไข' } });
       }
+      const prevStatus = before.status;
       const note = String(updates.revisionNote || '').trim();
       if (!note) return badRequest(res, 'กรุณาระบุข้อความที่ต้องการให้แก้ไข');
       const target = ['requester', 'lab', 'qc', 'both'].includes(req.body.target) ? req.body.target : 'requester';
@@ -1193,7 +1197,7 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
         before.reviewHistory.push({ action: 'reject', reviewedBy: actor || 'system', reviewedAt: new Date(), note });
         await before.save();
         logAudit(before, {
-          event: 'statusChanged', fromStatus: 'success', toStatus: 'rejected',
+          event: 'statusChanged', fromStatus: prevStatus, toStatus: 'rejected',
           actor: actor || 'system', note: `ส่งคืนผู้ส่งแก้ product: ${note}`, metadata: { returnTo: 'requester', conclusion: 'returned-to-requester' },
         });
         return res.json(before);
@@ -1223,7 +1227,7 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
       const targetLabel = target === 'lab' ? 'ฝั่ง Lab' : target === 'qc' ? 'ฝั่ง QC' : 'ทั้ง Lab และ QC';
       await before.save();
       logAudit(before, {
-        event: 'statusChanged', fromStatus: 'success', toStatus: 'inProgress',
+        event: 'statusChanged', fromStatus: prevStatus, toStatus: 'inProgress',
         actor: actor || 'system',
         note: `หัวหน้า QC ส่งกลับ${targetLabel}ทดสอบใหม่: ${note}`,
         metadata: { returnTo: target },

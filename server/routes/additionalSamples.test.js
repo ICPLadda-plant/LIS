@@ -145,6 +145,37 @@ test('generic PATCH cannot replace round history or forge completion stamps', as
   assert.equal(writes.length, 0);
 });
 
+for (const side of ['qc', 'lab']) test(`Final Result can be approved after only ${side} confirms results`, async context => {
+  const { state } = fixture(context, {
+    additionalSampleRequests: [],
+    qcCompletedAt: side === 'qc' ? new Date('2026-10-14T01:00:00Z') : null,
+    labCompletedAt: side === 'lab' ? new Date('2026-10-14T01:00:00Z') : null,
+  });
+
+  const res = await invoke(petitions, '/:id', 'patch', { status: 'approved' });
+
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(state.status, 'approved');
+});
+
+test('a completed track can be rejected before the other track finishes', async context => {
+  const { state } = fixture(context, {
+    additionalSampleRequests: [],
+    qcCompletedAt: new Date('2026-10-14T01:00:00Z'),
+    labCompletedAt: null,
+  });
+
+  const res = await invoke(petitions, '/:id', 'patch', {
+    status: 'rejected',
+    revisionNote: 'ทดสอบใหม่',
+    target: 'qc',
+  });
+
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(state.status, 'inProgress');
+  assert.equal(state.qcCompletedAt, null);
+});
+
 test('received round cannot complete with previous-round results', async context => {
   fixture(context, { additionalSampleRequests: [{ ...round, status: 'received', previousResults: [{ itemSeq: 1, parameterId, values: { value: 12 } }] }] });
   context.mock.method(QCTestResult, 'find', () => ({ lean: async () => [{ itemSeq: 1, parameterId, values: { value: 5 }, sampleRoundId: '' }] }));

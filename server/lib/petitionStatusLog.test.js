@@ -438,6 +438,42 @@ test('buildStatusLog: combines dual-track current + timeline', () => {
   assert.deepStrictEqual(out.timeline.map((t) => t.label), ['ยื่นคำขอ']);
 });
 
+test('buildStatusLog: track result is empty before receive and waiting after receive', () => {
+  const parameters = [
+    { _id: 'density', name: 'ค่า ถพ.', scope: 'qc', status: 'active', applyAll: true, valueFields: [] },
+    { _id: 'ai', name: '%AI', scope: 'lab', status: 'active', applyAll: true, valueFields: [] },
+  ];
+  const petition = { status: 'inProgress', items: [{ seq: 1, batchNo: 'B-1' }] };
+
+  const labWaiting = buildStatusLog({ ...petition, qcReceivedAt: 'T' }, [], [], parameters, false);
+  assert.strictEqual(labWaiting.current.tracks.qc.density, 'รอ QC ใส่ผล');
+  assert.strictEqual(labWaiting.current.tracks.lab['%AI'], '');
+
+  const qcWaiting = buildStatusLog({ ...petition, labReceivedAt: 'T' }, [], [], parameters, false);
+  assert.strictEqual(qcWaiting.current.tracks.qc.density, '');
+  assert.strictEqual(qcWaiting.current.tracks.lab['%AI'], 'รอ LAB ใส่ผล');
+
+  const afterReceive = buildStatusLog(
+    { ...petition, qcReceivedAt: 'T', labReceivedAt: 'T' },
+    [],
+    [],
+    parameters,
+    false,
+  );
+  assert.strictEqual(afterReceive.current.tracks.qc.density, 'รอ QC ใส่ผล');
+  assert.strictEqual(afterReceive.current.tracks.lab['%AI'], 'รอ LAB ใส่ผล');
+
+  const notRequested = buildStatusLog(
+    { ...petition, items: [{ seq: 1, batchNo: 'B-1', testItems: 'pH' }], qcReceivedAt: 'T', labReceivedAt: 'T' },
+    [],
+    [],
+    parameters,
+    false,
+  );
+  assert.strictEqual(notRequested.current.tracks.qc.density, '');
+  assert.strictEqual(notRequested.current.tracks.lab['%AI'], '');
+});
+
 test('buildStatusLog: sends density and %AI from original and additional Lab sample rounds', () => {
   const originalLab = {
     itemSeq: 1, parameterId: 'ai', parameterName: 'Active Ingredient',
@@ -467,7 +503,9 @@ test('buildStatusLog: sends density and %AI from original and additional Lab sam
     },
   ];
 
-  const { testResults } = buildStatusLog(petition, [], results, parameters, false);
+  const { current, testResults } = buildStatusLog(petition, [], results, parameters, false);
+  assert.strictEqual(current.tracks.qc.density, '1.052');
+  assert.strictEqual(current.tracks.lab['%AI'], '10.30');
   assert.deepStrictEqual(testResults, [
     { itemSeq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', side: 'lab', sampleRoundId: '', parameterName: 'Active Ingredient', fieldLabel: '%AI', value: '9.80', phase: 1 },
     { itemSeq: 1, sampleId: 'S-1', sampleName: 'ตัวอย่าง A', side: 'qc', sampleRoundId: '', parameterName: 'ค่า ถพ.', fieldLabel: 'ค่าถพ.::สาร A', value: 1.052, phase: 1 },

@@ -127,4 +127,22 @@ describe('PetitionView R&D parameter visibility', () => {
     expect(screen.queryByText('ยังไม่บันทึก')).not.toBeInTheDocument();
     expect(screen.getByText('1.7')).toBeInTheDocument();
   });
+
+  it('shows a dash without the missing-standard badge in result mode', async () => {
+    fixtures.getQCResults.mockResolvedValue([
+      {
+        petitionId: fixtures.petition._id,
+        itemSeq: 1,
+        parameterId: 'lab-only',
+        parameterName: 'ทดสอบ Lab',
+        values: { 'ผล Lab': 'ผ่าน' },
+      },
+    ]);
+
+    render(<PetitionView petition={fixtures.petition} hideMissingStandardBadge />);
+
+    await waitFor(() => expect(screen.getByText('ทดสอบ Lab')).toBeInTheDocument());
+    expect(screen.queryByText('ไม่มีเกณฑ์')).not.toBeInTheDocument();
+    expect(screen.getByText('เกณฑ์:')).toHaveTextContent('เกณฑ์: -');
+  });
 });
