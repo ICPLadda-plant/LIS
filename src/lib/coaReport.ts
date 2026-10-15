@@ -61,7 +61,7 @@ function addYears(value: string | undefined, years: number): string {
 }
 
 function isLiquidCommonName(commonName?: string): boolean {
-  return /\b(SC|EW|EC|ZC|SL)$/i.test(commonName?.trim() ?? "");
+  return /\b(SL|EC|EW|SC|ME|ZC)$/i.test(commonName?.trim() ?? "");
 }
 
 function normalizeCommonName(commonName?: string): string {

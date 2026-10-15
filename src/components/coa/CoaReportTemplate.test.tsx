@@ -4,7 +4,7 @@ import CoaReportTemplate, { COA_REPORT_CSS } from "./CoaReportTemplate";
 import { buildCoaReportPages, type CoaReportPage } from "@/lib/coaReport";
 
 describe("CoaReportTemplate", () => {
-  it.each(["GLYPHOSATE 48% SL", "Product 2% GR", "BROMADIOLONE 0.005%", "Other product"])(
+  it.each(["GLYPHOSATE 48% SL", "EMAMECTIN BENZOATE 2% W/V ME", "Product 2% GR", "BROMADIOLONE 0.005%", "Other product"])(
     "renders only selected parameter results in the existing %s form",
     (commonName) => {
       const pages = buildCoaReportPages({

@@ -125,7 +125,7 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].samples[0].aiContentCriteria).toBe("2% ± 0.50");
   });
 
-  it.each(["SC", "EW", "EC", "ZC", "SL"].flatMap((formulation) => [
+  it.each(["SL", "EC", "EW", "SC", "ME", "ZC"].flatMap((formulation) => [
     `Glyphosate 48% ${formulation}`,
     `Glyphosate 48% W/V ${formulation}`,
     `Glyphosate 48%${formulation}`,
@@ -170,7 +170,7 @@ describe("buildCoaReportPages", () => {
     },
   );
 
-  it.each(["SC", "EW", "EC", "ZC", "SL"])("recognizes %s without a concentration", (formulation) => {
+  it.each(["SL", "EC", "EW", "SC", "ME", "ZC"])("recognizes %s without a concentration", (formulation) => {
     const doc = {
       sampleSnapshots: [{ itemSeq: 1, commonName: `Product ${formulation}` }],
       resultSnapshots: [],
@@ -183,7 +183,7 @@ describe("buildCoaReportPages", () => {
     expect(page.samples[0].aiContentCriteria).toBe("-");
   });
 
-  it.each([undefined, "", "Product 48% ME", "Product SC extra", "Product ESC", "Product SC WP"])(
+  it.each([undefined, "", "Product SC extra", "Product ESC", "Product SC WP"])(
     "does not classify %s as a liquid formulation",
     (commonName) => {
       const doc = { sampleSnapshots: [{ itemSeq: 1, commonName }] } as CoaDocument;
