@@ -242,23 +242,59 @@ function physicalFromQc(result) {
   };
 }
 
-function aiFromQc(result, commonName) {
-  const rows = Array.isArray(result?.entries) && result.entries.length ? result.entries : [result?.values || {}];
+function aiValueFromRow(row, commonName) {
   const substance = normalizeText(commonName).split(/\s|\+|,/)[0];
   const values = [];
-  for (const row of rows) {
-    for (const [key, value] of Object.entries(row || {})) {
-      if (isAiContentTestItem(key) && text(value)) {
-        values.push({ key, value });
-      }
+  for (const [key, value] of Object.entries(row || {})) {
+    if (isAiContentTestItem(key) && text(value)) {
+      values.push({ key, value });
     }
   }
   const selected = values.find((entry) => substance && normalizeText(entry.key).includes(`::${substance}`))
     || values.find((entry) => normalizeText(entry.key) !== '%ai')
     || values[0];
   if (!selected) return null;
-  const resultText = text(selected.value).endsWith('%') ? text(selected.value) : `${text(selected.value)}%`;
-  return { result: resultText, key: selected.key };
+  const raw = text(selected.value);
+  const numericText = raw.replace(/,/g, '').match(/[-+]?(?:\d+(?:\.\d+)?|\.\d+)/)?.[0] || '';
+  const numeric = Number(numericText);
+  return {
+    key: selected.key,
+    raw,
+    numeric: Number.isFinite(numeric) ? numeric : null,
+    decimals: numericText.includes('.') ? numericText.split('.')[1].length : 0,
+  };
+}
+
+function aiFromQcResults(qcResults, commonName) {
+  const values = [];
+  for (const result of qcResults || []) {
+    const rows = Array.isArray(result?.entries) && result.entries.length
+      ? result.entries
+      : [result?.values || {}];
+    for (const row of rows) {
+      const selected = aiValueFromRow(row, commonName);
+      if (selected) values.push(selected);
+    }
+  }
+  if (!values.length) return null;
+  const numericValues = values.filter((entry) => entry.numeric !== null);
+  if (numericValues.length <= 1) {
+    const selected = numericValues[0] || values[0];
+    return {
+      result: selected.raw.includes('%') ? selected.raw : `${selected.raw}%`,
+      key: selected.key,
+      valueCount: 1,
+    };
+  }
+  const average = numericValues.reduce((sum, entry) => sum + entry.numeric, 0) / numericValues.length;
+  const maxDecimals = Math.max(...numericValues.map((entry) => entry.decimals));
+  const precision = Math.min(10, maxDecimals + Math.ceil(Math.log10(numericValues.length)));
+  const formatted = average.toFixed(precision).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+  return {
+    result: `${formatted}%`,
+    key: numericValues[0].key,
+    valueCount: numericValues.length,
+  };
 }
 
 function densityFromQc(result) {
@@ -299,6 +335,60 @@ function findBestLabItem(petitions, sample) {
   // A Lab result is safe to autofill only when both common name and batch match.
   // Keep near candidates for diagnostics, but never use them as the selected result.
   return { best: candidates.find((candidate) => candidate.matchKind === 'exact') || null, candidates };
+}
+
+function isEligibleAiLabDepartment(petition) {
+  const department = normalizeText(petition?.submittedBy?.department)
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+  if (!department) return normalizeText(petition?.dept) === 'fg';
+  if (department === 'qc' || department.includes('quality control') || department.includes('ควบคุมคุณภาพ')) {
+    return true;
+  }
+  return [
+    'warehouse product',
+    'product warehouse',
+    'warehouse fg',
+    'fg warehouse',
+    'finished goods warehouse',
+    'finished good warehouse',
+    'คลังสินค้า fg',
+    'คลังสินค้าสำเร็จรูป',
+    'คลังสินค้าผลิตภัณฑ์',
+    'คลังผลิตภัณฑ์',
+  ].some((name) => department.includes(name));
+}
+
+function isAfterDryingLabItem(item) {
+  const source = [item?.sampleName, item?.note, item?.testItems].map(text).join(' ');
+  return /(?:ยา\s*)?หลัง\s*อบ|after[\s-]*dry(?:ing)?|post[\s-]*dry/i.test(source);
+}
+
+function findLatestAiLabItems(petitions, sample) {
+  const commonName = normalizeText(sample?.commonName);
+  const batchNo = text(sample?.batchNo || sample?.lotNo);
+  if (!commonName || !batchNo) return { best: null, candidates: [] };
+  const candidates = [];
+  for (const petition of petitions || []) {
+    if (petition?.status === 'rejected' || !petition?.labApprovedAt || !isEligibleAiLabDepartment(petition)) continue;
+    const items = (petition.items || []).filter((item) => (
+      normalizeText(item.commonName) === commonName
+      && batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1
+      && !isAfterDryingLabItem(item)
+    ));
+    if (!items.length) continue;
+    candidates.push({
+      petition,
+      item: items[0],
+      items,
+      batchScore: 1,
+      matchKind: 'exact',
+      approvedTime: Date.parse(petition.labApprovedAt) || 0,
+      updatedTime: Date.parse(petition.updatedAt) || 0,
+    });
+  }
+  candidates.sort((left, right) => right.approvedTime - left.approvedTime || right.updatedTime - left.updatedTime);
+  return { best: candidates[0] || null, candidates };
 }
 
 function labRequestBatch(labRequests, petition, item) {
@@ -704,9 +794,9 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   };
 }
 
-function resultRowsFromQc(qcResults, commonName) {
+function resultRowsFromQc(qcResults, commonName, options = {}) {
   const physical = qcResults.map(physicalFromQc).find((entry) => entry.raw);
-  const ai = qcResults.map((result) => aiFromQc(result, commonName)).find(Boolean);
+  const ai = options.includeAi === false ? null : aiFromQcResults(qcResults, commonName);
   const density = qcResults.map(densityFromQc).find(Boolean) || '';
   const rows = [];
   if (physical?.raw) rows.push({
@@ -718,7 +808,11 @@ function resultRowsFromQc(qcResults, commonName) {
   if (density) rows.push({
     testItem: 'Density at 30°C (g/cm³)', criteria: '-', result: density, unit: 'g/cm³', method: 'DMA 501',
   });
-  const analysisDate = qcResults.map((entry) => normalizeIsoDate(entry.updatedAt || entry.enteredAt)).find(Boolean);
+  const analysisDate = qcResults
+    .map((entry) => normalizeIsoDate(entry.updatedAt || entry.enteredAt))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
   if (analysisDate) rows.push({ testItem: 'Date of analysis', criteria: '-', result: analysisDate, unit: '', method: '' });
   return { rows, physical, ai, density, analysisDate };
 }
@@ -770,6 +864,7 @@ module.exports = {
   fetchErpReferences,
   findBestCoaHistorySample,
   findBestLabItem,
+  findLatestAiLabItems,
   findBestLegacyLabResult,
   findBestRequestItem,
   formKindForCommonName,
@@ -779,6 +874,8 @@ module.exports = {
   normalizeIsoDate,
   normalizeText,
   physicalFromQc,
+  isAfterDryingLabItem,
+  isEligibleAiLabDepartment,
   resultRowsFromLegacyLab,
   resultRowsFromQc,
   rowsFromPayload,

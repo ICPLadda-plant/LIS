@@ -4,6 +4,7 @@ const {
   batchFromRow,
   batchSimilarity,
   findBestLegacyLabResult,
+  findLatestAiLabItems,
   findBestRequestItem,
   formKindForCommonName,
   legacyProductMatchScore,
@@ -11,6 +12,8 @@ const {
   mergeResultRows,
   normalizeIsoDate,
   physicalFromQc,
+  isAfterDryingLabItem,
+  isEligibleAiLabDepartment,
   resultRowsFromLegacyLab,
   resultRowsFromQc,
   sampleFromSources,
@@ -381,4 +384,69 @@ test('AI results prefer the substance-specific value over a generic total', () =
     { parameterName: '%AI', values: { '%AI': '1', '%AI::fipronil': '0.2650' } },
   ], 'FIPRONIL 0.3% GR');
   assert.equal(rows.ai.result, '0.2650%');
+});
+
+test('AI Lab selection accepts Warehouse Product and QC departments only', () => {
+  for (const department of [
+    'Warehouse Product', 'FG Warehouse', 'คลังสินค้า FG', 'QC', 'Quality Control', 'ควบคุมคุณภาพ',
+  ]) {
+    assert.equal(isEligibleAiLabDepartment({ submittedBy: { department } }), true, department);
+  }
+  assert.equal(isEligibleAiLabDepartment({ submittedBy: { department: 'R&D' }, dept: 'fg' }), false);
+  assert.equal(isEligibleAiLabDepartment({ dept: 'fg' }), true);
+});
+
+test('AI Lab selection uses the latest approved eligible petition and excludes after-drying items', () => {
+  const commonName = 'GLYPHOSATE 48% W/V SL';
+  const regularItems = [
+    { seq: 1, sampleName: 'Product A', commonName, batchNo: '2026031601' },
+    { seq: 2, sampleName: 'Product A duplicate', commonName, batchNo: '2026031601' },
+  ];
+  const result = findLatestAiLabItems([
+    {
+      _id: 'rnd-newest', labApprovedAt: '2026-10-12T00:00:00.000Z',
+      submittedBy: { department: 'R&D' }, items: regularItems,
+    },
+    {
+      _id: 'after-drying', labApprovedAt: '2026-10-11T00:00:00.000Z',
+      submittedBy: { department: 'QC' },
+      items: [{ seq: 1, sampleName: 'ยาหลังอบ', commonName, batchNo: '2026031601' }],
+    },
+    {
+      _id: 'warehouse-latest', labApprovedAt: '2026-10-10T00:00:00.000Z',
+      submittedBy: { department: 'Warehouse Product' }, items: regularItems,
+    },
+    {
+      _id: 'qc-older', labApprovedAt: '2026-10-09T00:00:00.000Z',
+      submittedBy: { department: 'QC' }, items: regularItems.slice(0, 1),
+    },
+  ], { commonName, batchNo: '2026031601' });
+
+  assert.equal(result.best.petition._id, 'warehouse-latest');
+  assert.deepEqual(result.best.items.map((item) => item.seq), [1, 2]);
+  assert.equal(isAfterDryingLabItem({ note: 'ทดสอบยาหลังอบ' }), true);
+});
+
+test('AI results average duplicate entries and ignore after-drying phase values', () => {
+  const rows = resultRowsFromQc([{
+    parameterName: '%AI',
+    entries: [
+      { '%AI::glyphosate': '24.28' },
+      { '%AI::glyphosate': '24.33' },
+    ],
+    valuesPhase2: { '%AI::glyphosate': '99.99' },
+  }], 'GLYPHOSATE 48% W/V SL');
+
+  assert.equal(rows.ai.result, '24.305%');
+  assert.equal(rows.ai.valueCount, 2);
+});
+
+test('AI results average matching values from multiple Lab result documents', () => {
+  const rows = resultRowsFromQc([
+    { parameterName: '%AI', values: { '%AI::glyphosate': '24.28' } },
+    { parameterName: '%AI', values: { '%AI::glyphosate': '24.33' } },
+  ], 'GLYPHOSATE 48% W/V SL');
+
+  assert.equal(rows.ai.result, '24.305%');
+  assert.equal(rows.ai.valueCount, 2);
 });

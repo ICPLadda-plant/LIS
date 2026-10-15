@@ -19,10 +19,12 @@ const {
   fetchErpReferences,
   findBestCoaHistorySample,
   findBestLabItem,
+  findLatestAiLabItems,
   findBestLegacyLabResult,
   findBestRequestItem,
   formKindForCommonName,
   mergeResultRows,
+  normalizeIsoDate,
   resultRowsFromLegacyLab,
   resultRowsFromQc,
   sampleFromSources,
@@ -811,15 +813,42 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       if (!sample.manufacturer) sample.manufacturer = manualText(legacyMatch.row?.manufacturer);
     }
     const lab = findBestLabItem(petitions, sample);
-    const qcResults = lab.best
-      ? await QCTestResult.find({ petitionId: String(lab.best.petition._id), itemSeq: Number(lab.best.item.seq) })
-        .sort({ updatedAt: -1 }).lean()
-      : [];
-    const resultData = resultRowsFromQc(qcResults, sample.commonName);
+    const aiLab = findLatestAiLabItems(petitions, sample);
+    const [qcResults, aiQcResults] = await Promise.all([
+      lab.best
+        ? QCTestResult.find({ petitionId: String(lab.best.petition._id), itemSeq: Number(lab.best.item.seq) })
+          .sort({ updatedAt: -1 }).lean()
+        : Promise.resolve([]),
+      aiLab.best
+        ? QCTestResult.find({
+          petitionId: String(aiLab.best.petition._id),
+          itemSeq: { $in: aiLab.best.items.map((item) => Number(item.seq)) },
+        }).sort({ updatedAt: -1 }).lean()
+        : Promise.resolve([]),
+    ]);
+    const resultData = resultRowsFromQc(qcResults, sample.commonName, { includeAi: false });
+    const aiResultData = resultRowsFromQc(aiQcResults, sample.commonName);
     const legacyResultData = resultRowsFromLegacyLab(legacyMatch?.row, sample.commonName);
-    resultData.rows = mergeResultRows(resultData.rows, legacyResultData.rows);
+    resultData.rows = mergeResultRows(
+      resultData.rows,
+      legacyResultData.rows.filter((row) => !isAiContentTestItem(row.testItem)),
+    );
     resultData.density ||= legacyResultData.density === '-' ? '' : legacyResultData.density;
     resultData.analysisDate ||= legacyResultData.analysisDate;
+    const aiRow = aiResultData.rows.find((row) => isAiContentTestItem(row.testItem));
+    if (aiRow) {
+      const insertAt = resultData.rows.findIndex((row) => /density|date\s*of\s*analysis/i.test(row.testItem || ''));
+      resultData.rows.splice(insertAt < 0 ? resultData.rows.length : insertAt, 0, aiRow);
+      resultData.ai = aiResultData.ai;
+      resultData.analysisDate = aiResultData.analysisDate
+        || normalizeIsoDate(aiLab.best?.petition?.labApprovedAt)
+        || resultData.analysisDate;
+      const analysisDateRow = resultData.rows.find((row) => /date\s*of\s*analysis/i.test(row.testItem || ''));
+      if (analysisDateRow && resultData.analysisDate) analysisDateRow.result = resultData.analysisDate;
+      else if (resultData.analysisDate) resultData.rows.push({
+        testItem: 'Date of analysis', criteria: '-', result: resultData.analysisDate, unit: '', method: '',
+      });
+    }
     let density = resultData.density;
     if (!density && sample.batchNo) {
       const pattern = new RegExp(escapeRegex(sample.batchNo), 'i');
@@ -904,7 +933,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         erp: true,
         stock: sourceData.stockCandidates.length > 0,
         mf: sourceData.mfCandidates.length > 0,
-        lab: Boolean(lab.best),
+        lab: Boolean(lab.best || aiLab.best),
         coaHistory: Boolean(coaHistoryMatch),
         legacyLab: Boolean(legacyMatch),
         density: Boolean(density),
@@ -935,37 +964,12 @@ router.get('/lab-ai-lookup', async (req, res) => {
         },
       },
     }).sort({ updatedAt: -1 }).limit(200).lean();
-    const lab = findBestLabItem(petitions, { batchNo, commonName, sampleName });
-    if (!lab.best) {
-      const legacyRows = await LegacyLabResult.find({
-        batch_no: new RegExp(`^\\s*${escapeRegex(batchNo)}(?:(?:\\s+|-)P\\d+)?\\s*$`, 'i'),
-      }).lean();
-      const legacySource = {
-        sampleSnapshots: [{ sampleName, commonName }],
-        externalCoaRequest: {},
-      };
-      const legacyMatch = findBestLegacyLabResult(legacyRows, legacySource, { batchNo, commonName, sampleName });
-      if (!legacyMatch) {
-        return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
-      }
-      const legacyResultData = resultRowsFromLegacyLab(legacyMatch.row, commonName);
-      return res.json({
-        batchNo,
-        commonName,
-        ai: legacyResultData.rows.find((row) => isAiContentTestItem(row.testItem)) || null,
-        analysisDate: legacyResultData.analysisDate || '',
-        match: {
-          petitionId: `legacy:${legacyMatch.row?._id || ''}`,
-          petitionNo: 'ผล Lab เดิม',
-          itemSeq: 1,
-          batchNo: legacyMatch.batchNo,
-        },
-      });
-    }
+    const lab = findLatestAiLabItems(petitions, { batchNo, commonName, sampleName });
+    if (!lab.best) return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
 
     const qcResults = await QCTestResult.find({
       petitionId: String(lab.best.petition._id),
-      itemSeq: Number(lab.best.item.seq),
+      itemSeq: { $in: lab.best.items.map((item) => Number(item.seq)) },
     }).sort({ updatedAt: -1 }).lean();
     const resultData = resultRowsFromQc(qcResults, commonName);
     const ai = resultData.rows.find((row) => isAiContentTestItem(row.testItem)) || null;
@@ -973,7 +977,7 @@ router.get('/lab-ai-lookup', async (req, res) => {
       batchNo,
       commonName,
       ai,
-      analysisDate: resultData.analysisDate || '',
+      analysisDate: resultData.analysisDate || normalizeIsoDate(lab.best.petition.labApprovedAt) || '',
       match: {
         petitionId: String(lab.best.petition._id),
         petitionNo: lab.best.petition.petitionNo,
