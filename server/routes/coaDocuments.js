@@ -892,11 +892,10 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     if (legacyMatch) {
       if (!authoritativeBatch) {
         sample.batchNo = legacyMatch.batchNo;
-        sample.productionDate = legacyMatch.productionDate;
       } else {
         if (!sample.batchNo) sample.batchNo = legacyMatch.batchNo;
-        if (!sample.productionDate) sample.productionDate = legacyMatch.productionDate;
       }
+      if (!sample.productionDate) sample.productionDate = legacyMatch.productionDate;
       if (!sample.manufacturer) sample.manufacturer = manualText(legacyMatch.row?.manufacturer);
     }
     const lab = findBestLabItem(petitions, sample);

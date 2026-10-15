@@ -1359,7 +1359,7 @@ test('ERP autofill keeps the matching LIS petition batch but uses the newest ERP
   }
 });
 
-test('ERP autofill keeps legacy appearance and density but does not use legacy AI', async () => {
+test('ERP autofill keeps ERP production date while using legacy appearance and density', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1404,7 +1404,7 @@ test('ERP autofill keeps legacy appearance and density but does not use legacy A
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '20260430');
     assert.equal(res.body.sample.lotNo, 'FG261015-008');
-    assert.equal(res.body.sample.productionDate, '2026-06-18');
+    assert.equal(res.body.sample.productionDate, '2026-10-15');
     assert.equal(res.body.results.find((row) => row.testItem === 'Appearance').result, 'Conform');
     assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '0.946');
