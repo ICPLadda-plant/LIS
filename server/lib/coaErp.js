@@ -303,11 +303,21 @@ function sampleFromSources(source, stockRows, mfRows) {
       : normalizeText(row.common_name || row.commonName) === normalizeText(commonName);
   }).filter((row) => batchFromRow(row));
   const mf = mfCandidates[0];
-  const sourceBatch = text(source?.sampleSnapshots?.[0]?.batchNo || source?.sampleSnapshots?.[0]?.lotNo);
+  const sourceSample = source?.sampleSnapshots?.[0] || {};
+  const requestedBatch = text(sourceSample.batchNo);
+  const requestedLot = text(sourceSample.lotNo);
+  const sourceBatch = requestedBatch || requestedLot;
+  const requestedProductionDate = normalizeIsoDate(sourceSample.productionDate);
   const mfBatch = batchFromRow(mf);
   const mfDate = productionDateFromRow(mf);
-  const lot = sourceBatch
-    ? lotSnapshot(sourceBatch, source?.sampleSnapshots?.[0]?.productionDate)
+  const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
+  const sourceBatchDate = requestedBatch ? lotSnapshot(requestedBatch).productionDate : '';
+  const lot = sourceLot
+    ? {
+      lotNo: requestedLot || sourceLot.lotNo,
+      batchNo: requestedBatch || sourceLot.batchNo,
+      productionDate: requestedProductionDate || sourceLot.productionDate || sourceBatchDate,
+    }
     : stock
       ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
       : mfBatch

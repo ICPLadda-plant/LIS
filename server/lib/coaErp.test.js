@@ -51,6 +51,33 @@ test('stock LOT autofill preserves the full LOT while using its real batch and p
   assert.equal(result.stockCandidates[0].batchNo, '480');
 });
 
+test('customer COA request batch, lot and production date take precedence over ERP references', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'Trade A',
+      commonName: 'PACLOBUTRAZOL 25% SC',
+      batchNo: 'B-CUSTOMER-001',
+      lotNo: 'L-CUSTOMER-001',
+      productionDate: '2026-04-18T00:00:00.000Z',
+    }],
+    externalCoaRequest: { itemNo: 'F-TWI25-1000X12' },
+  }, [{
+    item_no: 'F-TWI25-1000X12',
+    lot_no: '26S-PCB25-480-091069',
+    registering_date: '2026-10-10T00:00:00.000Z',
+    stock_qty: 100,
+  }], [{
+    item_no: 'F-TWI25-1000X12',
+    batch_no: 'FG260518-019',
+    create_date: '2026-05-18T00:00:00.000Z',
+  }]);
+
+  assert.equal(result.sample.batchNo, 'B-CUSTOMER-001');
+  assert.equal(result.sample.lotNo, 'L-CUSTOMER-001');
+  assert.equal(result.sample.productionDate, '2026-04-18');
+});
+
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {
   assert.equal(batchSimilarity('26S-GLY48-005', '26S-GLY48-005'), 1);
   assert.ok(batchSimilarity('26S-GLY48-005', '26S-GLY48-006') > batchSimilarity('26S-GLY48-005', '26S-OMT50-515'));

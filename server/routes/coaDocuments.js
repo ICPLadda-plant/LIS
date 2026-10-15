@@ -277,14 +277,24 @@ function externalCoaDate(row) {
   return firstExternalValue(row, ['UpdateDate', 'SaleOrderDate', 'ShipmentDate', 'ActionDate']);
 }
 
+function externalCoaProductionDate(row) {
+  return firstExternalValue(row, [
+    'ProductionDate', 'Production Date', 'production_date', 'productionDate',
+    'MfgDate', 'MFGDate', 'Mfg Date', 'MFG Date',
+    'ManufactureDate', 'ManufacturingDate', 'manufacture_date',
+    'ProdDate', 'Prod Date',
+  ]);
+}
+
 function externalCoaRowToDocument(row) {
   const itemSeq = externalNumber(row, ['Line']) || 1;
   const saleOrderNo = firstExternalValue(row, ['SaleOrderNo']);
   const itemNo = firstExternalValue(row, ['ItemNo']);
   const tradeName = firstExternalValue(row, ['TradeName']);
   const commonName = firstExternalValue(row, ['CommonName']);
-  const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch', 'LotNo', 'Lot No.', 'Lot']);
+  const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
   const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']);
+  const productionDate = externalCoaProductionDate(row);
   const date = externalCoaDate(row);
   const updatedAt = firstExternalValue(row, ['UpdateDate']) || date;
   const sampleSnapshot = {
@@ -296,6 +306,7 @@ function externalCoaRowToDocument(row) {
   };
   if (batchNo) sampleSnapshot.batchNo = batchNo;
   if (lotNo) sampleSnapshot.lotNo = lotNo;
+  if (productionDate) sampleSnapshot.productionDate = productionDate;
   return {
     _id: externalCoaRequestId(row),
     coaNo: null,
