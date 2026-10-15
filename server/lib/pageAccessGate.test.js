@@ -4,8 +4,10 @@ jest.mock('../models/User', () => ({
 }));
 jest.mock('../models/Role', () => ({ find: jest.fn() }));
 jest.mock('../models/AccessGroup', () => ({ find: jest.fn() }));
+jest.mock('./lisSessionCookie', () => ({ getLisSessionUserId: jest.fn() }));
 
 const User = require('../models/User');
+const { getLisSessionUserId } = require('./lisSessionCookie');
 const { requirePageAccess } = require('./pageAccessGate');
 
 function makeReq(email, ip) {
@@ -28,6 +30,7 @@ describe('requirePageAccess synthetic dev user', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    getLisSessionUserId.mockReturnValue(null);
     process.env.ALLOW_DEV_STATUS = 'true';
   });
 
@@ -49,6 +52,21 @@ describe('requirePageAccess synthetic dev user', () => {
       status: 'active',
     });
     expect(User.findOne).not.toHaveBeenCalled();
+  });
+
+  test('local dev identity takes precedence over an existing login session', async () => {
+    getLisSessionUserId.mockReturnValue('real-session-user');
+    const req = makeReq('admin.dev@icpladda.com', '::1');
+    const next = jest.fn();
+
+    await requirePageAccess(['/qc-testing'])(req, makeRes(), next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(req.currentUser).toMatchObject({
+      email: 'admin.dev@icpladda.com',
+      roles: expect.arrayContaining(['admin']),
+    });
+    expect(User.findById).not.toHaveBeenCalled();
   });
 
   test('does not allow the synthetic dev bypass from a remote address', async () => {

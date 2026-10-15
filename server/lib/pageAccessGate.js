@@ -17,17 +17,17 @@ function pathMatches(pattern, pathname) {
 }
 
 async function resolveUser(req) {
-  const sessionId = getLisSessionUserId(req);
-  if (sessionId) {
-    const user = await User.findById(sessionId).lean();
-    if (user) return user;
-  }
   const email = String(req.get('x-lis-user') || '').trim().toLowerCase();
   const devRoles = process.env.ALLOW_DEV_STATUS === 'true' && LOOPBACK_IPS.has(req.ip)
     ? syntheticDevRolesFromEmail(email)
     : [];
   if (devRoles.length > 0) {
     return { email, name: 'Dev User', roles: devRoles, status: 'active' };
+  }
+  const sessionId = getLisSessionUserId(req);
+  if (sessionId) {
+    const user = await User.findById(sessionId).lean();
+    if (user) return user;
   }
   return email ? User.findOne({ email }).lean() : null;
 }
