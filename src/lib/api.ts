@@ -1528,6 +1528,8 @@ export async function uploadQcPhoto(file: File): Promise<{ url: string }> {
   form.append('photo', file);
   const res = await fetch(`${APP_API_BASE}/uploads/qc-photo`, {
     method: 'POST',
+    credentials: 'include',
+    headers: identityHeaders(),
     body: form,
   });
   if (!res.ok) {
@@ -1540,7 +1542,8 @@ export async function uploadQcPhoto(file: File): Promise<{ url: string }> {
 export async function deleteQcPhoto(url: string): Promise<void> {
   const res = await fetch(`${APP_API_BASE}/uploads/qc-photo`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...identityHeaders() },
     body: JSON.stringify({ url }),
   });
   if (!res.ok) {
@@ -1554,6 +1557,8 @@ export async function uploadParamFile(file: File): Promise<{ url: string; name: 
   form.append('file', file);
   const res = await fetch(`${APP_API_BASE}/uploads/param-file`, {
     method: 'POST',
+    credentials: 'include',
+    headers: identityHeaders(),
     body: form,
   });
   if (!res.ok) {
@@ -1566,7 +1571,8 @@ export async function uploadParamFile(file: File): Promise<{ url: string; name: 
 export async function deleteParamFile(url: string): Promise<void> {
   const res = await fetch(`${APP_API_BASE}/uploads/param-file`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...identityHeaders() },
     body: JSON.stringify({ url }),
   });
   if (!res.ok) {
