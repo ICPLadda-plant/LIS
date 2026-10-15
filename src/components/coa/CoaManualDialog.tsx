@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { isAiContentTestItem } from "@/lib/aiToleranceCriteria";
 import { aiContentTestItemForCommonName } from "@/lib/coaFormulation";
+import { productionDateFromLotNo } from "@/lib/coaLot";
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
 
 const formLabels = {
@@ -116,7 +117,10 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   useEffect(() => {
     if (!open) return;
     const source = request.sampleSnapshots[0] || { itemSeq: request.selectedItemSeqs[0] || 1 };
-    setSample({ ...source, productionDate: source.productionDate?.slice(0, 10) || "" });
+    setSample({
+      ...source,
+      productionDate: productionDateFromLotNo(source.lotNo) || source.productionDate?.slice(0, 10) || "",
+    });
     setResultForm(resultFormFromRows(request.resultSnapshots));
     setRemark(request.remark || "");
     autoFilledResultValues.current = null;
@@ -126,7 +130,12 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   }, [open, request, reset]);
   useEffect(() => {
     if (!open || editing || !autofill.data) return;
-    setSample((current) => ({ ...current, ...autofill.data.sample, productionDate: autofill.data.sample.productionDate?.slice(0, 10) || "" }));
+    setSample((current) => ({
+      ...current,
+      ...autofill.data.sample,
+      productionDate: productionDateFromLotNo(autofill.data.sample.lotNo)
+        || autofill.data.sample.productionDate?.slice(0, 10) || "",
+    }));
     const nextResultForm = resultFormFromRows(autofill.data.results);
     setResultForm(nextResultForm);
     autoFilledResultValues.current = {
@@ -209,7 +218,12 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   function selectStockLot(lotNo: string) {
     const selected = autofill.data?.stockCandidates.find((candidate) => candidate.lotNo === lotNo);
     if (!selected) return;
-    setSample((current) => ({ ...current, lotNo: selected.lotNo, batchNo: selected.batchNo, productionDate: selected.productionDate }));
+    setSample((current) => ({
+      ...current,
+      lotNo: selected.lotNo,
+      batchNo: selected.batchNo,
+      productionDate: productionDateFromLotNo(selected.lotNo) || selected.productionDate,
+    }));
   }
   const sampleFields: Array<[keyof CoaSampleSnapshot, string, string?]> = [
     ["sampleName", "ชื่อการค้า *"], ["commonName", "ชื่อสามัญ *"], ["batchNo", "Batch No. *"],
@@ -272,7 +286,15 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
           {sampleFields.map(([key, label, type]) => <div key={key} className="space-y-1">
             <Label htmlFor={`manual-${key}`}>{label}</Label>
             <Input id={`manual-${key}`} type={type || "text"} required={label.endsWith("*")} maxLength={1000}
-              value={String(sample[key] || "")} onChange={(event) => setSample({ ...sample, [key]: event.target.value })} />
+              value={String(sample[key] || "")} onChange={(event) => {
+                const value = event.target.value;
+                const lotProductionDate = key === "lotNo" ? productionDateFromLotNo(value) : "";
+                setSample((current) => ({
+                  ...current,
+                  [key]: value,
+                  ...(lotProductionDate ? { productionDate: lotProductionDate } : {}),
+                }));
+              }} />
           </div>)}
         </div>
         <div className="space-y-3">

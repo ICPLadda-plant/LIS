@@ -1,3 +1,5 @@
+const { lotSnapshot } = require('./coaErp');
+
 // Manual ERP documents keep their entered results throughout the approval lifecycle.
 function manualCoaSnapshots(input, itemSeq) {
   const fail = () => { throw new Error('กรุณาระบุชื่อการค้า ชื่อสามัญ Batch วันที่ผลิต และผลทดสอบให้ครบ'); };
@@ -8,6 +10,7 @@ function manualCoaSnapshots(input, itemSeq) {
   for (const key of ['sampleName', 'commonName', 'batchNo', 'lotNo', 'productionDate', 'sampleId', 'condition', 'manufacturer']) {
     sampleSnapshot[key] = clean(sample[key]);
   }
+  sampleSnapshot.productionDate = lotSnapshot(sampleSnapshot.lotNo).productionDate || sampleSnapshot.productionDate;
   if (!sampleSnapshot.sampleName || !sampleSnapshot.commonName || !sampleSnapshot.batchNo
     || !/^\d{4}-\d{2}-\d{2}$/.test(sampleSnapshot.productionDate)
     || Number.isNaN(Date.parse(sampleSnapshot.productionDate))

@@ -521,7 +521,7 @@ describe("CoaCenterPage", () => {
       match: { petitionId: "p1", petitionNo: "P-AUTO-1", itemSeq: 1, batchNo: "FG260902-008", matchKind: "exact", batchScore: 1 },
       candidates: [],
       stockCandidates: [{
-        lotNo: "26S-PCB25-480-091069", batchNo: "480", productionDate: "2026-10-09",
+        lotNo: "26S-PCB25-480-091069", batchNo: "480", productionDate: "2026-06-18",
         quantity: 100, itemNo: "F-TWI25-1000X12",
       }],
       mfCandidates: [], form: { template: "grWpSp", aiCriteria: "25% ± 1.30", needsDensity: false },
