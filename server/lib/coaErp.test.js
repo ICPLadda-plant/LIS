@@ -385,7 +385,7 @@ test('AI results prefer the substance-specific value over a generic total', () =
   assert.equal(rows.ai.result, '0.2650%');
 });
 
-test('AI Lab selection uses the latest approved petition from any department and excludes after-drying items', () => {
+test('AI Lab selection prefers exact batch then falls back to the latest same drug and excludes after-drying items', () => {
   const commonName = 'GLYPHOSATE 48% W/V SL';
   const regularItems = [
     { seq: 1, sampleName: 'Product A', commonName, batchNo: '2026031601' },
@@ -414,6 +414,15 @@ test('AI Lab selection uses the latest approved petition from any department and
   assert.equal(result.best.petition._id, 'rnd-newest');
   assert.deepEqual(result.best.items.map((item) => item.seq), [1, 2]);
   assert.equal(isAfterDryingLabItem({ note: 'ทดสอบยาหลังอบ' }), true);
+
+  const fallback = findLatestAiLabItems([
+    {
+      _id: 'latest-in-progress', status: 'inProgress', updatedAt: '2026-10-15T00:00:00.000Z',
+      items: [{ seq: 7, sampleName: 'Product B', commonName, batchNo: 'B-OTHER' }],
+    },
+  ], { commonName, batchNo: 'B-NOT-FOUND', sampleName: 'Product A' });
+  assert.equal(fallback.best.petition._id, 'latest-in-progress');
+  assert.equal(fallback.best.matchKind, 'commonName');
 });
 
 test('AI results average duplicate entries and ignore after-drying phase values', () => {

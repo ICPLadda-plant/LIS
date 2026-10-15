@@ -1104,7 +1104,7 @@ test('revision approval aborts without activating the revision when supersession
   }
 });
 
-test('ERP autofill only uses Lab results when common name and batch both match', async () => {
+test('ERP autofill falls back to the latest AI result for the same drug when the batch differs', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1136,7 +1136,7 @@ test('ERP autofill only uses Lab results when common name and batch both match',
     LegacyLabResult.find = () => ({ lean: async () => [] });
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
       { parameterName: 'กายภาพ', values: { 'ลักษณะ': 'ของเหลวใส', 'สี': 'ขาว' }, updatedAt: '2026-10-07T00:00:00.000Z' },
-      { parameterName: '%AI', values: { '%AI::glyphosate': '48.35' } },
+      { petitionId: 'petition-auto-1', itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '48.35' } },
     ] }) });
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [{ 'Sample name': 'FG260902-008', 'Density [g/cm³]': '1.158', 'Date & time': '10/7/2026' }] }) }) });
 
@@ -1146,8 +1146,8 @@ test('ERP autofill only uses Lab results when common name and batch both match',
     assert.equal(res.body.sample.lotNo, 'FG260902-008');
     assert.equal(res.body.sample.productionDate, '2026-09-02');
     assert.equal(res.body.match, null);
-    assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
-    assert.match(res.body.warnings.join(' '), /ชื่อสามัญและ Batch No\./);
+    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '48.35%');
+    assert.doesNotMatch(res.body.warnings.join(' '), /ชื่อสามัญและ Batch No\./);
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '1.158');
     assert.equal(res.body.results.find((row) => row.testItem === 'Appearance'), undefined);
   } finally {
@@ -1214,11 +1214,11 @@ test('ERP autofill averages AI from the latest approved petition from any depart
           { parameterName: '%AI', values: { '%AI::glyphosate': '99.99' }, updatedAt: '2026-10-12T00:00:00.000Z' },
         ] }) };
       }
-      assert.equal(query.petitionId, 'petition-rnd-newer');
-      assert.deepEqual(query.itemSeq.$in, [1, 2]);
+      assert.deepEqual(query.petitionId.$in, ['petition-rnd-newer', 'petition-qc-latest']);
+      assert.deepEqual(query.itemSeq.$in, [1, 2, 3, 4]);
       return { sort: () => ({ lean: async () => [
-        { itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-12T01:00:00.000Z' },
-        { itemSeq: 2, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-12T02:00:00.000Z' },
+        { petitionId: 'petition-rnd-newer', itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-12T01:00:00.000Z' },
+        { petitionId: 'petition-rnd-newer', itemSeq: 2, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-12T02:00:00.000Z' },
       ] }) };
     };
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
@@ -1230,6 +1230,69 @@ test('ERP autofill averages AI from the latest approved petition from any depart
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '24.305%');
     assert.equal(res.body.results.find((row) => row.testItem === 'Date of analysis').result, '2026-10-12');
+  } finally {
+    global.fetch = originals.fetch;
+    Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    CoaDocument.find = originals.coaFind;
+    LegacyLabResult.find = originals.legacyFind;
+    QCTestResult.find = originals.qcFind;
+    ResultDensity.find = originals.densityFind;
+  }
+});
+
+test('ERP autofill shows the latest averaged AI history when the original petition is unavailable', async () => {
+  const originals = {
+    fetch: global.fetch,
+    petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    coaFind: CoaDocument.find,
+    legacyFind: LegacyLabResult.find,
+    qcFind: QCTestResult.find,
+    densityFind: ResultDensity.find,
+  };
+  const commonName = 'OMETHOATE 50% W/V SL';
+  const externalRow = {
+    SaleOrderNo: 'SO-AI-HISTORY', Line: 10000, ItemNo: 'F-OMT50-1X12', TradeName: 'ช้างโอเมท',
+    CommonName: commonName, CustomerName: 'Customer', ShipmentDate: '2026-10-15T00:00:00.000Z', remark: 'COA',
+  };
+  try {
+    global.fetch = async (url) => {
+      if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
+      if (String(url).includes('stock-all-item')) {
+        return { ok: true, json: async () => [{ item_no: 'F-OMT50-1X12', lot_no: '26S-OMT50-256-151069', stock_qty: 10 }] };
+      }
+      return { ok: true, json: async () => [] };
+    };
+    Petition.find = () => sortedLimitedLean([]);
+    LabRequest.find = () => ({ lean: async () => [] });
+    CoaDocument.find = () => sortedLimitedLean([]);
+    LegacyLabResult.find = () => ({ lean: async () => [] });
+    QCTestResult.find = (query) => {
+      assert.ok(query.$or);
+      return { sort: () => ({ lean: async () => [
+        {
+          petitionId: 'deleted-petition', petitionNo: 'P-HISTORY', itemSeq: 1,
+          sampleName: commonName, parameterName: '%AI', values: { '%AI': '49.90' },
+          updatedAt: '2026-10-10T01:00:00.000Z',
+        },
+        {
+          petitionId: 'deleted-petition', petitionNo: 'P-HISTORY', itemSeq: 2,
+          sampleName: commonName, parameterName: '%AI', values: { '%AI': '50.10' },
+          updatedAt: '2026-10-10T02:00:00.000Z',
+        },
+      ] }) };
+    };
+    ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
+
+    const res = await invoke('/erp-autofill/:externalRequestId', 'get', {
+      params: { externalRequestId: 'external-coa-request-SO-AI-HISTORY-10000' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '50%');
+    assert.equal(res.body.results.find((row) => row.testItem === 'Date of analysis').result, '2026-10-10');
+    assert.equal(res.body.dataSources.lab, true);
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
@@ -1398,11 +1461,11 @@ test('real-time Lab AI lookup averages the latest approved results from any depa
   try {
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => petitions }) }) });
     QCTestResult.find = (query) => {
-      assert.equal(query.petitionId, 'petition-rnd-newer');
-      assert.deepEqual(query.itemSeq.$in, [1, 6]);
+      assert.deepEqual(query.petitionId.$in, ['petition-rnd-newer', 'petition-qc-latest', 'petition-warehouse-older']);
+      assert.deepEqual(query.itemSeq.$in, [1, 6, 3, 4, 5]);
       return { sort: () => ({ lean: async () => [
-        { itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-12T01:00:00.000Z' },
-        { itemSeq: 6, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-12T02:00:00.000Z' },
+        { petitionId: 'petition-rnd-newer', itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-12T01:00:00.000Z' },
+        { petitionId: 'petition-rnd-newer', itemSeq: 6, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-12T02:00:00.000Z' },
       ] }) };
     };
 
@@ -1421,7 +1484,7 @@ test('real-time Lab AI lookup averages the latest approved results from any depa
   }
 });
 
-test('real-time Lab AI lookup returns the result for an exact batch and rejects another batch', async () => {
+test('real-time Lab AI lookup prefers the exact batch and falls back to the latest result for the same drug', async () => {
   const originals = {
     petitionFind: Petition.find,
     legacyFind: LegacyLabResult.find,
@@ -1436,7 +1499,7 @@ test('real-time Lab AI lookup returns the result for an exact batch and rejects 
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
     LegacyLabResult.find = () => ({ lean: async () => [] });
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
-      { parameterName: '%AI', values: { '%AI::glyphosate': '48.15' }, updatedAt: '2026-10-08T00:00:00.000Z' },
+      { petitionId: 'petition-ai-lookup', itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '48.15' }, updatedAt: '2026-10-08T00:00:00.000Z' },
     ] }) });
 
     const found = await invoke('/lab-ai-lookup', 'get', {
@@ -1451,8 +1514,8 @@ test('real-time Lab AI lookup returns the result for an exact batch and rejects 
       query: { batchNo: '081', commonName: 'GLYPHOSATE 48% W/V SL', sampleName: 'ช้างมาร์กี้' },
     });
     assert.equal(missing.statusCode, 200);
-    assert.equal(missing.body.ai, null);
-    assert.equal(missing.body.match, null);
+    assert.equal(missing.body.ai.result, '48.15%');
+    assert.equal(missing.body.match.batchNo, '080');
   } finally {
     Petition.find = originals.petitionFind;
     LegacyLabResult.find = originals.legacyFind;

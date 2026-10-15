@@ -345,32 +345,45 @@ function isAfterDryingLabItem(item) {
 function findLatestAiLabItems(petitions, sample) {
   const commonName = normalizeText(sample?.commonName);
   const batchNo = text(sample?.batchNo || sample?.lotNo);
-  if (!commonName || !batchNo) return { best: null, candidates: [] };
+  const sampleName = normalizeText(sample?.sampleName);
+  if (!commonName) return { best: null, candidates: [] };
   const candidates = [];
   for (const petition of petitions || []) {
-    const issuedAt = petition?.approvedAt || petition?.labApprovedAt;
-    if (petition?.status === 'rejected' || !issuedAt) continue;
+    if (petition?.status === 'rejected') continue;
     const eligibleItems = (petition.items || []).filter((item) => (
       normalizeText(item.commonName) === commonName
       && !isAfterDryingLabItem(item)
     ));
-    const exactItems = eligibleItems.filter((item) => batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1);
-    if (!exactItems.length) continue;
-    const matchedSampleNames = new Set(exactItems.map((item) => normalizeText(item.sampleName)).filter(Boolean));
-    const items = matchedSampleNames.size
-      ? eligibleItems.filter((item) => matchedSampleNames.has(normalizeText(item.sampleName)))
-      : eligibleItems;
-    candidates.push({
-      petition,
-      item: exactItems[0],
-      items,
-      batchScore: 1,
-      matchKind: 'exact',
-      approvedTime: Date.parse(issuedAt) || 0,
-      updatedTime: Date.parse(petition.updatedAt) || 0,
-    });
+    const itemGroups = new Map();
+    for (const item of eligibleItems) {
+      const normalizedSampleName = normalizeText(item.sampleName);
+      const key = normalizedSampleName || `seq:${Number(item.seq)}`;
+      if (!itemGroups.has(key)) itemGroups.set(key, []);
+      itemGroups.get(key).push(item);
+    }
+    for (const items of itemGroups.values()) {
+      const exactItem = batchNo
+        ? items.find((item) => batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1)
+        : null;
+      const sameSample = Boolean(sampleName && items.some((item) => normalizeText(item.sampleName) === sampleName));
+      const referenceAt = petition?.approvedAt || petition?.labApprovedAt || petition?.updatedAt || petition?.createdAt;
+      candidates.push({
+        petition,
+        item: exactItem || items[0],
+        items,
+        batchScore: exactItem ? 1 : 0,
+        matchKind: exactItem ? 'exact' : sameSample ? 'sample' : 'commonName',
+        approvedTime: Date.parse(referenceAt) || 0,
+        updatedTime: Date.parse(petition.updatedAt) || 0,
+      });
+    }
   }
-  candidates.sort((left, right) => right.approvedTime - left.approvedTime || right.updatedTime - left.updatedTime);
+  const matchRank = { exact: 2, sample: 1, commonName: 0 };
+  candidates.sort((left, right) => (
+    matchRank[right.matchKind] - matchRank[left.matchKind]
+    || right.approvedTime - left.approvedTime
+    || right.updatedTime - left.updatedTime
+  ));
   return { best: candidates[0] || null, candidates };
 }
 

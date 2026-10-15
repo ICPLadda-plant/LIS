@@ -23,6 +23,7 @@ const {
   findBestLegacyLabResult,
   findBestRequestItem,
   formKindForCommonName,
+  isAfterDryingLabItem,
   mergeResultRows,
   normalizeIsoDate,
   resultRowsFromLegacyLab,
@@ -197,6 +198,92 @@ function exactTrimmedRegex(value) {
 function commonNameRegex(value) {
   const tokens = String(value || '').trim().split(/\s+/).filter(Boolean);
   return new RegExp(tokens.map(escapeRegex).join('.*'), 'i');
+}
+
+function aiResultUpdatedTime(results, commonName) {
+  return Math.max(0, ...(results || [])
+    .filter((result) => resultRowsFromQc([result], commonName).ai)
+    .map((result) => Date.parse(result.updatedAt || result.enteredAt) || 0));
+}
+
+function aiCandidateMatchRank(candidate) {
+  if (candidate.matchKind === 'exact') return 2;
+  if (candidate.matchKind === 'sample') return 1;
+  return 0;
+}
+
+async function latestAiLabData(petitions, sample) {
+  const commonName = manualText(sample?.commonName);
+  const selection = findLatestAiLabItems(petitions, sample);
+  const candidates = selection.candidates.slice(0, 100);
+  if (candidates.length) {
+    const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
+    const itemSeqs = [...new Set(candidates.flatMap((candidate) => candidate.items.map((item) => Number(item.seq))))];
+    const results = await QCTestResult.find({
+      petitionId: { $in: petitionIds },
+      itemSeq: { $in: itemSeqs },
+    }).sort({ updatedAt: -1 }).lean();
+    const matches = candidates.map((candidate) => {
+      const seqs = new Set(candidate.items.map((item) => Number(item.seq)));
+      const candidateResults = results.filter((result) => (
+        String(result.petitionId) === String(candidate.petition._id)
+        && seqs.has(Number(result.itemSeq))
+      ));
+      const resultData = resultRowsFromQc(candidateResults, commonName);
+      if (!resultData.ai) return null;
+      return {
+        candidate,
+        qcResults: candidateResults,
+        resultData,
+        resultTime: aiResultUpdatedTime(candidateResults, commonName),
+      };
+    }).filter(Boolean);
+    matches.sort((left, right) => (
+      aiCandidateMatchRank(right.candidate) - aiCandidateMatchRank(left.candidate)
+      || right.resultTime - left.resultTime
+      || right.candidate.approvedTime - left.candidate.approvedTime
+    ));
+    if (matches[0]) return { ...selection, best: matches[0].candidate, ...matches[0], source: 'petition' };
+  }
+
+  const historyResults = await QCTestResult.find({
+    $or: [
+      { commonName: exactTrimmedRegex(commonName) },
+      { sampleName: exactTrimmedRegex(commonName) },
+    ],
+  }).sort({ updatedAt: -1 }).lean();
+  const groups = new Map();
+  for (const result of historyResults) {
+    if (isAfterDryingLabItem(result)) continue;
+    const key = String(result.petitionId || result.petitionNo || result.sampleName || result._id);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(result);
+  }
+  const historyMatches = [...groups.entries()].map(([key, qcResults]) => {
+    const resultData = resultRowsFromQc(qcResults, commonName);
+    if (!resultData.ai) return null;
+    return {
+      key,
+      qcResults,
+      resultData,
+      resultTime: aiResultUpdatedTime(qcResults, commonName),
+    };
+  }).filter(Boolean).sort((left, right) => right.resultTime - left.resultTime);
+  const history = historyMatches[0];
+  if (!history) return { ...selection, best: null, qcResults: [], resultData: resultRowsFromQc([], commonName), source: null };
+  const first = history.qcResults[0];
+  return {
+    ...selection,
+    best: null,
+    ...history,
+    source: 'history',
+    historyMatch: {
+      petitionId: String(first.petitionId || ''),
+      petitionNo: first.petitionNo || '',
+      itemSeq: Number(first.itemSeq),
+      batchNo: first.batchNo || '',
+    },
+  };
 }
 
 function activeCoaSummary(coa, sample) {
@@ -813,21 +900,15 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       if (!sample.manufacturer) sample.manufacturer = manualText(legacyMatch.row?.manufacturer);
     }
     const lab = findBestLabItem(petitions, sample);
-    const aiLab = findLatestAiLabItems(petitions, sample);
-    const [qcResults, aiQcResults] = await Promise.all([
+    const [qcResults, aiLabData] = await Promise.all([
       lab.best
         ? QCTestResult.find({ petitionId: String(lab.best.petition._id), itemSeq: Number(lab.best.item.seq) })
           .sort({ updatedAt: -1 }).lean()
         : Promise.resolve([]),
-      aiLab.best
-        ? QCTestResult.find({
-          petitionId: String(aiLab.best.petition._id),
-          itemSeq: { $in: aiLab.best.items.map((item) => Number(item.seq)) },
-        }).sort({ updatedAt: -1 }).lean()
-        : Promise.resolve([]),
+      latestAiLabData(petitions, sample),
     ]);
     const resultData = resultRowsFromQc(qcResults, sample.commonName, { includeAi: false });
-    const aiResultData = resultRowsFromQc(aiQcResults, sample.commonName);
+    const aiResultData = aiLabData.resultData;
     const legacyResultData = resultRowsFromLegacyLab(legacyMatch?.row, sample.commonName);
     resultData.rows = mergeResultRows(
       resultData.rows,
@@ -841,7 +922,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       resultData.rows.splice(insertAt < 0 ? resultData.rows.length : insertAt, 0, aiRow);
       resultData.ai = aiResultData.ai;
       resultData.analysisDate = aiResultData.analysisDate
-        || normalizeIsoDate(aiLab.best?.petition?.approvedAt || aiLab.best?.petition?.labApprovedAt)
+        || normalizeIsoDate(aiLabData.best?.petition?.approvedAt || aiLabData.best?.petition?.labApprovedAt)
         || resultData.analysisDate;
       const analysisDateRow = resultData.rows.find((row) => /date\s*of\s*analysis/i.test(row.testItem || ''));
       if (analysisDateRow && resultData.analysisDate) analysisDateRow.result = resultData.analysisDate;
@@ -879,7 +960,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     if (!sample.batchNo || !sample.productionDate) {
       warnings.push('ไม่พบ Batch No. และวันที่ผลิตจริงจากคำขอ COA, ใบคำร้อง LIS, COA เดิม, Stock, MF หรือฐานข้อมูลผล Lab เดิม');
     }
-    if (!lab.best && !legacyMatch) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
+    if (!lab.best && !legacyMatch && !aiResultData.ai) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
     else if (!lab.best && legacyMatch?.matchKind === 'productHistory') {
       warnings.push('ระบบเลือก Batch จากผล Lab เดิมที่สูตรตรงกันและใกล้วันส่งสินค้า กรุณาตรวจสอบ Batch ก่อนบันทึก');
     }
@@ -933,7 +1014,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         erp: true,
         stock: sourceData.stockCandidates.length > 0,
         mf: sourceData.mfCandidates.length > 0,
-        lab: Boolean(lab.best || aiLab.best),
+        lab: Boolean(lab.best || aiResultData.ai),
         coaHistory: Boolean(coaHistoryMatch),
         legacyLab: Boolean(legacyMatch),
         density: Boolean(density),
@@ -954,38 +1035,27 @@ router.get('/lab-ai-lookup', async (req, res) => {
     }
 
     const petitions = await Petition.find({
-      items: {
-        $elemMatch: {
-          commonName: commonNameRegex(commonName),
-          $or: [
-            { batchNo: exactTrimmedRegex(batchNo) },
-            { lotNo: exactTrimmedRegex(batchNo) },
-          ],
-        },
-      },
+      'items.commonName': commonNameRegex(commonName),
+      status: { $ne: 'rejected' },
     }).sort({ updatedAt: -1 }).limit(200).lean();
-    const lab = findLatestAiLabItems(petitions, { batchNo, commonName, sampleName });
-    if (!lab.best) return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
-
-    const qcResults = await QCTestResult.find({
-      petitionId: String(lab.best.petition._id),
-      itemSeq: { $in: lab.best.items.map((item) => Number(item.seq)) },
-    }).sort({ updatedAt: -1 }).lean();
-    const resultData = resultRowsFromQc(qcResults, commonName);
+    const lab = await latestAiLabData(petitions, { batchNo, commonName, sampleName });
+    const resultData = lab.resultData;
     const ai = resultData.rows.find((row) => isAiContentTestItem(row.testItem)) || null;
+    if (!ai) return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
+    const match = lab.best ? {
+      petitionId: String(lab.best.petition._id),
+      petitionNo: lab.best.petition.petitionNo,
+      itemSeq: Number(lab.best.item.seq),
+      batchNo: lab.best.item.batchNo || lab.best.item.lotNo || batchNo,
+    } : lab.historyMatch;
     return res.json({
       batchNo,
       commonName,
       ai,
       analysisDate: resultData.analysisDate
-        || normalizeIsoDate(lab.best.petition.approvedAt || lab.best.petition.labApprovedAt)
+        || normalizeIsoDate(lab.best?.petition?.approvedAt || lab.best?.petition?.labApprovedAt)
         || '',
-      match: {
-        petitionId: String(lab.best.petition._id),
-        petitionNo: lab.best.petition.petitionNo,
-        itemSeq: Number(lab.best.item.seq),
-        batchNo: lab.best.item.batchNo || lab.best.item.lotNo || batchNo,
-      },
+      match,
     });
   } catch (error) {
     res.status(errorStatus(error)).json({ error: error.message });
