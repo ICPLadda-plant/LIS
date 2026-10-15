@@ -119,7 +119,7 @@ describe("CoaReportTemplate", () => {
     const liquidRows = within(section).getAllByRole("row");
     const batchRowIndex = liquidRows.findIndex((row) => row.textContent?.includes("BATCH NO."));
     const appearanceRowIndex = liquidRows.findIndex((row) => row.textContent?.includes("Appearance"));
-    expect(batchRowIndex).toBeLessThan(appearanceRowIndex);
+    expect(appearanceRowIndex).toBeLessThan(batchRowIndex);
     expect(screen.queryByText("1.100 - 1.150")).not.toBeInTheDocument();
     const densityCells = within(screen.getByText("Density at 30°C (g/cm³)").closest("tr")!).getAllByRole("cell");
     expect(densityCells).toHaveLength(2);
