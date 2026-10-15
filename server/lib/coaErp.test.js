@@ -3,10 +3,15 @@ const assert = require('node:assert/strict');
 const {
   batchFromRow,
   batchSimilarity,
+  findBestLegacyLabResult,
   findBestRequestItem,
   formKindForCommonName,
+  legacyProductMatchScore,
   lotSnapshot,
+  mergeResultRows,
+  normalizeIsoDate,
   physicalFromQc,
+  resultRowsFromLegacyLab,
   resultRowsFromQc,
   sampleFromSources,
 } = require('./coaErp');
@@ -32,6 +37,134 @@ test('finished-product LOT supplies the batch segment and Buddhist production da
     batchNo: '480',
     productionDate: '2026-10-09',
   });
+});
+
+test('normalizes Buddhist-era dates from the legacy Lab database', () => {
+  assert.equal(normalizeIsoDate('26/06/2569'), '2026-06-26');
+  assert.equal(normalizeIsoDate('31/02/2569'), '');
+});
+
+test('legacy Lab matching handles reversed substances and historical spelling', () => {
+  const source = {
+    sampleSnapshots: [{ commonName: 'PROPANIL 36% + ANILOFOS 18% W/V EC' }],
+    externalCoaRequest: { packingSize: '12*1 L', shipmentDate: '2026-10-09' },
+  };
+  const match = findBestLegacyLabResult([{
+    _id: 'legacy-1', sample_name: 'Anilophos 18+Propanil 36%EC',
+    batch_no: '26S-ANF18+PPN36-013', production_date: '07/08/2569', test_date: '08/08/2569',
+    tests: [
+      { test_name: 'Anilophos', result: '18.39 % W/V', criteria: '16.92-19.08' },
+      { test_name: 'Propanil', result: '36.70 % W/V', criteria: '34.20-37.80' },
+      { test_name: 'Density', result: '1.091 g/cm³' },
+    ],
+  }], source);
+
+  assert.ok(legacyProductMatchScore(source.sampleSnapshots[0].commonName, 'Anilophos 18+Propanil 36%EC') >= 0.75);
+  assert.equal(match.batchNo, '26S-ANF18+PPN36-013');
+  assert.equal(match.productionDate, '2026-08-07');
+  assert.equal(match.matchKind, 'productHistory');
+});
+
+test('legacy Lab matching accepts established product-name aliases', () => {
+  assert.ok(legacyProductMatchScore(
+    'PACLOBUTRAZOL 25% SC',
+    'Paclobutrazole 25% SC',
+  ) >= 0.75);
+  assert.ok(legacyProductMatchScore(
+    '2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR',
+    'Anilophos 1.5+2,4-D BE3.76 %GR',
+  ) >= 0.75);
+});
+
+test('legacy Lab matching uses package type to choose the compatible formulation', () => {
+  const source = {
+    sampleSnapshots: [{ commonName: 'อะซีทามิพิด (acetamiprid)' }],
+    externalCoaRequest: { packingSize: '12*500 g', shipmentDate: '2026-10-15' },
+  };
+  const match = findBestLegacyLabResult([
+    {
+      sample_name: 'Acetamiprid 2.85% EC', batch_no: 'LIQUID-NEW',
+      production_date: '01/07/2569', test_date: '02/07/2569',
+      tests: [{ test_name: 'Acetamiprid', result: '2.89 % W/V', criteria: '2.57-3.14' }],
+    },
+    {
+      sample_name: 'Acetamiprid 20 %SP', batch_no: 'DRY-OLDER',
+      production_date: '20/03/2569', test_date: '09/07/2569',
+      tests: [{ test_name: 'Acetamiprid', result: '20.53 %W/W', criteria: '18.80-21.20' }],
+    },
+  ], source);
+
+  assert.equal(match.batchNo, 'DRY-OLDER');
+});
+
+test('legacy Lab matching rejects a different chemical with a similar name', () => {
+  const source = {
+    sampleSnapshots: [{ commonName: 'PHOSPHONIC ACID 40% W/V SL' }],
+    externalCoaRequest: { packingSize: '16*1 L', shipmentDate: '2026-10-07' },
+  };
+  const match = findBestLegacyLabResult([{
+    sample_name: 'Phosphoric acid 40% SL', batch_no: '2605202',
+    production_date: '22/07/2569', test_date: '14/08/2569',
+    tests: [{ test_name: 'Phosphoric acid', result: '42.40 % W/V', criteria: '38.00-42.00' }],
+  }], source);
+
+  assert.equal(match, null);
+});
+
+test('legacy Lab matching rejects a mislabeled row whose tests belong to another product', () => {
+  const source = {
+    sampleSnapshots: [{ commonName: '2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR' }],
+    externalCoaRequest: { packingSize: '1*15 kg', shipmentDate: '2026-10-07' },
+  };
+  const match = findBestLegacyLabResult([{
+    sample_name: 'Anilophos 1.5+2,4-D BE3.76 %GR', batch_no: '26S-OMT50-456',
+    production_date: '17/08/2569', test_date: '17/08/2569',
+    tests: [{ test_name: 'Omethoate', result: '51.94 % W/V', criteria: '47.50-52.50' }],
+  }], source);
+
+  assert.equal(match, null);
+});
+
+test('legacy Lab results fill every required COA result field and clean repeat suffixes', () => {
+  const source = {
+    sampleSnapshots: [{ commonName: 'EMAMECTIN BENZOATE 2.0% W/V ME' }],
+    externalCoaRequest: { packingSize: '24*500 cc', shipmentDate: '2026-10-15' },
+  };
+  const row = {
+    sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P1',
+    production_date: '18/06/2569', test_date: '31/08/2569', sample_condition: 'ของเหลวใสสีเหลือง',
+    tests: [
+      { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+      { test_name: 'Density', result: '0.946 g/cm³' },
+    ],
+  };
+  const match = findBestLegacyLabResult([row], source);
+  const result = resultRowsFromLegacyLab(row, source.sampleSnapshots[0].commonName);
+
+  assert.equal(match.batchNo, '20260430');
+  assert.equal(result.rows[0].testItem, 'Appearance');
+  assert.equal(result.rows[1].testItem, '%AI content');
+  assert.match(result.rows[2].testItem, /Density at 30/);
+  assert.equal(result.rows[3].testItem, 'Date of analysis');
+  assert.equal(result.rows[1].result, '2.09 % W/V');
+  assert.equal(result.rows[2].result, '0.946');
+  assert.equal(result.rows[3].result, '2026-08-31');
+});
+
+test('legacy Lab fallback fills placeholder values without replacing live results', () => {
+  const rows = mergeResultRows([
+    { testItem: 'Appearance', criteria: 'Clear liquid', result: 'Conform', method: 'Visual', unit: '' },
+    { testItem: '%AI content', criteria: '-', result: '-', method: '', unit: '%' },
+  ], [
+    { testItem: 'Appearance', criteria: 'Yellow liquid', result: 'Conform', method: 'Legacy', unit: '' },
+    { testItem: '%AI content', criteria: '1.70-2.30', result: '2.09 % W/V', method: 'CIPAC 1C', unit: '%' },
+  ]);
+
+  assert.equal(rows[0].criteria, 'Clear liquid');
+  assert.equal(rows[0].method, 'Visual');
+  assert.equal(rows[1].criteria, '1.70-2.30');
+  assert.equal(rows[1].result, '2.09 % W/V');
+  assert.equal(rows[1].method, 'CIPAC 1C');
 });
 
 test('stock LOT autofill preserves the full LOT while using its real batch and production date', () => {

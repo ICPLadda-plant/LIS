@@ -12,6 +12,7 @@ const Petition = require('../models/Petition');
 const LabRequest = require('../models/LabRequest');
 const QCTestResult = require('../models/QCTestResult');
 const ResultDensity = require('../models/ResultDensity');
+const LegacyLabResult = require('../models/LegacyLabResult');
 const Parameter = require('../models/Parameter');
 const User = require('../models/User');
 const Role = require('../models/Role');
@@ -1107,6 +1108,9 @@ test('ERP autofill only uses Lab results when common name and batch both match',
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    coaFind: CoaDocument.find,
+    legacyFind: LegacyLabResult.find,
     qcFind: QCTestResult.find,
     densityFind: ResultDensity.find,
   };
@@ -1118,7 +1122,7 @@ test('ERP autofill only uses Lab results when common name and batch both match',
   const petition = {
     _id: 'petition-auto-1', petitionNo: 'P-AUTO-1', updatedAt: '2026-10-07T00:00:00.000Z',
     labApprovedAt: '2026-10-07T00:00:00.000Z',
-    items: [{ seq: 1, sampleName: 'Test Trade', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: 'FG260902-007' }],
+    items: [{ seq: 1, sampleName: 'Different Trade', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: 'FG260902-007' }],
   };
   try {
     global.fetch = async (url) => {
@@ -1127,6 +1131,9 @@ test('ERP autofill only uses Lab results when common name and batch both match',
       return { ok: true, json: async () => [{ item_no: 'F-TEST-1X20', prod_order_no: 'MF26090201', create_date: '2026-09-02T00:00:00.000Z' }] };
     };
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    LabRequest.find = () => ({ lean: async () => [] });
+    CoaDocument.find = () => sortedLimitedLean([]);
+    LegacyLabResult.find = () => ({ lean: async () => [] });
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
       { parameterName: 'กายภาพ', values: { 'ลักษณะ': 'ของเหลวใส', 'สี': 'ขาว' }, updatedAt: '2026-10-07T00:00:00.000Z' },
       { parameterName: '%AI', values: { '%AI::glyphosate': '48.35' } },
@@ -1146,6 +1153,9 @@ test('ERP autofill only uses Lab results when common name and batch both match',
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    CoaDocument.find = originals.coaFind;
+    LegacyLabResult.find = originals.legacyFind;
     QCTestResult.find = originals.qcFind;
     ResultDensity.find = originals.densityFind;
   }
@@ -1155,6 +1165,9 @@ test('ERP autofill uses the matching LIS petition batch before Stock and MF data
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    coaFind: CoaDocument.find,
+    legacyFind: LegacyLabResult.find,
     qcFind: QCTestResult.find,
     densityFind: ResultDensity.find,
   };
@@ -1178,6 +1191,9 @@ test('ERP autofill uses the matching LIS petition batch before Stock and MF data
       return { ok: true, json: async () => [] };
     };
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    LabRequest.find = () => ({ lean: async () => [] });
+    CoaDocument.find = () => sortedLimitedLean([]);
+    LegacyLabResult.find = () => ({ lean: async () => [] });
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [] }) });
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
 
@@ -1192,19 +1208,91 @@ test('ERP autofill uses the matching LIS petition batch before Stock and MF data
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    CoaDocument.find = originals.coaFind;
+    LegacyLabResult.find = originals.legacyFind;
+    QCTestResult.find = originals.qcFind;
+    ResultDensity.find = originals.densityFind;
+  }
+});
+
+test('ERP autofill fills every required COA field from legacy Lab history', async () => {
+  const originals = {
+    fetch: global.fetch,
+    petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    coaFind: CoaDocument.find,
+    legacyFind: LegacyLabResult.find,
+    qcFind: QCTestResult.find,
+    densityFind: ResultDensity.find,
+  };
+  const externalRow = {
+    SaleOrderNo: 'SO-LEGACY-1', Line: 10000, ItemNo: 'F-EMB2-500X24', TradeName: 'Legacy Trade',
+    CommonName: 'EMAMECTIN BENZOATE 2.0% W/V ME', CustomerName: 'Customer',
+    PackingSize: '24*500 cc', ShipmentDate: '2026-10-15T00:00:00.000Z', remark: 'COA',
+  };
+  const legacyRow = {
+    _id: 'legacy-emamectin-1', sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P1',
+    production_date: '18/06/2569', test_date: '31/08/2569', sample_condition: 'Clear yellow liquid',
+    tests: [
+      { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+      { test_name: 'Density', result: '0.946 g/cm3', method: 'DMA 501' },
+    ],
+  };
+  try {
+    global.fetch = async (url) => {
+      if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
+      if (String(url).includes('stock-all-item')) {
+        return { ok: true, json: async () => [{ item_no: 'F-EMB2-500X24', lot_no: 'FG261015-008', stock_qty: 10 }] };
+      }
+      return { ok: true, json: async () => [] };
+    };
+    Petition.find = () => sortedLimitedLean([]);
+    LabRequest.find = () => ({ lean: async () => [] });
+    CoaDocument.find = () => sortedLimitedLean([]);
+    LegacyLabResult.find = () => ({ lean: async () => [legacyRow] });
+    QCTestResult.find = () => ({ sort: () => ({ lean: async () => [] }) });
+    ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
+
+    const res = await invoke('/erp-autofill/:externalRequestId', 'get', {
+      params: { externalRequestId: 'external-coa-request-SO-LEGACY-1-10000' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.sample.batchNo, '20260430');
+    assert.equal(res.body.sample.lotNo, 'FG261015-008');
+    assert.equal(res.body.sample.productionDate, '2026-06-18');
+    assert.equal(res.body.results.find((row) => row.testItem === 'Appearance').result, 'Conform');
+    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '2.09 % W/V');
+    assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '0.946');
+    assert.equal(res.body.results.find((row) => row.testItem === 'Date of analysis').result, '2026-08-31');
+    assert.equal(res.body.legacyMatch.matchKind, 'productHistory');
+    assert.equal(res.body.dataSources.legacyLab, true);
+    assert.equal(res.body.form.needsDensity, true);
+  } finally {
+    global.fetch = originals.fetch;
+    Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    CoaDocument.find = originals.coaFind;
+    LegacyLabResult.find = originals.legacyFind;
     QCTestResult.find = originals.qcFind;
     ResultDensity.find = originals.densityFind;
   }
 });
 
 test('real-time Lab AI lookup returns the result for an exact batch and rejects another batch', async () => {
-  const originals = { petitionFind: Petition.find, qcFind: QCTestResult.find };
+  const originals = {
+    petitionFind: Petition.find,
+    legacyFind: LegacyLabResult.find,
+    qcFind: QCTestResult.find,
+  };
   const petition = {
     _id: 'petition-ai-lookup', petitionNo: 'P-AI-LOOKUP', updatedAt: '2026-10-08T00:00:00.000Z',
     items: [{ seq: 1, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '080' }],
   };
   try {
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    LegacyLabResult.find = () => ({ lean: async () => [] });
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
       { parameterName: '%AI', values: { '%AI::glyphosate': '48.15' }, updatedAt: '2026-10-08T00:00:00.000Z' },
     ] }) });
@@ -1225,6 +1313,7 @@ test('real-time Lab AI lookup returns the result for an exact batch and rejects 
     assert.equal(missing.body.match, null);
   } finally {
     Petition.find = originals.petitionFind;
+    LegacyLabResult.find = originals.legacyFind;
     QCTestResult.find = originals.qcFind;
   }
 });

@@ -6,6 +6,7 @@ const Petition = require('../models/Petition');
 const LabRequest = require('../models/LabRequest');
 const QCTestResult = require('../models/QCTestResult');
 const ResultDensity = require('../models/ResultDensity');
+const LegacyLabResult = require('../models/LegacyLabResult');
 const Parameter = require('../models/Parameter');
 const User = require('../models/User');
 const Role = require('../models/Role');
@@ -16,9 +17,13 @@ const { buildCoaFormOptions, buildCoaParameterOptions, applyCoaFormSelections } 
 const {
   densityForBatch,
   fetchErpReferences,
+  findBestCoaHistorySample,
   findBestLabItem,
+  findBestLegacyLabResult,
   findBestRequestItem,
   formKindForCommonName,
+  mergeResultRows,
+  resultRowsFromLegacyLab,
   resultRowsFromQc,
   sampleFromSources,
 } = require('../lib/coaErp');
@@ -743,7 +748,23 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     if (sourceSample.commonName) {
       petitionMatchClauses.push({ 'items.commonName': commonNameRegex(sourceSample.commonName) });
     }
-    const [references, petitions] = await Promise.all([
+    const coaHistoryMatchClauses = [];
+    if (source.externalCoaRequest?.itemNo) {
+      coaHistoryMatchClauses.push({
+        'sampleSnapshots.sampleId': exactTrimmedRegex(source.externalCoaRequest.itemNo),
+      });
+    }
+    if (sourceSample.sampleName && sourceSample.commonName) {
+      coaHistoryMatchClauses.push({
+        sampleSnapshots: {
+          $elemMatch: {
+            sampleName: exactTrimmedRegex(sourceSample.sampleName),
+            commonName: commonNameRegex(sourceSample.commonName),
+          },
+        },
+      });
+    }
+    const [references, petitions, labRequests, coaHistory, legacyLabRows] = await Promise.all([
       fetchErpReferences(),
       petitionMatchClauses.length
         ? Petition.find({
@@ -752,24 +773,63 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         })
           .sort({ updatedAt: -1 }).limit(200).lean()
         : Promise.resolve([]),
+      LabRequest.find({ batchNo: { $exists: true, $nin: ['', null] } }).lean(),
+      coaHistoryMatchClauses.length
+        ? CoaDocument.find({
+          $or: coaHistoryMatchClauses,
+          status: { $nin: ['cancelled', 'superseded', 'rejected'] },
+        }).sort({ updatedAt: -1 }).limit(100).lean()
+        : Promise.resolve([]),
+      LegacyLabResult.find({}).lean(),
     ]);
-    const requestMatch = findBestRequestItem(petitions, source);
-    const sourceData = sampleFromSources(source, references.stockRows, references.mfRows, requestMatch?.item);
+    const requestMatch = findBestRequestItem(petitions, source, labRequests);
+    const coaHistoryMatch = findBestCoaHistorySample(coaHistory, source);
+    const sourceData = sampleFromSources(
+      source,
+      references.stockRows,
+      references.mfRows,
+      requestMatch?.item || coaHistoryMatch?.sample,
+    );
     const sample = sourceData.sample;
+    const authoritativeBatch = manualText(
+      sourceSample.batchNo || sourceSample.lotNo
+      || requestMatch?.item?.batchNo || requestMatch?.item?.lotNo
+      || coaHistoryMatch?.sample?.batchNo || coaHistoryMatch?.sample?.lotNo,
+    );
+    const legacyLookupSample = authoritativeBatch
+      ? sample
+      : { ...sample, batchNo: '', lotNo: '' };
+    const legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+    if (legacyMatch) {
+      if (!authoritativeBatch) {
+        sample.batchNo = legacyMatch.batchNo;
+        sample.productionDate = legacyMatch.productionDate;
+      } else {
+        if (!sample.batchNo) sample.batchNo = legacyMatch.batchNo;
+        if (!sample.productionDate) sample.productionDate = legacyMatch.productionDate;
+      }
+      if (!sample.manufacturer) sample.manufacturer = manualText(legacyMatch.row?.manufacturer);
+    }
     const lab = findBestLabItem(petitions, sample);
     const qcResults = lab.best
       ? await QCTestResult.find({ petitionId: String(lab.best.petition._id), itemSeq: Number(lab.best.item.seq) })
         .sort({ updatedAt: -1 }).lean()
       : [];
     const resultData = resultRowsFromQc(qcResults, sample.commonName);
+    const legacyResultData = resultRowsFromLegacyLab(legacyMatch?.row, sample.commonName);
+    resultData.rows = mergeResultRows(resultData.rows, legacyResultData.rows);
+    resultData.density ||= legacyResultData.density === '-' ? '' : legacyResultData.density;
+    resultData.analysisDate ||= legacyResultData.analysisDate;
     let density = resultData.density;
     if (!density && sample.batchNo) {
       const pattern = new RegExp(escapeRegex(sample.batchNo), 'i');
       const densityRows = await ResultDensity.find({ 'Sample name': pattern }).sort({ _id: -1 }).limit(100).lean();
       density = densityForBatch(densityRows, sample.batchNo);
     }
-    if (density && !resultData.rows.some((row) => /density/i.test(row.testItem || ''))) {
-      resultData.rows.push({
+    if (density) {
+      const densityRow = resultData.rows.find((row) => /density/i.test(row.testItem || ''));
+      if (densityRow && (!densityRow.result || densityRow.result === '-')) densityRow.result = density;
+      else if (!densityRow) resultData.rows.push({
         testItem: 'Density at 30°C (g/cm³)', criteria: '-', result: density, unit: 'g/cm³', method: 'DMA 501',
       });
     }
@@ -785,10 +845,25 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       matchKind: candidate.matchKind,
       labApprovedAt: candidate.petition.labApprovedAt || null,
     }));
+    const needsDensity = /\b(?:SC|SL|EC|EW|ZC|ME)\b/i.test(sample.commonName || '');
     const warnings = [];
-    if (!requestMatch && !sourceData.stockCandidates.length && !sourceData.mfCandidates.length) warnings.push('ไม่พบ LOT NO. จาก ERP/Stock/MF');
-    if (!lab.best) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
-    else if (lab.best.matchKind !== 'exact') warnings.push('พบผล Lab จากเลขแบชที่ใกล้เคียง กรุณาตรวจสอบก่อนบันทึก');
+    if (!sample.batchNo || !sample.productionDate) {
+      warnings.push('ไม่พบ Batch No. และวันที่ผลิตจริงจากคำขอ COA, ใบคำร้อง LIS, COA เดิม, Stock, MF หรือฐานข้อมูลผล Lab เดิม');
+    }
+    if (!lab.best && !legacyMatch) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
+    else if (!lab.best && legacyMatch?.matchKind === 'productHistory') {
+      warnings.push('ระบบเลือก Batch จากผล Lab เดิมที่สูตรตรงกันและใกล้วันส่งสินค้า กรุณาตรวจสอบ Batch ก่อนบันทึก');
+    }
+    else if (lab.best && lab.best.matchKind !== 'exact') warnings.push('พบผล Lab จากเลขแบชที่ใกล้เคียง กรุณาตรวจสอบก่อนบันทึก');
+    const missingResultFields = [
+      !resultData.rows.some((row) => /^appearance$/i.test(row.testItem || '') && row.result && row.result !== '-') && 'Appearance',
+      !resultData.rows.some((row) => isAiContentTestItem(row.testItem) && row.result && row.result !== '-') && '%AI',
+      needsDensity && !resultData.rows.some((row) => /density/i.test(row.testItem || '') && row.result && row.result !== '-') && 'Density',
+      !resultData.analysisDate && 'Date of analysis',
+    ].filter(Boolean);
+    if (missingResultFields.length) {
+      warnings.push(`ยังไม่พบข้อมูล ${missingResultFields.join(', ')} สำหรับ Batch นี้ในฐานข้อมูล`);
+    }
     if (resultData.physical?.raw && !resultData.physical.complete) warnings.push('ผลกายภาพบางคำยังไม่มีคำแปลภาษาอังกฤษ กรุณาตรวจสอบ');
     res.json({
       externalRequestId,
@@ -807,13 +882,22 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         matchKind: lab.best.matchKind,
         batchScore: lab.best.batchScore,
       } : null,
+      legacyMatch: legacyMatch ? {
+        id: String(legacyMatch.row?._id || ''),
+        sampleName: legacyMatch.row?.sample_name || '',
+        batchNo: legacyMatch.batchNo,
+        productionDate: legacyMatch.productionDate,
+        analysisDate: legacyMatch.analysisDate,
+        matchKind: legacyMatch.matchKind,
+        score: legacyMatch.score,
+      } : null,
       candidates,
       stockCandidates: sourceData.stockCandidates,
       mfCandidates: sourceData.mfCandidates,
       form: {
         template: formKindForCommonName(sample.commonName),
         aiCriteria: aiToleranceCriteriaForCommonName(sample.commonName) || '',
-        needsDensity: /\b(SC|SL|EC|EW|ZC)\s*$/i.test(sample.commonName || ''),
+        needsDensity,
       },
       warnings,
       dataSources: {
@@ -821,6 +905,8 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         stock: sourceData.stockCandidates.length > 0,
         mf: sourceData.mfCandidates.length > 0,
         lab: Boolean(lab.best),
+        coaHistory: Boolean(coaHistoryMatch),
+        legacyLab: Boolean(legacyMatch),
         density: Boolean(density),
       },
     });
@@ -851,7 +937,30 @@ router.get('/lab-ai-lookup', async (req, res) => {
     }).sort({ updatedAt: -1 }).limit(200).lean();
     const lab = findBestLabItem(petitions, { batchNo, commonName, sampleName });
     if (!lab.best) {
-      return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
+      const legacyRows = await LegacyLabResult.find({
+        batch_no: new RegExp(`^\\s*${escapeRegex(batchNo)}(?:(?:\\s+|-)P\\d+)?\\s*$`, 'i'),
+      }).lean();
+      const legacySource = {
+        sampleSnapshots: [{ sampleName, commonName }],
+        externalCoaRequest: {},
+      };
+      const legacyMatch = findBestLegacyLabResult(legacyRows, legacySource, { batchNo, commonName, sampleName });
+      if (!legacyMatch) {
+        return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
+      }
+      const legacyResultData = resultRowsFromLegacyLab(legacyMatch.row, commonName);
+      return res.json({
+        batchNo,
+        commonName,
+        ai: legacyResultData.rows.find((row) => isAiContentTestItem(row.testItem)) || null,
+        analysisDate: legacyResultData.analysisDate || '',
+        match: {
+          petitionId: `legacy:${legacyMatch.row?._id || ''}`,
+          petitionNo: 'ผล Lab เดิม',
+          itemSeq: 1,
+          batchNo: legacyMatch.batchNo,
+        },
+      });
     }
 
     const qcResults = await QCTestResult.find({

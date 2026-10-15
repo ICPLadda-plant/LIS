@@ -206,7 +206,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
         <DialogDescription>ใบขาย {request.petitionNoSnapshot} · {request.customerSnapshot?.name} — บันทึกเป็นร่างแล้วส่งให้ QC Head อนุมัติ</DialogDescription>
       </DialogHeader>
       <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (valid && !save.isPending) save.mutate(); }}>
-        {!editing && autofill.isFetching && <p role="status" className="text-sm text-muted-foreground">กำลังดึงข้อมูล ERP, LOT, MF และผล Lab...</p>}
+        {!editing && autofill.isFetching && <p role="status" className="text-sm text-muted-foreground">กำลังดึงข้อมูล ERP, LOT, MF, COA เดิม และผล Lab...</p>}
         {!editing && autofill.isError && <Alert variant="destructive">
           <AlertTitle>ดึงข้อมูลอัตโนมัติไม่สำเร็จ</AlertTitle>
           <AlertDescription>{autofill.error instanceof Error ? autofill.error.message : "สามารถกรอกข้อมูลเองได้"}</AlertDescription>
@@ -214,14 +214,25 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
         {!editing && autofill.data && <div className="space-y-2 rounded-lg border bg-card p-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-foreground">สถานะการจับคู่ข้อมูล</span>
-            <Badge variant={autofill.data.match?.matchKind === "exact" ? "green-soft" : "yellow-soft"}>
-              {autofill.data.match?.matchKind === "exact" ? "ตรงกัน" : autofill.data.match ? "ใกล้เคียง" : "ไม่พบผล Lab"}
+            <Badge variant={autofill.data.match?.matchKind === "exact" || autofill.data.legacyMatch?.matchKind === "exactBatch" ? "green-soft" : "yellow-soft"}>
+              {autofill.data.match?.matchKind === "exact"
+                ? "ตรงกัน"
+                : autofill.data.legacyMatch?.matchKind === "exactBatch"
+                  ? "ตรง Batch เดิม"
+                  : autofill.data.legacyMatch
+                    ? "ผล Lab เดิม"
+                    : autofill.data.match ? "ใกล้เคียง" : "ไม่พบผล Lab"}
             </Badge>
             <Badge variant="blue-soft">แบบฟอร์ม: {formLabels[autofill.data.form.template]}</Badge>
+            {autofill.data.dataSources.legacyLab && <Badge variant="blue-soft">มีผล Lab เดิม</Badge>}
             {autofill.data.dataSources.density && <Badge variant="blue-soft">มี Density</Badge>}
           </div>
           <p className="text-muted-foreground">
-            {autofill.data.match ? `ผล Lab: ${autofill.data.match.petitionNo || "-"} · Batch ${autofill.data.match.batchNo || "-"}` : "ยังไม่พบผล Lab ที่ตรงกัน"}
+            {autofill.data.match
+              ? `ผล Lab: ${autofill.data.match.petitionNo || "-"} · Batch ${autofill.data.match.batchNo || "-"}`
+              : autofill.data.legacyMatch
+                ? `ผล Lab เดิม: ${autofill.data.legacyMatch.sampleName || "-"} · Batch ${autofill.data.legacyMatch.batchNo || "-"}`
+                : "ยังไม่พบผล Lab ที่ตรงกัน"}
           </p>
           {autofill.data.warnings.map((warning) => <p key={warning} className="text-sm text-muted-foreground">{warning}</p>)}
           <p className="text-xs text-muted-foreground">ตรวจสอบและแก้ไขข้อมูลทุกช่องได้ก่อนบันทึกร่าง COA</p>
