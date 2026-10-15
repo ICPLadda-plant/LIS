@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import CoaCenterPage from "../CoaCenterPage";
-import type { CoaDocument } from "@/types/coa.types";
+import type { CoaDocument, CoaErpAutofill, CoaLabAiLookup } from "@/types/coa.types";
 
 const authMock = vi.hoisted(() => ({
   current: {
@@ -544,6 +544,54 @@ describe("CoaCenterPage", () => {
     expect(screen.getByLabelText("Batch No. *")).toHaveValue("480");
     expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-10-09");
     expect(screen.getByLabelText("Lot No.")).toHaveValue("26S-PCB25-480-091069");
+  });
+
+  it("keeps the averaged AI visible when an older batch lookup finishes late", async () => {
+    vi.mocked(api.getCoaDocuments).mockResolvedValueOnce({
+      items: [{
+        _id: "external-coa-request-SO-AI-AVERAGE-10000", coaNo: null, coaYear: 2026, revision: 0, status: "requested",
+        petitionId: "external-coa-request-SO-AI-AVERAGE-10000", petitionNoSnapshot: "SO-AI-AVERAGE", selectedItemSeqs: [10000],
+        customerSnapshot: { name: "Customer AI" },
+        sampleSnapshots: [{
+          itemSeq: 10000, sampleName: "Test Trade", commonName: "THIAMETHOXAM 25% WG",
+          batchNo: "OLD-BATCH", productionDate: "2026-09-01",
+        }],
+        resultSnapshots: [], externalRequestId: "external-coa-request-SO-AI-AVERAGE-10000",
+        externalCoaRequest: { saleOrderNo: "SO-AI-AVERAGE", line: 10000 },
+      }],
+    });
+    let resolveAutofill: ((value: CoaErpAutofill) => void) | undefined;
+    const pendingAutofill = new Promise<CoaErpAutofill>((resolve) => { resolveAutofill = resolve; });
+    let resolveOldLookup: ((value: CoaLabAiLookup) => void) | undefined;
+    const pendingOldLookup = new Promise<CoaLabAiLookup>((resolve) => { resolveOldLookup = resolve; });
+    vi.mocked(api.getErpCoaAutofill).mockReturnValueOnce(pendingAutofill);
+    vi.mocked(api.getCoaLabAiByBatch).mockImplementation(({ batchNo, commonName }) => {
+      if (batchNo === "OLD-BATCH") return pendingOldLookup;
+      return Promise.resolve({ batchNo, commonName, ai: null, analysisDate: "", match: null });
+    });
+
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "สถานะ ขอ COA" }));
+    fireEvent.click(await screen.findByRole("row", { name: /SO-AI-AVERAGE/ }));
+    await waitFor(() => expect(api.getCoaLabAiByBatch).toHaveBeenCalledWith(expect.objectContaining({ batchNo: "OLD-BATCH" })));
+
+    resolveAutofill?.({
+      externalRequestId: "external-coa-request-SO-AI-AVERAGE-10000", source: {},
+      sample: {
+        itemSeq: 10000, sampleName: "Test Trade", commonName: "THIAMETHOXAM 25% WG",
+        batchNo: "NEW-BATCH", productionDate: "2026-09-02",
+      },
+      results: [{ itemSeq: 10000, testItem: "%AI content", criteria: "25% ± 1.30", result: "24.305%", unit: "%" }],
+      match: { petitionId: "p-ai", petitionNo: "P-AI", itemSeq: 1, batchNo: "NEW-BATCH", matchKind: "exact", batchScore: 1 },
+      candidates: [], stockCandidates: [], mfCandidates: [],
+      form: { template: "grWpSp", aiCriteria: "25% ± 1.30", needsDensity: false }, warnings: [],
+      dataSources: { erp: true, stock: false, mf: false, lab: true, density: false },
+    });
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%"));
+
+    resolveOldLookup?.({ batchNo: "OLD-BATCH", commonName: "THIAMETHOXAM 25% WG", ai: null, analysisDate: "", match: null });
+    await waitFor(() => expect(api.getCoaLabAiByBatch).toHaveBeenCalledWith(expect.objectContaining({ batchNo: "NEW-BATCH" })));
+    expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%");
   });
 
   it("refreshes %AI from the entered batch in real time", async () => {

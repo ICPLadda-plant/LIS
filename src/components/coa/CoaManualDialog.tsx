@@ -158,6 +158,14 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   }, [open, sample.batchNo, sample.commonName, sample.sampleName]);
   useEffect(() => {
     if (!labAiLookupKey.batchNo || !labAiLookupKey.commonName || labAiLookup.isFetching) return;
+    const currentLookupKey = {
+      batchNo: String(sample.batchNo || "").trim(),
+      commonName: String(sample.commonName || "").trim(),
+      sampleName: String(sample.sampleName || "").trim(),
+    };
+    if (currentLookupKey.batchNo !== labAiLookupKey.batchNo
+      || currentLookupKey.commonName !== labAiLookupKey.commonName
+      || currentLookupKey.sampleName !== labAiLookupKey.sampleName) return;
     if (labAiLookup.isError) {
       setLabAiLookupStatus("error");
       return;
@@ -186,7 +194,15 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
       return next;
     });
     setLabAiLookupStatus(aiResult ? "found" : "not-found");
-  }, [labAiLookup.data, labAiLookup.isError, labAiLookup.isFetching, labAiLookupKey]);
+  }, [
+    labAiLookup.data,
+    labAiLookup.isError,
+    labAiLookup.isFetching,
+    labAiLookupKey,
+    sample.batchNo,
+    sample.commonName,
+    sample.sampleName,
+  ]);
   const resultFields = resultFieldsForCommonName(sample.commonName);
   const valid = [sample.sampleName, sample.commonName, sample.batchNo, sample.productionDate].every((value) => value?.trim())
     && resultFields.every(([field]) => resultForm[field].trim());
