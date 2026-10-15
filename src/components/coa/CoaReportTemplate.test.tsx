@@ -116,6 +116,10 @@ describe("CoaReportTemplate", () => {
     expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["TEST ITEM", "Specification", "Result"]);
     expect(screen.getByText("Clear liquid")).toBeInTheDocument();
     expect(screen.getByText("Conform")).toBeInTheDocument();
+    const liquidRows = within(section).getAllByRole("row");
+    const batchRowIndex = liquidRows.findIndex((row) => row.textContent?.includes("BATCH NO."));
+    const appearanceRowIndex = liquidRows.findIndex((row) => row.textContent?.includes("Appearance"));
+    expect(batchRowIndex).toBeLessThan(appearanceRowIndex);
     expect(screen.queryByText("1.100 - 1.150")).not.toBeInTheDocument();
     const densityCells = within(screen.getByText("Density at 30°C (g/cm³)").closest("tr")!).getAllByRole("cell");
     expect(densityCells).toHaveLength(2);

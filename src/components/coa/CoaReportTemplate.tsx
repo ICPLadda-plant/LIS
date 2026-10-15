@@ -147,13 +147,13 @@ function LiquidCoaPage({ page, index }: { page: CoaReportPage; index: number }) 
         <tbody>
           {sample?.selectedResultsOnly ? <SelectedCoaRows sample={sample} /> : <>
           <tr>
+            <td colSpan={2}>BATCH NO.</td>
+            <td>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
+          </tr>
+          <tr>
             <td>Appearance</td>
             <td>{appearance?.criteria === "-" ? "" : appearance?.criteria}</td>
             <td>{appearance?.result === "-" ? "" : appearance?.result}</td>
-          </tr>
-          <tr>
-            <td colSpan={2}>BATCH NO.</td>
-            <td>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
           </tr>
           <tr>
             <td>%AI content (W/V)</td>
