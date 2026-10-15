@@ -209,6 +209,26 @@ test('matching ERP Lot Description supplies production date before an existing r
   assert.equal(result.sample.productionDate, '2026-10-09');
 });
 
+test('newest ERP FG Lot Description supplies the production date even when the request date is older', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'Trade A',
+      commonName: 'PACLOBUTRAZOL 25% SC',
+      batchNo: 'B-CUSTOMER-001',
+      productionDate: '2026-06-16',
+    }],
+    externalCoaRequest: { itemNo: 'F-TWI25-1000X12' },
+  }, [{
+    item_no: 'F-TWI25-1000X12', lot_no: 'FG260615-022', stock_qty: 100,
+  }, {
+    item_no: 'F-TWI25-1000X12', lot_no: 'FG260902-008', stock_qty: 50,
+  }], []);
+
+  assert.equal(result.sample.batchNo, 'B-CUSTOMER-001');
+  assert.equal(result.sample.productionDate, '2026-09-02');
+});
+
 test('customer COA request batch, lot and production date take precedence over ERP references', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
@@ -236,7 +256,7 @@ test('customer COA request batch, lot and production date take precedence over E
   assert.equal(result.sample.productionDate, '2026-04-18');
 });
 
-test('LIS petition batch and production date take precedence when the COA request has no lot data', () => {
+test('LIS petition batch is preserved while the newest ERP FG supplies the production date', () => {
   const source = {
     selectedItemSeqs: [10000],
     sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'COMMON A' }],
@@ -263,7 +283,7 @@ test('LIS petition batch and production date take precedence when the COA reques
   assert.equal(petitionMatch.item.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.lotNo, 'L-CUSTOMER');
-  assert.equal(result.sample.productionDate, '2026-09-12');
+  assert.equal(result.sample.productionDate, '2026-10-15');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {

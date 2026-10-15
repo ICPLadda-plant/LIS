@@ -1161,7 +1161,7 @@ test('ERP autofill only uses Lab results when common name and batch both match',
   }
 });
 
-test('ERP autofill uses the matching LIS petition batch before Stock and MF data', async () => {
+test('ERP autofill keeps the matching LIS petition batch but uses the newest ERP FG production date', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1204,7 +1204,7 @@ test('ERP autofill uses the matching LIS petition batch before Stock and MF data
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'L-CUSTOMER');
-    assert.equal(res.body.sample.productionDate, '2026-09-12');
+    assert.equal(res.body.sample.productionDate, '2026-10-15');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;

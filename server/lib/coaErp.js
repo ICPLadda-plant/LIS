@@ -182,6 +182,10 @@ function lotDate(lotNo) {
   return `20${match[1]}-${match[2]}-${match[3]}`;
 }
 
+function isFgLotDescription(lotNo) {
+  return /^FG\d{6}(?:-|$)/i.test(text(lotNo));
+}
+
 function lotSnapshot(lotNo, fallbackDate = '') {
   const value = text(lotNo);
   const labeledLot = value.match(/^(?:.+)-([^-]+)-[0-3]\d[01]\d\d{2}$/);
@@ -652,7 +656,11 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
       || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
   });
-  const stock = matchingStock || stockCandidates[0];
+  const newestFgStock = stockCandidates.find((row) => isFgLotDescription(lotFromRow(row)));
+  const stock = newestFgStock || matchingStock || stockCandidates[0];
+  const newestFgLot = newestFgStock
+    ? lotSnapshot(lotFromRow(newestFgStock), productionDateFromRow(newestFgStock))
+    : null;
   const matchingStockLot = matchingStock
     ? lotSnapshot(lotFromRow(matchingStock), productionDateFromRow(matchingStock))
     : null;
@@ -662,7 +670,8 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     ? {
       lotNo: requestedLot || matchingStockLot?.lotNo || sourceLot.lotNo,
       batchNo: requestedBatch || sourceLot.batchNo,
-      productionDate: matchingStockLot?.productionDate || requestedProductionDate || sourceLot.productionDate || sourceBatchDate,
+      productionDate: newestFgLot?.productionDate || matchingStockLot?.productionDate
+        || requestedProductionDate || sourceLot.productionDate || sourceBatchDate,
     }
     : stock
       ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
