@@ -134,8 +134,8 @@ function productionDateFromRow(row, fallback = '') {
 
 function lotFromRow(row) {
   return pick(row, [
-    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
     'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
+    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
     'batch_no', 'batchNo', 'BatchNo', 'Batch No.', 'Batch No',
   ]) || batchFromRow(row);
 }
@@ -751,13 +751,17 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     ? lotSnapshot(lotFromRow(matchingStock), productionDateFromRow(matchingStock))
     : null;
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
-  const sourceBatchDate = requestedBatch ? lotSnapshot(requestedBatch).productionDate : '';
+  const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
+  const selectedSourceLot = requestedLot
+    ? lotSnapshot(requestedLot)
+    : requestedBatchLot?.productionDate
+      ? requestedBatchLot
+      : matchingStockLot || newestFgLot || sourceLot;
   const lot = sourceLot
     ? {
-      lotNo: requestedLot || matchingStockLot?.lotNo || sourceLot.lotNo,
-      batchNo: requestedBatch || sourceLot.batchNo,
-      productionDate: newestFgLot?.productionDate || matchingStockLot?.productionDate
-        || requestedProductionDate || sourceLot.productionDate || sourceBatchDate,
+      lotNo: selectedSourceLot?.lotNo || sourceLot.lotNo,
+      batchNo: requestedBatch || selectedSourceLot?.batchNo || sourceLot.batchNo,
+      productionDate: selectedSourceLot?.productionDate || requestedProductionDate || sourceLot.productionDate,
     }
     : stock
       ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))

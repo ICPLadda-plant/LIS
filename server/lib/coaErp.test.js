@@ -189,6 +189,22 @@ test('stock LOT autofill preserves the full LOT while using its real batch and p
   assert.equal(result.stockCandidates[0].batchNo, '480');
 });
 
+test('ERP Lot No. takes precedence and its six date digits supply the production date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'EMAMECTIN BENZOATE 2.0% W/V ME' }],
+    externalCoaRequest: { itemNo: 'FC-LINOI-1X16' },
+  }, [{
+    item_no: 'FC-LINOI-1X16',
+    lot_no: 'FG260404-002',
+    'Lot Description': 'FG261015-008',
+    stock_qty: 64,
+  }], []);
+
+  assert.equal(result.sample.lotNo, 'FG260404-002');
+  assert.equal(result.sample.productionDate, '2026-04-04');
+});
+
 test('matching ERP Lot Description supplies production date before an existing request date', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
@@ -258,7 +274,7 @@ test('customer COA request batch, lot and production date take precedence over E
   assert.equal(result.sample.productionDate, '2026-04-18');
 });
 
-test('LIS petition batch is preserved while the newest ERP FG supplies the production date', () => {
+test('LIS petition Lot No. supplies its own production date instead of a newer ERP lot', () => {
   const source = {
     selectedItemSeqs: [10000],
     sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'COMMON A' }],
@@ -275,7 +291,7 @@ test('LIS petition batch is preserved while the newest ERP FG supplies the produ
     },
     {
       updatedAt: '2026-09-13',
-      items: [{ itemNo: 'ITEM-A', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: 'B-CUSTOMER', lotNo: 'L-CUSTOMER', productionDate: '2026-09-12' }],
+      items: [{ itemNo: 'ITEM-A', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: 'B-CUSTOMER', lotNo: 'FG260912-001', productionDate: '2026-06-16' }],
     },
   ], source);
   const result = sampleFromSources(source, [{
@@ -284,8 +300,8 @@ test('LIS petition batch is preserved while the newest ERP FG supplies the produ
 
   assert.equal(petitionMatch.item.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.batchNo, 'B-CUSTOMER');
-  assert.equal(result.sample.lotNo, 'L-CUSTOMER');
-  assert.equal(result.sample.productionDate, '2026-10-15');
+  assert.equal(result.sample.lotNo, 'FG260912-001');
+  assert.equal(result.sample.productionDate, '2026-09-12');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {

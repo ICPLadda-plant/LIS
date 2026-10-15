@@ -1304,7 +1304,7 @@ test('ERP autofill shows the latest averaged AI history when the original petiti
   }
 });
 
-test('ERP autofill keeps the matching LIS petition batch but uses the newest ERP FG production date', async () => {
+test('ERP autofill keeps the matching LIS petition Lot No. production date', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1322,7 +1322,7 @@ test('ERP autofill keeps the matching LIS petition batch but uses the newest ERP
     _id: 'petition-request-1', petitionNo: 'P-REQUEST-1', updatedAt: '2026-09-13T00:00:00.000Z',
     items: [{
       seq: 1, itemNo: 'ITEM-A', sampleName: 'Trade A', commonName: 'COMMON A',
-      batchNo: 'B-CUSTOMER', lotNo: 'L-CUSTOMER', productionDate: '2026-09-12',
+      batchNo: 'B-CUSTOMER', lotNo: 'FG260912-001', productionDate: '2026-06-16',
     }],
   };
   try {
@@ -1346,8 +1346,8 @@ test('ERP autofill keeps the matching LIS petition batch but uses the newest ERP
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
-    assert.equal(res.body.sample.lotNo, 'L-CUSTOMER');
-    assert.equal(res.body.sample.productionDate, '2026-10-15');
+    assert.equal(res.body.sample.lotNo, 'FG260912-001');
+    assert.equal(res.body.sample.productionDate, '2026-09-12');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
@@ -1386,7 +1386,7 @@ test('ERP autofill keeps ERP production date while using legacy appearance and d
     global.fetch = async (url) => {
       if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
       if (String(url).includes('stock-all-item')) {
-        return { ok: true, json: async () => [{ item_no: 'F-EMB2-500X24', lot_no: 'FG261015-008', stock_qty: 10 }] };
+        return { ok: true, json: async () => [{ item_no: 'F-EMB2-500X24', lot_no: 'FG260404-002', stock_qty: 10 }] };
       }
       return { ok: true, json: async () => [] };
     };
@@ -1403,8 +1403,8 @@ test('ERP autofill keeps ERP production date while using legacy appearance and d
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '20260430');
-    assert.equal(res.body.sample.lotNo, 'FG261015-008');
-    assert.equal(res.body.sample.productionDate, '2026-10-15');
+    assert.equal(res.body.sample.lotNo, 'FG260404-002');
+    assert.equal(res.body.sample.productionDate, '2026-04-04');
     assert.equal(res.body.results.find((row) => row.testItem === 'Appearance').result, 'Conform');
     assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '0.946');
