@@ -17,6 +17,7 @@ const {
   densityForBatch,
   fetchErpReferences,
   findBestLabItem,
+  findBestRequestItem,
   formKindForCommonName,
   resultRowsFromQc,
   sampleFromSources,
@@ -732,13 +733,29 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     const source = requests.find((row) => row._id === externalRequestId);
     if (!source) throw errorWithStatus('ไม่พบคำขอ COA จาก ERP กรุณาโหลดรายการใหม่', 404);
 
-    const references = await fetchErpReferences();
-    const sourceData = sampleFromSources(source, references.stockRows, references.mfRows);
+    const sourceSample = source.sampleSnapshots?.[0] || {};
+    const petitionMatchClauses = [];
+    if (source.externalCoaRequest?.itemNo) {
+      petitionMatchClauses.push({
+        'items.itemNo': new RegExp(`^${escapeRegex(source.externalCoaRequest.itemNo)}$`, 'i'),
+      });
+    }
+    if (sourceSample.commonName) {
+      petitionMatchClauses.push({ 'items.commonName': commonNameRegex(sourceSample.commonName) });
+    }
+    const [references, petitions] = await Promise.all([
+      fetchErpReferences(),
+      petitionMatchClauses.length
+        ? Petition.find({
+          ...(petitionMatchClauses.length === 1 ? petitionMatchClauses[0] : { $or: petitionMatchClauses }),
+          status: { $ne: 'rejected' },
+        })
+          .sort({ updatedAt: -1 }).limit(200).lean()
+        : Promise.resolve([]),
+    ]);
+    const requestMatch = findBestRequestItem(petitions, source);
+    const sourceData = sampleFromSources(source, references.stockRows, references.mfRows, requestMatch?.item);
     const sample = sourceData.sample;
-    const petitions = sample.commonName
-      ? await Petition.find({ 'items.commonName': commonNameRegex(sample.commonName) })
-        .sort({ updatedAt: -1 }).limit(200).lean()
-      : [];
     const lab = findBestLabItem(petitions, sample);
     const qcResults = lab.best
       ? await QCTestResult.find({ petitionId: String(lab.best.petition._id), itemSeq: Number(lab.best.item.seq) })
@@ -769,7 +786,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       labApprovedAt: candidate.petition.labApprovedAt || null,
     }));
     const warnings = [];
-    if (!sourceData.stockCandidates.length && !sourceData.mfCandidates.length) warnings.push('ไม่พบ LOT NO. จาก ERP/Stock/MF');
+    if (!requestMatch && !sourceData.stockCandidates.length && !sourceData.mfCandidates.length) warnings.push('ไม่พบ LOT NO. จาก ERP/Stock/MF');
     if (!lab.best) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
     else if (lab.best.matchKind !== 'exact') warnings.push('พบผล Lab จากเลขแบชที่ใกล้เคียง กรุณาตรวจสอบก่อนบันทึก');
     if (resultData.physical?.raw && !resultData.physical.complete) warnings.push('ผลกายภาพบางคำยังไม่มีคำแปลภาษาอังกฤษ กรุณาตรวจสอบ');

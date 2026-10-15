@@ -279,7 +279,48 @@ function findBestLabItem(petitions, sample) {
   return { best: candidates.find((candidate) => candidate.matchKind === 'exact') || null, candidates };
 }
 
-function sampleFromSources(source, stockRows, mfRows) {
+function findBestRequestItem(petitions, source) {
+  const sourceItemNo = itemCode(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
+  if (!sourceItemNo) return null;
+
+  const sourceCommonName = normalizeText(source?.sampleSnapshots?.[0]?.commonName);
+  const sourceSampleName = normalizeText(source?.sampleSnapshots?.[0]?.sampleName);
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
+  const candidates = [];
+
+  for (const petition of petitions || []) {
+    for (const item of petition.items || []) {
+      if (itemCode(item.itemNo) !== sourceItemNo) continue;
+      const batchNo = text(item.batchNo || item.lotNo);
+      if (!batchNo) continue;
+      const productionDate = normalizeIsoDate(item.productionDate)
+        || lotSnapshot(item.lotNo || item.batchNo).productionDate;
+      const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
+      const hasTargetAndProduction = Number.isFinite(targetTime) && Number.isFinite(productionTime);
+      candidates.push({
+        petition,
+        item,
+        identityScore: Number(Boolean(sourceCommonName) && normalizeText(item.commonName) === sourceCommonName) * 2
+          + Number(Boolean(sourceSampleName) && normalizeText(item.sampleName) === sourceSampleName),
+        dateBucket: hasTargetAndProduction ? (productionTime <= targetTime ? 0 : 1) : 2,
+        dateDistance: hasTargetAndProduction
+          ? Math.abs(targetTime - productionTime)
+          : (Number.isFinite(productionTime) ? -productionTime : Number.POSITIVE_INFINITY),
+      });
+    }
+  }
+
+  candidates.sort((left, right) => right.identityScore - left.identityScore
+    || left.dateBucket - right.dateBucket
+    || left.dateDistance - right.dateDistance
+    || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
+  return candidates[0] || null;
+}
+
+function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const itemNo = text(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
   const commonName = text(source?.sampleSnapshots?.[0]?.commonName);
   const normalizedItemNo = itemCode(itemNo);
@@ -304,10 +345,10 @@ function sampleFromSources(source, stockRows, mfRows) {
   }).filter((row) => batchFromRow(row));
   const mf = mfCandidates[0];
   const sourceSample = source?.sampleSnapshots?.[0] || {};
-  const requestedBatch = text(sourceSample.batchNo);
-  const requestedLot = text(sourceSample.lotNo);
+  const requestedBatch = text(sourceSample.batchNo || petitionItem?.batchNo);
+  const requestedLot = text(sourceSample.lotNo || petitionItem?.lotNo);
   const sourceBatch = requestedBatch || requestedLot;
-  const requestedProductionDate = normalizeIsoDate(sourceSample.productionDate);
+  const requestedProductionDate = normalizeIsoDate(sourceSample.productionDate || petitionItem?.productionDate);
   const mfBatch = batchFromRow(mf);
   const mfDate = productionDateFromRow(mf);
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
@@ -413,6 +454,7 @@ module.exports = {
   densityForBatch,
   fetchErpReferences,
   findBestLabItem,
+  findBestRequestItem,
   formKindForCommonName,
   lotSnapshot,
   normalizeIsoDate,

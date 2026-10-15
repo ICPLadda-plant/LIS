@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   batchFromRow,
   batchSimilarity,
+  findBestRequestItem,
   formKindForCommonName,
   lotSnapshot,
   physicalFromQc,
@@ -76,6 +77,36 @@ test('customer COA request batch, lot and production date take precedence over E
   assert.equal(result.sample.batchNo, 'B-CUSTOMER-001');
   assert.equal(result.sample.lotNo, 'L-CUSTOMER-001');
   assert.equal(result.sample.productionDate, '2026-04-18');
+});
+
+test('LIS petition batch and production date take precedence when the COA request has no lot data', () => {
+  const source = {
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'COMMON A' }],
+    externalCoaRequest: {
+      itemNo: 'ITEM-A',
+      saleOrderDate: '2026-05-01',
+      shipmentDate: '2026-09-20',
+    },
+  };
+  const petitionMatch = findBestRequestItem([
+    {
+      updatedAt: '2026-10-16',
+      items: [{ itemNo: 'ITEM-A', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: 'B-NEW', productionDate: '2026-10-15' }],
+    },
+    {
+      updatedAt: '2026-09-13',
+      items: [{ itemNo: 'ITEM-A', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: 'B-CUSTOMER', lotNo: 'L-CUSTOMER', productionDate: '2026-09-12' }],
+    },
+  ], source);
+  const result = sampleFromSources(source, [{
+    item_no: 'ITEM-A', lot_no: 'FG261015-004', stock_qty: 100,
+  }], [], petitionMatch.item);
+
+  assert.equal(petitionMatch.item.batchNo, 'B-CUSTOMER');
+  assert.equal(result.sample.batchNo, 'B-CUSTOMER');
+  assert.equal(result.sample.lotNo, 'L-CUSTOMER');
+  assert.equal(result.sample.productionDate, '2026-09-12');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {

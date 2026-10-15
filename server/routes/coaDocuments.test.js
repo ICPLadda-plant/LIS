@@ -1151,6 +1151,52 @@ test('ERP autofill only uses Lab results when common name and batch both match',
   }
 });
 
+test('ERP autofill uses the matching LIS petition batch before Stock and MF data', async () => {
+  const originals = {
+    fetch: global.fetch,
+    petitionFind: Petition.find,
+    qcFind: QCTestResult.find,
+    densityFind: ResultDensity.find,
+  };
+  const externalRow = {
+    SaleOrderNo: 'SO-PETITION-1', Line: 10000, ItemNo: 'ITEM-A', TradeName: 'Trade A',
+    CommonName: 'COMMON A', ShipmentDate: '2026-09-20T00:00:00.000Z', remark: 'COA',
+  };
+  const petition = {
+    _id: 'petition-request-1', petitionNo: 'P-REQUEST-1', updatedAt: '2026-09-13T00:00:00.000Z',
+    items: [{
+      seq: 1, itemNo: 'ITEM-A', sampleName: 'Trade A', commonName: 'COMMON A',
+      batchNo: 'B-CUSTOMER', lotNo: 'L-CUSTOMER', productionDate: '2026-09-12',
+    }],
+  };
+  try {
+    global.fetch = async (url) => {
+      if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
+      if (String(url).includes('stock-all-item')) {
+        return { ok: true, json: async () => [{ item_no: 'ITEM-A', lot_no: 'FG261015-004', stock_qty: 10 }] };
+      }
+      return { ok: true, json: async () => [] };
+    };
+    Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    QCTestResult.find = () => ({ sort: () => ({ lean: async () => [] }) });
+    ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
+
+    const res = await invoke('/erp-autofill/:externalRequestId', 'get', {
+      params: { externalRequestId: 'external-coa-request-SO-PETITION-1-10000' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
+    assert.equal(res.body.sample.lotNo, 'L-CUSTOMER');
+    assert.equal(res.body.sample.productionDate, '2026-09-12');
+  } finally {
+    global.fetch = originals.fetch;
+    Petition.find = originals.petitionFind;
+    QCTestResult.find = originals.qcFind;
+    ResultDensity.find = originals.densityFind;
+  }
+});
+
 test('real-time Lab AI lookup returns the result for an exact batch and rejects another batch', async () => {
   const originals = { petitionFind: Petition.find, qcFind: QCTestResult.find };
   const petition = {
