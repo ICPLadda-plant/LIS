@@ -13,7 +13,6 @@ const {
   normalizeIsoDate,
   physicalFromQc,
   isAfterDryingLabItem,
-  isEligibleAiLabDepartment,
   resultRowsFromLegacyLab,
   resultRowsFromQc,
   sampleFromSources,
@@ -386,21 +385,11 @@ test('AI results prefer the substance-specific value over a generic total', () =
   assert.equal(rows.ai.result, '0.2650%');
 });
 
-test('AI Lab selection accepts Warehouse Product and QC departments only', () => {
-  for (const department of [
-    'Warehouse Product', 'FG Warehouse', 'คลังสินค้า FG', 'QC', 'Quality Control', 'ควบคุมคุณภาพ',
-  ]) {
-    assert.equal(isEligibleAiLabDepartment({ submittedBy: { department } }), true, department);
-  }
-  assert.equal(isEligibleAiLabDepartment({ submittedBy: { department: 'R&D' }, dept: 'fg' }), false);
-  assert.equal(isEligibleAiLabDepartment({ dept: 'fg' }), true);
-});
-
-test('AI Lab selection uses the latest approved eligible petition and excludes after-drying items', () => {
+test('AI Lab selection uses the latest approved petition from any department and excludes after-drying items', () => {
   const commonName = 'GLYPHOSATE 48% W/V SL';
   const regularItems = [
     { seq: 1, sampleName: 'Product A', commonName, batchNo: '2026031601' },
-    { seq: 2, sampleName: 'Product A duplicate', commonName, batchNo: '2026031601' },
+    { seq: 2, sampleName: 'Product A', commonName, batchNo: '2025120701' },
   ];
   const result = findLatestAiLabItems([
     {
@@ -422,7 +411,7 @@ test('AI Lab selection uses the latest approved eligible petition and excludes a
     },
   ], { commonName, batchNo: '2026031601' });
 
-  assert.equal(result.best.petition._id, 'warehouse-latest');
+  assert.equal(result.best.petition._id, 'rnd-newest');
   assert.deepEqual(result.best.items.map((item) => item.seq), [1, 2]);
   assert.equal(isAfterDryingLabItem({ note: 'ทดสอบยาหลังอบ' }), true);
 });

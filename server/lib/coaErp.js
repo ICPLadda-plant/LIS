@@ -337,28 +337,6 @@ function findBestLabItem(petitions, sample) {
   return { best: candidates.find((candidate) => candidate.matchKind === 'exact') || null, candidates };
 }
 
-function isEligibleAiLabDepartment(petition) {
-  const department = normalizeText(petition?.submittedBy?.department)
-    .replace(/[._-]+/g, ' ')
-    .replace(/\s+/g, ' ');
-  if (!department) return normalizeText(petition?.dept) === 'fg';
-  if (department === 'qc' || department.includes('quality control') || department.includes('ควบคุมคุณภาพ')) {
-    return true;
-  }
-  return [
-    'warehouse product',
-    'product warehouse',
-    'warehouse fg',
-    'fg warehouse',
-    'finished goods warehouse',
-    'finished good warehouse',
-    'คลังสินค้า fg',
-    'คลังสินค้าสำเร็จรูป',
-    'คลังสินค้าผลิตภัณฑ์',
-    'คลังผลิตภัณฑ์',
-  ].some((name) => department.includes(name));
-}
-
 function isAfterDryingLabItem(item) {
   const source = [item?.sampleName, item?.note, item?.testItems].map(text).join(' ');
   return /(?:ยา\s*)?หลัง\s*อบ|after[\s-]*dry(?:ing)?|post[\s-]*dry/i.test(source);
@@ -371,16 +349,20 @@ function findLatestAiLabItems(petitions, sample) {
   const candidates = [];
   for (const petition of petitions || []) {
     const issuedAt = petition?.approvedAt || petition?.labApprovedAt;
-    if (petition?.status === 'rejected' || !issuedAt || !isEligibleAiLabDepartment(petition)) continue;
-    const items = (petition.items || []).filter((item) => (
+    if (petition?.status === 'rejected' || !issuedAt) continue;
+    const eligibleItems = (petition.items || []).filter((item) => (
       normalizeText(item.commonName) === commonName
-      && batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1
       && !isAfterDryingLabItem(item)
     ));
-    if (!items.length) continue;
+    const exactItems = eligibleItems.filter((item) => batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1);
+    if (!exactItems.length) continue;
+    const matchedSampleNames = new Set(exactItems.map((item) => normalizeText(item.sampleName)).filter(Boolean));
+    const items = matchedSampleNames.size
+      ? eligibleItems.filter((item) => matchedSampleNames.has(normalizeText(item.sampleName)))
+      : eligibleItems;
     candidates.push({
       petition,
-      item: items[0],
+      item: exactItems[0],
       items,
       batchScore: 1,
       matchKind: 'exact',
@@ -876,7 +858,6 @@ module.exports = {
   normalizeText,
   physicalFromQc,
   isAfterDryingLabItem,
-  isEligibleAiLabDepartment,
   resultRowsFromLegacyLab,
   resultRowsFromQc,
   rowsFromPayload,

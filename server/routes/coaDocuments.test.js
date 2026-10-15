@@ -1161,7 +1161,7 @@ test('ERP autofill only uses Lab results when common name and batch both match',
   }
 });
 
-test('ERP autofill uses averaged AI only from the latest Warehouse Product or QC petition', async () => {
+test('ERP autofill averages AI from the latest approved petition from any department', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1182,7 +1182,10 @@ test('ERP autofill uses averaged AI only from the latest Warehouse Product or QC
     {
       _id: 'petition-rnd-newer', petitionNo: 'P-RND-NEWER', updatedAt: '2026-10-12T00:00:00.000Z',
       labApprovedAt: '2026-10-12T00:00:00.000Z', submittedBy: { department: 'R&D' },
-      items: [{ seq: 1, itemNo: 'F-TEST-1X20', sampleName: 'Test Trade', commonName, batchNo }],
+      items: [
+        { seq: 1, itemNo: 'F-TEST-1X20', sampleName: 'Test Trade', commonName, batchNo },
+        { seq: 2, itemNo: 'F-TEST-1X20', sampleName: 'Test Trade', commonName, batchNo: 'B-OLDER' },
+      ],
     },
     {
       _id: 'petition-qc-latest', petitionNo: 'P-QC-LATEST', updatedAt: '2026-10-10T00:00:00.000Z',
@@ -1205,14 +1208,19 @@ test('ERP autofill uses averaged AI only from the latest Warehouse Product or QC
     LabRequest.find = () => ({ lean: async () => [] });
     CoaDocument.find = () => sortedLimitedLean([]);
     LegacyLabResult.find = () => ({ lean: async () => [] });
-    QCTestResult.find = (query) => ({ sort: () => ({ lean: async () => (
-      typeof query.itemSeq === 'number'
-        ? [{ parameterName: '%AI', values: { '%AI::glyphosate': '99.99' }, updatedAt: '2026-10-12T00:00:00.000Z' }]
-        : [
-          { itemSeq: 3, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-10T01:00:00.000Z' },
-          { itemSeq: 4, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-10T02:00:00.000Z' },
-        ]
-    ) }) });
+    QCTestResult.find = (query) => {
+      if (typeof query.itemSeq === 'number') {
+        return { sort: () => ({ lean: async () => [
+          { parameterName: '%AI', values: { '%AI::glyphosate': '99.99' }, updatedAt: '2026-10-12T00:00:00.000Z' },
+        ] }) };
+      }
+      assert.equal(query.petitionId, 'petition-rnd-newer');
+      assert.deepEqual(query.itemSeq.$in, [1, 2]);
+      return { sort: () => ({ lean: async () => [
+        { itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-12T01:00:00.000Z' },
+        { itemSeq: 2, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-12T02:00:00.000Z' },
+      ] }) };
+    };
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
 
     const res = await invoke('/erp-autofill/:externalRequestId', 'get', {
@@ -1221,7 +1229,7 @@ test('ERP autofill uses averaged AI only from the latest Warehouse Product or QC
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '24.305%');
-    assert.equal(res.body.results.find((row) => row.testItem === 'Date of analysis').result, '2026-10-10');
+    assert.equal(res.body.results.find((row) => row.testItem === 'Date of analysis').result, '2026-10-12');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
@@ -1352,7 +1360,7 @@ test('ERP autofill keeps legacy appearance and density but does not use legacy A
   }
 });
 
-test('real-time Lab AI lookup averages the latest Warehouse Product or QC results', async () => {
+test('real-time Lab AI lookup averages the latest approved results from any department', async () => {
   const originals = {
     petitionFind: Petition.find,
     qcFind: QCTestResult.find,
@@ -1363,10 +1371,13 @@ test('real-time Lab AI lookup averages the latest Warehouse Product or QC result
     {
       _id: 'petition-rnd-newer', petitionNo: 'P-RND-NEWER', labApprovedAt: '2026-10-12T00:00:00.000Z',
       submittedBy: { department: 'R&D' },
-      items: [{ seq: 1, sampleName: 'Product A', commonName, batchNo }],
+      items: [
+        { seq: 1, sampleName: 'Product A', commonName, batchNo },
+        { seq: 6, sampleName: 'Product A', commonName, batchNo: 'B-OLDER' },
+      ],
     },
     {
-      _id: 'petition-after-drying', petitionNo: 'P-AFTER-DRYING', labApprovedAt: '2026-10-11T00:00:00.000Z',
+      _id: 'petition-after-drying', petitionNo: 'P-AFTER-DRYING', labApprovedAt: '2026-10-13T00:00:00.000Z',
       submittedBy: { department: 'QC' },
       items: [{ seq: 2, sampleName: 'ยาหลังอบ', commonName, batchNo }],
     },
@@ -1387,11 +1398,11 @@ test('real-time Lab AI lookup averages the latest Warehouse Product or QC result
   try {
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => petitions }) }) });
     QCTestResult.find = (query) => {
-      assert.equal(query.petitionId, 'petition-qc-latest');
-      assert.deepEqual(query.itemSeq.$in, [3, 4]);
+      assert.equal(query.petitionId, 'petition-rnd-newer');
+      assert.deepEqual(query.itemSeq.$in, [1, 6]);
       return { sort: () => ({ lean: async () => [
-        { itemSeq: 3, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-10T01:00:00.000Z' },
-        { itemSeq: 4, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-10T02:00:00.000Z' },
+        { itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-12T01:00:00.000Z' },
+        { itemSeq: 6, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-12T02:00:00.000Z' },
       ] }) };
     };
 
@@ -1401,9 +1412,9 @@ test('real-time Lab AI lookup averages the latest Warehouse Product or QC result
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.ai.result, '24.305%');
-    assert.equal(res.body.analysisDate, '2026-10-10');
-    assert.equal(res.body.match.petitionId, 'petition-qc-latest');
-    assert.equal(res.body.match.itemSeq, 3);
+    assert.equal(res.body.analysisDate, '2026-10-12');
+    assert.equal(res.body.match.petitionId, 'petition-rnd-newer');
+    assert.equal(res.body.match.itemSeq, 1);
   } finally {
     Petition.find = originals.petitionFind;
     QCTestResult.find = originals.qcFind;
