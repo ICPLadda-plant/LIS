@@ -841,7 +841,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       resultData.rows.splice(insertAt < 0 ? resultData.rows.length : insertAt, 0, aiRow);
       resultData.ai = aiResultData.ai;
       resultData.analysisDate = aiResultData.analysisDate
-        || normalizeIsoDate(aiLab.best?.petition?.labApprovedAt)
+        || normalizeIsoDate(aiLab.best?.petition?.approvedAt || aiLab.best?.petition?.labApprovedAt)
         || resultData.analysisDate;
       const analysisDateRow = resultData.rows.find((row) => /date\s*of\s*analysis/i.test(row.testItem || ''));
       if (analysisDateRow && resultData.analysisDate) analysisDateRow.result = resultData.analysisDate;
@@ -977,7 +977,9 @@ router.get('/lab-ai-lookup', async (req, res) => {
       batchNo,
       commonName,
       ai,
-      analysisDate: resultData.analysisDate || normalizeIsoDate(lab.best.petition.labApprovedAt) || '',
+      analysisDate: resultData.analysisDate
+        || normalizeIsoDate(lab.best.petition.approvedAt || lab.best.petition.labApprovedAt)
+        || '',
       match: {
         petitionId: String(lab.best.petition._id),
         petitionNo: lab.best.petition.petitionNo,

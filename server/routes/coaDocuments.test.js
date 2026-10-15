@@ -1186,7 +1186,7 @@ test('ERP autofill uses averaged AI only from the latest Warehouse Product or QC
     },
     {
       _id: 'petition-qc-latest', petitionNo: 'P-QC-LATEST', updatedAt: '2026-10-10T00:00:00.000Z',
-      labApprovedAt: '2026-10-10T00:00:00.000Z', submittedBy: { department: 'QC' },
+      approvedAt: '2026-10-10T00:00:00.000Z', submittedBy: { department: 'QC' },
       items: [
         { seq: 3, itemNo: 'F-TEST-1X20', sampleName: 'Test Trade', commonName, batchNo },
         { seq: 4, itemNo: 'F-TEST-1X20', sampleName: 'Test Trade duplicate', commonName, batchNo },
@@ -1371,7 +1371,7 @@ test('real-time Lab AI lookup averages the latest Warehouse Product or QC result
       items: [{ seq: 2, sampleName: 'ยาหลังอบ', commonName, batchNo }],
     },
     {
-      _id: 'petition-qc-latest', petitionNo: 'P-QC-LATEST', labApprovedAt: '2026-10-10T00:00:00.000Z',
+      _id: 'petition-qc-latest', petitionNo: 'P-QC-LATEST', approvedAt: '2026-10-10T00:00:00.000Z',
       submittedBy: { department: 'ควบคุมคุณภาพ' },
       items: [
         { seq: 3, sampleName: 'Product A', commonName, batchNo },
@@ -1418,7 +1418,7 @@ test('real-time Lab AI lookup returns the result for an exact batch and rejects 
   };
   const petition = {
     _id: 'petition-ai-lookup', petitionNo: 'P-AI-LOOKUP', updatedAt: '2026-10-08T00:00:00.000Z',
-    labApprovedAt: '2026-10-08T00:00:00.000Z', submittedBy: { department: 'QC' },
+    approvedAt: '2026-10-08T00:00:00.000Z', submittedBy: { department: 'QC' },
     items: [{ seq: 1, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '080' }],
   };
   try {

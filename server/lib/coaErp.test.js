@@ -413,7 +413,7 @@ test('AI Lab selection uses the latest approved eligible petition and excludes a
       items: [{ seq: 1, sampleName: 'ยาหลังอบ', commonName, batchNo: '2026031601' }],
     },
     {
-      _id: 'warehouse-latest', labApprovedAt: '2026-10-10T00:00:00.000Z',
+      _id: 'warehouse-latest', approvedAt: '2026-10-10T00:00:00.000Z',
       submittedBy: { department: 'Warehouse Product' }, items: regularItems,
     },
     {

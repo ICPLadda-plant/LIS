@@ -370,7 +370,8 @@ function findLatestAiLabItems(petitions, sample) {
   if (!commonName || !batchNo) return { best: null, candidates: [] };
   const candidates = [];
   for (const petition of petitions || []) {
-    if (petition?.status === 'rejected' || !petition?.labApprovedAt || !isEligibleAiLabDepartment(petition)) continue;
+    const issuedAt = petition?.approvedAt || petition?.labApprovedAt;
+    if (petition?.status === 'rejected' || !issuedAt || !isEligibleAiLabDepartment(petition)) continue;
     const items = (petition.items || []).filter((item) => (
       normalizeText(item.commonName) === commonName
       && batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1
@@ -383,7 +384,7 @@ function findLatestAiLabItems(petitions, sample) {
       items,
       batchScore: 1,
       matchKind: 'exact',
-      approvedTime: Date.parse(petition.labApprovedAt) || 0,
+      approvedTime: Date.parse(issuedAt) || 0,
       updatedTime: Date.parse(petition.updatedAt) || 0,
     });
   }
