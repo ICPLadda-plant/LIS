@@ -541,19 +541,64 @@ test('GET / merges external COA requests with stored and Lab-approved requested 
   }
 });
 
-test('approve route rejects non-QC Head actors before reading the document', async () => {
+test('approve route rejects actors who are neither QC Head nor the document creator', async () => {
+  const originalFindById = CoaDocument.findById;
   const restore = stubActorLookup({
     user: { name: 'Lab User', email: 'lab@example.com', role: 'lab-staff', roles: ['lab-staff'], status: 'active' },
   });
   try {
-  const res = await invoke('/:id/approve', 'post', {
-    params: { id: '507f1f77bcf86cd799439011' },
-    body: { _user: { name: 'Lab User', email: 'lab@example.com', role: 'lab_staff' } },
-  });
+    CoaDocument.findById = async () => ({
+      _id: 'coa-id',
+      status: 'pendingApproval',
+      createdBy: { email: 'creator@example.com' },
+    });
+    const res = await invoke('/:id/approve', 'post', {
+      params: { id: '507f1f77bcf86cd799439011' },
+      body: { _user: { name: 'Lab User', email: 'lab@example.com', role: 'lab_staff' } },
+    });
 
-  assert.equal(res.statusCode, 403);
-  assert.match(res.body.error, /QC Head/);
+    assert.equal(res.statusCode, 403);
+    assert.match(res.body.error, /ผู้สร้างเอกสาร/);
   } finally {
+    CoaDocument.findById = originalFindById;
+    restore();
+  }
+});
+
+test('approve route allows the document creator to approve a pending COA', async () => {
+  const originalFindById = CoaDocument.findById;
+  const originalAuditCreate = CoaAuditLog.create;
+  const restore = stubActorLookup({
+    user: { name: 'COA Creator', email: 'creator@example.com', role: 'lab-staff', roles: ['lab-staff'], status: 'active' },
+  });
+  const doc = {
+    _id: 'coa-id',
+    coaNo: '00012026',
+    status: 'pendingApproval',
+    entryMode: 'manual',
+    createdBy: { name: 'COA Creator', email: 'creator@example.com', role: 'lab-staff' },
+    sampleSnapshots: [{ itemSeq: 1, sampleName: 'Sample' }],
+    resultSnapshots: [{ itemSeq: 1, testItem: 'Appearance', result: 'Conform' }],
+    trendSnapshots: [],
+    approval: {},
+    $locals: {},
+    set(update) { Object.assign(this, update); },
+    save: async () => {},
+  };
+  try {
+    CoaDocument.findById = async () => doc;
+    CoaAuditLog.create = async () => {};
+    const res = await invoke('/:id/approve', 'post', {
+      params: { id: '507f1f77bcf86cd799439011' },
+      body: { _user: { name: 'COA Creator', email: 'creator@example.com', role: 'lab_staff' } },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(doc.status, 'approved');
+    assert.equal(doc.approval.approvedBy.email, 'creator@example.com');
+  } finally {
+    CoaDocument.findById = originalFindById;
+    CoaAuditLog.create = originalAuditCreate;
     restore();
   }
 });

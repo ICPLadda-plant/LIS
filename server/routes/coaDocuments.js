@@ -29,6 +29,7 @@ const {
   applySupersession,
   assertCanTransition,
   buildCoaSnapshots,
+  canReviewCoa,
   isQcHead,
   selectedItemsFromPetition,
   writeCoaAuditEvent,
@@ -54,7 +55,7 @@ function errorWithStatus(message, status) {
 
 function errorStatus(error) {
   if (error.status) return error.status;
-  return error.message.startsWith('QC Head required') ? 403 : 400;
+  return error.message.startsWith('QC Head required') || error.message.startsWith('QC Head or COA creator required') ? 403 : 400;
 }
 
 function manualText(value) {
@@ -1067,10 +1068,10 @@ router.post('/:id/submit', async (req, res) => {
 router.post('/:id/approve', async (req, res) => {
   try {
     const actor = await actorFromRequest(req.body);
-    if (!isQcHead(actor)) return res.status(403).json({ error: 'อนุมัติ COA ได้เฉพาะ QC Head' });
     const doc = await CoaDocument.findById(objectId(req.params.id));
     if (!doc) return res.status(404).json({ error: 'ไม่พบ COA' });
-    assertCanTransition(doc.status, 'approve', actor);
+    if (!canReviewCoa(actor, doc)) return res.status(403).json({ error: 'อนุมัติ COA ได้เฉพาะ QC Head หรือผู้สร้างเอกสาร' });
+    assertCanTransition(doc.status, 'approve', actor, doc);
     if (doc.sourceType !== 'erpManual' && doc.petitionId) await assertLabApprovedPetition(doc.petitionId);
     const missingSnapshots = !doc.sampleSnapshots?.length || !doc.resultSnapshots?.length || !doc.trendSnapshots?.length;
     const snapshots = doc.sourceType === 'erpManual' ? validateManualCoa(doc)
@@ -1122,11 +1123,11 @@ router.post('/:id/approve', async (req, res) => {
 router.post('/:id/reject', async (req, res) => {
   try {
     const actor = await actorFromRequest(req.body);
-    if (!isQcHead(actor)) return res.status(403).json({ error: 'ปฏิเสธ COA ได้เฉพาะ QC Head' });
     const reason = String(req.body.reason || '').trim();
     if (!reason) return res.status(400).json({ error: 'ต้องระบุเหตุผลการปฏิเสธ' });
     const doc = await CoaDocument.findById(objectId(req.params.id));
     if (!doc) return res.status(404).json({ error: 'ไม่พบ COA' });
+    if (!canReviewCoa(actor, doc)) return res.status(403).json({ error: 'ปฏิเสธ COA ได้เฉพาะ QC Head หรือผู้สร้างเอกสาร' });
     const { doc: updated } = await withCoaTransaction((session) => applyCoaLifecycleAction({
       doc,
       action: 'reject',

@@ -80,6 +80,16 @@ function isQcHead(user = {}) {
   );
 }
 
+function isCoaCreator(user = {}, doc = {}) {
+  const userEmail = String(user.email || '').trim().toLowerCase();
+  const creatorEmail = String(doc.createdBy?.email || '').trim().toLowerCase();
+  return Boolean(userEmail && creatorEmail && userEmail === creatorEmail);
+}
+
+function canReviewCoa(user = {}, doc = {}) {
+  return isQcHead(user) || isCoaCreator(user, doc);
+}
+
 function valueText(value) {
   if (value == null || String(value).trim() === '') return '-';
   if (Array.isArray(value)) return value.map(valueText).join(', ');
@@ -155,14 +165,20 @@ function physicalDescriptionBySeq(qcResults, parameterById, selectedSeqs) {
   return descriptions;
 }
 
-function assertCanTransition(fromStatus, action, actor) {
+function assertCanTransition(fromStatus, action, actor, doc) {
   const allowed = transitions[action];
   if (!allowed) throw new Error(`Unknown COA action ${action}`);
   if (!allowed.has(fromStatus)) {
     throw new Error(`Cannot ${action} COA from ${fromStatus}`);
   }
-  if (protectedActions.has(action) && !isQcHead(actor)) {
-    throw new Error(`QC Head required to ${action} COA`);
+  if (protectedActions.has(action)) {
+    const canPerform = action === 'approve' || action === 'reject'
+      ? canReviewCoa(actor, doc)
+      : isQcHead(actor);
+    if (!canPerform) {
+      const requiredRole = action === 'approve' || action === 'reject' ? 'QC Head or COA creator' : 'QC Head';
+      throw new Error(`${requiredRole} required to ${action} COA`);
+    }
   }
 }
 
@@ -224,7 +240,7 @@ async function recordCoaLifecycleAction({
     throw new Error('COA lifecycle action requires a COA document');
   }
   const sourceStatus = doc.status;
-  assertCanTransition(sourceStatus, action, actor);
+  assertCanTransition(sourceStatus, action, actor, doc);
   const eventForAction = lifecycleActionEvents[action];
   if (!eventForAction) {
     throw new Error(`Unknown COA action ${action}`);
@@ -291,7 +307,7 @@ async function applyCoaLifecycleAction({
   }
 
   const sourceStatus = doc.status;
-  assertCanTransition(sourceStatus, action, actor);
+  assertCanTransition(sourceStatus, action, actor, doc);
   const eventForAction = lifecycleActionEvents[action];
   if (!eventForAction) {
     throw new Error(`Unknown COA action ${action}`);
@@ -589,6 +605,8 @@ module.exports = {
   activePrintableStatuses,
   canPrintStatus,
   isQcHead,
+  isCoaCreator,
+  canReviewCoa,
   assertCanTransition,
   assertValidCancellation,
   buildCoaAuditEvent,

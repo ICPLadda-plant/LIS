@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CoaDetailPage from "../CoaDetailPage";
@@ -21,8 +21,8 @@ vi.mock("@/components/lis/AppLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/components/lis/PrintPreviewDialog", () => ({
-  default: ({ children, onPrinted, open }: { children: React.ReactNode; open: boolean; onPrinted?: (meta: { copies: number; outputMode: "local" | "server" }) => void }) => (
-    <div>{children}{open && <button onClick={() => onPrinted?.({ copies: 2, outputMode: "local" })}>Complete print</button>}</div>
+  default: ({ children, headerActions, onPrinted, open }: { children: React.ReactNode; headerActions?: React.ReactNode; open: boolean; onPrinted?: (meta: { copies: number; outputMode: "local" | "server" }) => void }) => (
+    <div>{children}{open && headerActions}{open && <button onClick={() => onPrinted?.({ copies: 2, outputMode: "local" })}>Complete print</button>}</div>
   ),
 }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: mocks.user }) }));
@@ -104,7 +104,7 @@ describe("CoaDetailPage", () => {
     renderPage();
 
     await screen.findByText("P-2608-0001");
-    expect(screen.queryByRole("button", { name: /QC Head อนุมัติ/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^อนุมัติ$/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ไม่อนุมัติ" })).not.toBeInTheDocument();
   });
 
@@ -113,7 +113,7 @@ describe("CoaDetailPage", () => {
     renderPage();
 
     await screen.findByText("P-2608-0001");
-    expect(screen.queryByRole("button", { name: /QC Head อนุมัติ/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^อนุมัติ$/ })).not.toBeInTheDocument();
   });
 
   it("does not treat a QC Head position without an approval signal as an approval grant", async () => {
@@ -121,33 +121,46 @@ describe("CoaDetailPage", () => {
     renderPage();
 
     await screen.findByText("P-2608-0001");
-    expect(screen.queryByRole("button", { name: /QC Head อนุมัติ/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^อนุมัติ$/ })).not.toBeInTheDocument();
   });
 
   it("shows approval actions for the coa.approve permission", async () => {
     mocks.user = { name: "QC Approver", email: "approver@example.com", role: "qc-staff", roles: ["qc-staff"], permissions: ["coa.approve"], position: "QC Staff" };
     renderPage();
 
-    expect(await screen.findByRole("button", { name: /QC Head อนุมัติ/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^อนุมัติ$/ })).toBeInTheDocument();
   });
 
   it("shows approval actions for the active QC Head role without approval permissions", async () => {
     mocks.user = { name: "QC Head", email: "qc@example.com", role: "qc-head", roles: ["qc-head", "qc-staff"], permissions: [], position: "QC Staff" };
     renderPage();
 
-    expect(await screen.findByRole("button", { name: /QC Head อนุมัติ/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^อนุมัติ$/ })).toBeInTheDocument();
   });
 
   it("shows QC Head approval actions and sends the authenticated actor", async () => {
     mocks.user = qcHead;
     renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: /QC Head อนุมัติ/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /^อนุมัติ$/ }));
 
     await waitFor(() => expect(mocks.approveCoaDocument).toHaveBeenCalledWith("c1", {
       _user: { ...qcHead, activeRole: "qc-head" },
     }));
-    expect(screen.getByRole("button", { name: "ไม่อนุมัติ" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "ไม่อนุมัติ" }).length).toBeGreaterThan(0);
+  });
+
+  it("shows approval actions to the COA creator", async () => {
+    mocks.user = { name: "COA Creator", email: "creator@example.com", role: "lab-staff", roles: ["lab-staff"], permissions: [], position: "Lab Staff" };
+    mocks.getCoaDocument.mockResolvedValue({
+      ...documentWith("pendingApproval"),
+      createdBy: { name: "COA Creator", email: "creator@example.com", role: "lab-staff" },
+    });
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: /^อนุมัติ$/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /เปิดดูไฟล์/ }));
+    expect(screen.getAllByRole("button", { name: /^อนุมัติ$/ })).toHaveLength(2);
   });
 
   it("sends the authenticated actor when submitting", async () => {
@@ -211,13 +224,16 @@ describe("CoaDetailPage", () => {
     renderPage();
 
     const reject = await screen.findByRole("button", { name: "ไม่อนุมัติ" });
-    expect(reject).toBeDisabled();
-    fireEvent.change(screen.getByPlaceholderText(/เหตุผล/), { target: { value: "  ผลไม่ผ่าน  " } });
-    expect(reject).toBeEnabled();
     fireEvent.click(reject);
+    const dialog = await screen.findByRole("dialog", { name: /ไม่อนุมัติ COA/ });
+    const confirm = within(dialog).getByRole("button", { name: "ยืนยันไม่อนุมัติ" });
+    expect(confirm).toBeDisabled();
+    fireEvent.change(within(dialog).getByPlaceholderText("เหตุผลที่ไม่อนุมัติ"), { target: { value: "  ผลไม่ผ่าน  " } });
+    expect(confirm).toBeEnabled();
+    fireEvent.click(confirm);
 
     await waitFor(() => expect(mocks.rejectCoaDocument).toHaveBeenCalledWith("c1", {
-      reason: "  ผลไม่ผ่าน  ",
+      reason: "ผลไม่ผ่าน",
       _user: { ...qcHead, activeRole: "qc-head" },
     }));
   });

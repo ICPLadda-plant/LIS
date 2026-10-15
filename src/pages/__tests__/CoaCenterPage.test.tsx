@@ -6,19 +6,21 @@ import { api } from "@/lib/api";
 import CoaCenterPage from "../CoaCenterPage";
 import type { CoaDocument } from "@/types/coa.types";
 
+const authMock = vi.hoisted(() => ({
+  current: {
+    name: "QC Head User",
+    email: "qc-head@example.com",
+    role: "qc-head",
+    roles: ["qc-head"],
+    permissions: ["coa.approve"],
+  },
+}));
+
 vi.mock("@/components/lis/AppLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: {
-      name: "QC Head User",
-      email: "qc-head@example.com",
-      role: "qc-head",
-      roles: ["qc-head"],
-      permissions: ["coa.approve"],
-    },
-  }),
+  useAuth: () => ({ user: authMock.current }),
 }));
 vi.mock("@/lib/api", () => ({
   api: {
@@ -48,6 +50,7 @@ vi.mock("@/lib/api", () => ({
           petitionId: "p2",
           petitionNoSnapshot: "P-2608-0002",
           sourceCoaId: "c2-source",
+          createdBy: { name: "COA Creator", email: "creator@example.com", role: "lab-staff" },
           customerSnapshot: { company: "Customer B" },
           selectedItemSeqs: [1],
           sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade B", commonName: "Common B", batchNo: "B-002", productionDate: "2026-07-30" }],
@@ -153,7 +156,16 @@ function renderPage(initialEntry = "/coa") {
 }
 
 describe("CoaCenterPage", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.current = {
+      name: "QC Head User",
+      email: "qc-head@example.com",
+      role: "qc-head",
+      roles: ["qc-head"],
+      permissions: ["coa.approve"],
+    };
+  });
 
   it("returns a created draft to the in-progress tab and clears the request search", async () => {
     vi.mocked(api.getEligibleCoaPetitions).mockResolvedValueOnce({ items: [{
@@ -351,13 +363,48 @@ describe("CoaCenterPage", () => {
     expect(screen.queryByRole("columnheader", { name: "ชื่อลูกค้า" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "คำสั่ง" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "เปิดดูไฟล์ COA 00022026" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "QC Head อนุมัติ COA 00022026" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "อนุมัติ COA 00022026" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ไม่อนุมัติ COA 00022026" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "เปิดดูไฟล์ COA 00022026" }));
+    const preview = await screen.findByRole("dialog", { name: /ตัวอย่างเอกสาร/ });
+    expect(within(preview).getByRole("button", { name: "อนุมัติ" })).toBeInTheDocument();
+    expect(within(preview).getByRole("button", { name: "ไม่อนุมัติ" })).toBeInTheDocument();
+    fireEvent.click(within(preview).getByRole("button", { name: "ไม่อนุมัติ" }));
+    const rejectDialog = await screen.findByRole("dialog", { name: /ไม่อนุมัติ COA 00022026/ });
+    fireEvent.change(within(rejectDialog).getByPlaceholderText("เหตุผลที่ไม่อนุมัติ"), { target: { value: "แก้ไขข้อมูลลูกค้า" } });
+    fireEvent.click(within(rejectDialog).getByRole("button", { name: "ยืนยันไม่อนุมัติ" }));
+    await waitFor(() => expect(api.rejectCoaDocument).toHaveBeenCalledWith(
+      "c2",
+      expect.objectContaining({ reason: "แก้ไขข้อมูลลูกค้า" }),
+    ));
 
     fireEvent.click(screen.getByRole("button", { name: "สถานะ อนุมัติแล้ว" }));
 
     expect(await screen.findByText("00032026")).toBeInTheDocument();
     expect(screen.queryByRole("row", { name: /00022026/ })).not.toBeInTheDocument();
+  });
+
+  it("allows the COA creator to review the document from the preview", async () => {
+    authMock.current = {
+      name: "COA Creator",
+      email: "creator@example.com",
+      role: "lab-staff",
+      roles: ["lab-staff"],
+      permissions: [],
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "สถานะ รออนุมัติ" }));
+    fireEvent.click(await screen.findByRole("button", { name: "เปิดดูไฟล์ COA 00022026" }));
+
+    const preview = await screen.findByRole("dialog", { name: /ตัวอย่างเอกสาร/ });
+    fireEvent.click(within(preview).getByRole("button", { name: "อนุมัติ" }));
+
+    await waitFor(() => expect(api.approveCoaDocument).toHaveBeenCalledWith(
+      "c2",
+      expect.objectContaining({ _user: expect.objectContaining({ email: "creator@example.com" }) }),
+    ));
   });
 
   it("shows the create COA action in a command column for requested COAs", async () => {
@@ -664,10 +711,10 @@ describe("CoaCenterPage", () => {
     expect(screen.getByRole("button", { name: "สถานะ รออนุมัติ" })).toHaveAttribute("aria-pressed", "true");
     const pendingApprovalRow = await screen.findByRole("row", { name: /00042026/ });
     expect(within(pendingApprovalRow).getByRole("button", { name: "เปิดดูไฟล์ COA 00042026" })).toBeInTheDocument();
-    expect(within(pendingApprovalRow).getByRole("button", { name: "QC Head อนุมัติ COA 00042026" })).toBeInTheDocument();
+    expect(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 00042026" })).toBeInTheDocument();
     expect(within(pendingApprovalRow).getByRole("button", { name: "ไม่อนุมัติ COA 00042026" })).toBeInTheDocument();
 
-    fireEvent.click(within(pendingApprovalRow).getByRole("button", { name: "QC Head อนุมัติ COA 00042026" }));
+    fireEvent.click(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 00042026" }));
 
     expect(screen.getByRole("button", { name: "สถานะ อนุมัติแล้ว" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("coa-center-page")).toHaveClass("space-y-4");

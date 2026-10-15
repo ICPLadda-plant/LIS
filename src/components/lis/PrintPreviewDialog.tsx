@@ -36,6 +36,7 @@ interface Props {
   autoPrint?: boolean;
   autoPrintKey?: string | number;
   previewOnly?: boolean;
+  headerActions?: React.ReactNode;
 }
 
 const BOX_CHROME = 18;
@@ -217,6 +218,7 @@ export default function PrintPreviewDialog({
   autoPrint,
   autoPrintKey,
   previewOnly = false,
+  headerActions,
 }: Props) {
   const printRef = useRef<HTMLDivElement>(null);
   const autoPrintDoneKeyRef = useRef<string | number | null>(null);
@@ -316,9 +318,14 @@ export default function PrintPreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`${widthClass} flex max-h-[90vh] min-h-[70vh] flex-col overflow-hidden`}>
-        <DialogHeader className="shrink-0">
-          <DialogTitle>{previewOnly ? "ตัวอย่างเอกสาร" : "ตัวอย่างก่อนพิมพ์"} — {meta?.label ?? docType}</DialogTitle>
-          {!previewOnly && (
+        <DialogHeader className="shrink-0 gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <DialogTitle>{previewOnly ? "ตัวอย่างเอกสาร" : "ตัวอย่างก่อนพิมพ์"} — {meta?.label ?? docType}</DialogTitle>
+            {headerActions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{headerActions}</div>}
+          </div>
+          {previewOnly ? (
+            <DialogDescription className="sr-only">ตรวจสอบรายละเอียดเอกสารก่อนดำเนินการ</DialogDescription>
+          ) : (
             <DialogDescription>
               เลือกพิมพ์จากเครื่องนี้เพื่อเปิด print dialog หรือเลือก Server/CUPS เพื่อส่งไปเครื่องที่ตั้งค่าไว้
             </DialogDescription>

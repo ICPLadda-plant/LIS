@@ -1,14 +1,14 @@
 import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BellRing, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, TrendingUp } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, TrendingUp, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import CoaCreateDialog from "@/components/coa/CoaCreateDialog";
@@ -22,7 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { buildCoaReportPages } from "@/lib/coaReport";
 import { buildCoaRequestTrend, formatCoaTrendPercent } from "@/lib/coaTrend";
-import { canPrintCoa } from "@/lib/coaStatus";
+import { canPrintCoa, canReviewCoa } from "@/lib/coaStatus";
 import { normalizeRoles, primaryRole } from "@/lib/roles";
 import { rankSearchResults } from "@/lib/searchRanking";
 import type { CoaDocument, CoaSampleSnapshot } from "@/types/coa.types";
@@ -577,6 +577,8 @@ export default function CoaCenterPage() {
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [openAllYear, setOpenAllYear] = useState<number | null>(null);
   const [previewDoc, setPreviewDoc] = useState<CoaDocument | null>(null);
+  const [rejectDoc, setRejectDoc] = useState<CoaDocument | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
   const notificationPanelRef = useRef<HTMLDivElement | null>(null);
   const [demoCoa, setDemoCoa] = useState<CoaDocument | null>(() => (demoCoaEnabled ? makeBromadioloneDemoCoa() : null));
   const [demoEditDoc, setDemoEditDoc] = useState<CoaDocument | null>(null);
@@ -594,9 +596,6 @@ export default function CoaCenterPage() {
     permissions: user?.permissions ?? [],
     position: user?.position,
   };
-  const isQcHead = [user?.role, actor.activeRole]
-    .some((value) => String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_") === "qc_head")
-    || actor.permissions.includes("coa.approve");
   const invalidateCoaDocuments = () => queryClient.invalidateQueries({ queryKey: ["coa", "documents"] });
   const syncCoaDocument = (doc: CoaDocument) => {
     queryClient.setQueryData<{ items: CoaDocument[] }>(["coa", "documents"], (current) => {
@@ -609,32 +608,50 @@ export default function CoaCenterPage() {
     });
   };
   const submit = useMutation({ mutationFn: (id: string) => api.submitCoaDocument(id, { _user: actor }), onSuccess: invalidateCoaDocuments });
-  const approve = useMutation({ mutationFn: (id: string) => api.approveCoaDocument(id, { _user: actor }), onSuccess: invalidateCoaDocuments });
+  const approve = useMutation({
+    mutationFn: (id: string) => api.approveCoaDocument(id, { _user: actor }),
+    onSuccess: (_data, id) => {
+      void invalidateCoaDocuments();
+      setPreviewDoc((current) => (current?._id === id ? null : current));
+    },
+  });
   const reject = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => api.rejectCoaDocument(id, { reason, _user: actor }),
-    onSuccess: invalidateCoaDocuments,
+    onSuccess: (_data, variables) => {
+      void invalidateCoaDocuments();
+      setPreviewDoc((current) => (current?._id === variables.id ? null : current));
+      setRejectDoc(null);
+      setRejectReason("");
+    },
   });
 
   function handleReject(doc: CoaDocument) {
-    const reason = window.prompt(`เหตุผลที่ไม่อนุมัติ COA ${coaDisplayNo(doc)}`)?.trim();
-    if (!reason) return;
-    if (isDemoCoaDocument(doc)) {
+    setRejectDoc(doc);
+    setRejectReason("");
+  }
+
+  function confirmReject() {
+    if (!rejectDoc || !rejectReason.trim()) return;
+    if (isDemoCoaDocument(rejectDoc)) {
       setDemoCoa({
-        ...doc,
+        ...rejectDoc,
         status: "draft",
         approval: {
-          ...doc.approval,
+          ...rejectDoc.approval,
           rejectedBy: actor,
           rejectedAt: new Date().toISOString(),
-          rejectReason: reason,
+          rejectReason: rejectReason.trim(),
         },
         updatedBy: actor,
         updatedAt: new Date().toISOString(),
       });
       setActiveWorkflowStage("inProgress");
+      setPreviewDoc(null);
+      setRejectDoc(null);
+      setRejectReason("");
       return;
     }
-    reject.mutate({ id: doc._id, reason });
+    reject.mutate({ id: rejectDoc._id, reason: rejectReason.trim() });
   }
 
   function handleCreate(doc: CoaDocument) {
@@ -705,6 +722,7 @@ export default function CoaCenterPage() {
         updatedAt: new Date().toISOString(),
       });
       setActiveWorkflowStage("approved");
+      setPreviewDoc(null);
       return;
     }
     approve.mutate(doc._id);
@@ -751,6 +769,7 @@ export default function CoaCenterPage() {
     return demoCoa ? [demoCoa, ...documents.filter((doc) => doc._id !== demoCoa._id)] : documents;
   }, [data, demoCoa]);
   const previewPages = useMemo(() => (previewDoc ? buildCoaReportPages(previewDoc) : []), [previewDoc]);
+  const previewCanReview = Boolean(previewDoc && isCoaPendingApproval(previewDoc) && canReviewCoa(user, previewDoc));
   const years = useMemo(() => {
     return Array.from(new Set(items.map(documentYear))).sort((a, b) => b - a);
   }, [items]);
@@ -1312,7 +1331,7 @@ export default function CoaCenterPage() {
                     )}
                     {showApprovalActions && (
                       <td className="px-4 py-3">
-                        {isQcHead ? (
+                        {canReviewCoa(user, doc) ? (
                           <div className="flex flex-col gap-2">
                             <Button
                               type="button"
@@ -1331,13 +1350,13 @@ export default function CoaCenterPage() {
                               size="sm"
                               className="gap-2 bg-primary-500 text-white shadow-sm hover:bg-primary-600"
                               disabled={approve.isPending || reject.isPending}
-                              aria-label={`QC Head อนุมัติ COA ${coaDisplayNo(doc)}`}
+                              aria-label={`อนุมัติ COA ${coaDisplayNo(doc)}`}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 handleApprove(doc);
                               }}
                             >
-                              QC Head อนุมัติ
+                              อนุมัติ
                             </Button>
                             <Button
                               type="button"
@@ -1524,9 +1543,64 @@ export default function CoaCenterPage() {
         docType="coa"
         css={COA_REPORT_CSS}
         previewOnly
+        headerActions={previewCanReview && previewDoc ? (
+          <>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-2"
+              disabled={approve.isPending || reject.isPending}
+              onClick={() => handleApprove(previewDoc)}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              อนุมัติ
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              disabled={approve.isPending || reject.isPending}
+              onClick={() => handleReject(previewDoc)}
+            >
+              <XCircle className="h-4 w-4" />
+              ไม่อนุมัติ
+            </Button>
+          </>
+        ) : undefined}
       >
         <CoaReportTemplate pages={previewPages} />
       </PrintPreviewDialog>
+      <Dialog
+        open={Boolean(rejectDoc)}
+        onOpenChange={(open) => {
+          if (!open && !reject.isPending) {
+            setRejectDoc(null);
+            setRejectReason("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ไม่อนุมัติ COA {rejectDoc ? coaDisplayNo(rejectDoc) : ""}</DialogTitle>
+            <DialogDescription>ระบุเหตุผลเพื่อส่งเอกสารกลับให้แก้ไข และบันทึกไว้ในประวัติเอกสาร</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="เหตุผลที่ไม่อนุมัติ"
+            rows={4}
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={reject.isPending} onClick={() => setRejectDoc(null)}>
+              ยกเลิก
+            </Button>
+            <Button type="button" variant="destructive" disabled={!rejectReason.trim() || reject.isPending} onClick={confirmReject}>
+              {reject.isPending ? "กำลังส่งกลับ..." : "ยืนยันไม่อนุมัติ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {createRequest && (isExternalCoaRequestDocument(createRequest) || createRequest.sourceType === "erpManual")
         ? <CoaManualDialog open={createOpen} onOpenChange={setCreateOpen} onSaved={handleCreated} request={createRequest} />
         : <CoaCreateDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={handleCreated} request={createRequest} />}
