@@ -187,6 +187,28 @@ test('stock LOT autofill preserves the full LOT while using its real batch and p
   assert.equal(result.stockCandidates[0].batchNo, '480');
 });
 
+test('matching ERP Lot Description supplies production date before an existing request date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'Trade A',
+      commonName: 'PACLOBUTRAZOL 25% SC',
+      batchNo: '480',
+      productionDate: '2026-06-16',
+    }],
+    externalCoaRequest: { itemNo: 'F-TWI25-1000X12' },
+  }, [{
+    item_no: 'F-TWI25-1000X12',
+    'Lot Description': '26S-PCB25-480-091069',
+    registering_date: '2026-10-10T00:00:00.000Z',
+    stock_qty: 100,
+  }], []);
+
+  assert.equal(result.sample.lotNo, '26S-PCB25-480-091069');
+  assert.equal(result.sample.batchNo, '480');
+  assert.equal(result.sample.productionDate, '2026-10-09');
+});
+
 test('customer COA request batch, lot and production date take precedence over ERP references', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],

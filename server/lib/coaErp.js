@@ -134,6 +134,7 @@ function productionDateFromRow(row, fallback = '') {
 
 function lotFromRow(row) {
   return pick(row, [
+    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
     'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
     'batch_no', 'batchNo', 'BatchNo', 'Batch No.', 'Batch No',
   ]) || batchFromRow(row);
@@ -633,7 +634,6 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
         || productionDateFromRow(right).localeCompare(productionDateFromRow(left))
         || Number(right.stock_qty_base || right.stock_qty || 0) - Number(left.stock_qty_base || left.stock_qty || 0);
     });
-  const stock = stockCandidates[0];
   const mfCandidates = mfRows.filter((row) => {
     return normalizedItemNo
       ? rowMatchesItem(row, normalizedItemNo)
@@ -647,13 +647,22 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const requestedProductionDate = normalizeIsoDate(sourceSample.productionDate || petitionItem?.productionDate);
   const mfBatch = batchFromRow(mf);
   const mfDate = productionDateFromRow(mf);
+  const matchingStock = stockCandidates.find((row) => {
+    const snapshot = lotSnapshot(lotFromRow(row), productionDateFromRow(row));
+    return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
+      || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
+  });
+  const stock = matchingStock || stockCandidates[0];
+  const matchingStockLot = matchingStock
+    ? lotSnapshot(lotFromRow(matchingStock), productionDateFromRow(matchingStock))
+    : null;
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const sourceBatchDate = requestedBatch ? lotSnapshot(requestedBatch).productionDate : '';
   const lot = sourceLot
     ? {
-      lotNo: requestedLot || sourceLot.lotNo,
+      lotNo: requestedLot || matchingStockLot?.lotNo || sourceLot.lotNo,
       batchNo: requestedBatch || sourceLot.batchNo,
-      productionDate: requestedProductionDate || sourceLot.productionDate || sourceBatchDate,
+      productionDate: matchingStockLot?.productionDate || requestedProductionDate || sourceLot.productionDate || sourceBatchDate,
     }
     : stock
       ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
