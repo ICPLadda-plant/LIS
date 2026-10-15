@@ -3,6 +3,9 @@ const Role = require('../models/Role');
 const AccessGroup = require('../models/AccessGroup');
 const { normalizeRoles, unionPermissions } = require('./roles');
 const { getLisSessionUserId } = require('./lisSessionCookie');
+const { syntheticDevRolesFromEmail } = require('./syntheticDevRoles');
+
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
 function pathMatches(pattern, pathname) {
   const a = String(pattern || '').replace(/\/+$/, '');
@@ -20,6 +23,12 @@ async function resolveUser(req) {
     if (user) return user;
   }
   const email = String(req.get('x-lis-user') || '').trim().toLowerCase();
+  const devRoles = process.env.ALLOW_DEV_STATUS === 'true' && LOOPBACK_IPS.has(req.ip)
+    ? syntheticDevRolesFromEmail(email)
+    : [];
+  if (devRoles.length > 0) {
+    return { email, name: 'Dev User', roles: devRoles, status: 'active' };
+  }
   return email ? User.findOne({ email }).lean() : null;
 }
 
