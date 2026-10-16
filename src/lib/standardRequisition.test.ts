@@ -46,6 +46,9 @@ describe("validateWeights", () => {
   it("total must not exceed remaining", () => {
     expect(validateWeights([60, 60], 100)).toBe("mg รวมเกินปริมาณคงเหลือของขวด");
   });
+  it("allows using the displayed total when remaining has floating-point residue", () => {
+    expect(validateWeights([0.02], 0.01999999999999602)).toBe("");
+  });
   it("ok returns empty string", () => {
     expect(validateWeights([10, 10, 10], 100)).toBe("");
   });

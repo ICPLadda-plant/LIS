@@ -19,6 +19,8 @@ interface StandardRequisitionSearchUnit {
   lotNo?: string | null;
 }
 
+const MG_COMPARISON_EPSILON = 1e-9;
+
 function normalizeSearchText(value: unknown): string {
   return String(value ?? "").trim().toLocaleLowerCase("th-TH");
 }
@@ -53,7 +55,9 @@ export function validateWeights(weights: number[], remainingMg: number): string 
   if (weights.length === 0 || weights.some((w) => !Number.isFinite(w) || w <= 0)) {
     return "กรุณากรอก mg ทุกน้ำหนักให้มากกว่า 0";
   }
-  if (sumWeights(weights) > remainingMg) return "mg รวมเกินปริมาณคงเหลือของขวด";
+  if (remainingMg <= 0 || sumWeights(weights) - remainingMg > MG_COMPARISON_EPSILON) {
+    return "mg รวมเกินปริมาณคงเหลือของขวด";
+  }
   return "";
 }
 
