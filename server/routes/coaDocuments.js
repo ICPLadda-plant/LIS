@@ -29,6 +29,7 @@ const {
   mergeResultRows,
   normalizeIsoDate,
   resultRowsFromLegacyLab,
+  resultRowsFromLegacyLabs,
   resultRowsFromQc,
   sampleFromSources,
 } = require('../lib/coaErp');
@@ -217,7 +218,10 @@ function aiCandidateMatchRank(candidate) {
 async function latestAiLabData(petitions, sample) {
   const commonName = manualText(sample?.commonName);
   const selection = findLatestAiLabItems(petitions, sample);
-  const candidates = selection.candidates.slice(0, 100);
+  const hasBatch = Boolean(manualText(sample?.batchNo || sample?.lotNo));
+  const candidates = selection.candidates
+    .filter((candidate) => !hasBatch || candidate.matchKind === 'exact')
+    .slice(0, 100);
   if (candidates.length) {
     const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
     const itemSeqs = [...new Set(candidates.flatMap((candidate) => candidate.items.map((item) => Number(item.seq))))];
@@ -245,7 +249,30 @@ async function latestAiLabData(petitions, sample) {
       || right.resultTime - left.resultTime
       || right.candidate.approvedTime - left.candidate.approvedTime
     ));
+    if (hasBatch && matches.length) {
+      const seen = new Set();
+      const qcResults = matches.flatMap((match) => match.qcResults).filter((result) => {
+        const key = String(result?._id || [
+          result?.petitionId, result?.itemSeq, result?.parameterId || result?.parameterName, result?.sampleRoundId,
+        ].join('\u0000'));
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return {
+        ...selection,
+        best: matches[0].candidate,
+        qcResults,
+        resultData: resultRowsFromQc(qcResults, commonName),
+        resultTime: Math.max(...matches.map((match) => match.resultTime)),
+        source: 'petition',
+      };
+    }
     if (matches[0]) return { ...selection, best: matches[0].candidate, ...matches[0], source: 'petition' };
+  }
+
+  if (hasBatch) {
+    return { ...selection, best: null, qcResults: [], resultData: resultRowsFromQc([], commonName), source: null };
   }
 
   const historyResults = await QCTestResult.find({
@@ -928,8 +955,9 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       latestAiLabData(petitions, sample),
     ]);
     const resultData = resultRowsFromQc(qcResults, sample.commonName, { includeAi: false });
-    const aiResultData = aiLabData.resultData;
     const legacyResultData = resultRowsFromLegacyLab(legacyMatch?.row, sample.commonName);
+    const legacyAiResultData = resultRowsFromLegacyLabs(legacyMatch?.matchingRows, sample.commonName);
+    const aiResultData = legacyAiResultData.ai ? legacyAiResultData : aiLabData.resultData;
     resultData.rows = mergeResultRows(
       resultData.rows,
       legacyResultData.rows.filter((row) => !isAiContentTestItem(row.testItem)),
@@ -1060,15 +1088,31 @@ router.get('/lab-ai-lookup', async (req, res) => {
       throw errorWithStatus('กรุณาระบุ Batch No. และชื่อสามัญเพื่อค้นหาผล %AI', 400);
     }
 
-    const petitions = await Petition.find({
-      'items.commonName': commonNameRegex(commonName),
-      status: { $ne: 'rejected' },
-    }).sort({ updatedAt: -1 }).limit(200).lean();
+    const [petitions, legacyRows] = await Promise.all([
+      Petition.find({
+        'items.commonName': commonNameRegex(commonName),
+        status: { $ne: 'rejected' },
+      }).sort({ updatedAt: -1 }).limit(200).lean(),
+      LegacyLabResult.find({
+        batch_no: new RegExp(`(?:^|-)${escapeRegex(batchNo)}(?:(?:\\s+|-)P\\d+)?\\s*$`, 'i'),
+      }).lean(),
+    ]);
     const lab = await latestAiLabData(petitions, { batchNo, commonName, sampleName });
-    const resultData = lab.resultData;
+    const legacySource = {
+      sampleSnapshots: [{ sampleName, commonName }],
+      externalCoaRequest: {},
+    };
+    const legacyMatch = findBestLegacyLabResult(legacyRows, legacySource, { batchNo, commonName, sampleName });
+    const legacyResultData = resultRowsFromLegacyLabs(legacyMatch?.matchingRows, commonName);
+    const resultData = legacyResultData.ai ? legacyResultData : lab.resultData;
     const ai = resultData.rows.find((row) => isAiContentTestItem(row.testItem)) || null;
     if (!ai) return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
-    const match = lab.best ? {
+    const match = legacyResultData.ai ? {
+      petitionId: `legacy:${legacyMatch?.row?._id || ''}`,
+      petitionNo: 'ผล Lab เดิม',
+      itemSeq: 1,
+      batchNo: legacyMatch.batchNo,
+    } : lab.best ? {
       petitionId: String(lab.best.petition._id),
       petitionNo: lab.best.petition.petitionNo,
       itemSeq: Number(lab.best.item.seq),

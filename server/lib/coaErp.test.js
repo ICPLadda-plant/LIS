@@ -16,6 +16,7 @@ const {
   physicalFromQc,
   isAfterDryingLabItem,
   resultRowsFromLegacyLab,
+  resultRowsFromLegacyLabs,
   resultRowsFromQc,
   sampleFromSources,
 } = require('./coaErp');
@@ -155,6 +156,28 @@ test('legacy Lab results fill every required COA result field and clean repeat s
   assert.equal(result.rows[1].result, '2.09 % W/V');
   assert.equal(result.rows[2].result, '0.946');
   assert.equal(result.rows[3].result, '2026-08-31');
+});
+
+test('legacy Lab AI excludes the named submitter and averages duplicate batch results', () => {
+  const result = resultRowsFromLegacyLabs([
+    {
+      customer_name: 'Production A', test_date: '16/09/2569',
+      tests: [{ test_name: 'Omethoate', result: '51.20 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' }],
+    },
+    {
+      customer_name: 'Production B', test_date: '17/09/2569',
+      tests: [{ test_name: 'Omethoate', result: '51.40 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' }],
+    },
+    {
+      customer_name: '\u0e27\u0e18\u0e32\u0e18\u0e23 \u0e2a\u0e2d\u0e19\u0e0b\u0e35', test_date: '18/09/2569',
+      tests: [{ test_name: 'Omethoate', result: '0.0045 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' }],
+    },
+  ], 'OMETHOATE 50% W/V SL');
+
+  assert.equal(result.ai.result, '51.3 %W/V');
+  assert.equal(result.ai.valueCount, 2);
+  assert.equal(result.analysisDate, '2026-09-17');
+  assert.equal(result.rows[0].criteria, '47.50-52.50');
 });
 
 test('legacy Lab fallback fills placeholder values without replacing live results', () => {
@@ -457,6 +480,10 @@ test('AI Lab selection prefers exact batch then falls back to the latest same dr
   ];
   const result = findLatestAiLabItems([
     {
+      _id: 'excluded-submitter', labApprovedAt: '2026-10-13T00:00:00.000Z',
+      submittedBy: { name: '\u0e27\u0e18\u0e32\u0e18\u0e23 \u0e2a\u0e2d\u0e19\u0e0b\u0e35' }, items: regularItems,
+    },
+    {
       _id: 'rnd-newest', labApprovedAt: '2026-10-12T00:00:00.000Z',
       submittedBy: { department: 'R&D' }, items: regularItems,
     },
@@ -476,7 +503,7 @@ test('AI Lab selection prefers exact batch then falls back to the latest same dr
   ], { commonName, batchNo: '2026031601' });
 
   assert.equal(result.best.petition._id, 'rnd-newest');
-  assert.deepEqual(result.best.items.map((item) => item.seq), [1, 2]);
+  assert.deepEqual(result.best.items.map((item) => item.seq), [1]);
   assert.equal(isAfterDryingLabItem({ note: 'ทดสอบยาหลังอบ' }), true);
 
   const fallback = findLatestAiLabItems([

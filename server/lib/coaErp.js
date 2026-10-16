@@ -6,6 +6,7 @@ const MF_URLS = [
   'https://n8n-plant.icpladda.com/webhook/item-MF-CLOSE',
 ];
 const STOCK_URL = 'https://n8n-plant.icpladda.com/webhook/api/stock-all-item';
+const EXCLUDED_AI_SUBMITTER = '\u0e27\u0e18\u0e32\u0e18\u0e23';
 const GR_WP_SP_FORMULATIONS = new Set(['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'GB']);
 const LEGACY_FORMULATIONS = new Set(['EC', 'SC', 'SL', 'WG', 'WP', 'GR', 'SP', 'ME', 'EW', 'ZC']);
 const LEGACY_IGNORED_TOKENS = new Set([
@@ -34,6 +35,10 @@ function normalizeText(value) {
 
 function normalizeBatch(value) {
   return text(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function isExcludedAiSubmitter(value) {
+  return normalizeText(value).replace(/\s+/g, '').includes(EXCLUDED_AI_SUBMITTER);
 }
 
 function rowsFromPayload(payload) {
@@ -419,7 +424,7 @@ function findLatestAiLabItems(petitions, sample) {
   if (!commonName) return { best: null, candidates: [] };
   const candidates = [];
   for (const petition of petitions || []) {
-    if (petition?.status === 'rejected') continue;
+    if (petition?.status === 'rejected' || isExcludedAiSubmitter(petition?.submittedBy?.name)) continue;
     const eligibleItems = (petition.items || []).filter((item) => (
       normalizeText(item.commonName) === commonName
       && !isAfterDryingLabItem(item)
@@ -432,15 +437,17 @@ function findLatestAiLabItems(petitions, sample) {
       itemGroups.get(key).push(item);
     }
     for (const items of itemGroups.values()) {
-      const exactItem = batchNo
-        ? items.find((item) => batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1)
-        : null;
+      const exactItems = batchNo
+        ? items.filter((item) => batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1)
+        : [];
+      const exactItem = exactItems[0] || null;
+      const matchedItems = exactItems.length ? exactItems : items;
       const sameSample = Boolean(sampleName && items.some((item) => normalizeText(item.sampleName) === sampleName));
       const referenceAt = petition?.approvedAt || petition?.labApprovedAt || petition?.updatedAt || petition?.createdAt;
       candidates.push({
         petition,
-        item: exactItem || items[0],
-        items,
+        item: exactItem || matchedItems[0],
+        items: matchedItems,
         batchScore: exactItem ? 1 : 0,
         matchKind: exactItem ? 'exact' : sameSample ? 'sample' : 'commonName',
         approvedTime: Date.parse(referenceAt) || 0,
@@ -707,10 +714,14 @@ function findBestLegacyLabResult(rows, source, sample = {}) {
     || right.analysisDate.localeCompare(left.analysisDate));
   const best = candidates[0];
   if (!best) return null;
+  const bestBatch = normalizeBatch(best.batchNo);
   return {
     ...best,
     matchKind: requestedBatch ? 'exactBatch' : 'productHistory',
     candidates: candidates.slice(0, 10),
+    matchingRows: candidates
+      .filter((candidate) => normalizeBatch(candidate.batchNo) === bestBatch)
+      .map((candidate) => candidate.row),
   };
 }
 
@@ -749,6 +760,71 @@ function resultRowsFromLegacyLab(row, commonName) {
     },
   ];
   return { rows, density, analysisDate };
+}
+
+function legacyResultValue(result) {
+  const raw = text(result);
+  const match = raw.match(/[-+]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)/);
+  if (!match) return { raw, numeric: null, decimals: 0, suffix: '' };
+  const numericText = match[0].replace(/,/g, '');
+  const numeric = Number(numericText);
+  return {
+    raw,
+    numeric: Number.isFinite(numeric) ? numeric : null,
+    decimals: numericText.includes('.') ? numericText.split('.')[1].length : 0,
+    suffix: raw.slice((match.index || 0) + match[0].length).trim(),
+  };
+}
+
+function averagedLegacyResult(entries) {
+  if (!entries.length) return '';
+  if (entries.length === 1 || entries.some((entry) => entry.numeric === null)) return entries[0].raw;
+  const average = entries.reduce((sum, entry) => sum + entry.numeric, 0) / entries.length;
+  const maxDecimals = Math.max(...entries.map((entry) => entry.decimals));
+  const precision = Math.min(10, maxDecimals + Math.ceil(Math.log10(entries.length)));
+  const formatted = average.toFixed(precision).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+  const suffix = entries.map((entry) => entry.suffix).find(Boolean) || '%';
+  return `${formatted}${suffix ? ` ${suffix}` : ''}`;
+}
+
+function resultRowsFromLegacyLabs(rows, commonName) {
+  const eligibleRows = (rows || []).filter((row) => !isExcludedAiSubmitter(row?.customer_name));
+  const testGroups = new Map();
+  for (const row of eligibleRows) {
+    for (const test of row?.tests || []) {
+      const testName = text(test?.test_name);
+      if (!testName || /(?:density|appearance)/i.test(testName)) continue;
+      const key = normalizeText(testName);
+      if (!testGroups.has(key)) testGroups.set(key, []);
+      testGroups.get(key).push({ test, value: legacyResultValue(test?.result) });
+    }
+  }
+  if (!testGroups.size) return { rows: [], ai: null, analysisDate: '', sourceRows: eligibleRows };
+
+  const groups = [...testGroups.values()];
+  const joinGroups = (selector) => groups.map((entries) => {
+    const value = selector(entries);
+    if (!value) return '';
+    return groups.length > 1 ? `${text(entries[0].test?.test_name)}: ${value}` : value;
+  }).filter(Boolean).join(' / ');
+  const result = joinGroups((entries) => averagedLegacyResult(entries.map((entry) => entry.value)));
+  const criteria = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.criteria))?.test?.criteria));
+  const method = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.method))?.test?.method));
+  const valueCount = groups.reduce((sum, entries) => sum + entries.length, 0);
+  const analysisDate = eligibleRows
+    .map((row) => normalizeIsoDate(row?.test_date || row?.report_date))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
+  const ai = { result, key: 'legacyLab', valueCount };
+  const aiRow = {
+    testItem: '%AI content',
+    criteria: criteria || aiToleranceCriteriaForCommonName(commonName) || '-',
+    result,
+    method,
+    unit: '%',
+  };
+  return { rows: [aiRow], ai, analysisDate, sourceRows: eligibleRows };
 }
 
 function resultRowKind(row) {
@@ -966,7 +1042,9 @@ module.exports = {
   normalizeText,
   physicalFromQc,
   isAfterDryingLabItem,
+  isExcludedAiSubmitter,
   resultRowsFromLegacyLab,
+  resultRowsFromLegacyLabs,
   resultRowsFromQc,
   rowsFromPayload,
   sampleFromSources,
