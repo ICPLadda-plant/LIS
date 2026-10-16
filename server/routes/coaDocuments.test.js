@@ -1359,6 +1359,62 @@ test('ERP autofill keeps the matching LIS petition Lot No. production date', asy
   }
 });
 
+test('ERP autofill replaces stale legacy identity with the nearest Density batch', async () => {
+  const originals = {
+    fetch: global.fetch,
+    petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    coaFind: CoaDocument.find,
+    legacyFind: LegacyLabResult.find,
+    qcFind: QCTestResult.find,
+    densityFind: ResultDensity.find,
+  };
+  const externalRow = {
+    SaleOrderNo: 'SO-OMT50-1', Line: 10000, ItemNo: 'F-OMT50-1X20', TradeName: 'Omethoate 50',
+    CommonName: 'OMETHOATE 50% W/V SL', CustomerName: 'Customer',
+    ShipmentDate: '2026-09-17T00:00:00.000Z', remark: 'COA',
+  };
+  const legacyRow = {
+    _id: 'legacy-omt50-256', sample_name: 'Omethoate 50% SL', batch_no: '26S-OMT50-256',
+    production_date: '09/05/2569', test_date: '09/05/2569', tests: [],
+  };
+  try {
+    global.fetch = async (url) => {
+      if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
+      return { ok: true, json: async () => [] };
+    };
+    Petition.find = () => sortedLimitedLean([]);
+    LabRequest.find = () => ({ lean: async () => [] });
+    CoaDocument.find = () => sortedLimitedLean([]);
+    LegacyLabResult.find = () => ({ lean: async () => [legacyRow] });
+    QCTestResult.find = () => ({ sort: () => ({ lean: async () => [] }) });
+    ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [
+      { 'Sample name': '26S-OMT50-256', 'Date & time': '5/9/2026 1:33 PM' },
+      { 'Sample name': '26S-OMT50-524', 'Date & time': '9/17/2026 1:29 PM' },
+      { 'Sample name': '26S-OMT50-526', 'Date & time': '9/17/2026 1:31 PM' },
+      { 'Sample name': '26S-OMT50-531', 'Date & time': '9/18/2026 1:39 PM' },
+    ] }) }) });
+
+    const res = await invoke('/erp-autofill/:externalRequestId', 'get', {
+      params: { externalRequestId: 'external-coa-request-SO-OMT50-1-10000' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.sample.batchNo, '526');
+    assert.equal(res.body.sample.productionDate, '2026-09-17');
+    assert.equal(res.body.legacyMatch, null);
+    assert.match(res.body.warnings.join(' '), /Density/);
+  } finally {
+    global.fetch = originals.fetch;
+    Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    CoaDocument.find = originals.coaFind;
+    LegacyLabResult.find = originals.legacyFind;
+    QCTestResult.find = originals.qcFind;
+    ResultDensity.find = originals.densityFind;
+  }
+});
+
 test('ERP autofill keeps ERP production date while using legacy appearance and density', async () => {
   const originals = {
     fetch: global.fetch,

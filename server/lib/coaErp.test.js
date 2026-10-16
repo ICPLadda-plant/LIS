@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const {
   batchFromRow,
   batchSimilarity,
+  densityBatchFamily,
+  findBestDensityBatch,
   findBestLegacyLabResult,
   findLatestAiLabItems,
   findBestRequestItem,
@@ -187,6 +189,52 @@ test('stock LOT autofill preserves the full LOT while using its real batch and p
   assert.equal(result.sample.batchNo, '480');
   assert.equal(result.sample.productionDate, '2026-10-09');
   assert.equal(result.stockCandidates[0].batchNo, '480');
+});
+
+test('dated ERP Lot Description overrides stale Lot and Batch values', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'Trade A',
+      commonName: 'OMETHOATE 50% W/V SL',
+      batchNo: '26S-OMT50-256',
+      productionDate: '2026-05-09',
+    }],
+    externalCoaRequest: {
+      itemNo: 'F-OMT50-1X20',
+      shipmentDate: '2026-09-17T00:00:00.000Z',
+    },
+  }, [{
+    item_no: 'F-OMT50-1X20',
+    lot_no: '26S-OMT50-256',
+    'Lot Description': '26S-OMT50-526-170969',
+    registering_date: '2026-09-18T00:00:00.000Z',
+    stock_qty: 100,
+  }], []);
+
+  assert.equal(result.erpLotDescription, '26S-OMT50-526-170969');
+  assert.equal(result.sample.lotNo, '26S-OMT50-526-170969');
+  assert.equal(result.sample.batchNo, '526');
+  assert.equal(result.sample.productionDate, '2026-09-17');
+});
+
+test('density history selects the matching batch family nearest the shipment date', () => {
+  assert.equal(densityBatchFamily('26S-OMT50-256'), '26S-OMT50');
+  const result = findBestDensityBatch([
+    { 'Sample name': '26S-OMT50-256', 'Date & time': '5/9/2026 1:33 PM' },
+    { 'Sample name': '26S-OMT50-524', 'Date & time': '9/17/2026 1:29 PM' },
+    { 'Sample name': '26S-OMT50-526', 'Date & time': '9/17/2026 1:31 PM' },
+    { 'Sample name': '26S-OMT50-531', 'Date & time': '9/18/2026 1:39 PM' },
+  ], {
+    externalCoaRequest: { shipmentDate: '2026-09-17T00:00:00.000Z' },
+  }, '26S-OMT50-256');
+
+  assert.deepEqual(result, {
+    batchNo: '526',
+    sourceBatchNo: '26S-OMT50-526',
+    productionDate: '2026-09-17',
+    productionTime: Date.parse('2026-09-17T00:00:00.000Z'),
+  });
 });
 
 test('ERP Lot No. takes precedence and its six date digits supply the production date', () => {

@@ -1,5 +1,5 @@
 const { aiToleranceCriteriaForCommonName, isAiContentTestItem } = require('./aiToleranceCriteria');
-const { batchMatches } = require('./densityBatch');
+const { batchMatches, densityBatchForRow } = require('./densityBatch');
 
 const MF_URLS = [
   'https://n8n-plant.icpladda.com/webhook/api/item-MF',
@@ -132,8 +132,15 @@ function productionDateFromRow(row, fallback = '') {
   return normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
 }
 
+function datedLotDescriptionFromRow(row) {
+  const value = pick(row, [
+    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
+  ]);
+  return /^(?:.+)-([^-]+)-[0-3]\d[01]\d\d{2}$/.test(value) && lotDate(value) ? value : '';
+}
+
 function lotFromRow(row) {
-  return pick(row, [
+  return datedLotDescriptionFromRow(row) || pick(row, [
     'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
     'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
     'batch_no', 'batchNo', 'BatchNo', 'Batch No.', 'Batch No',
@@ -194,6 +201,69 @@ function lotSnapshot(lotNo, fallbackDate = '') {
     batchNo: labeledLot ? labeledLot[1] : value,
     productionDate: lotDate(value) || normalizeIsoDate(fallbackDate),
   };
+}
+
+function densityBatchFamily(value) {
+  const batch = text(value).replace(/(?:\s+|-)?P\d+$/i, '');
+  return (batch.match(/^(.+)-\d+$/) || [])[1] || '';
+}
+
+function densityProductionDate(row) {
+  const value = text(row?.['Date & time'] || row?.['Date & time of report']);
+  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s|$)/);
+  if (!match) return '';
+  const year = Number(match[3]);
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return '';
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function findBestDensityBatch(rows, source, seedBatch) {
+  const family = densityBatchFamily(seedBatch);
+  if (!family) return null;
+  const normalizedFamily = normalizeBatch(family);
+  const seedBatchValue = (text(seedBatch).match(/-([^-]+)$/) || [])[1] || text(seedBatch);
+  const seedDigitSignature = seedBatchValue.replace(/\D/g, '').split('').sort().join('');
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
+  const seen = new Set();
+  const candidates = [];
+  for (const row of rows || []) {
+    const batchNo = text(densityBatchForRow(row));
+    const productionDate = densityProductionDate(row);
+    if (!batchNo || !productionDate || normalizeBatch(densityBatchFamily(batchNo)) !== normalizedFamily) continue;
+    const key = `${normalizeBatch(batchNo)}|${productionDate}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const parsedBatch = (batchNo.match(/-([^-]+)$/) || [])[1] || batchNo;
+    candidates.push({
+      batchNo: parsedBatch,
+      sourceBatchNo: batchNo,
+      productionDate,
+      productionTime: Date.parse(`${productionDate}T00:00:00.000Z`),
+      digitSignature: parsedBatch.replace(/\D/g, '').split('').sort().join(''),
+    });
+  }
+  candidates.sort((left, right) => {
+    const permutationDifference = Number(right.digitSignature === seedDigitSignature)
+      - Number(left.digitSignature === seedDigitSignature);
+    if (!Number.isFinite(targetTime)) {
+      return right.productionTime - left.productionTime || permutationDifference;
+    }
+    const leftBucket = left.productionTime <= targetTime ? 0 : 1;
+    const rightBucket = right.productionTime <= targetTime ? 0 : 1;
+    return leftBucket - rightBucket
+      || Math.abs(targetTime - left.productionTime) - Math.abs(targetTime - right.productionTime)
+      || permutationDifference
+      || right.productionTime - left.productionTime;
+  });
+  if (!candidates[0]) return null;
+  const { digitSignature, ...selected } = candidates[0];
+  return selected;
 }
 
 function commonPrefix(left, right) {
@@ -742,25 +812,43 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
       || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
   });
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const datedStock = stockCandidates.find((row) => {
+    if (!datedLotDescriptionFromRow(row)) return false;
+    const productionDate = lotSnapshot(lotFromRow(row), productionDateFromRow(row)).productionDate;
+    return !targetDate || productionDate <= targetDate;
+  }) || stockCandidates.find((row) => datedLotDescriptionFromRow(row));
   const newestFgStock = stockCandidates.find((row) => isFgLotDescription(lotFromRow(row)));
-  const stock = newestFgStock || matchingStock || stockCandidates[0];
+  const stock = matchingStock || datedStock || newestFgStock || stockCandidates[0];
   const newestFgLot = newestFgStock
     ? lotSnapshot(lotFromRow(newestFgStock), productionDateFromRow(newestFgStock))
     : null;
   const matchingStockLot = matchingStock
     ? lotSnapshot(lotFromRow(matchingStock), productionDateFromRow(matchingStock))
     : null;
+  const authoritativeErpLot = stock && datedLotDescriptionFromRow(stock)
+    ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
+    : null;
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
+  const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;
   const selectedSourceLot = requestedLot
-    ? lotSnapshot(requestedLot)
-    : requestedBatchLot?.productionDate
-      ? requestedBatchLot
-      : matchingStockLot || newestFgLot || sourceLot;
+    ? requestedLotSnapshot?.productionDate
+      ? requestedLotSnapshot
+      : authoritativeErpLot || requestedLotSnapshot
+    : authoritativeErpLot
+      || (requestedBatchLot?.productionDate
+        ? requestedBatchLot
+        : matchingStockLot || newestFgLot || sourceLot);
+  const useAuthoritativeErpLot = Boolean(authoritativeErpLot && selectedSourceLot === authoritativeErpLot);
   const lot = sourceLot
     ? {
       lotNo: selectedSourceLot?.lotNo || sourceLot.lotNo,
-      batchNo: requestedBatch || selectedSourceLot?.batchNo || sourceLot.batchNo,
+      batchNo: useAuthoritativeErpLot
+        ? authoritativeErpLot.batchNo
+        : requestedBatch || selectedSourceLot?.batchNo || sourceLot.batchNo,
       productionDate: selectedSourceLot?.productionDate || requestedProductionDate || sourceLot.productionDate,
     }
     : stock
@@ -769,6 +857,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
         ? lotSnapshot(mfBatch, mfDate)
         : { lotNo: '', batchNo: '', productionDate: '' };
   return {
+    erpLotDescription: authoritativeErpLot?.lotNo || '',
     sample: {
       itemSeq: Number(source.selectedItemSeqs?.[0] || 1),
       sampleName: text(source.sampleSnapshots?.[0]?.sampleName),
@@ -860,9 +949,11 @@ function densityForBatch(rows, batchNo) {
 module.exports = {
   batchSimilarity,
   cleanLegacyBatch,
+  densityBatchFamily,
   densityForBatch,
   fetchErpReferences,
   findBestCoaHistorySample,
+  findBestDensityBatch,
   findBestLabItem,
   findLatestAiLabItems,
   findBestLegacyLabResult,

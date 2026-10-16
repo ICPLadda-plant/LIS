@@ -15,9 +15,11 @@ const { manualCoaSnapshots, validateManualCoa } = require('../lib/coaManual');
 const { aiToleranceCriteriaForCommonName, isAiContentTestItem } = require('../lib/aiToleranceCriteria');
 const { buildCoaFormOptions, buildCoaParameterOptions, applyCoaFormSelections } = require('../lib/coaForm');
 const {
+  densityBatchFamily,
   densityForBatch,
   fetchErpReferences,
   findBestCoaHistorySample,
+  findBestDensityBatch,
   findBestLabItem,
   findLatestAiLabItems,
   findBestLegacyLabResult,
@@ -880,15 +882,34 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       requestMatch?.item || coaHistoryMatch?.sample,
     );
     const sample = sourceData.sample;
-    const authoritativeBatch = manualText(
+    let authoritativeBatch = manualText(
       sourceSample.batchNo || sourceSample.lotNo
       || requestMatch?.item?.batchNo || requestMatch?.item?.lotNo
-      || coaHistoryMatch?.sample?.batchNo || coaHistoryMatch?.sample?.lotNo,
+      || coaHistoryMatch?.sample?.batchNo || coaHistoryMatch?.sample?.lotNo
+      || (sourceData.erpLotDescription ? sample.batchNo : ''),
     );
-    const legacyLookupSample = authoritativeBatch
+    let legacyLookupSample = authoritativeBatch
       ? sample
       : { ...sample, batchNo: '', lotNo: '' };
-    const legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+    let legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+    let densityBatchMatch = null;
+    let densityIdentityRows = [];
+    if (!authoritativeBatch && legacyMatch?.matchKind === 'productHistory') {
+      const family = densityBatchFamily(legacyMatch.batchNo);
+      if (family) {
+        const pattern = new RegExp(`^${escapeRegex(family)}-\\d+(?:-P\\d+)?$`, 'i');
+        densityIdentityRows = await ResultDensity.find({ 'Sample name': pattern })
+          .sort({ _id: -1 }).limit(5000).lean();
+        densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyMatch.batchNo);
+        if (densityBatchMatch) {
+          sample.batchNo = densityBatchMatch.batchNo;
+          sample.productionDate = densityBatchMatch.productionDate;
+          authoritativeBatch = densityBatchMatch.batchNo;
+          legacyLookupSample = sample;
+          legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+        }
+      }
+    }
     if (legacyMatch) {
       if (!authoritativeBatch) {
         sample.batchNo = legacyMatch.batchNo;
@@ -931,9 +952,12 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     }
     let density = resultData.density;
     if (!density && sample.batchNo) {
-      const pattern = new RegExp(escapeRegex(sample.batchNo), 'i');
-      const densityRows = await ResultDensity.find({ 'Sample name': pattern }).sort({ _id: -1 }).limit(100).lean();
-      density = densityForBatch(densityRows, sample.batchNo);
+      const densityLookupBatch = densityBatchMatch?.sourceBatchNo || sample.batchNo;
+      const pattern = new RegExp(escapeRegex(densityLookupBatch), 'i');
+      const densityRows = densityIdentityRows.length
+        ? densityIdentityRows
+        : await ResultDensity.find({ 'Sample name': pattern }).sort({ _id: -1 }).limit(100).lean();
+      density = densityForBatch(densityRows, densityLookupBatch);
     }
     if (density) {
       const densityRow = resultData.rows.find((row) => /density/i.test(row.testItem || ''));
@@ -956,6 +980,9 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     }));
     const needsDensity = /\b(?:SC|SL|EC|EW|ZC|ME)\b/i.test(sample.commonName || '');
     const warnings = [];
+    if (densityBatchMatch) {
+      warnings.push('ERP Stock ปัจจุบันไม่มี Lot นี้ ระบบจึงใช้ Batch และวันที่จากประวัติ Density ที่ใกล้วันส่งสินค้ามากที่สุด');
+    }
     if (!sample.batchNo || !sample.productionDate) {
       warnings.push('ไม่พบ Batch No. และวันที่ผลิตจริงจากคำขอ COA, ใบคำร้อง LIS, COA เดิม, Stock, MF หรือฐานข้อมูลผล Lab เดิม');
     }
