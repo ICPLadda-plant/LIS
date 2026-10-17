@@ -877,10 +877,12 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   }).filter((row) => batchFromRow(row));
   const mf = mfCandidates[0];
   const sourceSample = source?.sampleSnapshots?.[0] || {};
+  const erpRequestLot = text(sourceSample.lotNo);
   const requestedBatch = text(sourceSample.batchNo || petitionItem?.batchNo);
-  const requestedLot = text(sourceSample.lotNo || petitionItem?.lotNo);
+  const requestedLot = text(erpRequestLot || petitionItem?.lotNo);
   const sourceBatch = requestedBatch || requestedLot;
-  const requestedProductionDate = normalizeIsoDate(sourceSample.productionDate || petitionItem?.productionDate);
+  const erpRequestProductionDate = normalizeIsoDate(sourceSample.productionDate)
+    || lotSnapshot(sourceSample.lotNo || sourceSample.batchNo).productionDate;
   const mfBatch = batchFromRow(mf);
   const mfDate = productionDateFromRow(mf);
   const matchingStock = stockCandidates.find((row) => {
@@ -907,6 +909,12 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const authoritativeErpLot = stock && datedLotDescriptionFromRow(stock)
     ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
     : null;
+  const erpStockProductionDate = stock
+    ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock)).productionDate
+    : '';
+  const erpProductionDate = erpRequestLot
+    ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
+    : erpStockProductionDate || erpRequestProductionDate || normalizeIsoDate(mfDate);
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
   const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;
@@ -925,7 +933,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
       batchNo: useAuthoritativeErpLot
         ? authoritativeErpLot.batchNo
         : requestedBatch || selectedSourceLot?.batchNo || sourceLot.batchNo,
-      productionDate: selectedSourceLot?.productionDate || requestedProductionDate || sourceLot.productionDate,
+      productionDate: erpProductionDate,
     }
     : stock
       ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
@@ -940,7 +948,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
       commonName,
       batchNo: lot.batchNo,
       lotNo: lot.lotNo,
-      productionDate: lot.productionDate,
+      productionDate: erpProductionDate,
       sampleId: itemNo,
       condition: text(source.externalCoaRequest?.packingSize || source.sampleSnapshots?.[0]?.condition),
     },

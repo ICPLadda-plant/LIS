@@ -365,7 +365,7 @@ test('customer COA request batch, lot and production date take precedence over E
   assert.equal(result.sample.productionDate, '2026-04-18');
 });
 
-test('LIS petition Lot No. supplies its own production date instead of a newer ERP lot', () => {
+test('ERP stock supplies production date instead of the LIS petition date', () => {
   const source = {
     selectedItemSeqs: [10000],
     sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'COMMON A' }],
@@ -386,13 +386,13 @@ test('LIS petition Lot No. supplies its own production date instead of a newer E
     },
   ], source);
   const result = sampleFromSources(source, [{
-    item_no: 'ITEM-A', lot_no: 'FG261015-004', stock_qty: 100,
+    item_no: 'ITEM-A', lot_no: 'FG260915-004', stock_qty: 100,
   }], [], petitionMatch.item);
 
   assert.equal(petitionMatch.item.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.lotNo, 'FG260912-001');
-  assert.equal(result.sample.productionDate, '2026-09-12');
+  assert.equal(result.sample.productionDate, '2026-09-15');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {

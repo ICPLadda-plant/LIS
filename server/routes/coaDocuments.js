@@ -930,7 +930,6 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyMatch.batchNo);
         if (densityBatchMatch) {
           sample.batchNo = densityBatchMatch.batchNo;
-          sample.productionDate = densityBatchMatch.productionDate;
           authoritativeBatch = densityBatchMatch.batchNo;
           legacyLookupSample = sample;
           legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
@@ -943,7 +942,6 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       } else {
         if (!sample.batchNo) sample.batchNo = legacyMatch.batchNo;
       }
-      if (!sample.productionDate) sample.productionDate = legacyMatch.productionDate;
       if (!sample.manufacturer) sample.manufacturer = manualText(legacyMatch.row?.manufacturer);
     }
     const lab = findBestLabItem(petitions, sample);
@@ -1010,10 +1008,10 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     const needsDensity = /\b(?:SC|SL|EC|EW|ZC|ME)\b/i.test(sample.commonName || '');
     const warnings = [];
     if (densityBatchMatch) {
-      warnings.push('ERP Stock ปัจจุบันไม่มี Lot นี้ ระบบจึงใช้ Batch และวันที่จากประวัติ Density ที่ใกล้วันส่งสินค้ามากที่สุด');
+      warnings.push('ERP Stock ปัจจุบันไม่มี Lot นี้ ระบบจึงใช้ Batch จากประวัติ Density ที่ใกล้วันส่งสินค้ามากที่สุด แต่ไม่นำวันที่ผลิตมาใช้');
     }
     if (!sample.batchNo || !sample.productionDate) {
-      warnings.push('ไม่พบ Batch No. และวันที่ผลิตจริงจากคำขอ COA, ใบคำร้อง LIS, COA เดิม, Stock, MF หรือฐานข้อมูลผล Lab เดิม');
+      warnings.push('ไม่พบ Batch No. หรือวันที่ผลิตจริงจาก ERP (คำขอ COA, Stock หรือ MF)');
     }
     if (!lab.best && !legacyMatch && !aiResultData.ai) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
     else if (!lab.best && legacyMatch?.matchKind === 'productHistory') {

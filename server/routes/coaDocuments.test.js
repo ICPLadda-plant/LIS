@@ -1313,7 +1313,7 @@ test('ERP autofill averages duplicate legacy Lab results and excludes the named 
   }
 });
 
-test('ERP autofill keeps the matching LIS petition Lot No. production date', async () => {
+test('ERP autofill keeps the matching LIS identifiers but uses the ERP production date', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1338,7 +1338,7 @@ test('ERP autofill keeps the matching LIS petition Lot No. production date', asy
     global.fetch = async (url) => {
       if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
       if (String(url).includes('stock-all-item')) {
-        return { ok: true, json: async () => [{ item_no: 'ITEM-A', lot_no: 'FG261015-004', stock_qty: 10 }] };
+        return { ok: true, json: async () => [{ item_no: 'ITEM-A', lot_no: 'FG260915-004', stock_qty: 10 }] };
       }
       return { ok: true, json: async () => [] };
     };
@@ -1356,7 +1356,7 @@ test('ERP autofill keeps the matching LIS petition Lot No. production date', asy
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'FG260912-001');
-    assert.equal(res.body.sample.productionDate, '2026-09-12');
+    assert.equal(res.body.sample.productionDate, '2026-09-15');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
@@ -1368,7 +1368,7 @@ test('ERP autofill keeps the matching LIS petition Lot No. production date', asy
   }
 });
 
-test('ERP autofill replaces stale legacy identity with the nearest Density batch', async () => {
+test('ERP autofill may identify the batch from Density but does not use its production date', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1410,7 +1410,7 @@ test('ERP autofill replaces stale legacy identity with the nearest Density batch
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '526');
-    assert.equal(res.body.sample.productionDate, '2026-09-17');
+    assert.equal(res.body.sample.productionDate, '');
     assert.equal(res.body.legacyMatch, null);
     assert.match(res.body.warnings.join(' '), /Density/);
   } finally {
