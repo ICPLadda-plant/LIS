@@ -17,6 +17,10 @@ test('validateWeights: not exceed remaining', () => {
   assert.strictEqual(validateWeights([60, 60], 100), 'ปริมาณคงเหลือไม่พอ');
 });
 
+test('validateWeights: allows displayed total with floating-point residue', () => {
+  assert.strictEqual(validateWeights([0.02], 0.01999999999999602), '');
+});
+
 test('validateWeights: ok → empty', () => {
   assert.strictEqual(validateWeights([10, 10, 10], 100), '');
 });

@@ -11,7 +11,7 @@ const crypto = require('crypto');
 const { normalizeRoles } = require('../lib/roles');
 const { syntheticDevRolesFromEmail } = require('../lib/syntheticDevRoles');
 const { isValidReceiveType, isValidUnitType } = require('../lib/stockSource');
-const { sumWeights } = require('../lib/requisitionWeights');
+const { MG_COMPARISON_EPSILON, sumWeights } = require('../lib/requisitionWeights');
 const { normalizeActorFields } = require('../lib/stockActor');
 const { buildLotBottleNumbers } = require('../lib/stockLotBottle');
 const { buildStandardLabelCodeDefaults, formatStandardLabelCode, parseStandardLabelCode, standardLabelCodePrefix } = require('../lib/stockStandardLabelCode');
@@ -680,8 +680,8 @@ function planDeductMg(unit, mg) {
   if (!unit || unit.status !== 'active') return { ok: false, reason: 'ขวดนี้ใช้งานต่อไม่ได้' };
   if (unit.exp && new Date(unit.exp).getTime() < Date.now()) return { ok: false, reason: 'ขวดนี้หมดอายุแล้ว' };
   const remaining = Number(unit.volume && unit.volume.remaining) || 0;
-  if (remaining < amount) return { ok: false, reason: 'ปริมาณคงเหลือไม่พอ' };
-  return { ok: true, after: remaining - amount };
+  if (remaining <= 0 || amount - remaining > MG_COMPARISON_EPSILON) return { ok: false, reason: 'ปริมาณคงเหลือไม่พอ' };
+  return { ok: true, after: Math.max(0, remaining - amount) };
 }
 
 // Atomic: หัก mg จาก volume.remaining ของขวด (กัน race ด้วย $gte). โยน Error ถ้าไม่ผ่าน.
@@ -692,13 +692,14 @@ async function deductMgFromUnit(qrId, mg, meta = {}) {
   if (!unit) throw new Error('ไม่พบขวด (QR)');
   const plan = planDeductMg(unit, amount);
   if (!plan.ok) throw new Error(plan.reason);
+  const deductionAmount = Math.min(amount, Number(unit.volume?.remaining) || 0);
   const updated = await StockUnit.findOneAndUpdate(
-    { qrId, status: 'active', 'volume.remaining': { $gte: amount } },
-    { $inc: { 'volume.remaining': -amount } },
+    { qrId, status: 'active', 'volume.remaining': { $gte: deductionAmount } },
+    { $inc: { 'volume.remaining': -deductionAmount } },
     { new: true },
   );
   if (!updated) throw new Error('ปริมาณคงเหลือไม่พอ');
-  const before = updated.volume.remaining + amount; // pre-decrement value, atomically consistent
+  const before = updated.volume.remaining + deductionAmount; // pre-decrement value, atomically consistent
   if (updated.volume.remaining <= 0) { updated.status = 'empty'; await updated.save(); }
   const std = await StockStandard.findOne({ code: updated.itemCode });
   await logTransaction({
@@ -709,7 +710,7 @@ async function deductMgFromUnit(qrId, mg, meta = {}) {
     action: 'deduct',
     unitId: updated._id.toString(),
     qrId,
-    volumeDelta: -amount,
+    volumeDelta: -deductionAmount,
     volumeUnit: 'mg',
     unit: 'mg',
     beforeQty: before,
