@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
 import { aiContentTestItemForCommonName } from "@/lib/coaFormulation";
 import { productionDateFromLotNo } from "@/lib/coaLot";
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
@@ -47,7 +47,7 @@ function dateValue(value?: string) {
   return value?.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || value || "";
 }
 
-function resultFormFromRows(rows: CoaResultSnapshot[]): ResultForm {
+function resultFormFromRows(rows: CoaResultSnapshot[], commonName?: string): ResultForm {
   const appearance = rows.find((row) => /^appearance$/i.test(row.testItem?.trim() || ""));
   const ai = rows.find((row) => isAiContentTestItem(row.testItem));
   const density = rows.find((row) => /density/i.test(row.testItem || ""));
@@ -55,7 +55,7 @@ function resultFormFromRows(rows: CoaResultSnapshot[]): ResultForm {
   const appearanceCriteria = appearance?.criteria?.trim();
   return {
     analysisDate: dateValue(analysisDate?.result),
-    aiCriteria: ai?.criteria || "",
+    aiCriteria: aiToleranceCriteriaForCommonName(commonName) || ai?.criteria || "",
     density: density?.result || "",
     aiResult: ai?.result || "",
     appearance: appearanceCriteria && appearanceCriteria !== "-"
@@ -121,7 +121,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
       ...source,
       productionDate: productionDateFromLotNo(source.lotNo) || source.productionDate?.slice(0, 10) || "",
     });
-    setResultForm(resultFormFromRows(request.resultSnapshots));
+    setResultForm(resultFormFromRows(request.resultSnapshots, source.commonName));
     setRemark(request.remark || "");
     autoFilledResultValues.current = null;
     setLabAiLookupKey({ batchNo: "", commonName: "", sampleName: "" });
@@ -136,7 +136,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
       productionDate: productionDateFromLotNo(autofill.data.sample.lotNo)
         || autofill.data.sample.productionDate?.slice(0, 10) || "",
     }));
-    const nextResultForm = resultFormFromRows(autofill.data.results);
+    const nextResultForm = resultFormFromRows(autofill.data.results, autofill.data.sample.commonName);
     setResultForm(nextResultForm);
     autoFilledResultValues.current = {
       batchNo: String(autofill.data.sample.batchNo || "").trim(),
@@ -144,6 +144,11 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
       ...(nextResultForm.analysisDate ? { analysisDate: nextResultForm.analysisDate } : {}),
     };
   }, [autofill.data, editing, open]);
+  useEffect(() => {
+    const aiCriteria = aiToleranceCriteriaForCommonName(sample.commonName);
+    if (!aiCriteria) return;
+    setResultForm((current) => current.aiCriteria === aiCriteria ? current : { ...current, aiCriteria });
+  }, [sample.commonName]);
   useEffect(() => {
     if (!open) {
       setLabAiLookupKey({ batchNo: "", commonName: "", sampleName: "" });

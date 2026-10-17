@@ -171,6 +171,7 @@ test('legacy Lab results fill every required COA result field and clean repeat s
   assert.equal(match.batchNo, '20260430');
   assert.equal(result.rows[0].testItem, 'Appearance');
   assert.equal(result.rows[1].testItem, '%AI content');
+  assert.equal(result.rows[1].criteria, '2% ± 0.30');
   assert.match(result.rows[2].testItem, /Density at 30/);
   assert.equal(result.rows[3].testItem, 'Date of analysis');
   assert.equal(result.rows[1].result, '2.09 % W/V');
@@ -197,7 +198,7 @@ test('legacy Lab AI excludes the named submitter and averages duplicate batch re
   assert.equal(result.ai.result, '51.3 %W/V');
   assert.equal(result.ai.valueCount, 2);
   assert.equal(result.analysisDate, '2026-09-17');
-  assert.equal(result.rows[0].criteria, '47.50-52.50');
+  assert.equal(result.rows[0].criteria, '50% ± 2.50');
 });
 
 test('legacy Lab fallback fills placeholder values without replacing live results', () => {
@@ -483,6 +484,14 @@ test('QC results become COA rows with common-name criteria and density', () => {
   assert.equal(rows.rows[1].result, '48.35%');
   assert.equal(rows.rows[1].criteria, '48% ± 2.40');
   assert.equal(rows.rows[2].result, '1.158');
+});
+
+test('common names with multiple AI percentages receive every plus-minus criterion', () => {
+  const rows = resultRowsFromQc([
+    { parameterName: '%AI', values: { '%AI::2,4-d': '45.1' } },
+  ], '2,4-D 45.2% + PICLORAM 11.6% SL');
+
+  assert.equal(rows.rows[0].criteria, '45.2% ± 2.26 / 11.6% ± 0.70');
 });
 
 test('AI results prefer the substance-specific value over a generic total', () => {

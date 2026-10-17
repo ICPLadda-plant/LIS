@@ -19,6 +19,42 @@ vi.mock("@/lib/api", () => ({
 }));
 
 describe("CoaManualDialog", () => {
+  it("uses the plus-minus criterion from the common name instead of a legacy range", async () => {
+    const request = {
+      _id: "manual-coa-criteria",
+      sourceType: "erpManual",
+      externalRequestId: "external-coa-request-SO-CRITERIA-10000",
+      revision: 0,
+      status: "draft",
+      petitionId: "",
+      petitionNoSnapshot: "SO-CRITERIA",
+      selectedItemSeqs: [10000],
+      sampleSnapshots: [{
+        itemSeq: 10000,
+        sampleName: "Trade A",
+        commonName: "PRODUCT 5% SL",
+        batchNo: "B-1",
+        productionDate: "2026-10-01",
+      }],
+      resultSnapshots: [{
+        itemSeq: 10000,
+        testItem: "%AI content",
+        result: "5.02%",
+        criteria: "4.50-5.50",
+        unit: "%",
+      }],
+    } as CoaDocument;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <CoaManualDialog open onOpenChange={vi.fn()} request={request} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("เกณฑ์ความคลาดเคลื่อน *")).toHaveValue("5% ± 0.50"));
+  });
+
   it("shows the production date from an existing draft Lot No.", async () => {
     const request = {
       _id: "manual-coa-1",

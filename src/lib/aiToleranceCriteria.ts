@@ -97,14 +97,20 @@ export function aiPercentFromCommonName(commonName?: string): string | null {
 }
 
 export function aiToleranceCriteriaForCommonName(commonName?: string): string | null {
-  const match = commonName?.match(/(\d+(?:\.\d+)?)\s*%/);
-  if (!match) return null;
-  const percent = normalizePercent(match[1]);
-  const afterPercent = textAfterMatchedPercent(commonName ?? "", match);
-  const specific = AI_TOLERANCE_CRITERIA.find((item) => (
-    item.percent === percent && item.formulation && new RegExp(`\\b${item.formulation}\\b`, "i").test(afterPercent)
-  ));
-  return (specific || AI_TOLERANCE_CRITERIA.find((item) => item.percent === percent && !item.formulation))?.criteria ?? null;
+  const source = commonName ?? "";
+  const percentPattern = /(\d+(?:\.\d+)?)\s*%/g;
+  const criteria: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = percentPattern.exec(source)) !== null) {
+    const percent = normalizePercent(match[1]);
+    const afterPercent = textAfterMatchedPercent(source, match);
+    const specific = AI_TOLERANCE_CRITERIA.find((item) => (
+      item.percent === percent && item.formulation && new RegExp(`\\b${item.formulation}\\b`, "i").test(afterPercent)
+    ));
+    const selected = specific || AI_TOLERANCE_CRITERIA.find((item) => item.percent === percent && !item.formulation);
+    if (selected && !criteria.includes(selected.criteria)) criteria.push(selected.criteria);
+  }
+  return criteria.length ? criteria.join(" / ") : null;
 }
 
 export function isAiContentTestItem(testItem?: string): boolean {

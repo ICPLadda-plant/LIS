@@ -747,7 +747,7 @@ function resultRowsFromLegacyLab(row, commonName) {
     },
     {
       testItem: '%AI content',
-      criteria: joinActive('criteria') || aiToleranceCriteriaForCommonName(commonName) || '-',
+      criteria: aiToleranceCriteriaForCommonName(commonName) || joinActive('criteria') || '-',
       result: joinActive('result') || '-',
       method: joinActive('method'),
       unit: '%',
@@ -819,7 +819,7 @@ function resultRowsFromLegacyLabs(rows, commonName) {
   const ai = { result, key: 'legacyLab', valueCount };
   const aiRow = {
     testItem: '%AI content',
-    criteria: criteria || aiToleranceCriteriaForCommonName(commonName) || '-',
+    criteria: aiToleranceCriteriaForCommonName(commonName) || criteria || '-',
     result,
     method,
     unit: '%',

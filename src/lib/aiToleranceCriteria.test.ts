@@ -14,6 +14,11 @@ describe("AI tolerance criteria", () => {
     expect(aiToleranceCriteriaForCommonName("Product 2% SL")).toBe("2% ± 0.30");
   });
 
+  it("returns a plus-minus criterion for every AI percentage in a mixed common name", () => {
+    expect(aiToleranceCriteriaForCommonName("2,4-D 45.2% + PICLORAM 11.6% SL"))
+      .toBe("45.2% ± 2.26 / 11.6% ± 0.70");
+  });
+
   it("matches AI content test item labels", () => {
     expect(isAiContentTestItem("%AI content (W/W)")).toBe(true);
     expect(isAiContentTestItem("Density at 30°C")).toBe(false);
