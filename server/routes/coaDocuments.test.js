@@ -1127,7 +1127,7 @@ test('ERP autofill excludes AI from another batch and averages matching density 
   try {
     global.fetch = async (url) => {
       if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
-      if (String(url).includes('stock-all-item')) return { ok: true, json: async () => [{ item_no: 'F-TEST-1X20', lot_no: 'FG260902-008', stock_qty: 10 }] };
+      if (String(url).includes('stock-all-item')) return { ok: true, json: async () => [{ item_no: 'F-TEST-1X20', lot_no: '26S-ACT50-095-171069', stock_qty: 10 }] };
       return { ok: true, json: async () => [{ item_no: 'F-TEST-1X20', prod_order_no: 'MF26090201', create_date: '2026-09-02T00:00:00.000Z' }] };
     };
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
@@ -1137,17 +1137,19 @@ test('ERP autofill excludes AI from another batch and averages matching density 
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
       { parameterName: 'กายภาพ', values: { 'ลักษณะ': 'ของเหลวใส', 'สี': 'ขาว' }, updatedAt: '2026-10-07T00:00:00.000Z' },
       { petitionId: 'petition-auto-1', itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '48.35' } },
+      { petitionId: 'petition-auto-1', itemSeq: 1, parameterName: 'ค่า ถพ.', entries: [{ 'ค่าถพ.::glyphosate': '1.159' }] },
     ] }) });
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [
-      { 'Sample name': 'FG260902-008 TOP', 'Density [g/cm³]': '1.1574', 'Measurement status': 'valid', 'Date & time': '10/7/2026 9:00 AM' },
-      { 'Sample name': 'FG260902-008 bottom', 'Density [g/cm³]': '1.1586', 'Measurement status': 'valid', 'Date & time': '10/7/2026 9:05 AM' },
+      { 'Sample name': '26S-ACT50-095 TOP', 'Density [g/cm³]': '1.1574', 'Measurement status': 'valid', 'Date & time': '10/7/2026 9:00 AM' },
+      { 'Sample name': '26S-ACT50-095 bottom', 'Density [g/cm³]': '1.1586', 'Measurement status': 'valid', 'Date & time': '10/7/2026 9:05 AM' },
     ] }) }) });
 
     const res = await invoke('/erp-autofill/:externalRequestId', 'get', { params: { externalRequestId: 'external-coa-request-SO-AUTO-1-10000' } });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.sample.lotNo, 'FG260902-008');
-    assert.equal(res.body.sample.productionDate, '2026-09-02');
+    assert.equal(res.body.sample.batchNo, '095');
+    assert.equal(res.body.sample.lotNo, '26S-ACT50-095-171069');
+    assert.equal(res.body.sample.productionDate, '2026-10-17');
     assert.equal(res.body.match, null);
     assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
     assert.match(res.body.warnings.join(' '), /Batch No\./);

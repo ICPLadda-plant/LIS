@@ -979,17 +979,18 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       });
     }
     let density = resultData.density;
-    if (!density && sample.batchNo) {
-      const densityLookupBatch = densityBatchMatch?.sourceBatchNo || sample.batchNo;
+    if (sample.batchNo) {
+      const densityBatchFromLot = manualText(sample.lotNo).match(/^(.+)-[0-3]\d[01]\d\d{2}$/)?.[1] || '';
+      const densityLookupBatch = densityBatchMatch?.sourceBatchNo || densityBatchFromLot || sample.batchNo;
       const pattern = new RegExp(escapeRegex(densityLookupBatch), 'i');
       const densityRows = densityIdentityRows.length
         ? densityIdentityRows
         : await ResultDensity.find({ 'Sample name': pattern }).sort({ _id: -1 }).limit(100).lean();
-      density = densityForBatch(densityRows, densityLookupBatch);
+      density = densityForBatch(densityRows, densityLookupBatch) || density;
     }
     if (density) {
       const densityRow = resultData.rows.find((row) => /density/i.test(row.testItem || ''));
-      if (densityRow && (!densityRow.result || densityRow.result === '-')) densityRow.result = density;
+      if (densityRow) densityRow.result = density;
       else if (!densityRow) resultData.rows.push({
         testItem: 'Density at 30°C (g/cm³)', criteria: '-', result: density, unit: 'g/cm³', method: 'DMA 501',
       });
