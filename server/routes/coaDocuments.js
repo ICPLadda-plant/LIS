@@ -26,6 +26,7 @@ const {
   findBestRequestItem,
   formKindForCommonName,
   isAfterDryingLabItem,
+  lotSnapshot,
   mergeResultRows,
   normalizeIsoDate,
   resultRowsFromLegacyLab,
@@ -410,6 +411,12 @@ function externalCoaProductionDate(row) {
   ]);
 }
 
+function externalCoaLotDescription(row) {
+  return firstExternalValue(row, [
+    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
+  ]);
+}
+
 function externalCoaRowToDocument(row) {
   const itemSeq = externalNumber(row, ['Line']) || 1;
   const saleOrderNo = firstExternalValue(row, ['SaleOrderNo']);
@@ -417,8 +424,9 @@ function externalCoaRowToDocument(row) {
   const tradeName = firstExternalValue(row, ['TradeName']);
   const commonName = firstExternalValue(row, ['CommonName']);
   const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
-  const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']);
-  const productionDate = externalCoaProductionDate(row);
+  const lotDescription = externalCoaLotDescription(row);
+  const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']) || lotDescription;
+  const productionDate = lotSnapshot(lotDescription).productionDate || externalCoaProductionDate(row);
   const date = externalCoaDate(row);
   const updatedAt = firstExternalValue(row, ['UpdateDate']) || date;
   const sampleSnapshot = {
