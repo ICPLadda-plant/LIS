@@ -1104,7 +1104,7 @@ test('revision approval aborts without activating the revision when supersession
   }
 });
 
-test('ERP autofill does not use an AI result from a different batch', async () => {
+test('ERP autofill excludes AI from another batch and averages matching density readings', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1138,7 +1138,10 @@ test('ERP autofill does not use an AI result from a different batch', async () =
       { parameterName: 'กายภาพ', values: { 'ลักษณะ': 'ของเหลวใส', 'สี': 'ขาว' }, updatedAt: '2026-10-07T00:00:00.000Z' },
       { petitionId: 'petition-auto-1', itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '48.35' } },
     ] }) });
-    ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [{ 'Sample name': 'FG260902-008', 'Density [g/cm³]': '1.158', 'Date & time': '10/7/2026' }] }) }) });
+    ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [
+      { 'Sample name': 'FG260902-008 TOP', 'Density [g/cm³]': '1.1574', 'Measurement status': 'valid', 'Date & time': '10/7/2026 9:00 AM' },
+      { 'Sample name': 'FG260902-008 bottom', 'Density [g/cm³]': '1.1586', 'Measurement status': 'valid', 'Date & time': '10/7/2026 9:05 AM' },
+    ] }) }) });
 
     const res = await invoke('/erp-autofill/:externalRequestId', 'get', { params: { externalRequestId: 'external-coa-request-SO-AUTO-1-10000' } });
 

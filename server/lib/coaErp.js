@@ -1015,11 +1015,21 @@ async function fetchErpReferences() {
 }
 
 function densityForBatch(rows, batchNo) {
-  return [...(rows || [])]
+  const readings = [...(rows || [])]
     .filter((row) => batchMatches(batchNo, row))
     .sort((left, right) => String(right['Date & time'] || '').localeCompare(String(left['Date & time'] || '')))
-    .map((row) => text(row['Density [g/cm³]'] || row.density))
-    .find(Boolean) || '';
+    .map((row) => {
+      const status = text(row['Measurement status']).toLowerCase();
+      const raw = text(row['Density [g/cm³]'] || row.density);
+      const numeric = Number(raw);
+      return { raw, numeric, usable: (!status || status === 'valid') && raw && Number.isFinite(numeric) };
+    })
+    .filter((reading) => reading.usable);
+
+  if (readings.length === 2) {
+    return ((readings[0].numeric + readings[1].numeric) / 2).toFixed(3);
+  }
+  return readings[0]?.raw || '';
 }
 
 module.exports = {

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   batchFromRow,
   batchSimilarity,
+  densityForBatch,
   densityBatchFamily,
   findBestDensityBatch,
   findBestLegacyLabResult,
@@ -20,6 +21,25 @@ const {
   resultRowsFromQc,
   sampleFromSources,
 } = require('./coaErp');
+
+test('averages two valid density readings from the same batch before autofill', () => {
+  const density = densityForBatch([
+    { 'Sample name': '26S-ACT50-095 TOP', 'Density [g/cm³]': '1.0514', 'Measurement status': 'valid', 'Date & time': '10/17/2026 9:00 AM' },
+    { 'Sample name': '26S-ACT50-095 bottom', 'Density [g/cm³]': '1.0526', 'Measurement status': 'Valid', 'Date & time': '10/17/2026 9:05 AM' },
+    { 'Sample name': '26S-ACT50-096', 'Density [g/cm³]': '1.9000', 'Measurement status': 'valid', 'Date & time': '10/17/2026 9:10 AM' },
+  ], '26S-ACT50-095');
+
+  assert.equal(density, '1.052');
+});
+
+test('ignores failed density readings when deciding whether to average', () => {
+  const density = densityForBatch([
+    { 'Sample name': 'FG260902-008', 'Density [g/cm³]': '1.158', 'Measurement status': 'valid', 'Date & time': '10/7/2026 9:00 AM' },
+    { 'Sample name': 'FG260902-008', 'Density [g/cm³]': '3.071', 'Measurement status': 'Error', 'Date & time': '10/7/2026 9:05 AM' },
+  ], 'FG260902-008');
+
+  assert.equal(density, '1.158');
+});
 
 test('uses the attached dry-product COA form for every requested common-name suffix', () => {
   for (const suffix of ['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'GB']) {
