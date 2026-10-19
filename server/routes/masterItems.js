@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const XLSX = require('xlsx');
 const MasterItemMeta = require('../models/MasterItemMeta');
+const ItemGroup = require('../models/ItemGroup');
 
 const router = express.Router();
 
@@ -351,9 +352,29 @@ async function getMergedMasterItems(req, res) {
   try {
     const items = await fetchMasterItems();
     const metas = await MasterItemMeta.find().lean();
+    const groups = await ItemGroup.find({ status: 'active' }).sort({ sortOrder: 1, name: 1 }).lean();
     const merged = mergeItemsWithMeta(items, metas);
 
-    return res.json(merged);
+    // Match src/lib/itemGroups.ts: exclude > include > common/trade name.
+    const groupRules = groups.map((group) => ({
+      summary: { _id: String(group._id), name: group.name },
+      include: new Set((group.includeItemNos || []).map((value) => String(value).trim())),
+      exclude: new Set((group.excludeItemNos || []).map((value) => String(value).trim())),
+      common: new Set((group.commonNames || []).map((value) => String(value).trim().toUpperCase())),
+      trade: new Set((group.tradeNames || []).map((value) => String(value).trim().toUpperCase())),
+    }));
+    return res.json(merged.map((item) => {
+      const itemNo = firstValue(item, MASTER_ITEM_KEYS);
+      const commonName = firstValue(item, COMMON_NAME_KEYS).toUpperCase();
+      const tradeName = firstValue(item, ['trade_name', 'tradename', 'tradeName']).toUpperCase();
+      const itemGroups = groupRules.filter((rule) => {
+        if (itemNo && rule.exclude.has(itemNo)) return false;
+        return (itemNo && rule.include.has(itemNo))
+          || (commonName && rule.common.has(commonName))
+          || (tradeName && rule.trade.has(tradeName));
+      }).map((rule) => rule.summary);
+      return { ...item, itemGroups };
+    }));
   } catch (err) {
     return res.status(err.status || 502).json({
       message: err.message || 'Cannot connect to master item webhook',
