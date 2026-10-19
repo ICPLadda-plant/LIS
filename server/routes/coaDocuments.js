@@ -494,6 +494,27 @@ function externalCoaRowsToDocuments(payload) {
   return documents;
 }
 
+function enrichExternalCoaDocumentsWithErpLots(documents, references = {}) {
+  const stockRows = Array.isArray(references.stockRows) ? references.stockRows : [];
+  const mfRows = Array.isArray(references.mfRows) ? references.mfRows : [];
+  if (!stockRows.length && !mfRows.length) return documents;
+
+  return documents.map((source) => {
+    const resolved = sampleFromSources(source, stockRows, mfRows).sample;
+    const samples = source.sampleSnapshots || [];
+    if (!samples.length || (!resolved.lotNo && !resolved.batchNo && !resolved.productionDate)) return source;
+    return {
+      ...source,
+      sampleSnapshots: samples.map((sample, index) => index === 0 ? {
+        ...sample,
+        lotNo: resolved.lotNo || sample.lotNo,
+        batchNo: resolved.batchNo || sample.batchNo,
+        productionDate: resolved.productionDate || sample.productionDate,
+      } : sample),
+    };
+  });
+}
+
 async function fetchExternalCoaDocuments() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), COA_REQUESTS_WEBHOOK_TIMEOUT_MS);
@@ -800,19 +821,28 @@ router.get('/', async (req, res) => {
     if (req.query.needsApproval === '1') {
       filter.status = { $in: ['pendingApproval', 'pendingRevisionApproval'] };
     }
-    const externalPromise = shouldFetchExternalCoaRequests(req.query)
+    const shouldFetchExternal = shouldFetchExternalCoaRequests(req.query);
+    const externalPromise = shouldFetchExternal
       ? fetchExternalCoaDocuments().catch((error) => {
           console.warn('[coa-documents] external COA request sync failed:', error.message);
           return [];
         })
       : Promise.resolve([]);
-    const [documents, requestedRows, externalRows] = await Promise.all([
+    const erpReferencesPromise = shouldFetchExternal
+      ? fetchErpReferences().catch((error) => {
+          console.warn('[coa-documents] ERP Lot sync failed:', error.message);
+          return { stockRows: [], mfRows: [] };
+        })
+      : Promise.resolve({ stockRows: [], mfRows: [] });
+    const [documents, requestedRows, externalRows, erpReferences] = await Promise.all([
       CoaDocument.find(filter).sort({ updatedAt: -1 }).limit(200).lean(),
       shouldIncludeRequestedRows(req.query)
         ? requestedCoaRows({ petitionNo: req.query.petitionNo })
         : Promise.resolve([]),
       externalPromise,
+      erpReferencesPromise,
     ]);
+    const enrichedExternalRows = enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences);
     const linkedExternalKeys = new Set(externalRows.length
       ? (await CoaDocument.find({
           'externalCoaRequest.saleOrderNo': { $in: externalRows.map((row) => row.externalCoaRequest.saleOrderNo) },
@@ -823,7 +853,7 @@ router.get('/', async (req, res) => {
       items: sortCoaRows([
         ...documents,
         ...requestedRows,
-        ...filterExternalCoaDocuments(externalRows, req.query)
+        ...filterExternalCoaDocuments(enrichedExternalRows, req.query)
           .filter((row) => !linkedExternalKeys.has(externalCoaKey(row.externalCoaRequest))),
       ]).slice(0, 200),
     });
@@ -1543,3 +1573,4 @@ module.exports.freezeSnapshots = freezeSnapshots;
 module.exports.actorFromRequest = actorFromRequest;
 module.exports.withCoaTransaction = withCoaTransaction;
 module.exports.externalCoaRowsToDocuments = externalCoaRowsToDocuments;
+module.exports.enrichExternalCoaDocumentsWithErpLots = enrichExternalCoaDocumentsWithErpLots;

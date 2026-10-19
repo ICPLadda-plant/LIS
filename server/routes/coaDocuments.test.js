@@ -348,7 +348,7 @@ test('GET / includes requested COA rows for Lab-approved petitions without COA d
       reportCustomerName: 'Customer A',
       requester: { fullName: 'Requester Name', department: 'R&D', email: 'requester@example.com', phone: '1234' },
     }] });
-    global.fetch = async () => ({ ok: true, status: 200, text: async () => '[]' });
+    global.fetch = async () => ({ ok: true, status: 200, text: async () => '[]', json: async () => [] });
 
     const res = await invoke('/', 'get');
 
@@ -451,6 +451,30 @@ test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', ()
   assert.equal(doc.sampleSnapshots[0].productionDate, '2026-08-11');
 });
 
+test('enrichExternalCoaDocumentsWithErpLots adds the ERP Lot to a COA request row', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26040023',
+    Line: 10000,
+    ItemNo: 'F-BPR-100X60',
+    TradeName: 'Trade WP',
+    CommonName: 'BISPYRIBAC-SODIUM 20% WP',
+    remark: 'ส่งของพร้อมเอกสาร COA',
+  }]);
+
+  const [enriched] = router.enrichExternalCoaDocumentsWithErpLots([source], {
+    stockRows: [{
+      item_no: 'F-BPR-100X60',
+      'Lot Description': '26S-BPR20-080-091069',
+      stock_qty: 10,
+    }],
+    mfRows: [],
+  });
+
+  assert.equal(enriched.sampleSnapshots[0].lotNo, '26S-BPR20-080-091069');
+  assert.equal(enriched.sampleSnapshots[0].batchNo, '080');
+  assert.equal(enriched.sampleSnapshots[0].productionDate, '2026-10-09');
+});
+
 test('manual route creates an ERP-linked COA without a petition and hides the ERP request row', async () => {
   const originals = {
     create: CoaDocument.create, find: CoaDocument.find, auditCreate: CoaAuditLog.create,
@@ -464,6 +488,7 @@ test('manual route creates an ERP-linked COA without a petition and hides the ER
     global.fetch = async () => ({
       ok: true, status: 200,
       text: async () => JSON.stringify([{ SaleOrderNo: 'SO1', Line: 10000, ItemNo: 'FC-1', CommonName: 'Glyphosate 48% SL', remark: 'COA' }]),
+      json: async () => [],
     });
     CoaDocument.create = async (payload) => { const doc = { _id: '507f1f77bcf86cd799439088', ...payload }; stored.push(doc); return doc; };
     CoaAuditLog.create = async () => {};
@@ -534,19 +559,31 @@ test('GET / merges external COA requests with stored and Lab-approved requested 
       items: [{ seq: 1, sampleName: 'Trade A', commonName: 'Common A' }],
     }]);
     LabRequest.find = () => ({ lean: async () => [{ petitionId: 'petition-1', sampleSeq: 1 }] });
-    global.fetch = async () => ({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify([{
-        CustomerName: 'Customer A',
-        SaleOrderNo: 'SO26040020',
-        Line: 10000,
-        TradeName: 'Carval',
-        CommonName: 'SPIRODICLOFEN 24 % W/V SC',
-        UpdateDate: '2026-04-02T00:00:00.000Z',
-        remark: 'send with COA',
-      }]),
-    });
+    global.fetch = async (url) => {
+      if (String(url).includes('/API/COA')) return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify([{
+          CustomerName: 'Customer A',
+          SaleOrderNo: 'SO26040020',
+          Line: 10000,
+          ItemNo: 'FC-CAVAL-1X16',
+          TradeName: 'Carval',
+          CommonName: 'SPIRODICLOFEN 24 % W/V SC',
+          UpdateDate: '2026-04-02T00:00:00.000Z',
+          remark: 'send with COA',
+        }]),
+      };
+      if (String(url).includes('stock-all-item')) return {
+        ok: true,
+        json: async () => [{
+          item_no: 'FC-CAVAL-1X16',
+          lot_no: '26S-SPD24-018-180469',
+          stock_qty: 10,
+        }],
+      };
+      return { ok: true, json: async () => [] };
+    };
 
     const res = await invoke('/', 'get');
 
@@ -556,6 +593,10 @@ test('GET / merges external COA requests with stored and Lab-approved requested 
       'external-coa-request-SO26040020-10000',
       'stored-coa',
     ]);
+    const external = res.body.items.find((item) => item._id === 'external-coa-request-SO26040020-10000');
+    assert.equal(external.sampleSnapshots[0].lotNo, '26S-SPD24-018-180469');
+    assert.equal(external.sampleSnapshots[0].batchNo, '018');
+    assert.equal(external.sampleSnapshots[0].productionDate, '2026-04-18');
   } finally {
     CoaDocument.find = originals.coaFind;
     Petition.find = originals.petitionFind;
