@@ -440,15 +440,15 @@ test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', ()
   const [doc] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO26040022',
     Line: 10000,
-    ItemNo: 'F-TWI25-1000X12',
+    ItemNo: 'F-BROML0_005',
     TradeName: 'Trade A',
-    CommonName: 'PACLOBUTRAZOL 25% SC',
-    LotNo: '26S-PCB25-480-091069',
+    CommonName: 'BROMADIOLONE 0.005% W/W GR',
+    LotNo: 'NEW-26S-BRM0.005-GR(ER)-176-110869',
     remark: 'COA',
   }]);
 
-  assert.equal(doc.sampleSnapshots[0].lotNo, '26S-PCB25-480-091069');
-  assert.equal(doc.sampleSnapshots[0].productionDate, '2026-10-09');
+  assert.equal(doc.sampleSnapshots[0].lotNo, 'NEW-26S-BRM0.005-GR(ER)-176-110869');
+  assert.equal(doc.sampleSnapshots[0].productionDate, '2026-08-11');
 });
 
 test('manual route creates an ERP-linked COA without a petition and hides the ERP request row', async () => {

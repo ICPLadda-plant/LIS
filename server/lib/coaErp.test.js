@@ -236,6 +236,27 @@ test('stock LOT autofill preserves the full LOT while using its real batch and p
   assert.equal(result.stockCandidates[0].batchNo, '480');
 });
 
+test('dated ERP Lot No. overrides stale request values for the COA production date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'Trade A',
+      commonName: 'BROMADIOLONE 0.005% W/W GR',
+      batchNo: 'OLD-BATCH',
+      productionDate: '2026-06-18',
+    }],
+    externalCoaRequest: { itemNo: 'F-BROML0_005' },
+  }, [{
+    item_no: 'F-BROML0_005',
+    lot_no: 'NEW-26S-BRM0.005-GR(ER)-176-110869',
+    stock_qty: 100,
+  }], []);
+
+  assert.equal(result.sample.lotNo, 'NEW-26S-BRM0.005-GR(ER)-176-110869');
+  assert.equal(result.sample.batchNo, '176');
+  assert.equal(result.sample.productionDate, '2026-08-11');
+});
+
 test('dated ERP Lot Description overrides stale Lot and Batch values', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
