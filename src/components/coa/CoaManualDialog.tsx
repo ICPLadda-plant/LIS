@@ -16,7 +16,7 @@ import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/
 
 const formLabels = {
   standard: "มาตรฐาน",
-  grWpSp: "WG / WP / ST / GR / DS / SP / GB",
+  grWpSp: "WG / WP / ST / GR / DS / SP / SG / GB",
   liquid: "ยาน้ำ",
   bromadiolone0005: "Bromadiolone 0.005%",
 } as const;

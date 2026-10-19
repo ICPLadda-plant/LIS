@@ -77,7 +77,7 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].samples[0].rows[0].criteria).toBe("48% ± 2.40");
   });
 
-  it.each(["GR", "DS", "WP", "WG", "GB", "ST", "SP"])(
+  it.each(["GR", "DS", "WP", "WG", "GB", "ST", "SP", "SG"])(
     "uses the special COA form for common names ending with %s",
     (suffix) => {
       const doc = {
@@ -88,15 +88,18 @@ describe("buildCoaReportPages", () => {
     },
   );
 
-  it("lets the SP suffix override the Bromadiolone wax-block form", () => {
-    const doc = {
-      sampleSnapshots: [{ itemSeq: 1, commonName: "BROMADIOLONE 0.005% SP" }],
-    } as CoaDocument;
+  it.each(["WP", "SG", "GB", "WG", "ST", "SP"])(
+    "lets the %s suffix override the Bromadiolone wax-block form",
+    (suffix) => {
+      const doc = {
+        sampleSnapshots: [{ itemSeq: 1, commonName: `BROMADIOLONE 0.005% ${suffix}` }],
+      } as CoaDocument;
 
-    const [page] = buildCoaReportPages(doc);
+      const [page] = buildCoaReportPages(doc);
 
-    expect(page.template).toBe("grWpSp");
-  });
+      expect(page.template).toBe("grWpSp");
+    },
+  );
 
   it("uses the number before % in the common name for AI tolerance criteria", () => {
     const doc = {

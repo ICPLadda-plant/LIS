@@ -66,13 +66,13 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("05/09/2026");
   });
 
-  it("uses the attached sand layout when Bromadiolone ends with SP", () => {
+  it("uses the attached sand layout when Bromadiolone ends with SG", () => {
     const pages = buildCoaReportPages({
       coaNo: "00092026",
       sampleSnapshots: [{
         itemSeq: 1,
         sampleName: "Sand Bait",
-        commonName: "BROMADIOLONE 0.005% SP",
+        commonName: "BROMADIOLONE 0.005% SG",
         batchNo: "B-999",
         productionDate: "2026-08-15",
       }],

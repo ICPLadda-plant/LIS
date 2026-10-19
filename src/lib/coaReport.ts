@@ -1,6 +1,6 @@
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
 import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
-import { isGrWpSpCommonName, isSpCommonName } from "@/lib/coaFormulation";
+import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { formatDate as formatDisplayDate } from "@/lib/dateTime";
 
 export type CoaReportTemplateKind = "standard" | "grWpSp" | "liquid" | "bromadiolone0005";
@@ -109,9 +109,8 @@ function dateOfAnalysis(rows: CoaResultSnapshot[]): string {
 }
 
 function templateKindFor(samples: CoaReportSample[]): CoaReportTemplateKind {
-  if (samples.some((sample) => isSpCommonName(sample.commonName))) return "grWpSp";
-  if (samples.some((sample) => isBromadiolone0005CommonName(sample.commonName))) return "bromadiolone0005";
   if (samples.some((sample) => isGrWpSpCommonName(sample.commonName))) return "grWpSp";
+  if (samples.some((sample) => isBromadiolone0005CommonName(sample.commonName))) return "bromadiolone0005";
   if (samples.some((sample) => isLiquidCommonName(sample.commonName))) return "liquid";
   return "standard";
 }

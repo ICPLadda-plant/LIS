@@ -1,11 +1,7 @@
-const GR_WP_SP_FORMULATIONS = new Set(["WG", "WP", "ST", "GR", "DS", "SP", "GB"]);
+const GR_WP_SP_FORMULATIONS = new Set(["WG", "WP", "ST", "GR", "DS", "SP", "SG", "GB"]);
 
 function formulationSuffix(commonName?: string): string {
   return commonName?.trim().toUpperCase().match(/\b([A-Z]{2,3})$/)?.[1] || "";
-}
-
-export function isSpCommonName(commonName?: string): boolean {
-  return formulationSuffix(commonName) === "SP";
 }
 
 export function isGrWpSpCommonName(commonName?: string): boolean {

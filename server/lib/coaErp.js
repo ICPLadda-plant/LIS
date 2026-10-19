@@ -7,7 +7,7 @@ const MF_URLS = [
 ];
 const STOCK_URL = 'https://n8n-plant.icpladda.com/webhook/api/stock-all-item';
 const EXCLUDED_AI_SUBMITTER = '\u0e27\u0e18\u0e32\u0e18\u0e23';
-const GR_WP_SP_FORMULATIONS = new Set(['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'GB']);
+const GR_WP_SP_FORMULATIONS = new Set(['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'SG', 'GB']);
 const LEGACY_FORMULATIONS = new Set(['EC', 'SC', 'SL', 'WG', 'WP', 'GR', 'SP', 'ME', 'EW', 'ZC']);
 const LEGACY_IGNORED_TOKENS = new Set([
   ...LEGACY_FORMULATIONS,
@@ -1010,9 +1010,8 @@ function resultRowsFromQc(qcResults, commonName, options = {}) {
 function formKindForCommonName(commonName) {
   const value = text(commonName).toUpperCase();
   const formulation = value.match(/\b([A-Z]{2,3})$/)?.[1] || '';
-  if (formulation === 'SP') return 'grWpSp';
-  if (/^BROMADIOLONE\s+0\.005%(?:\s|$)/.test(value)) return 'bromadiolone0005';
   if (GR_WP_SP_FORMULATIONS.has(formulation)) return 'grWpSp';
+  if (/^BROMADIOLONE\s+0\.005%(?:\s|$)/.test(value)) return 'bromadiolone0005';
   if (/\b(SL|EC|EW|SC|ME|ZC)$/.test(value)) return 'liquid';
   return 'standard';
 }

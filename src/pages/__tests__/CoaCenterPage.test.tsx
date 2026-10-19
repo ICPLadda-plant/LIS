@@ -536,7 +536,7 @@ describe("CoaCenterPage", () => {
     await waitFor(() => expect(screen.getByLabelText("Batch No. *")).toHaveValue("FG260902-008"));
     expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-09-02");
     expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%");
-    expect(screen.getByText("แบบฟอร์ม: WG / WP / ST / GR / DS / SP / GB")).toBeInTheDocument();
+    expect(screen.getByText("แบบฟอร์ม: WG / WP / ST / GR / DS / SP / SG / GB")).toBeInTheDocument();
 
     fireEvent.change(within(screen.getByRole("dialog")).getByRole("combobox"), {
       target: { value: "26S-PCB25-480-091069" },
