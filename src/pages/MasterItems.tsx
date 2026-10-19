@@ -1424,6 +1424,18 @@ export default function MasterItems() {
                                     </Badge>
                                   )}
                                 </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-1" aria-label="กลุ่มสินค้า">
+                                  <span className="text-xs text-muted-foreground">กลุ่ม:</span>
+                                  {groupIdsFor(originalItemNo).length > 0 ? (
+                                    groupIdsFor(originalItemNo).map((id) => groupNameById.has(id) && (
+                                      <Badge key={id} variant="secondary" className="max-w-full whitespace-normal break-words">
+                                        {groupNameById.get(id)}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">ยังไม่จัดกลุ่ม</span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </TableCell>
@@ -2986,6 +2998,15 @@ function MasterItemDetailDrawer({
             </div>
           </section>
 
+          <section className="space-y-2">
+            <h3 className="text-base font-semibold text-foreground">กลุ่มสินค้า</h3>
+            <div className="flex flex-wrap gap-1">
+              {memberGroups.length > 0 ? memberGroups.map((grp) => (
+                <Badge key={grp._id} variant="secondary" className="max-w-full whitespace-normal break-words">{grp.name}</Badge>
+              )) : <p className="text-sm text-muted-foreground">ยังไม่จัดกลุ่ม</p>}
+            </div>
+          </section>
+
           <section className="space-y-3">
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">บรรจุ / น้ำหนัก</h3>
             <div className="grid grid-cols-2 gap-4">
@@ -2994,17 +3015,6 @@ function MasterItemDetailDrawer({
               ))}
             </div>
           </section>
-
-          {memberGroups.length > 0 && (
-            <section className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">กลุ่มที่สังกัด</h3>
-              <div className="flex flex-wrap gap-1">
-                {memberGroups.map((grp) => (
-                  <Badge key={grp._id} variant="secondary">{grp.name}</Badge>
-                ))}
-              </div>
-            </section>
-          )}
 
           <section className="space-y-2">
             <div className="flex items-center justify-between">
