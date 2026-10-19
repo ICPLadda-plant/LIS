@@ -179,7 +179,17 @@ function normalizeIsoDate(value) {
 
 function lotDate(lotNo) {
   const value = text(lotNo);
-  const labeledDate = value.match(/-([0-3]\d)([01]\d)(\d{2})$/);
+  const fgDate = value.match(/^(?:FG)?(\d{2})(\d{2})(\d{2})(?:-|$)/i);
+  if (fgDate) {
+    const year = 2000 + Number(fgDate[1]);
+    const month = Number(fgDate[2]);
+    const day = Number(fgDate[3]);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  const labeledDate = value.match(/([0-3]\d)([01]\d)(\d{2})$/);
   if (labeledDate) {
     const day = Number(labeledDate[1]);
     const month = Number(labeledDate[2]);
@@ -189,9 +199,7 @@ function lotDate(lotNo) {
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
   }
-  const match = value.match(/^(?:FG)?(\d{2})(\d{2})(\d{2})-/i);
-  if (!match) return '';
-  return `20${match[1]}-${match[2]}-${match[3]}`;
+  return '';
 }
 
 function isFgLotDescription(lotNo) {

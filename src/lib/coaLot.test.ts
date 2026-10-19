@@ -4,6 +4,7 @@ import { productionDateFromLotNo } from "./coaLot";
 describe("productionDateFromLotNo", () => {
   it("reads the six-digit Buddhist date at the end of Lot No.", () => {
     expect(productionDateFromLotNo("26S-PCB25-480-091069")).toBe("2026-10-09");
+    expect(productionDateFromLotNo("26S-PCB25-480X091069")).toBe("2026-10-09");
   });
 
   it("reads the six digits after FG as YYMMDD", () => {

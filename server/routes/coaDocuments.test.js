@@ -436,6 +436,21 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   assert.equal(docs[0].externalCoaRequest.appearance, 'เม็ดยาสีแดง');
 });
 
+test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', () => {
+  const [doc] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26040022',
+    Line: 10000,
+    ItemNo: 'F-TWI25-1000X12',
+    TradeName: 'Trade A',
+    CommonName: 'PACLOBUTRAZOL 25% SC',
+    LotNo: '26S-PCB25-480-091069',
+    remark: 'COA',
+  }]);
+
+  assert.equal(doc.sampleSnapshots[0].lotNo, '26S-PCB25-480-091069');
+  assert.equal(doc.sampleSnapshots[0].productionDate, '2026-10-09');
+});
+
 test('manual route creates an ERP-linked COA without a petition and hides the ERP request row', async () => {
   const originals = {
     create: CoaDocument.create, find: CoaDocument.find, auditCreate: CoaAuditLog.create,

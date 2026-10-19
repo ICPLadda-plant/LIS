@@ -426,7 +426,9 @@ function externalCoaRowToDocument(row) {
   const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
   const lotDescription = externalCoaLotDescription(row);
   const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']) || lotDescription;
-  const productionDate = lotSnapshot(lotDescription).productionDate || externalCoaProductionDate(row);
+  const productionDate = lotSnapshot(lotNo).productionDate
+    || lotSnapshot(lotDescription).productionDate
+    || externalCoaProductionDate(row);
   const date = externalCoaDate(row);
   const updatedAt = firstExternalValue(row, ['UpdateDate']) || date;
   const sampleSnapshot = {

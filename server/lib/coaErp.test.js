@@ -64,6 +64,7 @@ test('finished-product LOT supplies the batch segment and Buddhist production da
     batchNo: '480',
     productionDate: '2026-10-09',
   });
+  assert.equal(lotSnapshot('26S-PCB25-480X091069').productionDate, '2026-10-09');
 });
 
 test('normalizes Buddhist-era dates from the legacy Lab database', () => {
