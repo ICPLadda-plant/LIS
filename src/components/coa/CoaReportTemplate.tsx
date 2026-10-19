@@ -42,11 +42,15 @@ export const COA_REPORT_CSS = `
 .coa-root h1, .coa-root th, .coa-title, .print-heading { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT} !important; }
 `;
 
-function SelectedCoaRows({ sample }: { sample: CoaReportSample }) {
+function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSample; hideDensity?: boolean }) {
+  const rows = hideDensity
+    ? sample.rows.filter((row) => !/\bdensity\b/i.test(row.testItem || ""))
+    : sample.rows;
+
   return (
     <>
       <tr><td colSpan={2}>BATCH NO.</td><td>{sample.batchLabel === "-" ? "" : sample.batchLabel}</td></tr>
-      {sample.rows.map((row, index) => (
+      {rows.map((row, index) => (
         <tr key={index}>
           <td>{row.testItem}</td>
           <td>{row.criteria === "-" ? "" : row.criteria}</td>
@@ -85,7 +89,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
           </tr>
         </thead>
         <tbody>
-          {sample?.selectedResultsOnly ? <SelectedCoaRows sample={sample} /> : <>
+          {sample?.selectedResultsOnly ? <SelectedCoaRows sample={sample} hideDensity /> : <>
           <tr>
             <td>Appearance</td>
             <td>{appearance?.criteria === "-" ? "" : appearance?.criteria}</td>

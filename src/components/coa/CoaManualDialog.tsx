@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
-import { aiContentTestItemForCommonName } from "@/lib/coaFormulation";
+import { aiContentTestItemForCommonName, isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { productionDateFromLotNo } from "@/lib/coaLot";
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
 
@@ -30,13 +30,16 @@ type ResultForm = {
 };
 
 function resultFieldsForCommonName(commonName?: string): Array<[keyof ResultForm, string, "date" | "text"]> {
-  return [
+  const fields: Array<[keyof ResultForm, string, "date" | "text"]> = [
     ["analysisDate", "Date of analysis", "date"],
     ["aiCriteria", "เกณฑ์ความคลาดเคลื่อน", "text"],
     ["density", "Density at 30°C (g/cm³)", "text"],
     ["aiResult", aiContentTestItemForCommonName(commonName), "text"],
     ["appearance", "Appearance", "text"],
   ];
+  return isGrWpSpCommonName(commonName)
+    ? fields.filter(([field]) => field !== "density")
+    : fields;
 }
 
 function emptyResultForm(): ResultForm {
@@ -66,12 +69,15 @@ function resultFormFromRows(rows: CoaResultSnapshot[], commonName?: string): Res
 
 function resultRowsFromForm(itemSeq: number, values: ResultForm, commonName?: string): CoaResultSnapshot[] {
   const aiResult = values.aiResult.trim();
-  return [
+  const rows: CoaResultSnapshot[] = [
     { itemSeq, testItem: "Appearance", result: "Conform", criteria: values.appearance.trim(), method: "Visual", unit: "" },
     { itemSeq, testItem: aiContentTestItemForCommonName(commonName), result: aiResult && /%$/.test(aiResult) ? aiResult : aiResult ? `${aiResult}%` : "", criteria: values.aiCriteria.trim(), unit: "%", method: "" },
     { itemSeq, testItem: "Density at 30°C (g/cm³)", result: values.density.trim(), criteria: "-", unit: "g/cm³", method: "DMA 501" },
     { itemSeq, testItem: "Date of analysis", result: values.analysisDate.trim(), criteria: "-", unit: "", method: "" },
   ];
+  return isGrWpSpCommonName(commonName)
+    ? rows.filter((row) => !/\bdensity\b/i.test(row.testItem || ""))
+    : rows;
 }
 
 type LabAiLookupStatus = "idle" | "waiting" | "searching" | "found" | "not-found" | "error";
@@ -260,7 +266,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
             </Badge>
             <Badge variant="blue-soft">แบบฟอร์ม: {formLabels[autofill.data.form.template]}</Badge>
             {autofill.data.dataSources.legacyLab && <Badge variant="blue-soft">มีผล Lab เดิม</Badge>}
-            {autofill.data.dataSources.density && <Badge variant="blue-soft">มี Density</Badge>}
+            {autofill.data.dataSources.density && !isGrWpSpCommonName(sample.commonName) && <Badge variant="blue-soft">มี Density</Badge>}
           </div>
           <p className="text-muted-foreground">
             {autofill.data.match
@@ -304,7 +310,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
         </div>
         <div className="space-y-3">
           <h2 className="text-base font-semibold text-foreground">ผลทดสอบ</h2>
-          <p className="text-sm text-muted-foreground">ระบบดึง 5 ข้อมูลจำเป็นจากผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน</p>
+          <p className="text-sm text-muted-foreground">ระบบดึง {resultFields.length} ข้อมูลจำเป็นจากผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {resultFields.map(([key, label, type]) => <div key={key} className="space-y-1">
               <Label htmlFor={`manual-result-${key}`}>{label} *</Label>

@@ -96,6 +96,35 @@ describe("CoaReportTemplate", () => {
     expect(screen.queryByText(/Density at 30/)).not.toBeInTheDocument();
   });
 
+  it("removes a stored Density row from an ERP dry formulation COA", () => {
+    const pages = buildCoaReportPages({
+      sourceType: "erpManual",
+      coaNo: "00102026",
+      sampleSnapshots: [{
+        itemSeq: 1,
+        sampleName: "Dry Product",
+        commonName: "PRODUCT 10% SP",
+        batchNo: "B-100",
+      }],
+      resultSnapshots: [
+        { itemSeq: 1, testItem: "Appearance", criteria: "White powder", result: "Conform" },
+        { itemSeq: 1, testItem: "%AI content (W/W)", criteria: "10% ± 0.50", result: "10.1%" },
+        { itemSeq: 1, testItem: "Density at 30°C (g/cm³)", criteria: "-", result: "1.120" },
+        { itemSeq: 1, testItem: "Date of analysis", criteria: "-", result: "2026-10-19" },
+      ],
+    } as Parameters<typeof buildCoaReportPages>[0]);
+
+    expect(pages[0].template).toBe("grWpSp");
+    expect(pages[0].samples[0].selectedResultsOnly).toBe(true);
+    render(<CoaReportTemplate pages={pages} />);
+
+    expect(screen.getByText("Appearance")).toBeInTheDocument();
+    expect(screen.getByText("%AI content (W/W)")).toBeInTheDocument();
+    expect(screen.getByText("Date of analysis")).toBeInTheDocument();
+    expect(screen.queryByText(/Density at 30/)).not.toBeInTheDocument();
+    expect(screen.queryByText("1.120")).not.toBeInTheDocument();
+  });
+
   it("renders the liquid formulation COA form", () => {
     const page: CoaReportPage = {
       template: "liquid",
