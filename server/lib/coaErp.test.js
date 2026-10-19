@@ -45,6 +45,7 @@ test('uses the attached dry-product COA form for every requested common-name suf
   for (const suffix of ['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'GB']) {
     assert.equal(formKindForCommonName(`THIAMETHOXAM 25% ${suffix}`), 'grWpSp');
   }
+  assert.equal(formKindForCommonName('BROMADIOLONE 0.005% SP'), 'grWpSp');
   for (const suffix of ['SL', 'EC', 'EW', 'SC', 'ME', 'ZC']) {
     assert.equal(formKindForCommonName(`GLYPHOSATE 48% W/V ${suffix}`), 'liquid');
   }

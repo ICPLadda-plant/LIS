@@ -66,6 +66,36 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("05/09/2026");
   });
 
+  it("uses the attached sand layout when Bromadiolone ends with SP", () => {
+    const pages = buildCoaReportPages({
+      coaNo: "00092026",
+      sampleSnapshots: [{
+        itemSeq: 1,
+        sampleName: "Sand Bait",
+        commonName: "BROMADIOLONE 0.005% SP",
+        batchNo: "B-999",
+        productionDate: "2026-08-15",
+      }],
+      resultSnapshots: [
+        { itemSeq: 1, testItem: "Appearance", criteria: "Red sand granules", result: "Conform" },
+        { itemSeq: 1, testItem: "%AI content (W/W)", result: "0.0051%" },
+        { itemSeq: 1, testItem: "Date of analysis", result: "2026-08-20" },
+      ],
+    } as Parameters<typeof buildCoaReportPages>[0]);
+
+    expect(pages[0].template).toBe("grWpSp");
+    render(<CoaReportTemplate pages={pages} />);
+
+    const section = screen.getByText("CERTIFICATE OF ANALYSIS").closest("section")!;
+    const rows = within(section).getAllByRole("row");
+    const appearanceIndex = rows.findIndex((row) => row.textContent?.includes("Appearance"));
+    const batchIndex = rows.findIndex((row) => row.textContent?.includes("BATCH NO."));
+    expect(appearanceIndex).toBeLessThan(batchIndex);
+    expect(screen.getByText("%AI content (W/W)")).toBeInTheDocument();
+    expect(screen.queryByText("Wax block size")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Density at 30/)).not.toBeInTheDocument();
+  });
+
   it("renders the liquid formulation COA form", () => {
     const page: CoaReportPage = {
       template: "liquid",

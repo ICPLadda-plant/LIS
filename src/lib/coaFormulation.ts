@@ -4,6 +4,10 @@ function formulationSuffix(commonName?: string): string {
   return commonName?.trim().toUpperCase().match(/\b([A-Z]{2,3})$/)?.[1] || "";
 }
 
+export function isSpCommonName(commonName?: string): boolean {
+  return formulationSuffix(commonName) === "SP";
+}
+
 export function isGrWpSpCommonName(commonName?: string): boolean {
   return GR_WP_SP_FORMULATIONS.has(formulationSuffix(commonName));
 }

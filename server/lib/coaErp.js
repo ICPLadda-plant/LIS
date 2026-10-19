@@ -1010,6 +1010,7 @@ function resultRowsFromQc(qcResults, commonName, options = {}) {
 function formKindForCommonName(commonName) {
   const value = text(commonName).toUpperCase();
   const formulation = value.match(/\b([A-Z]{2,3})$/)?.[1] || '';
+  if (formulation === 'SP') return 'grWpSp';
   if (/^BROMADIOLONE\s+0\.005%(?:\s|$)/.test(value)) return 'bromadiolone0005';
   if (GR_WP_SP_FORMULATIONS.has(formulation)) return 'grWpSp';
   if (/\b(SL|EC|EW|SC|ME|ZC)$/.test(value)) return 'liquid';

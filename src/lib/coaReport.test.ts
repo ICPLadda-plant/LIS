@@ -88,6 +88,16 @@ describe("buildCoaReportPages", () => {
     },
   );
 
+  it("lets the SP suffix override the Bromadiolone wax-block form", () => {
+    const doc = {
+      sampleSnapshots: [{ itemSeq: 1, commonName: "BROMADIOLONE 0.005% SP" }],
+    } as CoaDocument;
+
+    const [page] = buildCoaReportPages(doc);
+
+    expect(page.template).toBe("grWpSp");
+  });
+
   it("uses the number before % in the common name for AI tolerance criteria", () => {
     const doc = {
       _id: "c-ai",
