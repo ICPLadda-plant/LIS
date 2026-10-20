@@ -69,6 +69,15 @@ async function resultRoundContext(req, res, parameter) {
     res.status(409).json({ error: 'ตัวอย่างรอบนี้ยังไม่เปิด Phase 2 กรุณารอเงื่อนไขของรอบใหม่' });
     return null;
   }
+  // ใบหลัก (ไม่มี sampleRoundId): Phase 2 เปิดเมื่อ currentPhase=2 หรือ timer ครบแล้ว
+  // (lazy advance ยังไม่ทำงานจนกว่าจะมีคนเปิดใบ) — ไม่งั้นกันไว้ฝั่งหน้าเว็บอย่างเดียว
+  if (!sampleRoundId && req.body.phase === 2) {
+    const dueElapsed = petition.phase2DueAt && new Date(petition.phase2DueAt) <= new Date();
+    if ((petition.currentPhase ?? 1) !== 2 && !dueElapsed) {
+      res.status(409).json({ error: 'คำขอนี้ยังไม่เปิด Phase 2 กรุณารอเงื่อนไขตรวจซ้ำ' });
+      return null;
+    }
+  }
   const allowedRoundIds = new Set(['', ...(petition.additionalSampleRequests || []).filter(round => round.side === side && round.status === 'received' && round.items.some(item => item.itemSeq === Number(req.body.itemSeq))).map(round => String(round._id))]);
   return { sampleRoundId, allowedRoundIds };
 }
