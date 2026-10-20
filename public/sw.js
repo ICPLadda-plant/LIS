@@ -1,4 +1,4 @@
-const CACHE_VERSION = "lis-pwa-v1";
+const CACHE_VERSION = "lis-pwa-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,8 @@ const APP_SHELL = [
   "./pwa-icon-180.png",
   "./pwa-icon-192.png",
   "./pwa-icon-512.png",
+  "./pwa-maskable-192.png",
+  "./pwa-maskable-512.png",
 ];
 
 function isCacheableRequest(request) {
