@@ -12,6 +12,8 @@ interface TimerFieldProps {
   value: unknown;
   onChange: (val: unknown) => void;
   disabled?: boolean;
+  // เหตุผลที่ยังเริ่มจับเวลาไม่ได้ (เช่น ยังกรอกค่าก่อนอบไม่ครบ) — ปิดปุ่มเริ่มและแสดงข้อความนี้
+  startBlockedReason?: string;
 }
 
 function formatRemaining(ms: number): string {
@@ -31,7 +33,7 @@ function formatRemaining(ms: number): string {
   return `${d}d ${h}h`;
 }
 
-export function TimerField({ field, value, onChange, disabled = false }: TimerFieldProps) {
+export function TimerField({ field, value, onChange, disabled = false, startBlockedReason }: TimerFieldProps) {
   const startedAt = typeof value === "string" && value ? value : null;
   const duration = timerDurationMs(field);
 
@@ -45,20 +47,25 @@ export function TimerField({ field, value, onChange, disabled = false }: TimerFi
 
   if (!startedAt) {
     return (
-      <div className="flex items-center gap-3">
-        <Button
-          size="sm"
-          onClick={() => onChange(new Date().toISOString())}
-          disabled={disabled}
-          className="h-8"
-          type="button"
-        >
-          <Play className="h-3.5 w-3.5 mr-1" />
-          เริ่มจับเวลา
-        </Button>
-        <span className="text-xs text-grey-500">
-          ระยะเวลา {formatTimerHuman(field.timerDurationSec ?? 0)}
-        </span>
+      <div className="space-y-1">
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            onClick={() => onChange(new Date().toISOString())}
+            disabled={disabled || !!startBlockedReason}
+            className="h-8"
+            type="button"
+          >
+            <Play className="h-3.5 w-3.5 mr-1" />
+            เริ่มจับเวลา
+          </Button>
+          <span className="text-xs text-grey-500">
+            ระยะเวลา {formatTimerHuman(field.timerDurationSec ?? 0)}
+          </span>
+        </div>
+        {startBlockedReason && (
+          <p role="status" className="text-xs text-amber-700">{startBlockedReason}</p>
+        )}
       </div>
     );
   }

@@ -33,7 +33,7 @@ import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
 import { aiGridClass, calculateAi, calculatedAiFieldKind, formatCalculatedAi } from '@/lib/aiCalculation';
-import { visibleFieldsForPhase } from '@/lib/phaseRetest';
+import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
@@ -191,6 +191,7 @@ interface TestFieldProps {
   onPull?: (reading: InstrumentReading) => void;
   outputResult?: ResolvedOutput | null;
   headerMeta?: ReactNode;
+  timerStartBlockedReason?: string;
 }
 
 function TestField({
@@ -212,6 +213,7 @@ function TestField({
   onPull,
   outputResult,
   headerMeta,
+  timerStartBlockedReason,
 }: TestFieldProps) {
   const strVal = value == null ? '' : String(value);
   const strNote = noteValue == null ? '' : String(noteValue);
@@ -261,7 +263,7 @@ function TestField({
       </div>
 
       {field.type === 'timer' ? (
-        <TimerField field={field} value={value} onChange={onChange} disabled={effectivelyDisabled} />
+        <TimerField field={field} value={value} onChange={onChange} disabled={effectivelyDisabled} startBlockedReason={timerStartBlockedReason} />
       ) : field.type === 'enum' ? (
         <Select
           value={strVal || '__none__'}
@@ -787,6 +789,17 @@ export default function LabTestingDetailPage() {
   };
 
   const valuesForPhase = (phase: PetitionPhase) => (phase === 2 ? valuesPhase2 : values);
+
+  // ต้องกรอกค่าก่อนอบ (Phase 1) ของรายการให้ครบก่อนเริ่มจับเวลาตัว trigger เช่น อบ 14 วัน
+  const phaseTriggerReasonFor = (item: PetitionItem): string | undefined =>
+    phaseTriggerBlockedReason(missingValuesBeforePhaseTrigger(
+      matchLabParametersForItem(petition, item, allParameters, idsFor(item)).filter((param) => param.scope === 'lab'),
+      (param) => {
+        const k = resultKey(item.seq, param._id!);
+        return param.multiEntry ? getEntryValues({ entries: entriesByKey[k] }, param) : [values[k] ?? {}];
+      },
+      (field) => expandFieldForItem(field, item.commonName, { category: petitionCategory }),
+    ));
   const savesForPhase = (phase: PetitionPhase) => (phase === 2 ? saveStatesPhase2 : saveStates);
 
   // current array value for a `multiple` field (always returns an array for editing)
@@ -1341,6 +1354,7 @@ export default function LabTestingDetailPage() {
                                     noteSaveInfo={saveInfoSrc?.[noteLabel]}
                                     disabled={fieldDisabled}
                                     readOnly={!!aiFieldKind}
+                                    timerStartBlockedReason={unit.field.triggersPhase2 && effectivePhase === 1 ? phaseTriggerReasonFor(item) : undefined}
                                     instrumentSource={srcField}
                                     provenance={provenance}
                                     onPull={

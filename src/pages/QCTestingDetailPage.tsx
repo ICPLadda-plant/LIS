@@ -20,7 +20,7 @@ import { PhotoField } from '@/components/lis/PhotoField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { visibleFieldsForPhase } from '@/lib/phaseRetest';
+import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
@@ -118,6 +118,7 @@ interface TestFieldProps {
   outlierResult?: OutlierCheckResult | null;
   outputResult?: ResolvedOutput | null;
   hideStandard?: boolean;
+  timerStartBlockedReason?: string;
 }
 
 function TestField({
@@ -139,6 +140,7 @@ function TestField({
   outlierResult,
   outputResult,
   hideStandard = false,
+  timerStartBlockedReason,
 }: TestFieldProps) {
   const strVal = value == null ? '' : String(value);
   const strNote = noteValue == null ? '' : String(noteValue);
@@ -186,7 +188,7 @@ function TestField({
 
       {/* Input by type */}
       {field.type === 'timer' ? (
-        <TimerField field={field} value={value} onChange={onChange} disabled={disabled} />
+        <TimerField field={field} value={value} onChange={onChange} disabled={disabled} startBlockedReason={timerStartBlockedReason} />
       ) : field.type === 'enum' ? (
         <Select value={strVal || '__none__'} onValueChange={(v) => onChange(v === '__none__' ? '' : v)} disabled={disabled}>
           <SelectTrigger
@@ -911,6 +913,17 @@ export default function QCTestingDetailPage() {
   const valuesForPhase = (phase: PetitionPhase) => (phase === 2 ? valuesPhase2 : values);
   const savesForPhase = (phase: PetitionPhase) => (phase === 2 ? saveStatesPhase2 : saveStates);
 
+  // ต้องกรอกค่าก่อนอบ (Phase 1) ของรายการให้ครบก่อนเริ่มจับเวลาตัว trigger เช่น อบ 14 วัน
+  const phaseTriggerReasonFor = (item: PetitionItem): string | undefined =>
+    phaseTriggerBlockedReason(missingValuesBeforePhaseTrigger(
+      matchParametersForItem(item, parameters, idsFor(item), { petitionCategory }),
+      (param) => {
+        const k = resultKey(item.seq, param._id!);
+        return param.multiEntry ? getEntryValues({ entries: entriesByKey[k] }, param) : [values[k] ?? {}];
+      },
+      (field) => expandFieldForItem(field, item.commonName, { includeRestrictedStandards: canSeeRestrictedStandards, category: petitionCategory }),
+    ));
+
   // current array value for a `multiple` field (always returns an array for editing)
   const readMultiple = (values: Record<string, unknown> | undefined, label: string): unknown[] => {
     const v = values?.[label];
@@ -1479,6 +1492,7 @@ export default function QCTestingDetailPage() {
                           saveInfo={saveInfoSrc?.[unit.key]}
                           noteSaveInfo={saveInfoSrc?.[noteLabel]}
                           disabled={unitDisabled}
+                          timerStartBlockedReason={unit.field.triggersPhase2 && effectivePhase === 1 ? phaseTriggerReasonFor(item) : undefined}
                           onChange={(val) => {
                             if (aiFieldKind) return;
                             onUnitChange(unit.key, val);
