@@ -22,6 +22,7 @@ type ReceiveFields = Pick<
   | 'labReceivedBy'
   | 'labCompletedAt'
   | 'labApprovedAt'
+  | 'labRecheckRequestedAt'
   | 'qcReceivedAt'
   | 'qcReceivedBy'
   | 'qcCompletedAt'
@@ -64,10 +65,24 @@ export function labTrackStatusBadge(p: ReceiveFields & { status: PetitionStatus 
   return statusBadge(p.status);
 }
 
+/**
+ * Re-check ฝั่ง Lab ที่ยังไม่ถูกปิดด้วยการออกผลของหัวหน้า Lab — วันที่ทำซ้ำอาจไม่ใช่
+ * คนเดิม จึงต้องให้งานกลับมาบนบอร์ด Assign เพื่อเปลี่ยนผู้รับงานได้
+ */
+export function isLabRecheckPending(
+  p: Pick<Petition, 'labRecheckRequestedAt' | 'labApprovedAt'> & { status: PetitionStatus },
+): boolean {
+  if (!p.labRecheckRequestedAt) return false;
+  if (p.status === 'approved' || p.status === 'rejected') return false;
+  if (!p.labApprovedAt) return true;
+  return new Date(p.labApprovedAt).getTime() < new Date(p.labRecheckRequestedAt).getTime();
+}
+
 export function labAssignBoardStatusBadge(
   p: ReceiveFields & { status: PetitionStatus },
   assigned?: boolean,
 ): StatusBadge {
+  if (isLabRecheckPending(p)) return toneBadge('warning', 'Re-check · เปลี่ยนผู้รับงานได้');
   if (assigned) return toneBadge('info', 'assign แล้ว');
   if (!labReceivedAt(p)) return statusBadge('sampleSent');
   return statusBadge('pendingReview');

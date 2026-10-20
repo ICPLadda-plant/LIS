@@ -223,6 +223,16 @@ export default function PetitionAssignPage() {
     { page: 1, limit: 100, status: 'deliveringQC' },
     { refetchOnFocus: true, pollMs: 30_000 },
   );
+  // Re-check อาจเป็นคนอื่นมาทำอีกวัน — ดึงงานเหล่านี้กลับมา (แม้สถานะ success แล้ว) ให้เปลี่ยนผู้รับงานได้
+  const {
+    data: recheckData,
+    loading: recheckLoading,
+    error: recheckError,
+    refresh: refreshRecheck,
+  } = usePetitionList(
+    { page: 1, limit: 100, labRecheckPending: true },
+    { refetchOnFocus: true, pollMs: 30_000 },
+  );
   const [fetchedEmployees, setFetchedEmployees] = useState<EmployeeAssignee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(true);
   const [employeesError, setEmployeesError] = useState<string | null>(null);
@@ -322,8 +332,8 @@ export default function PetitionAssignPage() {
     [registryMethods],
   );
 
-  const loading = pendingLoading || inProgressLoading || staleReceivedLoading || parametersLoading;
-  const error = pendingError || inProgressError || staleReceivedError || (parametersError instanceof Error ? parametersError.message : null);
+  const loading = pendingLoading || inProgressLoading || staleReceivedLoading || recheckLoading || parametersLoading;
+  const error = pendingError || inProgressError || staleReceivedError || recheckError || (parametersError instanceof Error ? parametersError.message : null);
 
   const { data: masterItems = [] } = useQuery<MasterItemRaw[]>({
     queryKey: ['master-items-for-petition-assign'],
@@ -388,14 +398,21 @@ export default function PetitionAssignPage() {
     return map;
   }, [masterItems, simpleMethods]);
 
-  const queuePetitions = useMemo(
-    () => [
+  const queuePetitions = useMemo(() => {
+    // งาน re-check ที่ยัง inProgress ซ้ำกับ inProgressData — กันการ์ดซ้ำด้วย _id
+    const byId = new Map<string, Petition>();
+    [
       ...(pendingData?.items ?? []),
       ...(inProgressData?.items ?? []),
       ...(staleReceivedData?.items ?? []),
-    ].filter((petition) => isVisibleInAssignQueue(petition) && hasAssignableLabParameter(petition, labParameters, groupMembership)),
-    [inProgressData?.items, pendingData?.items, staleReceivedData?.items, labParameters, groupMembership],
-  );
+      ...(recheckData?.items ?? []),
+    ].forEach((petition) => {
+      if (!byId.has(petition._id)) byId.set(petition._id, petition);
+    });
+    return [...byId.values()].filter(
+      (petition) => isVisibleInAssignQueue(petition) && hasAssignableLabParameter(petition, labParameters, groupMembership),
+    );
+  }, [inProgressData?.items, pendingData?.items, staleReceivedData?.items, recheckData?.items, labParameters, groupMembership]);
 
   // Cache substance groups per petition
   const groupsByPetition = useMemo(() => {
@@ -502,6 +519,7 @@ export default function PetitionAssignPage() {
     refreshPending();
     refreshInProgress();
     refreshStaleReceived();
+    refreshRecheck();
   }
 
   const allPetitions = useMemo(

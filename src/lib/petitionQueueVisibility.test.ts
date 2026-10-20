@@ -61,6 +61,19 @@ describe('petitionQueueVisibility', () => {
     expect(isVisibleInAssignQueue(labReceivedPetition)).toBe(true);
   });
 
+  it('brings re-checked Lab work back to the Assign board after success so it can be reassigned', () => {
+    const recheckPetition = {
+      ...receivedStalePetition,
+      status: 'success',
+      assignedTo: { employeeId: 'E123', name: 'คนเดิม' },
+      labReceivedAt: '2026-09-03T07:05:34.767Z',
+      labCompletedAt: '2026-09-03T09:00:00.000Z',
+      labRecheckRequestedAt: '2026-09-04T01:00:00.000Z',
+    } as Petition;
+
+    expect(isVisibleInAssignQueue(recheckPetition)).toBe(true);
+    expect(isVisibleInAssignQueue({ ...recheckPetition, labRecheckRequestedAt: undefined })).toBe(false);  });
+
   it('keeps Lab-received petitions waiting for assignment until an assignee is selected', () => {
     const labReceivedWithoutAssignee = {
       ...receivedStalePetition,

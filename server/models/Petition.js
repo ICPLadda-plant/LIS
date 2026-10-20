@@ -149,6 +149,10 @@ const PetitionSchema = new mongoose.Schema(
     // Lab supervisor approval (ด่านหลังผู้ทดสอบ Lab บันทึกผล — success เกิดหลังขั้นนี้)
     labApprovedAt: Date,
     labApprovedBy: String,
+    // กด Re-check ฝั่ง Lab — คนที่มาทำซ้ำอีกวันอาจไม่ใช่คนเดิม งานจึงกลับไปโชว์บนบอร์ด
+    // Assign ให้เปลี่ยนผู้รับงานได้ จนกว่าหัวหน้า Lab ออกผล (labApprovedAt ใหม่กว่า)
+    labRecheckRequestedAt: Date,
+    labRecheckRequestedBy: String,
     // เหตุผลล่าสุดที่ track ถูกส่งกลับ (เคลียร์เมื่อผู้ทดสอบ re-confirm)
     labReturnNote: String,
     qcReturnNote: String,
