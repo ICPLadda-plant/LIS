@@ -303,7 +303,7 @@ describe("buildApprovalGroups", () => {
 
     // phase-2 row: "after" field with valuesPhase2 value
     expect(phase2Row).toBeDefined();
-    expect(phase2Row!.label).toBe("หลัง");
+    expect(phase2Row!.label).toBe("หลัง · ตรวจซ้ำ Phase 2");
     expect(phase2Row!.value).toBe("25");
     expect(phase2Row!.standardText).toBe("≤ 30 mL");
     expect(phase2Row!.abnormal).toBe(false);
@@ -314,7 +314,47 @@ describe("buildApprovalGroups", () => {
 
     // "before" field must NOT appear in phase-2 rows
     const phase2Labels = rows.filter((r) => r.phase === 2).map((r) => r.label);
-    expect(phase2Labels).not.toContain("ก่อน");
+    expect(phase2Labels).not.toContain("ก่อน · ตรวจซ้ำ Phase 2");
+  });
+
+  it("phase-2: parameter เดิมที่ไม่ใช่ตัว trigger (เช่น %AI) แสดงผลตรวจซ้ำหลังอบ ส่วนตัว trigger ไม่มีแถว Phase 2", () => {
+    const aiParam = param({
+      _id: "ai",
+      name: "%AI",
+      valueFields: [{ label: "ผล", type: "number", standardOperator: "between", standardValue: 9, standardValue2: 11, unit: "%" }],
+    });
+    const ovenParam = param({
+      _id: "oven",
+      name: "อบ 14 วัน",
+      hasPhases: true,
+      valueFields: [{ label: "เวลาอบ", type: "timer", timerUnit: "day", timerDurationSec: 14 * 86400, triggersPhase2: true }],
+    });
+    const phase2Petition = {
+      ...petition(),
+      items: [{ ...petition().items[0], testItems: "%AI, อบ 14 วัน" }],
+      currentPhase: 2,
+      phase2DueAt: "2026-10-01T00:00:00.000Z",
+      phase2TriggeredBy: { parameterId: "oven", fieldLabel: "เวลาอบ", itemSeq: 1, triggeredAt: "2026-09-17T00:00:00.000Z" },
+    } as unknown as Petition;
+    const results = [
+      { itemSeq: 1, parameterId: "ai", values: { ผล: 10 }, valuesPhase2: { ผล: 8 } },
+      { itemSeq: 1, parameterId: "oven", values: { เวลาอบ: "done" }, valuesPhase2: {} },
+    ] as unknown as QCTestResult[];
+
+    const groups = buildApprovalGroups(phase2Petition, [aiParam, ovenParam], results, new Map());
+    const ai = groups[0].params.find((group) => group.parameterId === "ai")!;
+    const oven = groups[0].params.find((group) => group.parameterId === "oven")!;
+
+    expect(ai.rows.map((row) => [row.label, row.value, row.phase, row.abnormal])).toEqual([
+      ["ผล", "10", 1, false],
+      ["ผล · ตรวจซ้ำ Phase 2", "8", 2, true],
+    ]);
+    expect(oven.rows.every((row) => row.phase === 1)).toBe(true);
+  });
+
+  it("phase-2: ยังไม่ถึงรอบตรวจซ้ำ ไม่สร้างแถว Phase 2 ให้ parameter ปกติ", () => {
+    const groups = buildApprovalGroups(petition(), [param()], [result(15)], new Map());
+    expect(groups[0].params[0].rows.every((row) => row.phase === 1)).toBe(true);
   });
 
   // Fix 2 — conditionalMode test

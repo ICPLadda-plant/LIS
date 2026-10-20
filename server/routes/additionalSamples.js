@@ -76,11 +76,10 @@ router.post('/:id/additional-samples', serializePetitionWrite(async (req, res) =
     const byId = new Map(params.map(param => [String(param._id), param]));
     const currentResults = results.filter(result => String(result.sampleRoundId || '') === requiredSampleRoundId(petition, scopeOf(byId.get(String(result.parameterId))), result.itemSeq));
     const previousResults = currentResults.filter(result => byId.has(String(result.parameterId)) && scopeOf(byId.get(String(result.parameterId))) === input.side);
-    const phase1Params = params.map(param => ({ ...param, valueFields: scopeOf(param) === input.side ? (param.valueFields || []).filter(field => !param.hasPhases || field.phase !== 'after') : [] }));
-    const phase2Params = params.map(param => ({ ...param, valueFields: scopeOf(param) === input.side && param.hasPhases ? (param.valueFields || []).filter(field => field.phase !== 'before') : [] }));
-    const phase2Results = currentResults.map(result => byId.get(String(result.parameterId))?.hasPhases ? { ...result, values: result.valuesPhase2 || {} } : result);
+    // computeAbnormalFlags ตรวจทั้งค่า Phase 1 และค่าตรวจซ้ำ Phase 2 ของ parameter เดิมแล้ว
+    const sideParams = params.map(param => ({ ...param, valueFields: scopeOf(param) === input.side ? (param.valueFields || []) : [] }));
     const options = { petitions: [petition], includeRestricted: true };
-    const failed = computeAbnormalFlags({ ...options, docs: currentResults, params: phase1Params })[String(petition._id)] || computeAbnormalFlags({ ...options, docs: phase2Results, params: phase2Params })[String(petition._id)];
+    const failed = computeAbnormalFlags({ ...options, docs: currentResults, params: sideParams })[String(petition._id)];
     if (!failed) return fail(res, 409, 'ต้องบันทึกผลที่ไม่ผ่านของรายการที่เลือกก่อนขอตัวอย่างเพิ่ม');
     const round = {
       _id: new mongoose.Types.ObjectId(), qrCode: 'LIS-EXTRA-' + randomUUID(),

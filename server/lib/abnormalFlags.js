@@ -227,12 +227,16 @@ function computeAbnormalFlags({ docs, params, petitions, includeRestricted = fal
     }
   }
 
+  // แยก context ข้าม parameter ตาม phase — ค่าตรวจซ้ำ (Phase 2) ต้องเทียบกับค่า Phase 2 ด้วยกัน
   const valuesByItem = {};
+  const valuesByItemPhase2 = {};
   for (const d of docs || []) {
     const key = `${d.petitionId}__${d.itemSeq}`;
     if (!valuesByItem[key]) valuesByItem[key] = {};
+    if (!valuesByItemPhase2[key]) valuesByItemPhase2[key] = {};
     const param = paramById.get(String(d.parameterId));
     valuesByItem[key][String(d.parameterId)] = getEntryValuesJS(d, param || {})[0] || {};
+    valuesByItemPhase2[key][String(d.parameterId)] = d.valuesPhase2 || {};
   }
 
   const map = {};
@@ -242,48 +246,62 @@ function computeAbnormalFlags({ docs, params, petitions, includeRestricted = fal
     if (map[d.petitionId]) continue;
     const param = paramById.get(String(d.parameterId));
     if (!param?.valueFields?.length) continue;
-    const ctxBucket = valuesByItem[`${d.petitionId}__${d.itemSeq}`] || {};
+    const itemKey = `${d.petitionId}__${d.itemSeq}`;
+    // Phase 1 = values/entries; Phase 2 = valuesPhase2 ของ parameter เดิม (รอบตรวจซ้ำหลัง trigger เช่น อบ 14 วัน)
+    const fieldsFor = (phase) => param.valueFields.filter((field) => {
+      if (!param.hasPhases) return true;
+      const fieldPhase = field.phase || 'both';
+      return fieldPhase === 'both' || fieldPhase === (phase === 1 ? 'before' : 'after');
+    });
+    const phase2Values = d.valuesPhase2 && Object.keys(d.valuesPhase2).length ? [d.valuesPhase2] : [];
+    const passes = [
+      { valueSets: getEntryValuesJS(d, param), fields: fieldsFor(1), ctxBucket: valuesByItem[itemKey] || {} },
+      { valueSets: phase2Values, fields: fieldsFor(2), ctxBucket: valuesByItemPhase2[itemKey] || {} },
+    ];
     let flagged = false;
-    for (const values of getEntryValuesJS(d, param)) {
-      for (const field of param.valueFields) {
-        const isNumeric = field.type === 'number' || field.type === 'float';
-        if (field.substanceMode && isNumeric) {
-          const prefix = `${field.label}::`;
-          for (const [vkey, vval] of Object.entries(values)) {
-            if (!vkey.startsWith(prefix)) continue;
-            const subKey = vkey.slice(prefix.length);
-            const raw = rawSpecForSubKey(d.commonName, subKey) || subKey;
-            const productType = productTypeFromSpecJS(raw) || productTypeFromSpecJS(d.commonName);
-            const category = categoryByItem[`${d.petitionId}__${d.itemSeq}`] || '';
-            const std = visibleSubstanceStandardJS(field, raw, includeRestricted, productType, category);
-            if (isSubstanceAbnormalJS(field, std, vval)) { flagged = true; break; }
+    for (const { valueSets, fields, ctxBucket } of passes) {
+      for (const values of valueSets) {
+        for (const field of fields) {
+          const isNumeric = field.type === 'number' || field.type === 'float';
+          if (field.substanceMode && isNumeric) {
+            const prefix = `${field.label}::`;
+            for (const [vkey, vval] of Object.entries(values)) {
+              if (!vkey.startsWith(prefix)) continue;
+              const subKey = vkey.slice(prefix.length);
+              const raw = rawSpecForSubKey(d.commonName, subKey) || subKey;
+              const productType = productTypeFromSpecJS(raw) || productTypeFromSpecJS(d.commonName);
+              const category = categoryByItem[`${d.petitionId}__${d.itemSeq}`] || '';
+              const std = visibleSubstanceStandardJS(field, raw, includeRestricted, productType, category);
+              if (isSubstanceAbnormalJS(field, std, vval)) { flagged = true; break; }
+            }
+            if (flagged) break;
+            continue;
+          }
+          if (field.labelToleranceMode && isNumeric) {
+            const prefix = `${field.label}::`;
+            for (const [vkey, vval] of Object.entries(values)) {
+              if (!vkey.startsWith(prefix)) continue;
+              const subKey = vkey.slice(prefix.length);
+              const raw = rawSpecForSubKey(d.commonName, subKey);
+              const productType = productTypeFromSpecJS(raw) || productTypeFromSpecJS(d.commonName);
+              const std = findLabelToleranceStandardJS(field, raw, productType);
+              if (isLabelToleranceAbnormal(std, raw, vval)) { flagged = true; break; }
+            }
+            if (flagged) break;
+            continue;
+          }
+          if (field.conditionalMode && field.conditionalResult === 'output' && isNumeric) {
+            const out = resolveConditionalOutputJS(field, { sameParam: values, otherParams: ctxBucket });
+            if (out && out.kind === 'abnormal') { flagged = true; break; }
+            continue;
+          }
+          const vf = field.conditionalMode && isNumeric
+            ? resolveFieldStandardJS(field, { sameParam: values, otherParams: ctxBucket })
+            : field;
+          for (const v of fieldValueListJS(values, field)) {
+            if (isFieldAbnormal(vf, v)) { flagged = true; break; }
           }
           if (flagged) break;
-          continue;
-        }
-        if (field.labelToleranceMode && isNumeric) {
-          const prefix = `${field.label}::`;
-          for (const [vkey, vval] of Object.entries(values)) {
-            if (!vkey.startsWith(prefix)) continue;
-            const subKey = vkey.slice(prefix.length);
-            const raw = rawSpecForSubKey(d.commonName, subKey);
-            const productType = productTypeFromSpecJS(raw) || productTypeFromSpecJS(d.commonName);
-            const std = findLabelToleranceStandardJS(field, raw, productType);
-            if (isLabelToleranceAbnormal(std, raw, vval)) { flagged = true; break; }
-          }
-          if (flagged) break;
-          continue;
-        }
-        if (field.conditionalMode && field.conditionalResult === 'output' && isNumeric) {
-          const out = resolveConditionalOutputJS(field, { sameParam: values, otherParams: ctxBucket });
-          if (out && out.kind === 'abnormal') { flagged = true; break; }
-          continue;
-        }
-        const vf = field.conditionalMode && isNumeric
-          ? resolveFieldStandardJS(field, { sameParam: values, otherParams: ctxBucket })
-          : field;
-        for (const v of fieldValueListJS(values, field)) {
-          if (isFieldAbnormal(vf, v)) { flagged = true; break; }
         }
         if (flagged) break;
       }
