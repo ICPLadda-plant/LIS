@@ -26,7 +26,7 @@ function createAdminGate({ findUserByEmail, findUserById, isDevBypass, warn = co
         warn('[adminGate] session lookup failed:', err.message);
         return res.status(500).json({ error: { message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' } });
       }
-      if (!sessionUser || !normalizeRoles(sessionUser).includes('admin')) {
+      if (!sessionUser || sessionUser.status === 'inactive' || !normalizeRoles(sessionUser).includes('admin')) {
         return res.status(403).json({ error: { message: 'เฉพาะผู้ดูแลระบบเท่านั้น' } });
       }
       req.adminUser = { email: sessionUser.email, name: sessionUser.name };
@@ -42,7 +42,7 @@ function createAdminGate({ findUserByEmail, findUserById, isDevBypass, warn = co
       warn('[adminGate] user lookup failed:', err.message);
       return res.status(500).json({ error: { message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' } });
     }
-    if (!user || !normalizeRoles(user).includes('admin')) {
+    if (!user || user.status === 'inactive' || !normalizeRoles(user).includes('admin')) {
       return res.status(403).json({ error: { message: 'เฉพาะผู้ดูแลระบบเท่านั้น' } });
     }
     req.adminUser = { email, name: user.name };

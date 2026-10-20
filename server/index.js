@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const User = require('./models/User');
 const { getLisSessionUserId } = require('./lib/lisSessionCookie');
+const { createUploadSessionGate } = require('./lib/uploadSessionGate');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const app = express();
@@ -39,18 +40,10 @@ app.use(express.json({
 }));
 
 // Serve uploaded QC photos as static assets
-async function requireUploadSession(req, res, next) {
-  if (!req.path.startsWith('/param-files/')) return next();
-  const userId = getLisSessionUserId(req);
-  if (!userId) return res.status(401).end();
-  try {
-    const user = await User.findById(userId).select('_id status').lean();
-    if (!user || user.status === 'inactive') return res.status(401).end();
-    return next();
-  } catch {
-    return res.status(503).end();
-  }
-}
+const requireUploadSession = createUploadSessionGate({
+  getSessionUserId: getLisSessionUserId,
+  findUserById: (id) => User.findById(id).select('_id status').lean(),
+});
 app.use('/LIS/uploads', requireUploadSession);
 app.use('/uploads', requireUploadSession);
 app.use('/LIS/uploads', express.static(path.join(__dirname, 'uploads')));

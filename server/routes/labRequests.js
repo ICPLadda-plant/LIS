@@ -7,6 +7,7 @@ const { requiresDeliveryAndBatch } = require('../lib/petitionSubmissionRules');
 
 // Generate next lab-request number from DocumentNumberConfig (default: L-YYMM-####).
 const { nextDocumentNumber } = require('../lib/documentNumber');
+const { queryString } = require('../lib/queryValue');
 function nextLabRequestNo() {
   return nextDocumentNumber('labRequest', LabRequest, 'labRequestNo');
 }
@@ -21,9 +22,12 @@ router.get('/', async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const q = {};
-    if (req.query.petitionId) q.petitionId = req.query.petitionId;
-    if (req.query.petitionNo) q.petitionNo = req.query.petitionNo;
-    if (req.query.batchNo) q.batchNo = req.query.batchNo;
+    const petitionId = queryString(req.query.petitionId);
+    const petitionNo = queryString(req.query.petitionNo);
+    const batchNo = queryString(req.query.batchNo);
+    if (petitionId) q.petitionId = petitionId;
+    if (petitionNo) q.petitionNo = petitionNo;
+    if (batchNo) q.batchNo = batchNo;
     const [items, total] = await Promise.all([
       LabRequest.find(q).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       LabRequest.countDocuments(q),

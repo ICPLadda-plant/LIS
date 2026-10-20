@@ -49,9 +49,11 @@ router.post('/:sampleId/qc', async (req, res) => {
     );
 
     // Petition → success when all samples have qcStatus === 'approved'
+    // ใบที่ปิดแล้ว (approved/rejected) ต้องไม่ถูกเปิดกลับเป็น success จากการอนุมัติรายตัวอย่าง
+    const CLOSED_PETITION_STATUSES = ['success', 'approved', 'rejected'];
     if (status === 'approved') {
       const petition = await Petition.findOne({ 'items.sampleId': req.params.sampleId });
-      if (petition && petition.status !== 'success') {
+      if (petition && !CLOSED_PETITION_STATUSES.includes(petition.status)) {
         const sampleIds = (petition.items || [])
           .map((it) => it.sampleId || `${petition.petitionNo}-${it.seq}`)
           .filter(Boolean);

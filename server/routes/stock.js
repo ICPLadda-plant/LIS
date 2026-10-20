@@ -10,6 +10,7 @@ const User = require('../models/User');
 const crypto = require('crypto');
 const { normalizeRoles } = require('../lib/roles');
 const { syntheticDevRolesFromEmail } = require('../lib/syntheticDevRoles');
+const { queryString } = require('../lib/queryValue');
 const { isValidReceiveType, isValidUnitType } = require('../lib/stockSource');
 const { MG_COMPARISON_EPSILON, sumWeights } = require('../lib/requisitionWeights');
 const { normalizeActorFields } = require('../lib/stockActor');
@@ -219,10 +220,10 @@ function buildTransactionFilter(query = {}) {
   const { itemType, itemId, qrId, action, search, user, createdFrom, createdTo } = query;
   const filter = {};
   const and = [];
-  if (itemType) filter.itemType = itemType;
-  if (itemId) filter.itemId = itemId;
+  if (queryString(itemType)) filter.itemType = itemType;
+  if (queryString(itemId)) filter.itemId = itemId;
   if (qrId) filter.qrId = String(qrId).trim();
-  if (action) filter.action = action;
+  if (queryString(action)) filter.action = action;
   if (String(search || '').trim()) {
     const regex = new RegExp(escapeRegExp(String(search).trim()), 'i');
     and.push({ $or: [{ itemName: regex }, { itemCode: regex }, { userName: regex }, { userEmail: regex }] });
@@ -313,7 +314,9 @@ function isLoopbackIp(value) {
 }
 
 function stockDevRolesFromEmail(email, req) {
-  if (process.env.ALLOW_DEV_STATUS !== 'true' && !isLoopbackIp(req?.ip)) return [];
+  // role จำลองใช้ได้เฉพาะ dev บนเครื่องตัวเอง (loopback) และห้ามเปิดบน production
+  if (process.env.NODE_ENV === 'production') return [];
+  if (!isLoopbackIp(req?.ip)) return [];
   return syntheticDevRolesFromEmail(email);
 }
 
@@ -1244,11 +1247,11 @@ router.get('/units', async (req, res) => {
   try {
     const { itemCode, itemType, itemId, status, kind, labelCode } = req.query;
     const f = {};
-    if (itemCode) f.itemCode = itemCode;
+    if (queryString(itemCode)) f.itemCode = itemCode;
     applyStockUnitItemTypeFilter(f, itemType);
     if (itemId) f.itemId = String(itemId).trim();
-    if (status) f.status = status;
-    if (kind) f.kind = kind;
+    if (queryString(status)) f.status = status;
+    if (queryString(kind)) f.kind = kind;
 
     const normalizedLabelCode = normalizeUnitLabelCodeSearch(labelCode);
     if (normalizedLabelCode) {

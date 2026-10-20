@@ -71,3 +71,15 @@ test('DB พัง → 500 ไม่ใช่ปล่อยผ่าน', async
   expect(called).toBe(false);
   expect(res.statusCode).toBe(500);
 });
+
+test('admin ที่ถูกระงับ (inactive) → 403', async () => {
+  const gate = createAdminGate({
+    ...deps,
+    findUserByEmail: async () => ({ email: 'old-admin@icpladda.com', name: 'อดีตแอดมิน', roles: ['admin'], status: 'inactive' }),
+  });
+  const res = makeRes();
+  let called = false;
+  await gate(makeReq({ 'X-LIS-User': 'old-admin@icpladda.com' }), res, () => { called = true; });
+  expect(called).toBe(false);
+  expect(res.statusCode).toBe(403);
+});

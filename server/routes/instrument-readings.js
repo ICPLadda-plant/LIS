@@ -3,6 +3,52 @@ const router = express.Router();
 const InstrumentSource = require('../models/InstrumentSource');
 const { extractReading } = require('../lib/instrumentReading');
 
+// เพดานฝั่ง server สำหรับการดึงค่าจากเครื่อง: ค่า timeoutMs ที่ตั้งไว้ใน Settings
+// ถูกบีบให้อยู่ในช่วงนี้ และ response ต้องไม่ใหญ่เกินกำหนด กัน request ค้างนานหรือกินหน่วยความจำ
+const DEFAULT_INSTRUMENT_TIMEOUT_MS = 5000;
+const MIN_INSTRUMENT_TIMEOUT_MS = 500;
+const MAX_INSTRUMENT_TIMEOUT_MS = 60000;
+const MAX_INSTRUMENT_RESPONSE_BYTES = 1024 * 1024;
+
+function boundedTimeoutMs(value) {
+  const ms = Number(value);
+  if (!Number.isFinite(ms) || ms <= 0) return DEFAULT_INSTRUMENT_TIMEOUT_MS;
+  return Math.min(MAX_INSTRUMENT_TIMEOUT_MS, Math.max(MIN_INSTRUMENT_TIMEOUT_MS, ms));
+}
+
+async function readBodyWithLimit(resp, maxBytes, controller) {
+  const tooLarge = () => {
+    const err = new Error('response too large');
+    err.code = 'RESPONSE_TOO_LARGE';
+    return err;
+  };
+  const declared = Number(resp.headers?.get?.('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    controller?.abort();
+    throw tooLarge();
+  }
+  if (!resp.body || typeof resp.body.getReader !== 'function') {
+    const text = await resp.text();
+    if (Buffer.byteLength(text) > maxBytes) throw tooLarge();
+    return text;
+  }
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      controller?.abort();
+      await reader.cancel().catch(() => {});
+      throw tooLarge();
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 // CRUD for the instrument-source config (managed in Settings) ----------------
 
 // GET /instrument-readings/sources — list all configured sources.
@@ -73,7 +119,7 @@ router.get('/:key/latest', async (req, res) => {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), source.timeoutMs || 5000);
+    const timer = setTimeout(() => controller.abort(), boundedTimeoutMs(source.timeoutMs));
     let raw;
     try {
       const headers = {};
@@ -89,9 +135,13 @@ router.get('/:key/latest', async (req, res) => {
       if (!resp.ok) {
         return res.json({ ok: false, key, error: `เครื่องตอบสถานะ ${resp.status}` });
       }
-      raw = await resp.json();
+      raw = JSON.parse(await readBodyWithLimit(resp, MAX_INSTRUMENT_RESPONSE_BYTES, controller));
     } catch (err) {
-      const msg = err.name === 'AbortError' ? 'เครื่องไม่ตอบ (timeout)' : `ติดต่อเครื่องไม่ได้: ${err.message}`;
+      const msg = err.name === 'AbortError'
+        ? 'เครื่องไม่ตอบ (timeout)'
+        : err.code === 'RESPONSE_TOO_LARGE'
+          ? 'ข้อมูลจากเครื่องใหญ่เกินกำหนด'
+          : `ติดต่อเครื่องไม่ได้: ${err.message}`;
       return res.json({ ok: false, key, error: msg });
     } finally {
       clearTimeout(timer);
@@ -117,3 +167,5 @@ router.get('/:key/latest', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.boundedTimeoutMs = boundedTimeoutMs;
+module.exports.readBodyWithLimit = readBodyWithLimit;

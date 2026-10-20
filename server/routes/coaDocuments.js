@@ -563,6 +563,8 @@ const SYNTHETIC_DEV_ROLE_IDS = [
 
 function syntheticDevRolesFromEmail(email) {
   if (process.env.ALLOW_DEV_STATUS !== 'true') return [];
+  // role จำลองใช้เฉพาะตอน dev เท่านั้น ถ้ารันเป็น production ห้ามเปิดแม้ flag จะถูกตั้งไว้ผิด
+  if (process.env.NODE_ENV === 'production') return [];
   const normalized = String(email || '').trim().toLowerCase();
   if (!normalized.endsWith(SYNTHETIC_DEV_EMAIL_SUFFIX)) return [];
   const roleSlug = normalized.slice(0, -SYNTHETIC_DEV_EMAIL_SUFFIX.length).split('-dept-')[0];
@@ -712,7 +714,7 @@ function requestedCoaRowFromPetition(petition, labRequests = [], coveredSeqs = n
 
 async function requestedCoaRows({ petitionNo } = {}) {
   const petitionFilter = { labApprovedAt: { $exists: true, $ne: null } };
-  if (petitionNo) petitionFilter.petitionNo = new RegExp(String(petitionNo).trim(), 'i');
+  if (petitionNo) petitionFilter.petitionNo = new RegExp(escapeRegex(String(petitionNo).trim()), 'i');
   const petitions = await Petition.find(petitionFilter)
     .sort({ labApprovedAt: -1 })
     .limit(100)
@@ -816,8 +818,8 @@ router.get('/', async (req, res) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = String(req.query.status);
-    if (req.query.coaNo) filter.coaNo = new RegExp(String(req.query.coaNo).trim(), 'i');
-    if (req.query.petitionNo) filter.petitionNoSnapshot = new RegExp(String(req.query.petitionNo).trim(), 'i');
+    if (req.query.coaNo) filter.coaNo = new RegExp(escapeRegex(String(req.query.coaNo).trim()), 'i');
+    if (req.query.petitionNo) filter.petitionNoSnapshot = new RegExp(escapeRegex(String(req.query.petitionNo).trim()), 'i');
     if (req.query.needsApproval === '1') {
       filter.status = { $in: ['pendingApproval', 'pendingRevisionApproval'] };
     }

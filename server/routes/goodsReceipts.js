@@ -5,6 +5,7 @@ const GoodsReceipt = require('../models/GoodsReceipt');
 const Petition = require('../models/Petition');
 const { nextDocumentNumber } = require('../lib/documentNumber');
 const { validateGoodsReceiptInput, mapGoodsReceiptError } = require('../lib/goodsReceipt');
+const { queryString } = require('../lib/queryValue');
 
 function badRequest(res, message) {
   return res.status(400).json({ error: { message } });
@@ -16,8 +17,10 @@ router.get('/', async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
     const q = {};
-    if (req.query.petitionId) q.petitionId = req.query.petitionId;
-    if (req.query.petitionNo) q.petitionNo = req.query.petitionNo;
+    const petitionId = queryString(req.query.petitionId);
+    const petitionNo = queryString(req.query.petitionNo);
+    if (petitionId) q.petitionId = petitionId;
+    if (petitionNo) q.petitionNo = petitionNo;
     const [items, total] = await Promise.all([
       GoodsReceipt.find(q).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
       GoodsReceipt.countDocuments(q),
