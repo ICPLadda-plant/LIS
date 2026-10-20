@@ -114,13 +114,13 @@ describe("MasterItems interactions", () => {
 
     vi.useFakeTimers();
     fireEvent.click(row!);
-    expect(screen.queryByText("Kg/Unit")).not.toBeInTheDocument();
+    expect(screen.queryByText("น้ำหนักต่อหน่วยย่อย (kg)")).not.toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(250);
     });
 
-    expect(screen.getByText("Kg/Unit")).toBeInTheDocument();
+    expect(screen.getByText("น้ำหนักต่อหน่วยย่อย (kg)")).toBeInTheDocument();
   });
 
   it("ranks alternate code fields ahead of hidden detail matches without dropping them", async () => {
@@ -177,16 +177,16 @@ describe("MasterItems interactions", () => {
 
     vi.useFakeTimers();
     fireEvent.click(row!, { detail: 1 });
-    expect(screen.queryByText("Kg/Unit")).not.toBeInTheDocument();
+    expect(screen.queryByText("น้ำหนักต่อหน่วยย่อย (kg)")).not.toBeInTheDocument();
 
     fireEvent.click(row!, { detail: 2 });
     fireEvent.doubleClick(row!);
-    expect(screen.getByText("Kg/Unit")).toBeInTheDocument();
+    expect(screen.getByText("น้ำหนักต่อหน่วยย่อย (kg)")).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(250);
     });
-    expect(screen.getByText("Kg/Unit")).toBeInTheDocument();
+    expect(screen.getByText("น้ำหนักต่อหน่วยย่อย (kg)")).toBeInTheDocument();
   });
 
   it("opens the edit form from the detail header pencil action", async () => {
@@ -196,7 +196,7 @@ describe("MasterItems interactions", () => {
     expect(row).not.toBeNull();
 
     fireEvent.doubleClick(row!);
-    const editButton = await screen.findByLabelText("แก้ไข item จากแถบรายละเอียด");
+    const editButton = await screen.findByLabelText("แก้ไขสินค้าจากแถบรายละเอียด");
     fireEvent.click(editButton);
 
     expect(await screen.findByDisplayValue("FG-001")).toBeInTheDocument();
@@ -230,7 +230,7 @@ describe("MasterItems interactions", () => {
     expect(within(drawer).getByText("CYPERMETHRIN 35% EC")).toBeInTheDocument();
     expect(within(drawer).getByText("EC - น้ำ (อีซี)")).toBeInTheDocument();
 
-    fireEvent.click(within(drawer).getByLabelText("แก้ไข item จากแถบรายละเอียด"));
+    fireEvent.click(within(drawer).getByLabelText("แก้ไขสินค้าจากแถบรายละเอียด"));
     expect(await screen.findByDisplayValue("CYPERMETHRIN 35% EC")).toBeDisabled();
     expect(screen.getByDisplayValue("EC - น้ำ (อีซี)")).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "บันทึก" }));
@@ -252,9 +252,9 @@ describe("MasterItems interactions", () => {
     await screen.findByText("FG-001");
 
     fireEvent.click(screen.getByRole("button", { name: /เพิ่มสินค้า/ }));
-    fireEvent.change(await screen.findByLabelText("Code"), { target: { value: "FG-NEW" } });
-    fireEvent.change(screen.getByLabelText("ชื่อ Item"), { target: { value: "New Product" } });
-    fireEvent.change(screen.getByLabelText("ชื่อสามัญ"), { target: { value: "ABAMECTIN 1.8% EC" } });
+    fireEvent.change(await screen.findByLabelText("รหัสสินค้า"), { target: { value: "FG-NEW" } });
+    fireEvent.change(screen.getByLabelText("ชื่อสินค้า"), { target: { value: "New Product" } });
+    fireEvent.change(within(screen.getByRole("dialog")).getByLabelText("ชื่อสามัญ"), { target: { value: "ABAMECTIN 1.8% EC" } });
     expect(screen.getByDisplayValue("EC - น้ำ (อีซี)")).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "บันทึก" }));
 
@@ -295,7 +295,7 @@ describe("MasterItems interactions", () => {
 
     renderMasterItems();
 
-    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Master Common Name Item" }), { button: 0, ctrlKey: false });
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "ชื่อสามัญ" }), { button: 0, ctrlKey: false });
     const commonNameTable = screen.getByRole("columnheader", { name: "จำนวนที่พบ" }).closest("table");
     expect(commonNameTable).not.toBeNull();
 
@@ -330,11 +330,11 @@ describe("MasterItems interactions", () => {
 
     renderMasterItems();
 
-    fireEvent.mouseDown(await screen.findByRole("tab", { name: "Master Common Name Item" }), { button: 0, ctrlKey: false });
+    fireEvent.mouseDown(await screen.findByRole("tab", { name: "ชื่อสามัญ" }), { button: 0, ctrlKey: false });
     fireEvent.click(await screen.findByRole("button", { name: "ดูรายละเอียด DIURON 80% WP" }));
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("รายละเอียด Common Name")).toBeInTheDocument();
+    expect(within(dialog).getByText("รายละเอียดชื่อสามัญ")).toBeInTheDocument();
     expect(within(dialog).getByText("FG-001")).toBeInTheDocument();
     expect(within(dialog).getByText("FG-002")).toBeInTheDocument();
 
@@ -366,10 +366,10 @@ describe("MasterItems interactions", () => {
     expect(addButton).toBeDefined();
     fireEvent.click(addButton!);
 
-    fireEvent.change(await screen.findByLabelText("Kg/Carton"), { target: { value: "18" } });
-    fireEvent.change(await screen.findByLabelText("Units/Carton"), { target: { value: "12" } });
+    fireEvent.change(await screen.findByLabelText("น้ำหนักต่อลัง (kg)"), { target: { value: "18" } });
+    fireEvent.change(await screen.findByLabelText("จำนวนต่อลัง"), { target: { value: "12" } });
 
-    expect(screen.getByLabelText("Gross Kg/Unit")).toHaveValue(1.5);
+    expect(screen.getByLabelText("น้ำหนักต่อหน่วยย่อย (kg)")).toHaveValue(1.5);
   });
 
   it("saves uploaded product image URLs with the master item metadata", async () => {
@@ -382,8 +382,8 @@ describe("MasterItems interactions", () => {
     await screen.findByText("FG-001");
     fireEvent.click(screen.getByRole("button", { name: /เพิ่มสินค้า/ }));
 
-    fireEvent.change(await screen.findByLabelText("Code"), { target: { value: "FG-002" } });
-    fireEvent.change(screen.getByLabelText("ชื่อ Item"), { target: { value: "Product With Photo" } });
+    fireEvent.change(await screen.findByLabelText("รหัสสินค้า"), { target: { value: "FG-002" } });
+    fireEvent.change(screen.getByLabelText("ชื่อสินค้า"), { target: { value: "Product With Photo" } });
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement | null;
     expect(input).not.toBeNull();
