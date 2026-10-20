@@ -2338,13 +2338,13 @@ function ApplyRuleCard({
           </div>
         ) : null}
         {shownDimensions.map(({ key, label }) => (
-          <div key={key} className="flex items-end gap-2">
+          <div key={key} className="flex items-start gap-2">
             <div className="min-w-0 flex-1">{renderPicker(key, label)}</div>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="h-11 w-11 shrink-0"
+              className="mt-6 h-11 w-11 shrink-0"
               onClick={() => removeDimension(key)}
               aria-label={`เอาเงื่อนไข ${label} ออกจาก${ruleLabel}`}
               title="เอาเงื่อนไขนี้ออก"
@@ -3369,7 +3369,7 @@ export default function ParameterSettings() {
             พารามิเตอร์การตรวจสอบ
           </span>
         }
-        description="กำหนดพารามิเตอร์ที่ต้องตรวจ — เลือกหลายมิติพร้อมกันแล้ว item ต้องตรงทุกมิติที่เลือก"
+        description="กำหนดพารามิเตอร์ที่ต้องตรวจ และเลือกว่าใช้กับ item ไหนด้วยกฎ"
         actions={
           <>
             <Button
