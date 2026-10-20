@@ -601,16 +601,20 @@ describe("ParameterSettings criteria tabs", () => {
     fireEvent.click(within(row as HTMLTableRowElement).getByTitle("แก้ไข"));
 
     const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "เลือกประเภทสาร (น้ำ / ทราย / ผง / ของเหลว / ของแข็ง)" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "เพิ่มเงื่อนไข ประเภทสาร ในกฎ 1" }));
+    const firstRule = within(dialog).getByRole("group", { name: "กฎ 1" });
+    fireEvent.click(within(firstRule).getByRole("button", { name: "เลือกประเภทสาร (น้ำ / ทราย / ผง / ของเหลว / ของแข็ง)" }));
     fireEvent.click(await screen.findByRole("button", { name: "ผง" }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "เพิ่มกฎ" }));
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "เลือกประเภท common name (EC / SC / WP ...)" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "เพิ่มกฎ (หรือ)" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "เพิ่มเงื่อนไข ประเภท Common Name ในกฎ 2" }));
+    const secondRule = within(dialog).getByRole("group", { name: "กฎ 2" });
+    fireEvent.click(within(secondRule).getByRole("button", { name: "เลือกประเภท common name (EC / SC / WP ...)" }));
     fireEvent.click(await screen.findByRole("button", { name: /EC - น้ำ/ }));
-    fireEvent.click(within(dialog).getByRole("button", { name: "เพิ่มกฎ" }));
 
-    expect(within(dialog).getByText("item 1")).toBeInTheDocument();
-    expect(within(dialog).getByText("item 2")).toBeInTheDocument();
+    expect(within(secondRule).getByText("ตรงกับ 1 item")).toBeInTheDocument();
+    const preview = within(dialog).getByRole("region", { name: "ผลลัพธ์ใช้กับ" });
+    expect(within(preview).getByText("R-001")).toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "บันทึกการแก้ไข" }));
 
@@ -621,6 +625,46 @@ describe("ParameterSettings criteria tabs", () => {
       { commonNames: ["EC"] },
     ]);
     expect(payload.productTypes).toEqual([]);
+    expect(payload.commonNames).toEqual([]);
+  });
+
+  it("opens legacy parameter-level criteria as rule 1 and saves them as an apply rule", async () => {
+    const masterItems = [
+      { item_no: "R-001", item_name1: "ABAMECTIN 1.8% W/V EC", common_name: "ABAMECTIN 1.8% W/V EC" },
+      { item_no: "F-002", item_name1: "ABAMECTIN 1.8% W/V EC FG", common_name: "ABAMECTIN 1.8% W/V EC" },
+    ];
+    vi.mocked(api.get).mockImplementation((path) => Promise.resolve({
+      data: { data: path === "/master-items" ? masterItems : [] },
+    } as Awaited<ReturnType<typeof api.get<unknown>>>));
+    api.getParameters.mockResolvedValueOnce([
+      {
+        _id: "p-legacy",
+        name: "legacy parameter",
+        scope: "qc",
+        status: "active",
+        applyAll: false,
+        categories: ["RM"],
+        commonNames: ["EC"],
+        valueFields: [{ label: "Result", type: "text" }],
+      },
+    ]);
+    api.updateParameter.mockResolvedValueOnce({} as ParameterItem);
+
+    renderPage();
+
+    const row = (await screen.findByText("legacy parameter")).closest("tr")!;
+    fireEvent.click(within(row).getByTitle("แก้ไข"));
+    const dialog = await screen.findByRole("dialog");
+    const firstRule = within(dialog).getByRole("group", { name: "กฎ 1" });
+    expect(await within(firstRule).findByText("ตรงกับ 1 item")).toBeInTheDocument();
+    expect(within(dialog).queryByRole("group", { name: "กฎ 2" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "บันทึกการแก้ไข" }));
+
+    await waitFor(() => expect(api.updateParameter).toHaveBeenCalledTimes(1));
+    const [, payload] = api.updateParameter.mock.calls[0] as [string, ParameterItem];
+    expect(payload.applyRules).toEqual([{ commonNames: ["EC"], categories: ["RM"] }]);
+    expect(payload.categories).toEqual([]);
     expect(payload.commonNames).toEqual([]);
   });
 

@@ -212,6 +212,12 @@ function normalizedApplyRules(param: ParameterItem): ParameterApplyRule[] {
   return (param.applyRules ?? []).filter((rule) => hasAnyCriteria(rule));
 }
 
+// กฎ "ใช้กับ" ข้อเดียวตรงกับ item นี้ไหม — ไม่รวมประตูหมวดหมู่ระดับ parameter และไม่รวมยกเว้น
+// ใช้กับตัวแสดงผลลัพธ์ในหน้า Parameter Settings เพื่อนับว่าแต่ละกฎครอบคลุม item ไหนบ้าง
+export function applyRuleMatchesFacets(rule: ParameterApplyRule, facets: ParameterMatchFacets): boolean {
+  return hasAnyCriteria(rule) && criteriaMatchesEveryFacet(rule, facets);
+}
+
 // Returns true when the parameter's "ใช้กับ" criteria fit this petition item.
 //
 // หมวดหมู่ (คลัง RM/FG) เป็น "ประตู" แบบ AND ไม่ใช่มิติ OR ตัวที่หก.

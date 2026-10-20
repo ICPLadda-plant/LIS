@@ -1,5 +1,5 @@
 import type { ParameterItem } from "./api";
-import { parameterMatchesFacets } from "./petitionTestItems";
+import { parameterMatchesFacets, type ParameterMatchFacets } from "./petitionTestItems";
 import { getClassification, getCommonName } from "./productClassification";
 
 export type MasterItemRecord = Record<string, unknown>;
@@ -102,6 +102,20 @@ export function getParameterOptionCommonName(item: MasterItemRecord): string {
   return getCommonName(getParameterOptionItemName(item));
 }
 
+// ข้อเท็จจริงของแถว Master Item ดิบ ในรูปที่ matcher กลางใช้
+export function facetsForMasterItem(item: MasterItemRecord, itemGroupIds: string[] = []): ParameterMatchFacets {
+  return {
+    itemNo: getParameterOptionItemNo(item),
+    itemName: getParameterOptionItemName(item),
+    fullCommonName: getParameterOptionFullCommonName(item),
+    commonName: getParameterOptionCommonName(item),
+    productType: getParameterOptionProductType(item),
+    subCategory: getParameterOptionSubCategory(item),
+    category: getParameterOptionCategory(item),
+    itemGroupIds,
+  };
+}
+
 function itemMatchesIncludeCriteria(
   form: Partial<ParameterItem>,
   item: MasterItemRecord,
@@ -123,16 +137,7 @@ function itemMatchesIncludeCriteria(
     excludeItemGroups: [],
   };
 
-  return parameterMatchesFacets(includeOnly, {
-    itemNo: getParameterOptionItemNo(item),
-    itemName: getParameterOptionItemName(item),
-    fullCommonName: getParameterOptionFullCommonName(item),
-    commonName: getParameterOptionCommonName(item),
-    productType: getParameterOptionProductType(item),
-    subCategory: getParameterOptionSubCategory(item),
-    category: getParameterOptionCategory(item),
-    itemGroupIds,
-  });
+  return parameterMatchesFacets(includeOnly, facetsForMasterItem(item, itemGroupIds));
 }
 
 function hasIncludeCriteria(form: Partial<ParameterItem>): boolean {

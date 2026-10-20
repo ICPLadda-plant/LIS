@@ -200,7 +200,7 @@ function ApplyToSection({
         <div className="space-y-2">
           {applyRules.map((rule, index) => (
             <div key={index} className="rounded-md border bg-card p-2 text-xs text-card-foreground">
-              <Badge variant="secondary">item {index + 1}</Badge>
+              <Badge variant="secondary">กฎ {index + 1}</Badge>
               <p className="mt-1 text-muted-foreground">{summarizeApplyRule(rule, groupNameById)}</p>
             </div>
           ))}

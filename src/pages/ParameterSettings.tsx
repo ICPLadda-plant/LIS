@@ -26,6 +26,8 @@ import { SubstanceStandardRowDialog } from "@/components/lis/SubstanceStandardRo
 import { ConditionalStandardsDialog } from "@/components/lis/ConditionalStandardsDialog";
 import { LabelToleranceDialog } from "@/components/lis/LabelToleranceDialog";
 import { ParameterDetailDrawer } from "@/components/lis/ParameterDetailDrawer";
+import { ParameterApplyPreview } from "@/components/lis/ParameterApplyPreview";
+import { buildApplyPreview, buildMasterItemFacets } from "@/lib/parameterApplyPreview";
 import { describeRule, describeSubstanceStandard, describeOutputRule, describeLabelTolerance, describeSingleStandard } from "@/lib/standardOperators";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -275,6 +277,31 @@ function clearCurrentApplyRule(form: ParameterItem): ParameterItem {
     categories: [],
     subCategories: [],
     itemGroups: [],
+  };
+}
+
+// ฟอร์มแบบการ์ดกฎเก็บทุกเงื่อนไขไว้ใน applyRules เท่านั้น — ข้อมูลเก่าที่ใช้เงื่อนไขระดับ parameter
+// จะถูกย้ายเป็นกฎข้อแรก (matcher ตีความเหมือนกัน) ส่วนหมวดหมู่ระดับ parameter ที่อยู่คู่กับ
+// applyRules เป็นประตู AND ของทุกกฎ จึงรวมเข้าไปในแต่ละกฎ
+function toRuleEditingForm(form: ParameterItem): ParameterItem {
+  const saved = normalizedApplyRules(form.applyRules);
+  const legacy = currentApplyRule(form);
+  let rules: ParameterApplyRule[];
+  if (saved.length === 0) {
+    rules = applyRuleHasCriteria(legacy) ? [legacy] : [];
+  } else {
+    const gate = legacy.categories ?? [];
+    rules = gate.length === 0
+      ? saved
+      : saved.map((rule) => {
+          const own = rule.categories ?? [];
+          const narrowed = own.length === 0 ? gate : own.filter((c) => gate.includes(c));
+          return { ...rule, categories: narrowed.length > 0 ? narrowed : gate };
+        });
+  }
+  return {
+    ...clearCurrentApplyRule(form),
+    applyRules: rules.length > 0 ? rules : [{}],
   };
 }
 
@@ -2066,6 +2093,313 @@ type DialogProps = {
   onSaved: () => void;
 };
 
+type OptionalRuleDimension = "commonNames" | "fullCommonNames" | "productTypes" | "itemGroups" | "itemNos";
+
+const OPTIONAL_RULE_DIMENSIONS: { key: OptionalRuleDimension; label: string }[] = [
+  { key: "commonNames", label: "ประเภท Common Name" },
+  { key: "fullCommonNames", label: "Common Name" },
+  { key: "productTypes", label: "ประเภทสาร" },
+  { key: "itemGroups", label: "กลุ่ม Item" },
+  { key: "itemNos", label: "Item Name" },
+];
+
+type ApplyRuleOptions = {
+  itemNoOptions: string[];
+  itemNoLabelByNo: Map<string, string>;
+  fullCommonNameOptions: string[];
+  commonNameOptions: string[];
+  commonNameLabelByCode: Map<string, string>;
+  productTypeOptions: string[];
+  subCategoryByParent: Record<SubCategoryParent, string[]>;
+  groupOptions: string[];
+  groupIdByName: Map<string, string>;
+  groupNameById: Map<string, string>;
+};
+
+function ApplyRulesEditor({
+  rules,
+  onChange,
+  ruleCounts,
+  countsReady,
+  options,
+}: {
+  rules: ParameterApplyRule[];
+  onChange: (next: ParameterApplyRule[]) => void;
+  ruleCounts: number[];
+  countsReady: boolean;
+  options: ApplyRuleOptions;
+}) {
+  const updateRule = (index: number, next: ParameterApplyRule) =>
+    onChange(rules.map((rule, i) => (i === index ? next : rule)));
+
+  return (
+    <div className="mt-5 space-y-3">
+      {rules.map((rule, index) => (
+        <Fragment key={index}>
+          {index > 0 ? (
+            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+              <div className="h-px flex-1 bg-border" />
+              หรือ
+              <div className="h-px flex-1 bg-border" />
+            </div>
+          ) : null}
+          <ApplyRuleCard
+            rule={rule}
+            index={index}
+            count={ruleCounts[index] ?? 0}
+            countsReady={countsReady}
+            canRemove={rules.length > 1}
+            onChange={(next) => updateRule(index, next)}
+            onRemove={() => onChange(rules.filter((_, i) => i !== index))}
+            options={options}
+          />
+        </Fragment>
+      ))}
+      <Button type="button" variant="outline" onClick={() => onChange([...rules, {}])}>
+        <Plus className="mr-1 h-4 w-4" /> เพิ่มกฎ (หรือ)
+      </Button>
+    </div>
+  );
+}
+
+function ApplyRuleCard({
+  rule,
+  index,
+  count,
+  countsReady,
+  canRemove,
+  onChange,
+  onRemove,
+  options,
+}: {
+  rule: ParameterApplyRule;
+  index: number;
+  count: number;
+  countsReady: boolean;
+  canRemove: boolean;
+  onChange: (next: ParameterApplyRule) => void;
+  onRemove: () => void;
+  options: ApplyRuleOptions;
+}) {
+  const ruleLabel = `กฎ ${index + 1}`;
+  const hasCriteria = applyRuleHasCriteria(cleanApplyRule(rule));
+  const activeParents = (rule.categories ?? []).filter((c): c is SubCategoryParent =>
+    (SUB_CATEGORY_PARENTS as readonly string[]).includes(c),
+  );
+  const subCategoryGroups = activeParents
+    .map((parent) => ({
+      label: `${parent} — หมวดย่อยจาก code`,
+      options: options.subCategoryByParent[parent] ?? [],
+    }))
+    .filter((group) => group.options.length > 0);
+  const shownDimensions = OPTIONAL_RULE_DIMENSIONS.filter((d) => rule[d.key] !== undefined);
+  const missingDimensions = OPTIONAL_RULE_DIMENSIONS.filter((d) => rule[d.key] === undefined);
+
+  const setValues = (key: keyof ParameterApplyRule, values: string[]) => onChange({ ...rule, [key]: values });
+  const removeDimension = (key: keyof ParameterApplyRule) => {
+    const next = { ...rule };
+    delete next[key];
+    onChange(next);
+  };
+
+  const renderPicker = (key: OptionalRuleDimension, label: string) => {
+    switch (key) {
+      case "commonNames":
+        return (
+          <MultiSelectPopover
+            label={label}
+            placeholder="เลือกประเภท common name (EC / SC / WP ...)"
+            values={rule.commonNames ?? []}
+            onChange={(v) => setValues("commonNames", v)}
+            options={options.commonNameOptions}
+            labelFor={(code) => options.commonNameLabelByCode.get(code) ?? formatClassificationOption(code)}
+            emptyText="ยังไม่มี common name ที่ตรวจจับได้"
+          />
+        );
+      case "fullCommonNames":
+        return (
+          <MultiSelectPopover
+            label={label}
+            placeholder="พิมพ์หรือเลือก common name"
+            values={rule.fullCommonNames ?? []}
+            onChange={(v) => setValues("fullCommonNames", v)}
+            options={options.fullCommonNameOptions}
+            allowCustom
+            emptyText="ยังไม่มี common name ใน master items"
+          />
+        );
+      case "productTypes":
+        return (
+          <MultiSelectPopover
+            label={label}
+            placeholder="เลือกประเภทสาร (น้ำ / ทราย / ผง / ของเหลว / ของแข็ง)"
+            values={rule.productTypes ?? []}
+            onChange={(v) => setValues("productTypes", v)}
+            options={options.productTypeOptions}
+            labelFor={formatProductTypeOption}
+            emptyText="ยังไม่มีประเภทสาร"
+          />
+        );
+      case "itemGroups":
+        return (
+          <MultiSelectPopover
+            label={label}
+            placeholder="เลือกกลุ่ม item ที่จัดเอง"
+            values={(rule.itemGroups ?? []).map((id) => options.groupNameById.get(id) ?? id)}
+            onChange={(names) =>
+              setValues(
+                "itemGroups",
+                names.map((name) => options.groupIdByName.get(name)).filter((id): id is string => !!id),
+              )
+            }
+            options={options.groupOptions}
+            emptyText="ยังไม่มีกลุ่ม — สร้างที่หน้า Master Item"
+          />
+        );
+      case "itemNos":
+        return (
+          <MultiSelectPopover
+            label={label}
+            placeholder="เลือกรหัสสินค้า / ชื่อสินค้า"
+            values={rule.itemNos ?? []}
+            onChange={(v) => setValues("itemNos", v)}
+            options={options.itemNoOptions}
+            labelFor={(itemNo) => options.itemNoLabelByNo.get(itemNo) ?? itemNo}
+            emptyText="ยังไม่มี master items"
+          />
+        );
+    }
+  };
+
+  return (
+    <div role="group" aria-label={ruleLabel} className="space-y-4 rounded-lg border bg-card p-4 text-card-foreground">
+      <div className="flex items-center gap-2">
+        <Badge variant="secondary">{ruleLabel}</Badge>
+        <span className="text-sm text-muted-foreground">
+          {!hasCriteria ? "ยังไม่ได้เลือกเงื่อนไข" : countsReady ? `ตรงกับ ${count} item` : ""}
+        </span>
+        {canRemove ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="ml-auto"
+            onClick={onRemove}
+            aria-label={`ลบ${ruleLabel}`}
+            title={`ลบ${ruleLabel}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label className="text-sm font-medium">หมวดหมู่</Label>
+          <Select
+            value={warehouseScopeValue(rule.categories)}
+            onValueChange={(value) => {
+              const categories = categoriesFromWarehouseScope(value as WarehouseScopeValue);
+              const allowedSubs = new Set(
+                categories.flatMap((p) => options.subCategoryByParent[p as SubCategoryParent] ?? []),
+              );
+              const subCategories = (rule.subCategories ?? []).filter((s) => allowedSubs.has(s));
+              onChange({ ...rule, categories, subCategories });
+            }}
+          >
+            <SelectTrigger className="h-11 text-base" aria-label={`หมวดหมู่ของ${ruleLabel}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">ทั้งหมด</SelectItem>
+              <SelectItem value="RM">คลัง RM</SelectItem>
+              <SelectItem value="FG">คลัง FG</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            คลัง FG คือรหัสสินค้าขึ้นต้น F, คลัง RM คือรหัสสินค้าขึ้นต้น R
+          </p>
+        </div>
+        {activeParents.length > 0 ? (
+          <div className="space-y-1.5">
+            <MultiSelectPopover
+              label={`หมวดหมู่ย่อย (prefix code ของ ${activeParents.join(" / ")})`}
+              placeholder="เลือก prefix เช่น F, FC, RO, RC ..."
+              values={rule.subCategories ?? []}
+              onChange={(v) => setValues("subCategories", v)}
+              options={subCategoryGroups.flatMap((g) => g.options)}
+              groupedOptions={subCategoryGroups.length > 1 ? subCategoryGroups : undefined}
+              emptyText="ไม่พบ prefix จาก master items"
+            />
+            <p className="text-xs text-muted-foreground">
+              เลือก <span className="font-mono">RO</span> จะรวม <span className="font-mono">ROLS</span>,{" "}
+              <span className="font-mono">ROPH</span> ด้วย
+            </p>
+          </div>
+        ) : null}
+        {shownDimensions.map(({ key, label }) => (
+          <div key={key} className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">{renderPicker(key, label)}</div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11 shrink-0"
+              onClick={() => removeDimension(key)}
+              aria-label={`เอาเงื่อนไข ${label} ออกจาก${ruleLabel}`}
+              title="เอาเงื่อนไขนี้ออก"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        {(rule.itemNames?.length ?? 0) > 0 ? (
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <MultiSelectPopover
+                label="Item Name เดิม"
+                placeholder="เลือก item name เดิม"
+                values={rule.itemNames ?? []}
+                onChange={(v) => setValues("itemNames", v)}
+                options={rule.itemNames ?? []}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {missingDimensions.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+          <span className="text-xs text-muted-foreground">เพิ่มเงื่อนไข (และ)</span>
+          {missingDimensions.map(({ key, label }) => (
+            <Button
+              key={key}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setValues(key, [])}
+              aria-label={`เพิ่มเงื่อนไข ${label} ใน${ruleLabel}`}
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" /> {label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
+
+      {hasCriteria ? (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">เงื่อนไข:</span>{" "}
+          {summarizeApplyRule(cleanApplyRule(rule), {
+            groupNameById: options.groupNameById,
+            itemNoLabelByNo: options.itemNoLabelByNo,
+          })}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function ParameterDialog({
   open,
   item,
@@ -2107,6 +2441,23 @@ function ParameterDialog({
     [form, itemGroupMembership, masterItems],
   );
   const hasContextualExcludeOptions = Object.values(contextualExcludeOptions).some((set) => set.show);
+  const masterItemFacets = useMemo(
+    () => buildMasterItemFacets(masterItems as ParameterMasterItemRecord[], itemGroupMembership),
+    [itemGroupMembership, masterItems],
+  );
+  const applyPreview = useMemo(() => buildApplyPreview(form, masterItemFacets), [form, masterItemFacets]);
+  const applyRuleOptions: ApplyRuleOptions = {
+    itemNoOptions,
+    itemNoLabelByNo,
+    fullCommonNameOptions,
+    commonNameOptions,
+    commonNameLabelByCode,
+    productTypeOptions,
+    subCategoryByParent,
+    groupOptions,
+    groupIdByName,
+    groupNameById,
+  };
 
   const runAi = async () => {
     const desc = aiPrompt.trim();
@@ -2124,12 +2475,12 @@ function ParameterDialog({
         ...emptyValueField(),
         ...f,
       }));
-      setForm({
+      setForm(toRuleEditingForm({
         ...emptyForm(scope),
         ...gen,
         scope,
         valueFields,
-      });
+      }));
       if (valid) {
         toast.success("สร้างพารามิเตอร์ด้วย AI แล้ว — ตรวจสอบและกดบันทึก");
       } else {
@@ -2144,7 +2495,9 @@ function ParameterDialog({
 
   useEffect(() => {
     if (open) {
-      const initialForm = item ? { ...emptyForm(defaultScope), ...item, scope: item.scope ?? defaultScope } : emptyForm(defaultScope);
+      const initialForm = toRuleEditingForm(
+        item ? { ...emptyForm(defaultScope), ...item, scope: item.scope ?? defaultScope } : emptyForm(defaultScope),
+      );
       setForm(initialForm);
       setAiPrompt("");
       setCloseConfirmOpen(false);
@@ -2181,26 +2534,8 @@ function ParameterDialog({
 
   const validate = (): string | null => {
     if (!form.name?.trim()) return "กรุณากรอกชื่อพารามิเตอร์";
-    if (!form.applyAll) {
-      const savedApplyRules = normalizedApplyRules(form.applyRules);
-      const draftApplyRule = currentApplyRule(form);
-      const hasDraftApplyRule = applyRuleHasCriteria(draftApplyRule);
-      const total =
-        (form.commonNames?.length ?? 0) +
-        (form.itemNos?.length ?? 0) +
-        (form.itemNames?.length ?? 0) +
-        (form.fullCommonNames?.length ?? 0) +
-        (form.productTypes?.length ?? 0) +
-        (form.categories?.length ?? 0) +
-        (form.subCategories?.length ?? 0) +
-        (form.itemGroups?.length ?? 0) +
-        savedApplyRules.length;
-      if (total === 0) {
-        return "กรุณาเลือก 'ใช้กับ' อย่างน้อย 1 รายการ หรือเลือก 'ใช้กับทั้งหมด'";
-      }
-      if (savedApplyRules.length > 0 && hasDraftApplyRule) {
-        return "กรุณากดเพิ่มกฎ เพื่อยืนยันเงื่อนไขปัจจุบันก่อนบันทึก";
-      }
+    if (!form.applyAll && normalizedApplyRules(form.applyRules).length === 0) {
+      return "กรุณาเลือกเงื่อนไข 'ใช้กับ' อย่างน้อย 1 กฎ หรือเลือก 'ใช้กับทั้งหมด'";
     }
     const fields = form.valueFields ?? [];
     for (let i = 0; i < fields.length; i += 1) {
@@ -2292,21 +2627,21 @@ function ParameterDialog({
     const keepVisible = (values: string[] | undefined, visible: { show: boolean; values: string[] }) =>
       visible.show ? (values ?? []).filter((value) => visible.values.includes(value)) : [];
     const applyRules = form.applyAll ? [] : normalizedApplyRules(form.applyRules);
-    const usesApplyRules = applyRules.length > 0;
     const payload: Partial<ParameterItem> = {
       name: form.name.trim(),
       scope,
       shareWithLab: scope === "qc" ? !!form.shareWithLab : false,
       status: form.status ?? "active",
       applyAll: !!form.applyAll,
-      commonNames: form.applyAll || usesApplyRules ? [] : form.commonNames ?? [],
-      itemNos: form.applyAll || usesApplyRules ? [] : form.itemNos ?? [],
-      itemNames: form.applyAll || usesApplyRules ? [] : form.itemNames ?? [],
-      fullCommonNames: form.applyAll || usesApplyRules ? [] : form.fullCommonNames ?? [],
-      productTypes: form.applyAll || usesApplyRules ? [] : form.productTypes ?? [],
-      categories: form.applyAll || usesApplyRules ? [] : form.categories ?? [],
-      subCategories: form.applyAll || usesApplyRules ? [] : form.subCategories ?? [],
-      itemGroups: form.applyAll || usesApplyRules ? [] : form.itemGroups ?? [],
+      // ทุกเงื่อนไขอยู่ใน applyRules แล้ว (ดู toRuleEditingForm) — ล้างช่องระดับ parameter เสมอ
+      commonNames: [],
+      itemNos: [],
+      itemNames: [],
+      fullCommonNames: [],
+      productTypes: [],
+      categories: [],
+      subCategories: [],
+      itemGroups: [],
       applyRules,
       excludeCommonNames: keepVisible(form.excludeCommonNames, contextualExcludeOptions.commonNames),
       excludeItemNos: keepVisible(form.excludeItemNos, contextualExcludeOptions.itemNos),
@@ -2344,28 +2679,6 @@ function ParameterDialog({
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     await saveForm();
-  };
-
-  const addedApplyRules = normalizedApplyRules(form.applyRules);
-  const draftApplyRule = currentApplyRule(form);
-  const hasDraftApplyRule = applyRuleHasCriteria(draftApplyRule);
-
-  const addApplyRule = () => {
-    setForm((prev) => {
-      const rule = currentApplyRule(prev);
-      if (!applyRuleHasCriteria(rule)) return prev;
-      return {
-        ...clearCurrentApplyRule(prev),
-        applyRules: [...normalizedApplyRules(prev.applyRules), rule],
-      };
-    });
-  };
-
-  const removeApplyRule = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      applyRules: normalizedApplyRules(prev.applyRules).filter((_, i) => i !== index),
-    }));
   };
 
   const requestClose = () => {
@@ -2529,7 +2842,7 @@ function ParameterDialog({
               <div>
                 <h3 className="text-base font-semibold">ใช้กับ</h3>
                 <p className="text-xs text-muted-foreground">
-                  เลือกได้หลายมิติพร้อมกัน — item ต้องตรงทุกมิติที่เลือก (OR เฉพาะตัวเลือกในมิติเดียวกัน)
+                  ในกฎเดียวกัน item ต้องตรงทุกเงื่อนไข ถ้ามีหลายกฎ ตรงกฎใดกฎหนึ่งก็พอ
                 </p>
               </div>
               <label className="flex items-center gap-2 text-sm">
@@ -2541,194 +2854,20 @@ function ParameterDialog({
               </label>
             </div>
 
-            <div
-              className={cn(
-                "mt-5 grid grid-cols-1 gap-5 md:grid-cols-2",
-                form.applyAll && "pointer-events-none opacity-50",
-              )}
-            >
-              <MultiSelectPopover
-                label="Item Name"
-                placeholder="เลือกรหัสสินค้า / ชื่อสินค้า"
-                values={form.itemNos ?? []}
-                onChange={(v) => set("itemNos", v)}
-                options={itemNoOptions}
-                labelFor={(itemNo) => itemNoLabelByNo.get(itemNo) ?? itemNo}
-                disabled={form.applyAll}
-                emptyText="ยังไม่มี master items"
-                hint="แสดงจากรหัสสินค้า + ชื่อสินค้า เช่น F-ABMTK-1000X12 อะบาแมวทองคำ"
+            {form.applyAll ? (
+              <p className="mt-4 rounded-md bg-muted/40 p-4 text-sm text-muted-foreground">
+                parameter นี้จะแสดงกับทุก item ใช้ส่วนยกเว้นด้านล่างถ้ามีบาง item ที่ไม่ต้องตรวจ
+              </p>
+            ) : (
+              <ApplyRulesEditor
+                rules={form.applyRules ?? []}
+                onChange={(next) => set("applyRules", next)}
+                ruleCounts={applyPreview.ruleCounts}
+                countsReady={masterItems.length > 0}
+                options={applyRuleOptions}
               />
-              <MultiSelectPopover
-                label="Common Name"
-                placeholder="พิมพ์หรือเลือก common name"
-                values={form.fullCommonNames ?? []}
-                onChange={(v) => set("fullCommonNames", v)}
-                options={fullCommonNameOptions}
-                allowCustom
-                disabled={form.applyAll}
-                emptyText="ยังไม่มี common name ใน master items"
-                hint="ใช้เมื่อต้องล็อกด้วย common name แบบเต็ม เช่น ABAMECTIN 1.8% EC"
-              />
-              <MultiSelectPopover
-                label="ประเภท Common Name"
-                placeholder="เลือกประเภท common name (EC / SC / WP ...)"
-                values={form.commonNames ?? []}
-                onChange={(v) => set("commonNames", v)}
-                options={commonNameOptions}
-                labelFor={(code) => commonNameLabelByCode.get(code) ?? formatClassificationOption(code)}
-                disabled={form.applyAll}
-                emptyText="ยังไม่มี common name ที่ตรวจจับได้"
-                hint="เลือกด้วยประเภท common name แล้วครอบคลุมรหัสสินค้าทั้งหมดในประเภทนั้น"
-              />
-              <MultiSelectPopover
-                label="กลุ่ม Item"
-                placeholder="เลือกกลุ่ม item ที่จัดเอง"
-                values={(form.itemGroups ?? []).map((id) => groupNameById.get(id) ?? id)}
-                onChange={(names) =>
-                  set(
-                    "itemGroups",
-                    names
-                      .map((name) => groupIdByName.get(name))
-                      .filter((id): id is string => !!id),
-                  )
-                }
-                options={groupOptions}
-                disabled={form.applyAll}
-                emptyText="ยังไม่มีกลุ่ม — สร้างที่หน้า Master Item"
-              />
-              <MultiSelectPopover
-                label="ประเภทสาร"
-                placeholder="เลือกประเภทสาร (น้ำ / ทราย / ผง / ของเหลว / ของแข็ง)"
-                values={form.productTypes ?? []}
-                onChange={(v) => set("productTypes", v)}
-                options={productTypeOptions}
-                labelFor={formatProductTypeOption}
-                disabled={form.applyAll}
-                emptyText="ยังไม่มีประเภทสาร"
-              />
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">หมวดหมู่</Label>
-                <Select
-                  value={warehouseScopeValue(form.categories)}
-                  onValueChange={(value) => {
-                    const categories = categoriesFromWarehouseScope(value as WarehouseScopeValue);
-                    const activeParents = new Set(
-                      categories.filter((c): c is SubCategoryParent =>
-                        (SUB_CATEGORY_PARENTS as readonly string[]).includes(c),
-                      ),
-                    );
-                    const allowedSubs = new Set(
-                      Array.from(activeParents).flatMap((p) => subCategoryByParent[p] ?? []),
-                    );
-                    setForm((prev) => ({
-                      ...prev,
-                      categories,
-                      subCategories: (prev.subCategories ?? []).filter((s) => allowedSubs.has(s)),
-                    }));
-                  }}
-                  disabled={form.applyAll}
-                >
-                  <SelectTrigger className="h-11 text-base">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">ทั้งหมด</SelectItem>
-                    <SelectItem value="RM">คลัง RM</SelectItem>
-                    <SelectItem value="FG">คลัง FG</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Default เป็นทั้งหมด — คลัง FG คือรหัสสินค้าขึ้นต้น F, คลัง RM คือรหัสสินค้าขึ้นต้น R
-                </p>
-              </div>
-              {(() => {
-                const activeParents = (form.categories ?? []).filter(
-                  (c): c is SubCategoryParent =>
-                    (SUB_CATEGORY_PARENTS as readonly string[]).includes(c),
-                );
-                if (activeParents.length === 0) return null;
-                const grouped = activeParents
-                  .map((parent) => ({
-                    label: `${parent} — หมวดย่อยจาก code`,
-                    options: subCategoryByParent[parent] ?? [],
-                  }))
-                  .filter((g) => g.options.length > 0);
-                const flatOptions = grouped.flatMap((g) => g.options);
-                return (
-                  <div className="md:col-span-2 space-y-1.5">
-                    <MultiSelectPopover
-                      label={`หมวดหมู่ย่อย (prefix code ของ ${activeParents.join(" / ")})`}
-                      placeholder="เลือก prefix เช่น F, FC, RO, RC ..."
-                      values={form.subCategories ?? []}
-                      onChange={(v) => set("subCategories", v)}
-                      options={flatOptions}
-                      groupedOptions={grouped.length > 1 ? grouped : undefined}
-                      disabled={form.applyAll}
-                      emptyText="ไม่พบ prefix จาก master items"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      ครอบคลุมทุก code ที่ <span className="font-semibold">ขึ้นต้นด้วย</span> prefix ที่เลือก — เช่น เลือก <span className="font-mono">RO</span> จะรวม <span className="font-mono">ROLS</span>, <span className="font-mono">ROPH</span> ด้วย
-                    </p>
-                  </div>
-                );
-              })()}
-              <div className="md:col-span-2 space-y-3 rounded-lg border bg-muted/20 p-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-semibold">กฎการใช้ parameter</h4>
-                    <p className="text-xs text-muted-foreground">
-                      ใน 1 กฎต้องตรงทุกมิติที่เลือกพร้อมกัน; กฎหลาย item จะเป็น OR
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={form.applyAll || !hasDraftApplyRule}
-                    onClick={addApplyRule}
-                  >
-                    <Plus className="h-4 w-4" />
-                    เพิ่มกฎ
-                  </Button>
-                </div>
+            )}
 
-                {hasDraftApplyRule ? (
-                  <div className="rounded-md border bg-background p-2 text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">กำลังเลือก:</span>{" "}
-                    {summarizeApplyRule(draftApplyRule, { groupNameById, itemNoLabelByNo })}
-                  </div>
-                ) : null}
-
-                {addedApplyRules.length > 0 ? (
-                  <div className="space-y-2">
-                    {addedApplyRules.map((rule, index) => (
-                      <div key={index} className="flex items-start justify-between gap-2 rounded-md border bg-background p-2">
-                        <div className="space-y-1 text-xs">
-                          <Badge variant="secondary">item {index + 1}</Badge>
-                          <p className="text-muted-foreground">
-                            {summarizeApplyRule(rule, { groupNameById, itemNoLabelByNo })}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={form.applyAll}
-                          onClick={() => removeApplyRule(index)}
-                          title={`ลบ item ${index + 1}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    ถ้ามีหลายทางเลือก ให้เลือกเงื่อนไขชุดแรกแล้วกดเพิ่มกฎ จากนั้นเลือกชุดถัดไป
-                  </p>
-                )}
-              </div>
-            </div>
 
             {hasContextualExcludeOptions ? (
               <div className="mt-5 rounded-lg border border-dashed bg-muted/20 p-4">
@@ -2828,6 +2967,12 @@ function ParameterDialog({
                 </div>
               </div>
             ) : null}
+
+            <ParameterApplyPreview
+              preview={applyPreview}
+              applyAll={!!form.applyAll}
+              ready={masterItems.length > 0}
+            />
           </div>
 
           <div className="rounded-lg border p-5">
@@ -3674,7 +3819,7 @@ function ApplyToBadges({
                 className="inline-flex items-center gap-1 rounded-md bg-card px-2 py-0.5 text-xs text-card-foreground ring-1 ring-border"
                 title={summary}
               >
-                <span className="font-semibold">item {index + 1}:</span>
+                <span className="font-semibold">กฎ {index + 1}:</span>
                 <span className="truncate max-w-[180px]">{summary}</span>
               </span>
             );

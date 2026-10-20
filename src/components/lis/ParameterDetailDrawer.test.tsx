@@ -63,7 +63,7 @@ describe("ParameterDetailDrawer", () => {
     expect(screen.queryByText(/\+1/)).not.toBeInTheDocument();
   });
 
-  it("ใช้กับ: โชว์หลายกฎเป็น item 1 / item 2", () => {
+  it("ใช้กับ: โชว์หลายกฎเป็น กฎ 1 / กฎ 2", () => {
     renderDrawer({
       _id: "p1",
       name: "X",
@@ -75,8 +75,8 @@ describe("ParameterDetailDrawer", () => {
       valueFields: [],
     });
 
-    expect(screen.getByText("item 1")).toBeInTheDocument();
-    expect(screen.getByText("item 2")).toBeInTheDocument();
+    expect(screen.getByText("กฎ 1")).toBeInTheDocument();
+    expect(screen.getByText("กฎ 2")).toBeInTheDocument();
     expect(screen.getByText("ประเภท: ผง")).toBeInTheDocument();
     expect(screen.getByText("ประเภท Common Name: EC")).toBeInTheDocument();
     expect(screen.getByText("ยกเว้น ประเภท Common Name:")).toBeInTheDocument();
