@@ -1,5 +1,9 @@
 export const PWA_ACTIVE_ACCOUNT_STORAGE_KEY = "lis.pwa.activeAccountId";
 
+// Bump with CACHE_VERSION in public/sw.js. The query gives the worker a new URL,
+// so browsers skip any CDN copy of an older sw.js still cached under the old URL.
+export const PWA_SERVICE_WORKER_VERSION = "3";
+
 type StandaloneNavigator = Navigator & { standalone?: boolean };
 
 type RegisterPwaServiceWorkerOptions = {
@@ -40,8 +44,9 @@ export async function registerPwaServiceWorker(options: RegisterPwaServiceWorker
   if (!enabled || !serviceWorker) return;
 
   try {
-    await serviceWorker.register(getPwaAssetUrl("sw.js", baseUrl), {
+    await serviceWorker.register(getPwaAssetUrl(`sw.js?v=${PWA_SERVICE_WORKER_VERSION}`, baseUrl), {
       scope: normalizePwaBaseUrl(baseUrl),
+      updateViaCache: "none",
     });
   } catch (error) {
     console.error("[pwa] service worker registration failed", error);
