@@ -2,6 +2,11 @@ const express = require('express');
 const http = require('http');
 
 const mockMasterItemMetaFind = jest.fn();
+const mockItemGroupFind = jest.fn();
+
+jest.mock('../models/ItemGroup', () => ({
+  find: (...args) => mockItemGroupFind(...args),
+}));
 
 jest.mock('../models/MasterItemMeta', () => ({
   find: (...args) => mockMasterItemMetaFind(...args),
@@ -63,11 +68,55 @@ describe('masterItems route', () => {
   beforeEach(() => {
     global.fetch = jest.fn();
     mockMasterItemMetaFind.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+    mockItemGroupFind.mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }) });
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
     delete global.fetch;
+  });
+
+  test('GET / adds all matching groups with exclusions taking precedence', async () => {
+    const groups = [
+      { _id: 'common', name: 'Common', commonNames: [' diuron 80% wp '] },
+      { _id: 'trade', name: 'Trade', tradeNames: [' brand '] },
+      { _id: 'manual', name: 'Manual', includeItemNos: [' FG-001 ', 'META-ONLY'] },
+      { _id: 'excluded', name: 'Excluded', commonNames: ['DIURON 80% WP'], includeItemNos: ['FG-001'], excludeItemNos: [' FG-001 '] },
+      { _id: 'case', name: 'Case sensitive code', includeItemNos: ['fg-001'] },
+    ];
+    mockItemGroupFind.mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(groups) }) });
+    mockMasterItemMetaFind.mockReturnValue({ lean: jest.fn().mockResolvedValue([
+      { itemNo: 'META-ONLY', itemName: 'Local item' },
+    ]) });
+    global.fetch
+      .mockReturnValueOnce(jsonResponse([
+        { item_no: ' FG-001 ', common_name: 'diuron 80% wp', trade_name: 'Brand', unit_cost: 42 },
+        { item_no: 'NONE', common_name: '' },
+      ]))
+      .mockReturnValueOnce(jsonResponse([{ itemCode: 'LDI-001', commonName: 'DIURON 80% WP' }]));
+
+    const res = await request(makeApp(), '/');
+
+    expect(res.status).toBe(200);
+    expect(mockItemGroupFind).toHaveBeenCalledWith({ status: 'active' });
+    expect(res.body[0]).toMatchObject({ unit_cost: 42, itemGroups: [
+      { _id: 'common', name: 'Common' },
+      { _id: 'trade', name: 'Trade' },
+      { _id: 'manual', name: 'Manual' },
+    ] });
+    expect(res.body[1].itemGroups).toEqual([]);
+    expect(res.body[2].itemGroups).toEqual([
+      { _id: 'common', name: 'Common' }, { _id: 'excluded', name: 'Excluded' },
+    ]);
+    expect(res.body[3].itemGroups).toEqual([{ _id: 'manual', name: 'Manual' }]);
+  });
+
+  test('GET / returns an empty group list when no active groups exist', async () => {
+    global.fetch.mockReturnValueOnce(jsonResponse([{ item_no: 'FG-001' }]))
+      .mockReturnValueOnce(jsonResponse([]));
+    const res = await request(makeApp(), '/');
+    expect(res.status).toBe(200);
+    expect(res.body[0].itemGroups).toEqual([]);
   });
 
   test('GET /common-names returns grouped common names before /:id fallback', async () => {
