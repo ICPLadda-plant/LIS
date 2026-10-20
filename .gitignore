@@ -43,3 +43,6 @@ server/uploads/param-files/*
 # Build output assets
 /assets/
 /asset/
+
+# backup ข้อมูลก่อนรันสคริปต์ซ่อมฐานข้อมูล
+server/scripts/backups/

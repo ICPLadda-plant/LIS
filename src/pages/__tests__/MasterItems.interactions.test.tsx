@@ -203,6 +203,69 @@ describe("MasterItems interactions", () => {
     expect(screen.getByDisplayValue("Cypermethrin")).toBeDisabled();
   });
 
+  it("keeps the ERP common name when meta holds a stale type code, and edits never overwrite it", async () => {
+    const erpItem = {
+      ...masterItem,
+      common_name: "CYPERMETHRIN 35% EC",
+      item_name2: "CYPERMETHRIN 35% EC",
+      item_name3: "12*1 L",
+      // server merges meta into the item: these came from an earlier buggy edit
+      itemType: "EC",
+      description: "CYPERMETHRIN 35% EC",
+    };
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      if (path === "/master-items") return { data: { data: [erpItem] } };
+      if (path === "/master-item-meta") {
+        return { data: { data: [{ itemNo: "FG-001", itemType: "EC", description: "CYPERMETHRIN 35% EC" }] } };
+      }
+      return { data: { data: [] } };
+    });
+    vi.mocked(api.put).mockResolvedValue({ data: { data: {} } } as never);
+    vi.mocked(api.patch).mockResolvedValue({ data: { data: {} } } as never);
+    renderMasterItems();
+
+    const row = (await screen.findByText("FG-001")).closest("tr");
+    fireEvent.doubleClick(row!);
+    const drawer = await screen.findByRole("dialog");
+    expect(within(drawer).getByText("CYPERMETHRIN 35% EC")).toBeInTheDocument();
+    expect(within(drawer).getByText("EC - น้ำ (อีซี)")).toBeInTheDocument();
+
+    fireEvent.click(within(drawer).getByLabelText("แก้ไข item จากแถบรายละเอียด"));
+    expect(await screen.findByDisplayValue("CYPERMETHRIN 35% EC")).toBeDisabled();
+    expect(screen.getByDisplayValue("EC - น้ำ (อีซี)")).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "บันทึก" }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalled());
+    const [metaPath, metaPayload] = vi.mocked(api.put).mock.calls[0];
+    expect(metaPath).toBe("/master-item-meta/FG-001");
+    expect(metaPayload).not.toHaveProperty("itemType");
+    expect(metaPayload).not.toHaveProperty("description");
+    await waitFor(() => expect(api.patch).toHaveBeenCalled());
+    const webhookPayload = vi.mocked(api.patch).mock.calls[0][1] as Record<string, unknown>;
+    expect(webhookPayload.common_name).toBe("CYPERMETHRIN 35% EC");
+  });
+
+  it("saves the typed common name when creating an item", async () => {
+    vi.mocked(api.put).mockResolvedValue({ data: { data: {} } } as never);
+    vi.mocked(api.post).mockResolvedValue({ data: { data: {} } } as never);
+    renderMasterItems();
+    await screen.findByText("FG-001");
+
+    fireEvent.click(screen.getByRole("button", { name: /เพิ่มสินค้า/ }));
+    fireEvent.change(await screen.findByLabelText("Code"), { target: { value: "FG-NEW" } });
+    fireEvent.change(screen.getByLabelText("ชื่อ Item"), { target: { value: "New Product" } });
+    fireEvent.change(screen.getByLabelText("ชื่อสามัญ"), { target: { value: "ABAMECTIN 1.8% EC" } });
+    expect(screen.getByDisplayValue("EC - น้ำ (อีซี)")).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "บันทึก" }));
+
+    await waitFor(() => expect(api.put).toHaveBeenCalled());
+    const [metaPath, metaPayload] = vi.mocked(api.put).mock.calls[0];
+    expect(metaPath).toBe("/master-item-meta/FG-NEW");
+    expect(metaPayload).toMatchObject({ itemType: "ABAMECTIN 1.8% EC" });
+    await waitFor(() => expect(api.post).toHaveBeenCalled());
+    expect(vi.mocked(api.post).mock.calls[0][1]).toMatchObject({ common_name: "ABAMECTIN 1.8% EC" });
+  });
+
   it("collects split common names in a dedicated master common name item tab", async () => {
     vi.mocked(api.get).mockImplementation(async (path: string) => {
       if (path === "/master-items") {

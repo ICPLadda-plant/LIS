@@ -81,7 +81,6 @@ import { readSlotMethods, type MethodDoc } from "@/lib/methodRegistry";
 import { buildOverrideMap, normalizeCommonName, normalizeKey } from "@/lib/commonNameOverride";
 import type { CommonNameOverrideRow } from "@/lib/commonNameOverride";
 import {
-  classificationTypes,
   getClassification,
   getCommonName,
 } from "@/lib/productClassification";
@@ -170,11 +169,10 @@ type MasterCommonNameItem = {
 type MasterItemForm = {
   itemCode: string;
   itemName: string;
-  itemType: string;
+  commonName: string;
   category: string;
   unit: string;
   status: string;
-  description: string;
   requiredInspectionQty: string;
   kgPerCarton: string;
   grossKgPerUnit: string;
@@ -190,11 +188,10 @@ type MasterItemForm = {
 const emptyForm: MasterItemForm = {
   itemCode: "",
   itemName: "",
-  itemType: "",
+  commonName: "",
   category: "",
   unit: "",
   status: "active",
-  description: "",
   requiredInspectionQty: "0",
   kgPerCarton: "",
   grossKgPerUnit: "",
@@ -307,14 +304,16 @@ const hiddenTableKeys = [
   "packing_unit_desc",
   "packing_qty_per",
 ];
+// meta.itemType เก็บ "ชื่อสามัญ" (จาก Sync Kg/ลัง) และ meta.description เก็บ "ขนาดบรรจุ"
+// แต่ข้อมูลเก่าบางแถวถูกฟอร์มเขียนรหัสสูตร (EC/WP) หรือชื่อสามัญทับไว้ — จึงไม่เอาสองช่องนี้
+// ไปทับ common_name / item_name2 / item_name3 ของ ERP. ชื่อสามัญจาก ERP เป็นตัวจริงเสมอ;
+// ถ้าต้องการชื่อที่แสดงต่างออกไปให้ใช้ "ตั้งชื่อมาตรฐาน (common name)".
 const OVERRIDE_FIELD_MAP: Array<{ key: keyof MasterItemOverride; targets: string[] }> = [
   { key: "itemCode", targets: codeKeys },
   { key: "itemName", targets: nameKeys },
-  { key: "itemType", targets: typeKeys },
   { key: "category", targets: categoryKeys },
   { key: "unit", targets: unitKeys },
   { key: "status", targets: statusKeys },
-  { key: "description", targets: descriptionKeys },
 ];
 
 function applyOverride(item: MasterItem, override?: MasterItemOverride): MasterItem {
@@ -780,22 +779,16 @@ export function buildMasterCommonNameRows(entries: Array<{ item: MasterItem; ori
 
 function itemToForm(item: MasterItem, metaQty = 0): MasterItemForm {
   const statusValue = firstValue(item, statusKeys);
-  const classification = getClassification([
-    firstValue(item, typeKeys),
-    firstValue(item, descriptionKeys),
-    firstValue(item, nameKeys),
-  ].filter(Boolean).join(" "));
   return {
     itemCode: String(firstValue(item, codeKeys)),
     itemName: String(firstValue(item, nameKeys)),
-    itemType: classification?.code ?? String(firstValue(item, typeKeys)),
+    commonName: formString(firstValue(item, commonNameKeys)),
     category: String(firstValue(item, categoryKeys)),
     unit: String(firstValue(item, unitKeys)),
     status:
       typeof statusValue === "boolean"
         ? statusValue ? "active" : "inactive"
         : String(statusValue || "active"),
-    description: String(firstValue(item, descriptionKeys)),
     requiredInspectionQty: String(metaQty || 0),
     kgPerCarton: formString(firstValue(item, weightKeys)),
     grossKgPerUnit: formString(firstValue(item, ["grossKgPerUnit"])),
@@ -810,9 +803,8 @@ function itemToForm(item: MasterItem, metaQty = 0): MasterItemForm {
 }
 
 function buildPayload(form: MasterItemForm, editing: MasterItem | null) {
-  const classification = getClassification(form.itemType);
-  const itemType = classification?.code ?? form.itemType.trim();
   const category = form.category.trim();
+  const commonName = form.commonName.trim();
   const payload = {
     ...(editing ?? {}),
   };
@@ -825,17 +817,15 @@ function buildPayload(form: MasterItemForm, editing: MasterItem | null) {
     ...payload,
     item_no: form.itemCode.trim(),
     item_name1: form.itemName.trim(),
-    common_name: itemType,
-    commonname: itemType,
+    // แก้ไข: คงชื่อสามัญเดิมจาก ERP (มากับ editing). เพิ่มใหม่: ใช้ชื่อสามัญที่กรอก
+    ...(editing ? {} : { common_name: commonName, commonname: commonName }),
     inventory_posting_group: category,
     base_unit_of_mea: form.unit.trim(),
     itemCode: form.itemCode.trim(),
     itemName: form.itemName.trim(),
-    itemType,
     category,
     unit: form.unit.trim(),
     status: form.status,
-    description: form.description.trim(),
     imageUrl: form.imageUrls[0] ?? "",
     image_url: form.imageUrls[0] ?? "",
     imageUrls: form.imageUrls,
@@ -2592,7 +2582,8 @@ function MasterItemDialog({
   const [unitOptions, setUnitOptions] = useState(defaultUnitOptions);
   const [busy, setBusy] = useState(false);
   const isEdit = !!item;
-  const readOnlyCommonName = item ? formString(firstValue(item, commonNameKeys)) : "";
+  // ประเภทสูตร (EC/WP/...) คำนวณจากชื่อสามัญเสมอ — ไม่เก็บแยก
+  const classification = getClassification(form.commonName);
   const addUnitOption = (option: string) => {
     setUnitOptions((current) => current.includes(option) ? current : [...current, option]);
   };
@@ -2609,14 +2600,6 @@ function MasterItemDialog({
     });
   };
 
-  const setClassification = (value: string) => {
-    const classification = getClassification(value);
-    setForm((current) => ({
-      ...current,
-      itemType: classification?.code ?? value,
-    }));
-  };
-
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!form.itemCode.trim() || !form.itemName.trim()) {
@@ -2624,7 +2607,6 @@ function MasterItemDialog({
       return;
     }
 
-    const itemTypeCode = getClassification(form.itemType)?.code ?? form.itemType.trim();
     const qtyValue = Math.max(0, Math.floor(Number(form.requiredInspectionQty) || 0));
     const numberFields = {
       kgPerCarton: formNumber(form.kgPerCarton),
@@ -2641,11 +2623,11 @@ function MasterItemDialog({
     const overridePayload = {
       itemCode: form.itemCode.trim(),
       itemName: form.itemName.trim(),
-      itemType: itemTypeCode,
+      // meta.itemType = ชื่อสามัญ; ส่งเฉพาะตอนเพิ่มใหม่ ตอนแก้ไขห้ามทับค่าที่ Sync ไว้
+      ...(isEdit ? {} : { itemType: form.commonName.trim() }),
       category: form.category.trim(),
       unit: form.unit.trim(),
       status: form.status,
-      description: form.description.trim(),
       requiredInspectionQty: qtyValue,
       imageUrl: form.imageUrls[0] ?? "",
       imageUrls: form.imageUrls,
@@ -2712,31 +2694,26 @@ function MasterItemDialog({
                 disabled={isEdit}
               />
             </div>
-            {isEdit && (
-              <div className="space-y-1.5 md:col-span-2">
-                <Label htmlFor="commonname">commonname</Label>
-                <Input
-                  id="commonname"
-                  value={readOnlyCommonName}
-                  disabled
-                  readOnly
-                />
-              </div>
-            )}
+            <div className="space-y-1.5 md:col-span-2">
+              <Label htmlFor="commonname">ชื่อสามัญ</Label>
+              <Input
+                id="commonname"
+                value={form.commonName}
+                onChange={(event) => setField("commonName", event.target.value)}
+                disabled={isEdit}
+                readOnly={isEdit}
+                placeholder="เช่น ABAMECTIN 1.8% EC"
+              />
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="itemType">ประเภท</Label>
-              <Select value={getClassification(form.itemType)?.code ?? ""} onValueChange={setClassification}>
-                <SelectTrigger id="itemType">
-                  <SelectValue placeholder="เลือกประเภท" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classificationTypes.map((item) => (
-                    <SelectItem key={item.key} value={item.code}>
-                      {item.code} - {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="itemType"
+                value={classification ? `${classification.code} - ${classification.label}` : "-"}
+                disabled
+                readOnly
+              />
+              <p className="text-xs text-muted-foreground">คำนวณอัตโนมัติจากชื่อสามัญ</p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="category">หมวดหมู่</Label>
@@ -2846,14 +2823,6 @@ function MasterItemDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="description">รายละเอียด</Label>
-              <Textarea
-                id="description"
-                value={form.description}
-                onChange={(event) => setField("description", event.target.value)}
-              />
-            </div>
           </div>
 
           <DialogFooter>
@@ -2893,7 +2862,6 @@ function MasterItemDetailDrawer({
   const code = displayValue(originalItemNo || firstValue(item, codeKeys));
   const name = displayValue(firstValue(item, nameKeys));
   const imageUrls = getImageUrls(item);
-  const description = displayValue(firstValue(item, descriptionKeys));
   const hasExtra =
     extraColumns.length > 0 && extraColumns.some((key) => String(item[key] ?? "").trim() !== "");
 
@@ -3043,13 +3011,6 @@ function MasterItemDetailDrawer({
               </div>
             )}
           </section>
-
-          {description !== "-" && (
-            <section className="space-y-1">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">รายละเอียด</h3>
-              <p className="whitespace-pre-wrap break-words text-sm">{description}</p>
-            </section>
-          )}
 
           {hasExtra && (
             <section className="space-y-2">
