@@ -225,6 +225,7 @@ const PetitionSchema = new mongoose.Schema(
           fieldLabel: String,
           itemSeq: Number,
           triggeredAt: Date,
+          side: { type: String, enum: ['qc', 'lab'] },
         },
         { _id: false },
       ),

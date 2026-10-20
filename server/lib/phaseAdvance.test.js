@@ -201,3 +201,68 @@ test('legacy scheduling and lazy advancement still use original petition phase',
   assert.deepEqual(petition.phase2UnlockedAt, FUTURE);
   assert.equal(audit.mock.calls[0].arguments[0].event, 'statusChanged');
 });
+
+// ── Phase 2 ต้องเปิดงานของฝั่งที่ trigger ให้ต้องยืนยันผลใหม่ ไม่งั้นหัวหน้าออก Final Result ข้ามผล Phase 2 ได้
+const { isPetitionComplete } = require('./petitionStatusLog');
+
+function originalPhaseFixture(context, side) {
+  const f = fixture(context);
+  f.petition.additionalSampleRequests = [];
+  f.petition.currentPhase = 1;
+  f.petition.phase2DueAt = PAST;
+  f.petition.phase2UnlockedAt = null;
+  f.petition.phase2TriggeredBy = { parameterId: 'p', side, triggeredAt: PAST };
+  f.petition.status = 'success';
+  f.petition.completedAt = PAST;
+  f.petition.qcCompletedAt = PAST;
+  f.petition.qcCompletedBy = 'qc-user';
+  f.petition.labCompletedAt = PAST;
+  f.petition.labCompletedBy = 'lab-user';
+  f.petition.labApprovedAt = PAST;
+  f.petition.labApprovedBy = 'lab-head';
+  f.petition.items = [{ batchNo: 'B-1', sampleName: 'x' }]; // batch ลงท้าย 1 = มี Lab track
+  return f;
+}
+
+test('original Phase 2 triggered on QC side reopens QC only, so petition is no longer complete', async (context) => {
+  const { petition } = originalPhaseFixture(context, 'qc');
+  await maybeAdvancePhase(petition);
+  assert.equal(petition.currentPhase, 2);
+  assert.equal(petition.qcCompletedAt, null);
+  assert.equal(petition.qcCompletedBy, undefined);
+  assert.deepEqual(petition.labApprovedAt, PAST);
+  assert.deepEqual(petition.labCompletedAt, PAST);
+  assert.equal(isPetitionComplete(petition), false);
+});
+
+test('original Phase 2 triggered on Lab side reopens Lab only (completion and approval)', async (context) => {
+  const { petition } = originalPhaseFixture(context, 'lab');
+  await maybeAdvancePhase(petition);
+  assert.equal(petition.labCompletedAt, null);
+  assert.equal(petition.labApprovedAt, null);
+  assert.equal(petition.labApprovedBy, undefined);
+  assert.deepEqual(petition.qcCompletedAt, PAST);
+  assert.equal(isPetitionComplete(petition), false);
+});
+
+test('legacy trigger without side reopens both tracks (safe default)', async (context) => {
+  const { petition } = originalPhaseFixture(context, undefined);
+  await maybeAdvancePhase(petition);
+  assert.equal(petition.qcCompletedAt, null);
+  assert.equal(petition.labCompletedAt, null);
+  assert.equal(petition.labApprovedAt, null);
+});
+
+test('original scheduling records the trigger side', async (context) => {
+  const { petition, input } = fixture(context);
+  petition.additionalSampleRequests = [];
+  petition.currentPhase = 1;
+  petition.phase2DueAt = null;
+  await scheduleOrUnlockPhase2({ ...input, sampleRoundId: undefined });
+  assert.equal(petition.phase2TriggeredBy.side, 'qc');
+  await scheduleOrUnlockPhase2({
+    ...input, sampleRoundId: undefined, parameter: { ...input.parameter, scope: 'lab' },
+    field: { triggersPhase2: true, type: 'checkbox' },
+  });
+  assert.equal(petition.phase2TriggeredBy.side, 'lab');
+});
