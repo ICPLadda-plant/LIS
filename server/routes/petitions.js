@@ -686,7 +686,17 @@ router.post('/status-petition-log', serializePetitionWrite(async (req, res) => {
     const q = mongoose.Types.ObjectId.isValid(petitionId) ? { _id: petitionId } : { petitionNo: petitionId };
     const petition = await Petition.findOne(q);
     if (!petition) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
-    const actor = String(req.body?.actor || 'system').trim();
+    // re-check เปลี่ยน state (ดึงงานกลับขึ้นบอร์ด Assign) — ใช้ผู้เรียกจริง + สิทธิ์ทดสอบ Lab
+    // แบบเดียวกับ /:id/complete ไม่เชื่อ actor จาก body
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!canTestSide(user, petition, 'lab')) {
+      return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์ขอตรวจสอบซ้ำงาน Lab นี้' } });
+    }
+    if (!hasLabTrack(petition) || ['approved', 'rejected'].includes(petition.status)) {
+      return res.status(409).json({ error: { message: 'คำร้องนี้ขอตรวจสอบซ้ำฝั่ง Lab ไม่ได้' } });
+    }
+    const actor = user.name || user.email;
     await Petition.updateOne(
       { _id: petition._id },
       { $set: { labRecheckRequestedAt: new Date(), labRecheckRequestedBy: actor } },
