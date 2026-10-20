@@ -892,8 +892,9 @@ export default function QCTestingDetailPage() {
 
   // 2-phase support
   // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1
+  // ดูจาก parameter ทุกฝั่ง เพราะตัวอบอาจตั้งไว้ฝั่ง Lab แต่ QC ต้องตรวจ parameter เดิมของตัวเองซ้ำด้วย
   const itemHasPhasedParam = (item: PetitionItem) =>
-    matchParametersForItem(item, parameters, idsFor(item), { petitionCategory }).some((p) => p.hasPhases);
+    matchParametersForItem(item, allParameters.filter((p) => p.hasPhases), idsFor(item), { petitionCategory }).length > 0;
   const hasAnyPhasedParam = items.some(itemHasPhasedParam);
   const currentPhase: PetitionPhase = (petition.currentPhase ?? 1) as PetitionPhase;
   const effectivePhaseForItem = (item: PetitionItem): PetitionPhase => {

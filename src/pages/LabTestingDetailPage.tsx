@@ -434,6 +434,8 @@ export default function LabTestingDetailPage() {
   });
 
   const [allParameters, setAllParameters] = useState<ParameterItem[]>([]);
+  // parameter trigger รอบตรวจซ้ำทุกฝั่ง — ตัวอบอาจเป็น QC ที่ไม่ได้แชร์ให้ Lab แต่ Lab ต้องตรวจ %AI ซ้ำ
+  const [phaseTriggerParameters, setPhaseTriggerParameters] = useState<ParameterItem[]>([]);
   // Instrument sources (config) → lookup by key for the "ดึงค่า" pull button.
   // Loaded once via useEffect, mirroring the getParameters pattern below.
   const [instrumentSources, setInstrumentSources] = useState<InstrumentSource[]>([]);
@@ -472,6 +474,7 @@ export default function LabTestingDetailPage() {
           (p) => p.scope === 'lab' || (p.scope === 'qc' && p.shareWithLab === true),
         );
         setAllParameters(labParams);
+        setPhaseTriggerParameters(all.filter((p) => p.hasPhases));
       })
       .catch(() => setParamsLoadError(true))
       .finally(() => setParamsLoaded(true));
@@ -763,9 +766,12 @@ export default function LabTestingDetailPage() {
   );
 
   // 2-phase support: does any matched parameter use hasPhases?
-  // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1
   const itemHasPhasedParam = (item: PetitionItem) =>
-    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((p) => p.hasPhases);
+    // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1
+    matchParametersForItem(item, phaseTriggerParameters, idsFor(item), {
+      forceLabTrack: isResearchAndDevelopmentPetition(petition),
+      petitionCategory: getPetitionCategory(petition),
+    }).length > 0;
   const hasAnyPhasedParam = labItems.some(itemHasPhasedParam);
   const currentPhase: PetitionPhase = (petition.currentPhase ?? 1) as PetitionPhase;
   // If user hasn't picked a tab, default to current phase
