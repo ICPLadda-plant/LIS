@@ -13,7 +13,13 @@ export const devIndexHtml = `<!doctype html>
     <title>ICPLadda - LIS</title>
     <meta name="description" content="LIS - Lab Information System">
     <meta name="author" content="ICP Ladda" />
-    <link rel="icon" type="image/png" href="/LIS/favicon.png">
+    <meta name="theme-color" content="#1f6fb2" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="LIS" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/pwa-icon-180.png" />
+    <link rel="icon" type="image/png" href="/favicon.png">
   </head>
   <body>
     <div id="root"></div>
