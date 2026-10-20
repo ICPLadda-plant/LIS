@@ -227,6 +227,8 @@ function timelineLabel(log, petition) {
       return petition?.assignedTo?.name
         ? `มอบหมายให้ ${petition.assignedTo.name}`
         : (log.note || 'มอบหมาย');
+    case 'recheck':
+      return 'ขอตรวจสอบใหม่';
     case 'resultEntered': {
       const p = md.parameterName || md.parameterId || '';
       return p ? `QC บันทึกผล — ${p}` : 'QC บันทึกผล';
@@ -259,6 +261,7 @@ function buildTimeline(auditLogs, petition) {
     if (!label) continue;
     const entry = { label, at: log.createdAt, actor: log.actor };
     if (log.event === 'received' && log.metadata?.side) entry.side = log.metadata.side;
+    if (log.event === 'recheck') entry.side = 'lab';
     if (log.event === 'assigned') {
       // assignment belongs to ONE side — derive from the assignee snapshot logged
       // at assign time (falls back to the petition's current assignee on old logs).
@@ -349,11 +352,27 @@ function isPetitionComplete(petition) {
   return (!requiresQcTrack(petition) || qcDone) && labDone;
 }
 
+// Lab re-check ที่หัวหน้า Lab ยังไม่ออกผลรอบใหม่ (mirror ของ isLabRecheckPending ฝั่ง FE
+// ใน src/lib/receiveStatus.ts และ filter ?labRecheckPending ใน routes/petitions.js)
+function isLabRecheckPending(petition) {
+  const requestedAt = petition?.labRecheckRequestedAt;
+  if (!requestedAt) return false;
+  if (petition.status === 'approved' || petition.status === 'rejected') return false;
+  if (!petition.labApprovedAt) return true;
+  return new Date(petition.labApprovedAt).getTime() < new Date(requestedAt).getTime();
+}
+
 // Top-level: assemble { current, timeline } from route-loaded inputs.
 function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone) {
   const qc = computeQcHeuristic(petition, qcResults, parameters);
   const fieldLabels = enteredFieldLabels(qcResults);
-  const current = buildCurrent(petition, qc, fieldLabels, !!labDone);
+  const labRecheck = isLabRecheckPending(petition) && hasLabTrack(petition);
+  // re-check = Lab ยังไม่จบ แม้เคยบันทึกผลไปแล้ว → คง track Lab ไว้
+  const current = buildCurrent(petition, qc, fieldLabels, !!labDone && !labRecheck);
+  if (labRecheck && !current.tracks?.lab) {
+    // success → buildCurrent ตอบ label เดียวไม่มี track; เติม track Lab ให้เห็นว่ากำลังตรวจซ้ำ
+    current.tracks = { ...(current.tracks || {}), lab: { side: 'lab', label: 'Lab ตรวจสอบใหม่' } };
+  }
   const timeline = buildTimeline(auditLogs, petition);
   const testResults = buildTestResults(petition, qcResults, parameters);
   if (current.tracks?.qc) {
@@ -370,8 +389,9 @@ function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone) {
     const needsAi = ai != null || hasApplicableTrackField(
       petition, parameters, 'lab', /^%\s*ai(?:$|\s|[-—:])/i,
     );
+    // มี %AI แล้วแต่โดน re-check → ค่าเดิมยังเชื่อไม่ได้ จนกว่าหัวหน้า Lab ออกผลรอบใหม่
     current.tracks.lab['%AI'] = petition.labReceivedAt && needsAi
-      ? (ai == null ? 'รอ LAB ใส่ผล' : String(ai))
+      ? (ai == null ? 'รอ LAB ใส่ผล' : labRecheck ? 'ตรวจสอบใหม่' : String(ai))
       : '';
   }
   return { current, timeline, testResults };
