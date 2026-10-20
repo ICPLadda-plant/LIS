@@ -357,6 +357,37 @@ describe("buildApprovalGroups", () => {
     expect(groups[0].params[0].rows.every((row) => row.phase === 1)).toBe(true);
   });
 
+  it("phase-2: ใบที่มีทั้งยานำเข้าและยาในประเทศ สร้างแถวตรวจซ้ำเฉพาะรายการที่มีตัวอบ", () => {
+    const aiParam = param({ _id: "ai", name: "%AI" });
+    const ovenParam = param({
+      _id: "oven",
+      name: "อบ 14 วัน",
+      hasPhases: true,
+      valueFields: [{ label: "เวลาอบ", type: "timer", timerUnit: "day", timerDurationSec: 14 * 86400, triggersPhase2: true }],
+    });
+    const mixed = {
+      ...petition(),
+      items: [
+        { seq: 1, sampleName: "ยานำเข้า", commonName: "density", testItems: "%AI, อบ 14 วัน" },
+        { seq: 2, sampleName: "ยาในประเทศ", commonName: "density", testItems: "%AI" },
+      ],
+      currentPhase: 2,
+      phase2DueAt: "2026-10-01T00:00:00.000Z",
+      phase2TriggeredBy: { parameterId: "oven", fieldLabel: "เวลาอบ", itemSeq: 1, triggeredAt: "2026-09-17T00:00:00.000Z" },
+    } as unknown as Petition;
+    const results = [
+      { itemSeq: 1, parameterId: "ai", values: { ค่า: 15 }, valuesPhase2: { ค่า: 14 } },
+      { itemSeq: 2, parameterId: "ai", values: { ค่า: 15 } },
+    ] as unknown as QCTestResult[];
+
+    const groups = buildApprovalGroups(mixed, [aiParam, ovenParam], results, new Map());
+    const importedAi = groups[0].params.find((group) => group.parameterId === "ai")!;
+    const domesticAi = groups[1].params.find((group) => group.parameterId === "ai")!;
+
+    expect(importedAi.rows.some((row) => row.phase === 2)).toBe(true);
+    expect(domesticAi.rows.every((row) => row.phase === 1)).toBe(true);
+  });
+
   // Fix 2 — conditionalMode test
   it("conditionalMode: standardText และ abnormal สะท้อนเกณฑ์ที่ resolve จาก conditionalStandards", () => {
     // param มี field "ปริมาณ" ที่ conditionalMode=true

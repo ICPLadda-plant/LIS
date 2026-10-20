@@ -891,12 +891,13 @@ export default function QCTestingDetailPage() {
   const items = petition.items ?? [];
 
   // 2-phase support
-  const hasAnyPhasedParam = items.some((item) =>
-    matchParametersForItem(item, parameters, idsFor(item), { petitionCategory }).some((p) => p.hasPhases),
-  );
+  // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1
+  const itemHasPhasedParam = (item: PetitionItem) =>
+    matchParametersForItem(item, parameters, idsFor(item), { petitionCategory }).some((p) => p.hasPhases);
+  const hasAnyPhasedParam = items.some(itemHasPhasedParam);
   const currentPhase: PetitionPhase = (petition.currentPhase ?? 1) as PetitionPhase;
   const effectivePhaseForItem = (item: PetitionItem): PetitionPhase => {
-    if (!hasAnyPhasedParam) return 1;
+    if (!itemHasPhasedParam(item)) return 1;
     const round = sampleRoundFor(petition, 'qc', item.seq);
     return round ? selectedRoundPhases[round._id + ':' + item.seq] ?? round.currentPhase ?? 1 : selectedPhase;
   };

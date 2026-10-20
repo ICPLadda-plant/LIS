@@ -763,13 +763,14 @@ export default function LabTestingDetailPage() {
   );
 
   // 2-phase support: does any matched parameter use hasPhases?
-  const hasAnyPhasedParam = labItems.some((item) =>
-    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((p) => p.hasPhases),
-  );
+  // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1
+  const itemHasPhasedParam = (item: PetitionItem) =>
+    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((p) => p.hasPhases);
+  const hasAnyPhasedParam = labItems.some(itemHasPhasedParam);
   const currentPhase: PetitionPhase = (petition.currentPhase ?? 1) as PetitionPhase;
   // If user hasn't picked a tab, default to current phase
   const effectivePhaseForItem = (item: PetitionItem): PetitionPhase => {
-    if (!hasAnyPhasedParam) return 1;
+    if (!itemHasPhasedParam(item)) return 1;
     const round = sampleRoundFor(petition, 'lab', item.seq);
     return round ? selectedRoundPhases[round._id + ':' + item.seq] ?? round.currentPhase ?? 1 : selectedPhase;
   };

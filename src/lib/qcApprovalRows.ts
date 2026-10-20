@@ -111,13 +111,15 @@ export function buildApprovalGroups(
 
   return (petition.items ?? []).map((item) => {
     const matched = matchParametersForItem(item, parameters, idsFor(item), { petitionCategory });
+    // รายการที่ไม่มี parameter trigger (เช่น ไม่ใช่ยานำเข้าที่ต้องอบ) ไม่มีรอบตรวจซ้ำ แม้ใบเดียวกันจะเข้า Phase 2 แล้ว
+    const itemHasPhasedParam = matched.some((p) => p.hasPhases);
 
     const params: ApprovalParamGroup[] = matched.map((param) => {
       const k = resultKey(item.seq, param._id!);
       const side = (param.scope ?? "qc") === "lab" ? "lab" : "qc";
       const phaseState = sampleRoundFor(petition, side, item.seq) ?? petition;
       const triggerParameterId = phaseState.phase2TriggeredBy?.parameterId ?? null;
-      const phase2Opened = (phaseState.currentPhase ?? 1) === 2 || !!phaseState.phase2DueAt;
+      const phase2Opened = itemHasPhasedParam && ((phaseState.currentPhase ?? 1) === 2 || !!phaseState.phase2DueAt);
       const hasPhase2Values = Object.keys(v2[k] ?? {}).length > 0;
       // รอบตรวจซ้ำใช้ parameter เดิมทุกตัวของรายการ ยกเว้นตัว trigger เอง
       const includePhase2 = phase2Opened || hasPhase2Values ||
