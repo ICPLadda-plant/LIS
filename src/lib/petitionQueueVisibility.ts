@@ -1,5 +1,5 @@
 import type { Petition } from '@/types/petition.types';
-import { labReceivedAt, qcReceivedAt } from './receiveStatus';
+import { isLabRecheckPending, labReceivedAt, qcReceivedAt } from './receiveStatus';
 import { hasLabTrack, requiresQcTrack } from './petitionRouting';
 
 const OPEN_TESTING_STATUSES: readonly Petition['status'][] = ['sampleSent', 'pendingReview', 'inProgress'];
@@ -18,6 +18,9 @@ export function isVisibleInQcTestingQueue(petition: Petition): boolean {
 
 export function isVisibleInAssignQueue(petition: Petition): boolean {
   if (!hasLabTrack(petition)) return false;
+  // Re-check may be redone by someone else on another day — show it again
+  // (even after success) so it can be reassigned.
+  if (isLabRecheckPending(petition)) return true;
   // Keep received-but-unassigned work on the board so Lab can be assigned after
   // accepting the sample, and keep assigned work visible during testing.
   if (petition.assignedTo) return OPEN_TESTING_STATUSES.includes(petition.status);

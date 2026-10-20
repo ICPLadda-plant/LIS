@@ -7,6 +7,7 @@ import {
   qcReceivedBy,
   labTrackStatusBadge,
   labAssignBoardStatusBadge,
+  isLabRecheckPending,
   qcTrackStatusBadge,
   labTrackStatusSteps,
   qcTrackStatusSteps,
@@ -106,6 +107,28 @@ describe('labAssignBoardStatusBadge', () => {
   it('Lab received card still shows received wording', () => {
     const p = { status: 'inProgress' as const, labReceivedAt: T1 };
     expect(labAssignBoardStatusBadge(p).label).toBe('รับตัวอย่างแล้ว');
+  });
+
+  it('re-check card shows Re-check even when already assigned', () => {
+    const p = { status: 'success' as const, labReceivedAt: T1, labRecheckRequestedAt: T2 };
+    expect(labAssignBoardStatusBadge(p, true).label).toBe('Re-check · เปลี่ยนผู้รับงานได้');
+  });
+});
+
+describe('isLabRecheckPending', () => {
+  it('pending while Lab head has not approved after the re-check', () => {
+    expect(isLabRecheckPending({ status: 'success', labRecheckRequestedAt: T2 })).toBe(true);
+    expect(isLabRecheckPending({ status: 'inProgress', labRecheckRequestedAt: T2, labApprovedAt: T1 })).toBe(true);
+  });
+
+  it('cleared once Lab approval happens after the re-check', () => {
+    expect(isLabRecheckPending({ status: 'success', labRecheckRequestedAt: T1, labApprovedAt: T2 })).toBe(false);
+  });
+
+  it('never pending without a re-check or on closed petitions', () => {
+    expect(isLabRecheckPending({ status: 'inProgress' })).toBe(false);
+    expect(isLabRecheckPending({ status: 'approved', labRecheckRequestedAt: T2 })).toBe(false);
+    expect(isLabRecheckPending({ status: 'rejected', labRecheckRequestedAt: T2 })).toBe(false);
   });
 });
 

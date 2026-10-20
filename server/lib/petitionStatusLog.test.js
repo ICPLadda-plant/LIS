@@ -474,6 +474,47 @@ test('buildStatusLog: track result is empty before receive and waiting after rec
   assert.strictEqual(notRequested.current.tracks.lab['%AI'], '');
 });
 
+test('buildStatusLog: %AI shows "ตรวจสอบใหม่" while a Lab re-check is pending and %AI was entered', () => {
+  const parameters = [
+    { _id: 'ai', name: '%AI', scope: 'lab', status: 'active', applyAll: true, valueFields: [] },
+  ];
+  const results = [{ itemSeq: 1, parameterId: 'ai', parameterName: '%AI', values: { '%AI': '48.10' } }];
+  const base = {
+    status: 'inProgress', qcReceivedAt: 'T', labReceivedAt: 'T',
+    items: [{ seq: 1, batchNo: 'B-1' }],
+    labRecheckRequestedAt: '2026-10-20T02:00:00.000Z',
+  };
+
+  const inProgress = buildStatusLog(base, [], results, parameters, false);
+  assert.strictEqual(inProgress.current.tracks.lab['%AI'], 'ตรวจสอบใหม่');
+
+  // Lab บันทึกผลแล้ว (labDone) — track Lab ต้องกลับมาให้เห็นว่ากำลังตรวจสอบใหม่
+  const labDone = buildStatusLog({ ...base, labCompletedAt: 'T' }, [], results, parameters, true);
+  assert.strictEqual(labDone.current.tracks.lab['%AI'], 'ตรวจสอบใหม่');
+
+  const success = buildStatusLog({ ...base, status: 'success', labCompletedAt: 'T' }, [], results, parameters, true);
+  assert.strictEqual(success.current.tracks.lab['%AI'], 'ตรวจสอบใหม่');
+
+  // ยังไม่มี %AI → ยังรอ Lab ใส่ผลตามเดิม
+  const noValue = buildStatusLog(base, [], [], parameters, false);
+  assert.strictEqual(noValue.current.tracks.lab['%AI'], 'รอ LAB ใส่ผล');
+
+  // หัวหน้า Lab ออกผลหลัง re-check แล้ว → กลับไปโชว์ค่าจริง
+  const approved = buildStatusLog(
+    { ...base, labApprovedAt: '2026-10-20T05:00:00.000Z' }, [], results, parameters, false,
+  );
+  assert.strictEqual(approved.current.tracks.lab['%AI'], '48.10');
+});
+
+test('buildStatusLog: recheck audit event appears on the Lab timeline', () => {
+  const out = buildStatusLog(
+    { status: 'inProgress', items: [{ seq: 1, batchNo: 'B-1' }] },
+    [{ event: 'recheck', actor: 'Lab A', createdAt: 'T1' }],
+    [], [], false,
+  );
+  assert.deepStrictEqual(out.timeline, [{ label: 'ขอตรวจสอบใหม่', at: 'T1', actor: 'Lab A', side: 'lab' }]);
+});
+
 test('buildStatusLog: sends density and %AI from original and additional Lab sample rounds', () => {
   const originalLab = {
     itemSeq: 1, parameterId: 'ai', parameterName: 'Active Ingredient',

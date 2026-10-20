@@ -133,6 +133,7 @@ interface PetitionListParams {
   awaitingQcApproval?: boolean;
   awaitingLabApproval?: boolean;
   labApproved?: boolean;
+  labRecheckPending?: boolean;
 }
 interface PetitionListResponse {
   items: Petition[];
@@ -165,6 +166,7 @@ export function usePetitionList(params: PetitionListParams, options: PetitionRef
     if (params.awaitingQcApproval) sp.set('awaitingQcApproval', 'true');
     if (params.awaitingLabApproval) sp.set('awaitingLabApproval', 'true');
     if (params.labApproved) sp.set('labApproved', 'true');
+    if (params.labRecheckPending) sp.set('labRecheckPending', 'true');
     return sp.toString();
   })();
 

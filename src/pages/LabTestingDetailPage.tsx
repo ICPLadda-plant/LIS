@@ -943,7 +943,7 @@ export default function LabTestingDetailPage() {
     setSubmitting(true);
     try {
       await api.requestPetitionRecheck(petition._id, user?.name ?? user?.email ?? 'system');
-      toast.success('แจ้งขอตรวจสอบซ้ำไปยัง QC Head และผู้ส่งคำขอแล้ว');
+      toast.success('แจ้งขอตรวจสอบซ้ำไปยัง QC Head และผู้ส่งคำขอแล้ว — เปลี่ยนผู้รับงานได้ที่หน้า Assign');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'แจ้งขอตรวจสอบซ้ำไม่สำเร็จ');
     } finally {

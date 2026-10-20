@@ -257,6 +257,9 @@ interface PetitionBase {
   qcCompletedBy?: string;
   labApprovedAt?: string | null;
   labApprovedBy?: string;
+  // กด Re-check ฝั่ง Lab — งานกลับไปโชว์บนบอร์ด Assign ให้เปลี่ยนผู้รับงานได้จนกว่าหัวหน้า Lab ออกผล
+  labRecheckRequestedAt?: string | null;
+  labRecheckRequestedBy?: string;
   labReturnNote?: string;
   qcReturnNote?: string;
   labRedoExplanation?: string;
