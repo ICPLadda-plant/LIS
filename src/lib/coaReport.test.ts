@@ -77,7 +77,7 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].samples[0].rows[0].criteria).toBe("48% ± 2.40");
   });
 
-  it.each(["GR", "DS", "WP", "WG", "GB", "ST", "SP"])(
+  it.each(["GR", "DS", "WP", "WG", "GB", "ST", "SP", "SG"])(
     "uses the special COA form for common names ending with %s",
     (suffix) => {
       const doc = {
@@ -85,6 +85,19 @@ describe("buildCoaReportPages", () => {
       } as CoaDocument;
 
       expect(buildCoaReportPages(doc)[0].template).toBe("grWpSp");
+    },
+  );
+
+  it.each(["WP", "SG", "GB", "WG", "ST", "SP"])(
+    "lets the %s suffix override the Bromadiolone wax-block form",
+    (suffix) => {
+      const doc = {
+        sampleSnapshots: [{ itemSeq: 1, commonName: `BROMADIOLONE 0.005% ${suffix}` }],
+      } as CoaDocument;
+
+      const [page] = buildCoaReportPages(doc);
+
+      expect(page.template).toBe("grWpSp");
     },
   );
 
@@ -125,7 +138,7 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].samples[0].aiContentCriteria).toBe("2% ± 0.50");
   });
 
-  it.each(["SC", "EW", "EC", "ZC", "SL"].flatMap((formulation) => [
+  it.each(["SL", "EC", "EW", "SC", "ME", "ZC"].flatMap((formulation) => [
     `Glyphosate 48% ${formulation}`,
     `Glyphosate 48% W/V ${formulation}`,
     `Glyphosate 48%${formulation}`,
@@ -170,7 +183,7 @@ describe("buildCoaReportPages", () => {
     },
   );
 
-  it.each(["SC", "EW", "EC", "ZC", "SL"])("recognizes %s without a concentration", (formulation) => {
+  it.each(["SL", "EC", "EW", "SC", "ME", "ZC"])("recognizes %s without a concentration", (formulation) => {
     const doc = {
       sampleSnapshots: [{ itemSeq: 1, commonName: `Product ${formulation}` }],
       resultSnapshots: [],
@@ -183,7 +196,7 @@ describe("buildCoaReportPages", () => {
     expect(page.samples[0].aiContentCriteria).toBe("-");
   });
 
-  it.each([undefined, "", "Product 48% ME", "Product SC extra", "Product ESC", "Product SC WP"])(
+  it.each([undefined, "", "Product SC extra", "Product ESC", "Product SC WP"])(
     "does not classify %s as a liquid formulation",
     (commonName) => {
       const doc = { sampleSnapshots: [{ itemSeq: 1, commonName }] } as CoaDocument;

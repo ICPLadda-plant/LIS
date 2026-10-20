@@ -157,6 +157,15 @@ export type CoaErpAutofill = {
     matchKind: "exact" | "close" | "none";
     batchScore: number;
   } | null;
+  legacyMatch?: {
+    id: string;
+    sampleName: string;
+    batchNo: string;
+    productionDate: string;
+    analysisDate: string;
+    matchKind: "exactBatch" | "productHistory";
+    score: number;
+  } | null;
   candidates: Array<{
     petitionId: string;
     petitionNo?: string;
@@ -168,11 +177,19 @@ export type CoaErpAutofill = {
     matchKind: "exact" | "close" | "none";
     labApprovedAt?: string | null;
   }>;
-  stockCandidates: Array<{ lotNo: string; productionDate: string; quantity: number; itemNo: string }>;
+  stockCandidates: Array<{ lotNo: string; batchNo: string; productionDate: string; quantity: number; itemNo: string }>;
   mfCandidates: Array<{ batchNo: string; productionDate: string; itemNo: string }>;
   form: { template: "standard" | "grWpSp" | "liquid" | "bromadiolone0005"; aiCriteria: string; needsDensity: boolean };
   warnings: string[];
-  dataSources: { erp: boolean; stock: boolean; mf: boolean; lab: boolean; density: boolean };
+  dataSources: {
+    erp: boolean;
+    stock: boolean;
+    mf: boolean;
+    lab: boolean;
+    coaHistory?: boolean;
+    legacyLab?: boolean;
+    density: boolean;
+  };
 };
 
 export type CoaLabAiLookup = {

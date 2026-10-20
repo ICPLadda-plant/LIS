@@ -4,21 +4,23 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api";
 import CoaCenterPage from "../CoaCenterPage";
-import type { CoaDocument } from "@/types/coa.types";
+import type { CoaDocument, CoaErpAutofill, CoaLabAiLookup } from "@/types/coa.types";
+
+const authMock = vi.hoisted(() => ({
+  current: {
+    name: "QC Head User",
+    email: "qc-head@example.com",
+    role: "qc-head",
+    roles: ["qc-head"],
+    permissions: ["coa.approve"],
+  },
+}));
 
 vi.mock("@/components/lis/AppLayout", () => ({
   default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: () => ({
-    user: {
-      name: "QC Head User",
-      email: "qc-head@example.com",
-      role: "qc-head",
-      roles: ["qc-head"],
-      permissions: ["coa.approve"],
-    },
-  }),
+  useAuth: () => ({ user: authMock.current }),
 }));
 vi.mock("@/lib/api", () => ({
   api: {
@@ -48,6 +50,7 @@ vi.mock("@/lib/api", () => ({
           petitionId: "p2",
           petitionNoSnapshot: "P-2608-0002",
           sourceCoaId: "c2-source",
+          createdBy: { name: "COA Creator", email: "creator@example.com", role: "lab-staff" },
           customerSnapshot: { company: "Customer B" },
           selectedItemSeqs: [1],
           sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade B", commonName: "Common B", batchNo: "B-002", productionDate: "2026-07-30" }],
@@ -153,7 +156,16 @@ function renderPage(initialEntry = "/coa") {
 }
 
 describe("CoaCenterPage", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.current = {
+      name: "QC Head User",
+      email: "qc-head@example.com",
+      role: "qc-head",
+      roles: ["qc-head"],
+      permissions: ["coa.approve"],
+    };
+  });
 
   it("returns a created draft to the in-progress tab and clears the request search", async () => {
     vi.mocked(api.getEligibleCoaPetitions).mockResolvedValueOnce({ items: [{
@@ -351,13 +363,48 @@ describe("CoaCenterPage", () => {
     expect(screen.queryByRole("columnheader", { name: "ชื่อลูกค้า" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "คำสั่ง" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "เปิดดูไฟล์ COA 00022026" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "QC Head อนุมัติ COA 00022026" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "อนุมัติ COA 00022026" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ไม่อนุมัติ COA 00022026" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "เปิดดูไฟล์ COA 00022026" }));
+    const preview = await screen.findByRole("dialog", { name: /ตัวอย่างเอกสาร/ });
+    expect(within(preview).getByRole("button", { name: "อนุมัติ" })).toBeInTheDocument();
+    expect(within(preview).getByRole("button", { name: "ไม่อนุมัติ" })).toBeInTheDocument();
+    fireEvent.click(within(preview).getByRole("button", { name: "ไม่อนุมัติ" }));
+    const rejectDialog = await screen.findByRole("dialog", { name: /ไม่อนุมัติ COA 00022026/ });
+    fireEvent.change(within(rejectDialog).getByPlaceholderText("เหตุผลที่ไม่อนุมัติ"), { target: { value: "แก้ไขข้อมูลลูกค้า" } });
+    fireEvent.click(within(rejectDialog).getByRole("button", { name: "ยืนยันไม่อนุมัติ" }));
+    await waitFor(() => expect(api.rejectCoaDocument).toHaveBeenCalledWith(
+      "c2",
+      expect.objectContaining({ reason: "แก้ไขข้อมูลลูกค้า" }),
+    ));
 
     fireEvent.click(screen.getByRole("button", { name: "สถานะ อนุมัติแล้ว" }));
 
     expect(await screen.findByText("00032026")).toBeInTheDocument();
     expect(screen.queryByRole("row", { name: /00022026/ })).not.toBeInTheDocument();
+  });
+
+  it("allows the COA creator to review the document from the preview", async () => {
+    authMock.current = {
+      name: "COA Creator",
+      email: "creator@example.com",
+      role: "lab-staff",
+      roles: ["lab-staff"],
+      permissions: [],
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "สถานะ รออนุมัติ" }));
+    fireEvent.click(await screen.findByRole("button", { name: "เปิดดูไฟล์ COA 00022026" }));
+
+    const preview = await screen.findByRole("dialog", { name: /ตัวอย่างเอกสาร/ });
+    fireEvent.click(within(preview).getByRole("button", { name: "อนุมัติ" }));
+
+    await waitFor(() => expect(api.approveCoaDocument).toHaveBeenCalledWith(
+      "c2",
+      expect.objectContaining({ _user: expect.objectContaining({ email: "creator@example.com" }) }),
+    ));
   });
 
   it("shows the create COA action in a command column for requested COAs", async () => {
@@ -391,7 +438,7 @@ describe("CoaCenterPage", () => {
         petitionNoSnapshot: "SO26040020",
         customerSnapshot: { name: "Customer A", company: "ICPL" },
         selectedItemSeqs: [10000],
-        sampleSnapshots: [{ itemSeq: 10000, sampleName: "Carval", commonName: "SPIRODICLOFEN 24 % W/V SC", sampleId: "FC-CAVAL-1X16", condition: "16*1 L" }],
+        sampleSnapshots: [{ itemSeq: 10000, sampleName: "Carval", commonName: "THIAMETHOXAM 25% WG", sampleId: "FC-CAVAL-1X16", condition: "16*1 L" }],
         resultSnapshots: [],
         print: { printCount: 0 },
         createdAt: new Date().toISOString(),
@@ -413,16 +460,16 @@ describe("CoaCenterPage", () => {
 
     expect(await screen.findByRole("dialog")).toHaveTextContent("สร้าง COA แบบกรอกเอง");
     expect(screen.getByLabelText("ชื่อการค้า *")).toHaveValue("Carval");
-    expect(screen.getByLabelText("ชื่อสามัญ *")).toHaveValue("SPIRODICLOFEN 24 % W/V SC");
+    expect(screen.getByLabelText("ชื่อสามัญ *")).toHaveValue("THIAMETHOXAM 25% WG");
     expect(screen.getByRole("button", { name: "บันทึกร่าง COA" })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText("Batch No. *"), { target: { value: "B-ERP-1" } });
     fireEvent.change(screen.getByLabelText("วันที่ผลิต *"), { target: { value: "2026-10-01" } });
     fireEvent.change(screen.getByLabelText("Date of analysis *"), { target: { value: "2026-10-08" } });
-    fireEvent.change(screen.getByLabelText("เกณฑ์ความคลาดเคลื่อน *"), { target: { value: "24% ± 1.20" } });
+    fireEvent.change(screen.getByLabelText("เกณฑ์ความคลาดเคลื่อน *"), { target: { value: "25% ± 1.30" } });
     fireEvent.change(screen.getByLabelText("Density at 30°C (g/cm³) *"), { target: { value: "1.100" } });
-    fireEvent.change(screen.getByLabelText("%AI content (W/V) *"), { target: { value: "24" } });
-    fireEvent.change(screen.getByLabelText("Appearance *"), { target: { value: "Clear liquid" } });
+    fireEvent.change(screen.getByLabelText("%AI content (W/W) *"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Appearance *"), { target: { value: "Off-white cylinder granule" } });
     vi.mocked(api.createErpManualCoaDocument).mockRejectedValueOnce(new Error("บันทึกไม่สำเร็จ"));
     fireEvent.click(screen.getByRole("button", { name: "บันทึกร่าง COA" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("บันทึกไม่สำเร็จ");
@@ -430,8 +477,8 @@ describe("CoaCenterPage", () => {
       externalRequestId: "external-coa-request-SO26040020-10000",
       sample: expect.objectContaining({ batchNo: "B-ERP-1", productionDate: "2026-10-01" }),
       results: expect.arrayContaining([
-        expect.objectContaining({ testItem: "Appearance", criteria: "Clear liquid", result: "Conform" }),
-        expect.objectContaining({ testItem: "%AI content (W/V)", criteria: "24% ± 1.20", result: "24%" }),
+        expect.objectContaining({ testItem: "Appearance", criteria: "Off-white cylinder granule", result: "Conform" }),
+        expect.objectContaining({ testItem: "%AI content (W/W)", criteria: "25% ± 1.30", result: "25%" }),
         expect.objectContaining({ testItem: "Density at 30°C (g/cm³)", result: "1.100" }),
         expect.objectContaining({ testItem: "Date of analysis", result: "2026-10-08" }),
       ]),
@@ -458,7 +505,7 @@ describe("CoaCenterPage", () => {
         _id: "external-coa-request-SO-AUTO-1-10000", coaNo: null, coaYear: 2026, revision: 0, status: "requested",
         petitionId: "external-coa-request-SO-AUTO-1-10000", petitionNoSnapshot: "SO-AUTO-1", selectedItemSeqs: [10000],
         customerSnapshot: { name: "Customer A" },
-        sampleSnapshots: [{ itemSeq: 10000, sampleName: "Test Trade", commonName: "GLYPHOSATE 48% W/V SL" }],
+        sampleSnapshots: [{ itemSeq: 10000, sampleName: "Test Trade", commonName: "THIAMETHOXAM 25% WG" }],
         resultSnapshots: [], externalRequestId: "external-coa-request-SO-AUTO-1-10000",
         externalCoaRequest: { saleOrderNo: "SO-AUTO-1", line: 10000 },
       }],
@@ -467,12 +514,17 @@ describe("CoaCenterPage", () => {
       externalRequestId: "external-coa-request-SO-AUTO-1-10000",
       source: {},
       sample: {
-        itemSeq: 10000, sampleName: "Test Trade", commonName: "GLYPHOSATE 48% W/V SL",
+        itemSeq: 10000, sampleName: "Test Trade", commonName: "THIAMETHOXAM 25% WG",
         batchNo: "FG260902-008", lotNo: "FG260902-008", productionDate: "2026-09-02",
       },
-      results: [{ itemSeq: 10000, testItem: "%AI content", criteria: "48% ± 2.40", result: "48.35%", unit: "%" }],
+      results: [{ itemSeq: 10000, testItem: "%AI content", criteria: "25% ± 1.30", result: "24.305%", unit: "%" }],
       match: { petitionId: "p1", petitionNo: "P-AUTO-1", itemSeq: 1, batchNo: "FG260902-008", matchKind: "exact", batchScore: 1 },
-      candidates: [], stockCandidates: [], mfCandidates: [], form: { template: "liquid", aiCriteria: "48% ± 2.40", needsDensity: true },
+      candidates: [],
+      stockCandidates: [{
+        lotNo: "26S-PCB25-480-091069", batchNo: "480", productionDate: "2026-06-18",
+        quantity: 100, itemNo: "F-TWI25-1000X12",
+      }],
+      mfCandidates: [], form: { template: "grWpSp", aiCriteria: "25% ± 1.30", needsDensity: false },
       warnings: [], dataSources: { erp: true, stock: true, mf: true, lab: true, density: false },
     });
 
@@ -483,8 +535,63 @@ describe("CoaCenterPage", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Batch No. *")).toHaveValue("FG260902-008"));
     expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-09-02");
-    expect(screen.getByLabelText("%AI content (W/V) *")).toHaveValue("48.35%");
-    expect(screen.getByText("แบบฟอร์ม: ยาน้ำ")).toBeInTheDocument();
+    expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%");
+    expect(screen.getByText("แบบฟอร์ม: WG / WP / ST / GR / DS / SP / SG / GB")).toBeInTheDocument();
+
+    fireEvent.change(within(screen.getByRole("dialog")).getByRole("combobox"), {
+      target: { value: "26S-PCB25-480-091069" },
+    });
+    expect(screen.getByLabelText("Batch No. *")).toHaveValue("480");
+    expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-10-09");
+    expect(screen.getByLabelText("Lot No.")).toHaveValue("26S-PCB25-480-091069");
+  });
+
+  it("keeps the averaged AI visible when an older batch lookup finishes late", async () => {
+    vi.mocked(api.getCoaDocuments).mockResolvedValueOnce({
+      items: [{
+        _id: "external-coa-request-SO-AI-AVERAGE-10000", coaNo: null, coaYear: 2026, revision: 0, status: "requested",
+        petitionId: "external-coa-request-SO-AI-AVERAGE-10000", petitionNoSnapshot: "SO-AI-AVERAGE", selectedItemSeqs: [10000],
+        customerSnapshot: { name: "Customer AI" },
+        sampleSnapshots: [{
+          itemSeq: 10000, sampleName: "Test Trade", commonName: "THIAMETHOXAM 25% WG",
+          batchNo: "OLD-BATCH", productionDate: "2026-09-01",
+        }],
+        resultSnapshots: [], externalRequestId: "external-coa-request-SO-AI-AVERAGE-10000",
+        externalCoaRequest: { saleOrderNo: "SO-AI-AVERAGE", line: 10000 },
+      }],
+    });
+    let resolveAutofill: ((value: CoaErpAutofill) => void) | undefined;
+    const pendingAutofill = new Promise<CoaErpAutofill>((resolve) => { resolveAutofill = resolve; });
+    let resolveOldLookup: ((value: CoaLabAiLookup) => void) | undefined;
+    const pendingOldLookup = new Promise<CoaLabAiLookup>((resolve) => { resolveOldLookup = resolve; });
+    vi.mocked(api.getErpCoaAutofill).mockReturnValueOnce(pendingAutofill);
+    vi.mocked(api.getCoaLabAiByBatch).mockImplementation(({ batchNo, commonName }) => {
+      if (batchNo === "OLD-BATCH") return pendingOldLookup;
+      return Promise.resolve({ batchNo, commonName, ai: null, analysisDate: "", match: null });
+    });
+
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "สถานะ ขอ COA" }));
+    fireEvent.click(await screen.findByRole("row", { name: /SO-AI-AVERAGE/ }));
+    await waitFor(() => expect(api.getCoaLabAiByBatch).toHaveBeenCalledWith(expect.objectContaining({ batchNo: "OLD-BATCH" })));
+
+    resolveAutofill?.({
+      externalRequestId: "external-coa-request-SO-AI-AVERAGE-10000", source: {},
+      sample: {
+        itemSeq: 10000, sampleName: "Test Trade", commonName: "THIAMETHOXAM 25% WG",
+        batchNo: "NEW-BATCH", productionDate: "2026-09-02",
+      },
+      results: [{ itemSeq: 10000, testItem: "%AI content", criteria: "25% ± 1.30", result: "24.305%", unit: "%" }],
+      match: { petitionId: "p-ai", petitionNo: "P-AI", itemSeq: 1, batchNo: "NEW-BATCH", matchKind: "exact", batchScore: 1 },
+      candidates: [], stockCandidates: [], mfCandidates: [],
+      form: { template: "grWpSp", aiCriteria: "25% ± 1.30", needsDensity: false }, warnings: [],
+      dataSources: { erp: true, stock: false, mf: false, lab: true, density: false },
+    });
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%"));
+
+    resolveOldLookup?.({ batchNo: "OLD-BATCH", commonName: "THIAMETHOXAM 25% WG", ai: null, analysisDate: "", match: null });
+    await waitFor(() => expect(api.getCoaLabAiByBatch).toHaveBeenCalledWith(expect.objectContaining({ batchNo: "NEW-BATCH" })));
+    expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%");
   });
 
   it("refreshes %AI from the entered batch in real time", async () => {
@@ -652,10 +759,10 @@ describe("CoaCenterPage", () => {
     expect(screen.getByRole("button", { name: "สถานะ รออนุมัติ" })).toHaveAttribute("aria-pressed", "true");
     const pendingApprovalRow = await screen.findByRole("row", { name: /00042026/ });
     expect(within(pendingApprovalRow).getByRole("button", { name: "เปิดดูไฟล์ COA 00042026" })).toBeInTheDocument();
-    expect(within(pendingApprovalRow).getByRole("button", { name: "QC Head อนุมัติ COA 00042026" })).toBeInTheDocument();
+    expect(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 00042026" })).toBeInTheDocument();
     expect(within(pendingApprovalRow).getByRole("button", { name: "ไม่อนุมัติ COA 00042026" })).toBeInTheDocument();
 
-    fireEvent.click(within(pendingApprovalRow).getByRole("button", { name: "QC Head อนุมัติ COA 00042026" }));
+    fireEvent.click(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 00042026" }));
 
     expect(screen.getByRole("button", { name: "สถานะ อนุมัติแล้ว" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("coa-center-page")).toHaveClass("space-y-4");

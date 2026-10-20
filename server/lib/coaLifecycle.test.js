@@ -6,6 +6,8 @@ const CoaDocument = require('../models/CoaDocument');
 const CoaAuditLog = require('../models/CoaAuditLog');
 const {
   assertCanTransition,
+  canReviewCoa,
+  isCoaCreator,
   isQcHead,
   activePrintableStatuses,
   canPrintStatus,
@@ -34,23 +36,42 @@ test('QC Head role detection accepts role, activeRole, permission, and position 
   assert.equal(isQcHead({ role: 'lab-staff' }), false);
 });
 
+test('COA review access accepts the document creator by email', () => {
+  const doc = { createdBy: { email: 'creator@example.com' } };
+  assert.equal(isCoaCreator({ email: 'CREATOR@example.com' }, doc), true);
+  assert.equal(canReviewCoa({ email: 'creator@example.com', role: 'lab-staff' }, doc), true);
+  assert.equal(canReviewCoa({ email: 'other@example.com', role: 'lab-staff' }, doc), false);
+});
+
 test('lifecycle allows submit, approve, revise, cancel, and print only from valid statuses', () => {
   assert.doesNotThrow(() => assertCanTransition('draft', 'submit'));
   assert.doesNotThrow(() => assertCanTransition('pendingApproval', 'approve', { role: 'qc-head' }));
+  assert.doesNotThrow(() => assertCanTransition(
+    'pendingApproval',
+    'approve',
+    { email: 'creator@example.com', role: 'lab-staff' },
+    { createdBy: { email: 'creator@example.com' } },
+  ));
   assert.doesNotThrow(() => assertCanTransition('approved', 'revise'));
   assert.doesNotThrow(() => assertCanTransition('printed', 'cancel', { permissions: ['coa.approve'] }));
   assert.doesNotThrow(() => assertCanTransition('reissued', 'print'));
 
-  assert.throws(() => assertCanTransition('pendingApproval', 'approve'), /QC Head required to approve COA/);
-  assert.throws(() => assertCanTransition('pendingApproval', 'approve', { role: 'lab-staff' }), /QC Head required to approve COA/);
+  assert.throws(() => assertCanTransition('pendingApproval', 'approve'), /QC Head or COA creator required to approve COA/);
+  assert.throws(() => assertCanTransition('pendingApproval', 'approve', { role: 'lab-staff' }), /QC Head or COA creator required to approve COA/);
   assert.throws(() => assertCanTransition('draft', 'approve', { role: 'qc-head' }), /Cannot approve COA from draft/);
   assert.throws(() => assertCanTransition('pendingApproval', 'print'), /Cannot print COA from pendingApproval/);
   assert.throws(() => assertCanTransition('cancelled', 'print'), /Cannot print COA from cancelled/);
 });
 
-test('rejection and cancellation require QC Head and cancellation requires a reason', () => {
+test('rejection allows a reviewer while cancellation still requires QC Head and a reason', () => {
   assert.doesNotThrow(() => assertCanTransition('pendingApproval', 'reject', { position: 'QC Head' }));
-  assert.throws(() => assertCanTransition('pendingApproval', 'reject', { role: 'lab-staff' }), /QC Head required to reject COA/);
+  assert.doesNotThrow(() => assertCanTransition(
+    'pendingApproval',
+    'reject',
+    { email: 'creator@example.com', role: 'lab-staff' },
+    { createdBy: { email: 'creator@example.com' } },
+  ));
+  assert.throws(() => assertCanTransition('pendingApproval', 'reject', { role: 'lab-staff' }), /QC Head or COA creator required to reject COA/);
   assert.doesNotThrow(() => assertValidCancellation('Correction required'));
   assert.throws(() => assertValidCancellation('  '), /COA cancellation reason is required/);
   assert.throws(() => assertCanTransition('approved', 'cancel', { role: 'lab-staff' }), /QC Head required to cancel COA/);
@@ -200,7 +221,7 @@ test('recordCoaLifecycleAction validates transition, actor, and persists audit e
       actor: { role: 'lab-staff', name: 'Lab Staff', email: 'lab@example.com' },
       CoaAuditLogModel: stubAuditModel,
     }),
-    /QC Head required to approve COA/,
+    /QC Head or COA creator required to approve COA/,
   );
   assert.equal(createdRows.length, 0);
 
@@ -271,7 +292,7 @@ test('applyCoaLifecycleAction saves the transition and persists its audit event'
       actor: { role: 'lab-staff', name: 'Lab Staff', email: 'lab@example.com' },
       CoaAuditLogModel: stubAuditModel,
     }),
-    /QC Head required to approve COA/,
+    /QC Head or COA creator required to approve COA/,
   );
   assert.equal(createdRows.length, 1);
 

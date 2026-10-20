@@ -1,11 +1,19 @@
 const { aiToleranceCriteriaForCommonName, isAiContentTestItem } = require('./aiToleranceCriteria');
-const { batchMatches } = require('./densityBatch');
+const { batchMatches, densityBatchForRow } = require('./densityBatch');
 
 const MF_URLS = [
   'https://n8n-plant.icpladda.com/webhook/api/item-MF',
   'https://n8n-plant.icpladda.com/webhook/item-MF-CLOSE',
 ];
 const STOCK_URL = 'https://n8n-plant.icpladda.com/webhook/api/stock-all-item';
+const EXCLUDED_AI_SUBMITTER = '\u0e27\u0e18\u0e32\u0e18\u0e23';
+const GR_WP_SP_FORMULATIONS = new Set(['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'SG', 'GB']);
+const LEGACY_FORMULATIONS = new Set(['EC', 'SC', 'SL', 'WG', 'WP', 'GR', 'SP', 'ME', 'EW', 'ZC']);
+const LEGACY_IGNORED_TOKENS = new Set([
+  ...LEGACY_FORMULATIONS,
+  'WV', 'WW', 'W', 'V', 'LIVE', 'STOCK', 'PUBLIC', 'HEALTH', 'BIO', 'GREEN', 'BROWN',
+  'WAX', 'BLOCK', 'SAND', 'GRANULE', 'GRANULES', 'TECH', 'AI', 'ACTIVE', 'INGREDIENT', 'CONTENT',
+]);
 const PHYSICAL_ENGLISH = {
   'ของเหลวใส': 'Clear liquid', 'ของเหลวขุ่น': 'Cloudy liquid', 'ของเหลวหนืด': 'Viscous liquid',
   'เม็ดทรงกระบอก': 'Cylindrical granules', 'เกล็ด': 'Flakes', 'ผงละเอียด': 'Fine powder',
@@ -27,6 +35,10 @@ function normalizeText(value) {
 
 function normalizeBatch(value) {
   return text(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+function isExcludedAiSubmitter(value) {
+  return normalizeText(value).replace(/\s+/g, '').includes(EXCLUDED_AI_SUBMITTER);
 }
 
 function rowsFromPayload(payload) {
@@ -125,9 +137,22 @@ function productionDateFromRow(row, fallback = '') {
   return normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
 }
 
-function lotFromRow(row) {
-  return pick(row, [
+function suffixDatedLotFromRow(row) {
+  const keys = [
     'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
+    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
+  ];
+  for (const key of keys) {
+    const value = text(row?.[key]);
+    if (/([0-3]\d)([01]\d)(\d{2})$/.test(value) && lotDate(value)) return value;
+  }
+  return '';
+}
+
+function lotFromRow(row) {
+  return suffixDatedLotFromRow(row) || pick(row, [
+    'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
+    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
     'batch_no', 'batchNo', 'BatchNo', 'Batch No.', 'Batch No',
   ]) || batchFromRow(row);
 }
@@ -142,24 +167,121 @@ function normalizeIsoDate(value) {
   const source = text(value);
   const iso = source.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+  const dmy = source.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmy) {
+    const year = Number(dmy[3]) >= 2400 ? Number(dmy[3]) - 543 : Number(dmy[3]);
+    const month = Number(dmy[2]);
+    const day = Number(dmy[1]);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return '';
+  }
   const parsed = new Date(source);
   return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
 }
 
 function lotDate(lotNo) {
   const value = text(lotNo);
-  const match = value.match(/^(?:FG)?(\d{2})(\d{2})(\d{2})-/i);
-  if (!match) return '';
-  return `20${match[1]}-${match[2]}-${match[3]}`;
+  const fgDate = value.match(/^(?:FG)?(\d{2})(\d{2})(\d{2})(?:-|$)/i);
+  if (fgDate) {
+    const year = 2000 + Number(fgDate[1]);
+    const month = Number(fgDate[2]);
+    const day = Number(fgDate[3]);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  const labeledDate = value.match(/([0-3]\d)([01]\d)(\d{2})$/);
+  if (labeledDate) {
+    const day = Number(labeledDate[1]);
+    const month = Number(labeledDate[2]);
+    const year = 2500 + Number(labeledDate[3]) - 543;
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day) {
+      return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  return '';
+}
+
+function isFgLotDescription(lotNo) {
+  return /^FG\d{6}(?:-|$)/i.test(text(lotNo));
 }
 
 function lotSnapshot(lotNo, fallbackDate = '') {
   const value = text(lotNo);
+  const labeledLot = value.match(/^(?:.+)-([^-]+)-[0-3]\d[01]\d\d{2}$/);
   return {
     lotNo: value,
-    batchNo: value,
+    batchNo: labeledLot ? labeledLot[1] : value,
     productionDate: lotDate(value) || normalizeIsoDate(fallbackDate),
   };
+}
+
+function densityBatchFamily(value) {
+  const batch = text(value).replace(/(?:\s+|-)?P\d+$/i, '');
+  return (batch.match(/^(.+)-\d+$/) || [])[1] || '';
+}
+
+function densityProductionDate(row) {
+  const value = text(row?.['Date & time'] || row?.['Date & time of report']);
+  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s|$)/);
+  if (!match) return '';
+  const year = Number(match[3]);
+  const month = Number(match[1]);
+  const day = Number(match[2]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return '';
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function findBestDensityBatch(rows, source, seedBatch) {
+  const family = densityBatchFamily(seedBatch);
+  if (!family) return null;
+  const normalizedFamily = normalizeBatch(family);
+  const seedBatchValue = (text(seedBatch).match(/-([^-]+)$/) || [])[1] || text(seedBatch);
+  const seedDigitSignature = seedBatchValue.replace(/\D/g, '').split('').sort().join('');
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
+  const seen = new Set();
+  const candidates = [];
+  for (const row of rows || []) {
+    const batchNo = text(densityBatchForRow(row));
+    const productionDate = densityProductionDate(row);
+    if (!batchNo || !productionDate || normalizeBatch(densityBatchFamily(batchNo)) !== normalizedFamily) continue;
+    const key = `${normalizeBatch(batchNo)}|${productionDate}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const parsedBatch = (batchNo.match(/-([^-]+)$/) || [])[1] || batchNo;
+    candidates.push({
+      batchNo: parsedBatch,
+      sourceBatchNo: batchNo,
+      productionDate,
+      productionTime: Date.parse(`${productionDate}T00:00:00.000Z`),
+      digitSignature: parsedBatch.replace(/\D/g, '').split('').sort().join(''),
+    });
+  }
+  candidates.sort((left, right) => {
+    const permutationDifference = Number(right.digitSignature === seedDigitSignature)
+      - Number(left.digitSignature === seedDigitSignature);
+    if (!Number.isFinite(targetTime)) {
+      return right.productionTime - left.productionTime || permutationDifference;
+    }
+    const leftBucket = left.productionTime <= targetTime ? 0 : 1;
+    const rightBucket = right.productionTime <= targetTime ? 0 : 1;
+    return leftBucket - rightBucket
+      || Math.abs(targetTime - left.productionTime) - Math.abs(targetTime - right.productionTime)
+      || permutationDifference
+      || right.productionTime - left.productionTime;
+  });
+  if (!candidates[0]) return null;
+  const { digitSignature, ...selected } = candidates[0];
+  return selected;
 }
 
 function commonPrefix(left, right) {
@@ -208,23 +330,59 @@ function physicalFromQc(result) {
   };
 }
 
-function aiFromQc(result, commonName) {
-  const rows = Array.isArray(result?.entries) && result.entries.length ? result.entries : [result?.values || {}];
+function aiValueFromRow(row, commonName) {
   const substance = normalizeText(commonName).split(/\s|\+|,/)[0];
   const values = [];
-  for (const row of rows) {
-    for (const [key, value] of Object.entries(row || {})) {
-      if (isAiContentTestItem(key) && text(value)) {
-        values.push({ key, value });
-      }
+  for (const [key, value] of Object.entries(row || {})) {
+    if (isAiContentTestItem(key) && text(value)) {
+      values.push({ key, value });
     }
   }
   const selected = values.find((entry) => substance && normalizeText(entry.key).includes(`::${substance}`))
     || values.find((entry) => normalizeText(entry.key) !== '%ai')
     || values[0];
   if (!selected) return null;
-  const resultText = text(selected.value).endsWith('%') ? text(selected.value) : `${text(selected.value)}%`;
-  return { result: resultText, key: selected.key };
+  const raw = text(selected.value);
+  const numericText = raw.replace(/,/g, '').match(/[-+]?(?:\d+(?:\.\d+)?|\.\d+)/)?.[0] || '';
+  const numeric = Number(numericText);
+  return {
+    key: selected.key,
+    raw,
+    numeric: Number.isFinite(numeric) ? numeric : null,
+    decimals: numericText.includes('.') ? numericText.split('.')[1].length : 0,
+  };
+}
+
+function aiFromQcResults(qcResults, commonName) {
+  const values = [];
+  for (const result of qcResults || []) {
+    const rows = Array.isArray(result?.entries) && result.entries.length
+      ? result.entries
+      : [result?.values || {}];
+    for (const row of rows) {
+      const selected = aiValueFromRow(row, commonName);
+      if (selected) values.push(selected);
+    }
+  }
+  if (!values.length) return null;
+  const numericValues = values.filter((entry) => entry.numeric !== null);
+  if (numericValues.length <= 1) {
+    const selected = numericValues[0] || values[0];
+    return {
+      result: selected.raw.includes('%') ? selected.raw : `${selected.raw}%`,
+      key: selected.key,
+      valueCount: 1,
+    };
+  }
+  const average = numericValues.reduce((sum, entry) => sum + entry.numeric, 0) / numericValues.length;
+  const maxDecimals = Math.max(...numericValues.map((entry) => entry.decimals));
+  const precision = Math.min(10, maxDecimals + Math.ceil(Math.log10(numericValues.length)));
+  const formatted = average.toFixed(precision).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+  return {
+    result: `${formatted}%`,
+    key: numericValues[0].key,
+    valueCount: numericValues.length,
+  };
 }
 
 function densityFromQc(result) {
@@ -267,7 +425,448 @@ function findBestLabItem(petitions, sample) {
   return { best: candidates.find((candidate) => candidate.matchKind === 'exact') || null, candidates };
 }
 
-function sampleFromSources(source, stockRows, mfRows) {
+function isAfterDryingLabItem(item) {
+  const source = [item?.sampleName, item?.note, item?.testItems].map(text).join(' ');
+  return /(?:ยา\s*)?หลัง\s*อบ|after[\s-]*dry(?:ing)?|post[\s-]*dry/i.test(source);
+}
+
+function findLatestAiLabItems(petitions, sample) {
+  const commonName = normalizeText(sample?.commonName);
+  const batchNo = text(sample?.batchNo || sample?.lotNo);
+  const sampleName = normalizeText(sample?.sampleName);
+  if (!commonName) return { best: null, candidates: [] };
+  const candidates = [];
+  for (const petition of petitions || []) {
+    if (petition?.status === 'rejected' || isExcludedAiSubmitter(petition?.submittedBy?.name)) continue;
+    const eligibleItems = (petition.items || []).filter((item) => (
+      normalizeText(item.commonName) === commonName
+      && !isAfterDryingLabItem(item)
+    ));
+    const itemGroups = new Map();
+    for (const item of eligibleItems) {
+      const normalizedSampleName = normalizeText(item.sampleName);
+      const key = normalizedSampleName || `seq:${Number(item.seq)}`;
+      if (!itemGroups.has(key)) itemGroups.set(key, []);
+      itemGroups.get(key).push(item);
+    }
+    for (const items of itemGroups.values()) {
+      const exactItems = batchNo
+        ? items.filter((item) => batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1)
+        : [];
+      const exactItem = exactItems[0] || null;
+      const matchedItems = exactItems.length ? exactItems : items;
+      const sameSample = Boolean(sampleName && items.some((item) => normalizeText(item.sampleName) === sampleName));
+      const referenceAt = petition?.approvedAt || petition?.labApprovedAt || petition?.updatedAt || petition?.createdAt;
+      candidates.push({
+        petition,
+        item: exactItem || matchedItems[0],
+        items: matchedItems,
+        batchScore: exactItem ? 1 : 0,
+        matchKind: exactItem ? 'exact' : sameSample ? 'sample' : 'commonName',
+        approvedTime: Date.parse(referenceAt) || 0,
+        updatedTime: Date.parse(petition.updatedAt) || 0,
+      });
+    }
+  }
+  const matchRank = { exact: 2, sample: 1, commonName: 0 };
+  candidates.sort((left, right) => (
+    matchRank[right.matchKind] - matchRank[left.matchKind]
+    || right.approvedTime - left.approvedTime
+    || right.updatedTime - left.updatedTime
+  ));
+  return { best: candidates[0] || null, candidates };
+}
+
+function labRequestBatch(labRequests, petition, item) {
+  const petitionId = String(petition?._id || '');
+  const itemSeq = Number(item?.seq);
+  return text((labRequests || []).find((request) => (
+    String(request?.petitionId || '') === petitionId && Number(request?.sampleSeq) === itemSeq
+  ))?.batchNo);
+}
+
+function findBestRequestItem(petitions, source, labRequests = []) {
+  const sourceItemNo = itemCode(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
+  const sourceCommonName = normalizeText(source?.sampleSnapshots?.[0]?.commonName);
+  const sourceSampleName = normalizeText(source?.sampleSnapshots?.[0]?.sampleName);
+  if (!sourceItemNo && !sourceCommonName && !sourceSampleName) return null;
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
+  const candidates = [];
+
+  for (const petition of petitions || []) {
+    for (const item of petition.items || []) {
+      const itemNoMatch = Boolean(sourceItemNo) && itemCode(item.itemNo) === sourceItemNo;
+      const nameMatch = Boolean(sourceSampleName && sourceCommonName)
+        && normalizeText(item.sampleName) === sourceSampleName
+        && normalizeText(item.commonName) === sourceCommonName;
+      if (!itemNoMatch && !nameMatch) continue;
+      const batchNo = text(item.batchNo || item.lotNo || labRequestBatch(labRequests, petition, item));
+      if (!batchNo) continue;
+      const productionDate = normalizeIsoDate(item.productionDate)
+        || lotSnapshot(item.lotNo || item.batchNo).productionDate;
+      const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
+      const hasTargetAndProduction = Number.isFinite(targetTime) && Number.isFinite(productionTime);
+      candidates.push({
+        petition,
+        item: item.batchNo || item.lotNo ? item : { ...item, batchNo },
+        identityTier: itemNoMatch ? 2 : 1,
+        identityScore: Number(Boolean(sourceCommonName) && normalizeText(item.commonName) === sourceCommonName) * 2
+          + Number(Boolean(sourceSampleName) && normalizeText(item.sampleName) === sourceSampleName),
+        dateBucket: hasTargetAndProduction ? (productionTime <= targetTime ? 0 : 1) : 2,
+        dateDistance: hasTargetAndProduction
+          ? Math.abs(targetTime - productionTime)
+          : (Number.isFinite(productionTime) ? -productionTime : Number.POSITIVE_INFINITY),
+      });
+    }
+  }
+
+  candidates.sort((left, right) => right.identityTier - left.identityTier
+    || right.identityScore - left.identityScore
+    || left.dateBucket - right.dateBucket
+    || left.dateDistance - right.dateDistance
+    || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
+  return candidates[0] || null;
+}
+
+function findBestCoaHistorySample(coas, source) {
+  const sourceSample = source?.sampleSnapshots?.[0] || {};
+  const sourceItemNo = itemCode(source?.externalCoaRequest?.itemNo || sourceSample.sampleId);
+  const sourceSampleName = normalizeText(sourceSample.sampleName);
+  const sourceCommonName = normalizeText(sourceSample.commonName);
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
+  const candidates = [];
+
+  for (const coa of coas || []) {
+    for (const sample of coa.sampleSnapshots || []) {
+      const batchNo = text(sample.batchNo || sample.lotNo);
+      if (!batchNo) continue;
+      const itemNoMatch = Boolean(sourceItemNo) && itemCode(sample.sampleId) === sourceItemNo;
+      const nameMatch = Boolean(sourceSampleName && sourceCommonName)
+        && normalizeText(sample.sampleName) === sourceSampleName
+        && normalizeText(sample.commonName) === sourceCommonName;
+      if (!itemNoMatch && !nameMatch) continue;
+      const productionDate = normalizeIsoDate(sample.productionDate)
+        || lotSnapshot(sample.lotNo || sample.batchNo).productionDate;
+      const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
+      const hasDates = Number.isFinite(targetTime) && Number.isFinite(productionTime);
+      candidates.push({
+        coa,
+        sample,
+        identityTier: itemNoMatch ? 2 : 1,
+        dateBucket: hasDates ? (productionTime <= targetTime ? 0 : 1) : 2,
+        dateDistance: hasDates ? Math.abs(targetTime - productionTime) : Number.POSITIVE_INFINITY,
+      });
+    }
+  }
+
+  candidates.sort((left, right) => right.identityTier - left.identityTier
+    || left.dateBucket - right.dateBucket
+    || left.dateDistance - right.dateDistance
+    || String(right.coa.updatedAt || '').localeCompare(String(left.coa.updatedAt || '')));
+  return candidates[0] || null;
+}
+
+function cleanLegacyBatch(value) {
+  return text(value).replace(/(?:\s+|-)P\d+$/i, '').trim();
+}
+
+function legacyIdentityText(value) {
+  return text(value).toUpperCase()
+    .replace(/\bBENSOATE\b/g, 'BENZOATE')
+    .replace(/\bANILOPHOS\b/g, 'ANILOFOS')
+    .replace(/\bHYDROCHLORIDE\b/g, 'HCL')
+    .replace(/\bFOSETHYL\b/g, 'FOSETYL')
+    .replace(/\bPROFENOPHOS\b/g, 'PROFENOFOS')
+    .replace(/\bPACLOBUTRAZOLE\b/g, 'PACLOBUTRAZOL')
+    .replace(/\bBISPYRIBAC[\s-]+SODIUM\b/g, 'BISPYRIBAC')
+    .replace(/2\s*,?\s*4\s*[- ]?D\s*[- ]?(?:BUTYL|B\.?E\.?)(?=\s|\d|%|$)/g, '24D BE')
+    .replace(/W\s*\/\s*V/g, 'WV')
+    .replace(/W\s*\/\s*W/g, 'WW');
+}
+
+function legacyIdentity(value) {
+  const normalized = legacyIdentityText(value);
+  const strengthValues = [
+    ...[...normalized.matchAll(/(\d+(?:\.\d+)?)\s*%/g)].map((match) => Number(match[1])),
+    ...[...normalized.matchAll(/(\d+(?:\.\d+)?)\s*(?=\+)/g)].map((match) => Number(match[1])),
+  ].filter(Number.isFinite).sort((left, right) => left - right);
+  const withoutStrengths = normalized
+    .replace(/\d+(?:\.\d+)?\s*%/g, ' ')
+    .replace(/\d+(?:\.\d+)?\s*(?=\+)/g, ' ');
+  const tokens = [...new Set((withoutStrengths.match(/[A-Z0-9]+/g) || [])
+    .filter((token) => /[A-Z]/.test(token) && !LEGACY_IGNORED_TOKENS.has(token)))];
+  const formulation = (normalized.match(/\b(EC|SC|SL|WG|WP|GR|SP|ME|EW|ZC)\b/) || [])[1] || '';
+  return { tokens, strengthValues, formulation };
+}
+
+function sameNumberList(left, right) {
+  return left.length === right.length && left.every((value, index) => Math.abs(value - right[index]) < 0.000001);
+}
+
+function legacyProductMatchScore(commonName, legacySampleName) {
+  const source = legacyIdentity(commonName);
+  const candidate = legacyIdentity(legacySampleName);
+  if (!source.tokens.length || !candidate.tokens.length) return 0;
+  if (!source.tokens.every((token) => candidate.tokens.includes(token))) return 0;
+  if (source.strengthValues.length && !sameNumberList(source.strengthValues, candidate.strengthValues)) return 0;
+  if (source.formulation && candidate.formulation && source.formulation !== candidate.formulation) return 0;
+
+  const tokenPrecision = source.tokens.length / candidate.tokens.length;
+  const strengthScore = source.strengthValues.length ? 0.12 : 0.04;
+  const formulationScore = source.formulation ? 0.08 : 0.03;
+  return Math.min(1, 0.62 + tokenPrecision * 0.18 + strengthScore + formulationScore);
+}
+
+function legacyRowMatchesTests(row, commonName) {
+  const sourceTokens = legacyIdentity(commonName).tokens;
+  const testTokenGroups = (row?.tests || [])
+    .filter((test) => !/(?:density|appearance)/i.test(text(test?.test_name)))
+    .map((test) => legacyIdentity(test?.test_name).tokens)
+    .filter((tokens) => tokens.length);
+  return !testTokenGroups.length || testTokenGroups.every((tokens) => (
+    tokens.some((token) => sourceTokens.includes(token))
+  ));
+}
+
+function legacyBatchMatches(left, right) {
+  const source = normalizeBatch(cleanLegacyBatch(left));
+  const candidate = normalizeBatch(cleanLegacyBatch(right));
+  if (!source || !candidate) return false;
+  return source === candidate
+    || (source.length >= 3 && candidate.endsWith(source))
+    || (candidate.length >= 3 && source.endsWith(candidate));
+}
+
+function legacyPackingScore(packingSize, formulation) {
+  const packing = text(packingSize).toUpperCase();
+  if (!packing || !formulation) return 0;
+  const dry = /(?:^|\s)(?:KG|G)(?:\s|$)/.test(packing);
+  const liquid = /(?:^|\s)(?:L|ML|CC)(?:\s|$)/.test(packing);
+  if (dry && GR_WP_SP_FORMULATIONS.has(formulation)) return 1;
+  if (liquid && ['EC', 'SC', 'SL', 'ME', 'EW', 'ZC'].includes(formulation)) return 1;
+  return 0;
+}
+
+function legacyQualifierScore(source, batchNo) {
+  const commonName = text(source?.sampleSnapshots?.[0]?.commonName).toUpperCase();
+  const itemNo = itemCode(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
+  const batch = text(batchNo).toUpperCase();
+  if ((commonName.includes('LIVE STOCK') || itemNo.startsWith('FLS-')) && /(?:^|-)LS(?:-|$)/.test(batch)) return 1;
+  if ((commonName.includes('PUBLIC HEALTH') || /^FC?PH-/.test(itemNo)) && batch.includes('GMP')) return 1;
+  if (commonName.includes('BIO') && /(?:^|-)B(?:-|$)/.test(batch)) return 1;
+  return 0;
+}
+
+function legacyTestConformanceBucket(row) {
+  let parsedAny = false;
+  for (const test of row?.tests || []) {
+    const result = Number((text(test?.result).replace(/,/g, '').match(/-?\d+(?:\.\d+)?/) || [])[0]);
+    if (!Number.isFinite(result)) continue;
+    const criteria = text(test?.criteria).replace(/,/g, '');
+    const range = criteria.match(/(-?\d+(?:\.\d+)?)\s*[-–]\s*(-?\d+(?:\.\d+)?)/);
+    if (range) {
+      parsedAny = true;
+      if (result < Number(range[1]) || result > Number(range[2])) return 1;
+      continue;
+    }
+    const minimum = criteria.match(/(?:>=|≥)\s*(-?\d+(?:\.\d+)?)/);
+    if (minimum) {
+      parsedAny = true;
+      if (result < Number(minimum[1])) return 1;
+    }
+  }
+  return parsedAny ? 0 : 2;
+}
+
+function findBestLegacyLabResult(rows, source, sample = {}) {
+  const commonName = text(sample.commonName || source?.sampleSnapshots?.[0]?.commonName);
+  const requestedBatch = text(sample.batchNo || sample.lotNo);
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
+  let candidates = (rows || []).map((row) => {
+    const score = legacyProductMatchScore(commonName, row?.sample_name);
+    const productionDate = normalizeIsoDate(row?.production_date);
+    const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
+    const hasDates = Number.isFinite(targetTime) && Number.isFinite(productionTime);
+    const batchNo = cleanLegacyBatch(row?.batch_no);
+    return {
+      row,
+      batchNo,
+      productionDate,
+      analysisDate: normalizeIsoDate(row?.test_date || row?.report_date),
+      score,
+      batchMatch: legacyBatchMatches(requestedBatch, batchNo),
+      packingScore: legacyPackingScore(source?.externalCoaRequest?.packingSize, legacyIdentity(row?.sample_name).formulation),
+      qualifierScore: legacyQualifierScore(source, batchNo),
+      conformanceBucket: legacyTestConformanceBucket(row),
+      dateBucket: hasDates ? (productionTime <= targetTime ? 0 : 1) : 2,
+      dateDistance: hasDates ? Math.abs(targetTime - productionTime) : Number.POSITIVE_INFINITY,
+    };
+  }).filter((candidate) => (
+    candidate.batchNo && candidate.productionDate && candidate.score >= 0.75
+      && legacyRowMatchesTests(candidate.row, commonName)
+  ));
+
+  if (requestedBatch) {
+    candidates = candidates.filter((candidate) => candidate.batchMatch);
+  }
+  candidates.sort((left, right) => right.score - left.score
+    || right.packingScore - left.packingScore
+    || right.qualifierScore - left.qualifierScore
+    || left.conformanceBucket - right.conformanceBucket
+    || left.dateBucket - right.dateBucket
+    || left.dateDistance - right.dateDistance
+    || right.analysisDate.localeCompare(left.analysisDate));
+  const best = candidates[0];
+  if (!best) return null;
+  const bestBatch = normalizeBatch(best.batchNo);
+  return {
+    ...best,
+    matchKind: requestedBatch ? 'exactBatch' : 'productHistory',
+    candidates: candidates.slice(0, 10),
+    matchingRows: candidates
+      .filter((candidate) => normalizeBatch(candidate.batchNo) === bestBatch)
+      .map((candidate) => candidate.row),
+  };
+}
+
+function densityValueFromLegacyTest(result) {
+  return text(result).replace(/\s*g\s*\/\s*cm(?:ยณ|³|3).*$/i, '').trim();
+}
+
+function resultRowsFromLegacyLab(row, commonName) {
+  if (!row) return { rows: [], density: '', analysisDate: '' };
+  const tests = Array.isArray(row.tests) ? row.tests : [];
+  const densityTest = tests.find((test) => /density/i.test(text(test?.test_name)));
+  const activeTests = tests.filter((test) => !/(?:density|appearance)/i.test(text(test?.test_name)));
+  const joinActive = (key) => activeTests.map((test) => {
+    const value = text(test?.[key]);
+    if (!value) return '';
+    return activeTests.length > 1 ? `${text(test?.test_name)}: ${value}` : value;
+  }).filter(Boolean).join(' / ');
+  const density = densityValueFromLegacyTest(densityTest?.result) || '-';
+  const analysisDate = normalizeIsoDate(row.test_date || row.report_date);
+  const rows = [
+    {
+      testItem: 'Appearance', criteria: text(row.sample_condition) || '-', result: 'Conform', method: 'Visual', unit: '',
+    },
+    {
+      testItem: '%AI content',
+      criteria: aiToleranceCriteriaForCommonName(commonName) || joinActive('criteria') || '-',
+      result: joinActive('result') || '-',
+      method: joinActive('method'),
+      unit: '%',
+    },
+    {
+      testItem: 'Density at 30°C (g/cm³)', criteria: '-', result: density, unit: 'g/cm³', method: densityTest?.method || 'DMA 501',
+    },
+    {
+      testItem: 'Date of analysis', criteria: '-', result: analysisDate || '-', unit: '', method: '',
+    },
+  ];
+  return { rows, density, analysisDate };
+}
+
+function legacyResultValue(result) {
+  const raw = text(result);
+  const match = raw.match(/[-+]?(?:\d[\d,]*(?:\.\d+)?|\.\d+)/);
+  if (!match) return { raw, numeric: null, decimals: 0, suffix: '' };
+  const numericText = match[0].replace(/,/g, '');
+  const numeric = Number(numericText);
+  return {
+    raw,
+    numeric: Number.isFinite(numeric) ? numeric : null,
+    decimals: numericText.includes('.') ? numericText.split('.')[1].length : 0,
+    suffix: raw.slice((match.index || 0) + match[0].length).trim(),
+  };
+}
+
+function averagedLegacyResult(entries) {
+  if (!entries.length) return '';
+  if (entries.length === 1 || entries.some((entry) => entry.numeric === null)) return entries[0].raw;
+  const average = entries.reduce((sum, entry) => sum + entry.numeric, 0) / entries.length;
+  const maxDecimals = Math.max(...entries.map((entry) => entry.decimals));
+  const precision = Math.min(10, maxDecimals + Math.ceil(Math.log10(entries.length)));
+  const formatted = average.toFixed(precision).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+  const suffix = entries.map((entry) => entry.suffix).find(Boolean) || '%';
+  return `${formatted}${suffix ? ` ${suffix}` : ''}`;
+}
+
+function resultRowsFromLegacyLabs(rows, commonName) {
+  const eligibleRows = (rows || []).filter((row) => !isExcludedAiSubmitter(row?.customer_name));
+  const testGroups = new Map();
+  for (const row of eligibleRows) {
+    for (const test of row?.tests || []) {
+      const testName = text(test?.test_name);
+      if (!testName || /(?:density|appearance)/i.test(testName)) continue;
+      const key = normalizeText(testName);
+      if (!testGroups.has(key)) testGroups.set(key, []);
+      testGroups.get(key).push({ test, value: legacyResultValue(test?.result) });
+    }
+  }
+  if (!testGroups.size) return { rows: [], ai: null, analysisDate: '', sourceRows: eligibleRows };
+
+  const groups = [...testGroups.values()];
+  const joinGroups = (selector) => groups.map((entries) => {
+    const value = selector(entries);
+    if (!value) return '';
+    return groups.length > 1 ? `${text(entries[0].test?.test_name)}: ${value}` : value;
+  }).filter(Boolean).join(' / ');
+  const result = joinGroups((entries) => averagedLegacyResult(entries.map((entry) => entry.value)));
+  const criteria = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.criteria))?.test?.criteria));
+  const method = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.method))?.test?.method));
+  const valueCount = groups.reduce((sum, entries) => sum + entries.length, 0);
+  const analysisDate = eligibleRows
+    .map((row) => normalizeIsoDate(row?.test_date || row?.report_date))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
+  const ai = { result, key: 'legacyLab', valueCount };
+  const aiRow = {
+    testItem: '%AI content',
+    criteria: aiToleranceCriteriaForCommonName(commonName) || criteria || '-',
+    result,
+    method,
+    unit: '%',
+  };
+  return { rows: [aiRow], ai, analysisDate, sourceRows: eligibleRows };
+}
+
+function resultRowKind(row) {
+  if (/^appearance$/i.test(text(row?.testItem))) return 'appearance';
+  if (isAiContentTestItem(row?.testItem)) return 'ai';
+  if (/density/i.test(text(row?.testItem))) return 'density';
+  if (/date\s*of\s*analysis/i.test(text(row?.testItem))) return 'analysisDate';
+  return normalizeText(row?.testItem);
+}
+
+function mergeResultRows(primaryRows, fallbackRows) {
+  const rows = [...(primaryRows || [])];
+  for (const row of fallbackRows || []) {
+    const kind = resultRowKind(row);
+    const existing = rows.find((candidate) => resultRowKind(candidate) === kind);
+    if (!existing) {
+      rows.push(row);
+      continue;
+    }
+    for (const field of ['criteria', 'result', 'method', 'unit']) {
+      if ((!text(existing[field]) || text(existing[field]) === '-') && text(row[field])) {
+        existing[field] = row[field];
+      }
+    }
+  }
+  return rows;
+}
+
+function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const itemNo = text(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
   const commonName = text(source?.sampleSnapshots?.[0]?.commonName);
   const normalizedItemNo = itemCode(itemNo);
@@ -284,36 +883,95 @@ function sampleFromSources(source, stockRows, mfRows) {
         || productionDateFromRow(right).localeCompare(productionDateFromRow(left))
         || Number(right.stock_qty_base || right.stock_qty || 0) - Number(left.stock_qty_base || left.stock_qty || 0);
     });
-  const stock = stockCandidates[0];
   const mfCandidates = mfRows.filter((row) => {
     return normalizedItemNo
       ? rowMatchesItem(row, normalizedItemNo)
       : normalizeText(row.common_name || row.commonName) === normalizeText(commonName);
-  });
+  }).filter((row) => batchFromRow(row));
   const mf = mfCandidates[0];
-  const sourceBatch = text(source?.sampleSnapshots?.[0]?.batchNo || source?.sampleSnapshots?.[0]?.lotNo);
+  const sourceSample = source?.sampleSnapshots?.[0] || {};
+  const erpRequestLot = text(sourceSample.lotNo);
+  const requestedBatch = text(sourceSample.batchNo || petitionItem?.batchNo);
+  const requestedLot = text(erpRequestLot || petitionItem?.lotNo);
+  const sourceBatch = requestedBatch || requestedLot;
+  const erpRequestProductionDate = normalizeIsoDate(sourceSample.productionDate)
+    || lotSnapshot(sourceSample.lotNo || sourceSample.batchNo).productionDate;
   const mfBatch = batchFromRow(mf);
   const mfDate = productionDateFromRow(mf);
-  const lot = sourceBatch
-    ? lotSnapshot(sourceBatch, source?.sampleSnapshots?.[0]?.productionDate)
+  const matchingStock = stockCandidates.find((row) => {
+    const snapshot = lotSnapshot(lotFromRow(row), productionDateFromRow(row));
+    return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
+      || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
+  });
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const datedStock = stockCandidates.find((row) => {
+    if (!suffixDatedLotFromRow(row)) return false;
+    const productionDate = lotSnapshot(lotFromRow(row), productionDateFromRow(row)).productionDate;
+    return !targetDate || productionDate <= targetDate;
+  }) || stockCandidates.find((row) => suffixDatedLotFromRow(row));
+  const newestFgStock = stockCandidates.find((row) => isFgLotDescription(lotFromRow(row)));
+  const stock = matchingStock || datedStock || newestFgStock || stockCandidates[0];
+  const newestFgLot = newestFgStock
+    ? lotSnapshot(lotFromRow(newestFgStock), productionDateFromRow(newestFgStock))
+    : null;
+  const matchingStockLot = matchingStock
+    ? lotSnapshot(lotFromRow(matchingStock), productionDateFromRow(matchingStock))
+    : null;
+  const authoritativeErpLot = stock && suffixDatedLotFromRow(stock)
+    ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
+    : null;
+  const erpStockProductionDate = stock
+    ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock)).productionDate
+    : '';
+  const erpProductionDate = erpRequestLot
+    ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
+    : erpStockProductionDate || erpRequestProductionDate || normalizeIsoDate(mfDate);
+  const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
+  const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
+  const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;
+  let selectedSourceLot;
+  if (erpRequestLot) selectedSourceLot = requestedLotSnapshot;
+  else if (requestedLot) {
+    selectedSourceLot = requestedLotSnapshot?.productionDate
+      ? requestedLotSnapshot
+      : authoritativeErpLot || requestedLotSnapshot;
+  } else {
+    selectedSourceLot = authoritativeErpLot
+      || (requestedBatchLot?.productionDate
+        ? requestedBatchLot
+        : matchingStockLot || newestFgLot || sourceLot);
+  }
+  const useAuthoritativeErpLot = Boolean(authoritativeErpLot && selectedSourceLot === authoritativeErpLot);
+  const lot = sourceLot
+    ? {
+      lotNo: selectedSourceLot?.lotNo || sourceLot.lotNo,
+      batchNo: useAuthoritativeErpLot
+        ? authoritativeErpLot.batchNo
+        : requestedBatch || selectedSourceLot?.batchNo || sourceLot.batchNo,
+      productionDate: erpProductionDate,
+    }
     : stock
       ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
       : mfBatch
         ? lotSnapshot(mfBatch, mfDate)
-        : { lotNo: '', batchNo: '', productionDate: mfDate };
+        : { lotNo: '', batchNo: '', productionDate: '' };
   return {
+    erpLotDescription: authoritativeErpLot?.lotNo || '',
     sample: {
       itemSeq: Number(source.selectedItemSeqs?.[0] || 1),
       sampleName: text(source.sampleSnapshots?.[0]?.sampleName),
       commonName,
       batchNo: lot.batchNo,
       lotNo: lot.lotNo,
-      productionDate: lot.productionDate,
+      productionDate: erpProductionDate,
       sampleId: itemNo,
       condition: text(source.externalCoaRequest?.packingSize || source.sampleSnapshots?.[0]?.condition),
     },
     stockCandidates: stockCandidates.slice(0, 10).map((row) => ({
       lotNo: lotFromRow(row),
+      batchNo: lotSnapshot(lotFromRow(row), productionDateFromRow(row)).batchNo,
       productionDate: lotSnapshot(lotFromRow(row), productionDateFromRow(row)).productionDate,
       quantity: Number(row.stock_qty_base || row.stock_qty || 0),
       itemNo: itemCodeFromRow(row),
@@ -326,9 +984,9 @@ function sampleFromSources(source, stockRows, mfRows) {
   };
 }
 
-function resultRowsFromQc(qcResults, commonName) {
+function resultRowsFromQc(qcResults, commonName, options = {}) {
   const physical = qcResults.map(physicalFromQc).find((entry) => entry.raw);
-  const ai = qcResults.map((result) => aiFromQc(result, commonName)).find(Boolean);
+  const ai = options.includeAi === false ? null : aiFromQcResults(qcResults, commonName);
   const density = qcResults.map(densityFromQc).find(Boolean) || '';
   const rows = [];
   if (physical?.raw) rows.push({
@@ -340,16 +998,21 @@ function resultRowsFromQc(qcResults, commonName) {
   if (density) rows.push({
     testItem: 'Density at 30°C (g/cm³)', criteria: '-', result: density, unit: 'g/cm³', method: 'DMA 501',
   });
-  const analysisDate = qcResults.map((entry) => normalizeIsoDate(entry.updatedAt || entry.enteredAt)).find(Boolean);
+  const analysisDate = qcResults
+    .map((entry) => normalizeIsoDate(entry.updatedAt || entry.enteredAt))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
   if (analysisDate) rows.push({ testItem: 'Date of analysis', criteria: '-', result: analysisDate, unit: '', method: '' });
   return { rows, physical, ai, density, analysisDate };
 }
 
 function formKindForCommonName(commonName) {
   const value = text(commonName).toUpperCase();
+  const formulation = value.match(/\b([A-Z]{2,3})$/)?.[1] || '';
+  if (GR_WP_SP_FORMULATIONS.has(formulation)) return 'grWpSp';
   if (/^BROMADIOLONE\s+0\.005%(?:\s|$)/.test(value)) return 'bromadiolone0005';
-  if (/\b(GR|DS|WP|WG|GB|ST|SP)$/.test(value)) return 'grWpSp';
-  if (/\b(SC|EW|EC|ZC|SL)$/.test(value)) return 'liquid';
+  if (/\b(SL|EC|EW|SC|ME|ZC)$/.test(value)) return 'liquid';
   return 'standard';
 }
 
@@ -377,23 +1040,46 @@ async function fetchErpReferences() {
 }
 
 function densityForBatch(rows, batchNo) {
-  return [...(rows || [])]
+  const readings = [...(rows || [])]
     .filter((row) => batchMatches(batchNo, row))
     .sort((left, right) => String(right['Date & time'] || '').localeCompare(String(left['Date & time'] || '')))
-    .map((row) => text(row['Density [g/cm³]'] || row.density))
-    .find(Boolean) || '';
+    .map((row) => {
+      const status = text(row['Measurement status']).toLowerCase();
+      const raw = text(row['Density [g/cm³]'] || row.density);
+      const numeric = Number(raw);
+      return { raw, numeric, usable: (!status || status === 'valid') && raw && Number.isFinite(numeric) };
+    })
+    .filter((reading) => reading.usable);
+
+  if (readings.length === 2) {
+    return ((readings[0].numeric + readings[1].numeric) / 2).toFixed(3);
+  }
+  return readings[0]?.raw || '';
 }
 
 module.exports = {
   batchSimilarity,
+  cleanLegacyBatch,
+  densityBatchFamily,
   densityForBatch,
   fetchErpReferences,
+  findBestCoaHistorySample,
+  findBestDensityBatch,
   findBestLabItem,
+  findLatestAiLabItems,
+  findBestLegacyLabResult,
+  findBestRequestItem,
   formKindForCommonName,
+  legacyProductMatchScore,
   lotSnapshot,
+  mergeResultRows,
   normalizeIsoDate,
   normalizeText,
   physicalFromQc,
+  isAfterDryingLabItem,
+  isExcludedAiSubmitter,
+  resultRowsFromLegacyLab,
+  resultRowsFromLegacyLabs,
   resultRowsFromQc,
   rowsFromPayload,
   sampleFromSources,

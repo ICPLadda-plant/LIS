@@ -16,6 +16,16 @@ test('manual snapshots use the ERP line and preserve entered test results', () =
   assert.deepEqual(validateManualCoa({ ...snapshots, selectedItemSeqs: [10000] }), snapshots);
 });
 
+test('manual snapshots replace a stale production date with the six-digit Lot No. date', () => {
+  const data = input();
+  data.sample.lotNo = '26S-PCB25-480-091069';
+  data.sample.productionDate = '2026-06-18';
+
+  const snapshots = manualCoaSnapshots(data, 10000);
+
+  assert.equal(snapshots.sampleSnapshots[0].productionDate, '2026-10-09');
+});
+
 test('manual snapshots reject missing fields, invalid dates and empty results', () => {
   for (const mutate of [
     (data) => { data.sample.batchNo = ' '; },

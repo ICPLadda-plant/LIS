@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { FileCheck2, Printer } from "lucide-react";
+import { CheckCircle2, FileCheck2, Printer, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import CoaAuditTimeline from "@/components/coa/CoaAuditTimeline";
 import CoaManualDialog from "@/components/coa/CoaManualDialog";
@@ -13,7 +14,7 @@ import CoaReportTemplate, { COA_REPORT_CSS } from "@/components/coa/CoaReportTem
 import CoaStatusBadge from "@/components/coa/CoaStatusBadge";
 import { api } from "@/lib/api";
 import { buildCoaReportPages } from "@/lib/coaReport";
-import { allowedCoaActions, canPrintCoa } from "@/lib/coaStatus";
+import { allowedCoaActions, canPrintCoa, canReviewCoa, isCoaQcHead } from "@/lib/coaStatus";
 import { openPrintPdf } from "@/lib/print";
 import { useAuth } from "@/hooks/useAuth";
 import { normalizeRoles, primaryRole } from "@/lib/roles";
@@ -26,6 +27,7 @@ export default function CoaDetailPage() {
   const queryClient = useQueryClient();
   const [printOpen, setPrintOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [remark, setRemark] = useState("");
   const pdfRef = useRef<HTMLDivElement>(null);
@@ -46,9 +48,7 @@ export default function CoaDetailPage() {
     permissions: user?.permissions ?? [],
     position: user?.position,
   };
-  const isQcHead = [user?.role, actor.activeRole]
-    .some((value) => String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_") === "qc_head")
-    || actor.permissions.includes("coa.approve");
+  const isQcHead = isCoaQcHead(actor);
   const pages = useMemo(() => (doc ? buildCoaReportPages(doc) : []), [doc]);
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["coa", id] });
   const submit = useMutation({ mutationFn: () => api.submitCoaDocument(id, { _user: actor }), onSuccess: invalidate });
@@ -60,14 +60,23 @@ export default function CoaDetailPage() {
       setPrintOpen(true);
     },
   });
-  const reject = useMutation({ mutationFn: () => api.rejectCoaDocument(id, { reason, _user: actor }), onSuccess: invalidate });
+  const reject = useMutation({
+    mutationFn: () => api.rejectCoaDocument(id, { reason: reason.trim(), _user: actor }),
+    onSuccess: () => {
+      void invalidate();
+      setRejectOpen(false);
+      setPrintOpen(false);
+      setReason("");
+    },
+  });
   const revise = useMutation({ mutationFn: () => api.reviseCoaDocument(id, { _user: actor }), onSuccess: (next) => navigate(`/coa/${next._id}`) });
   const cancel = useMutation({ mutationFn: () => api.cancelCoaDocument(id, { reason, _user: actor }), onSuccess: invalidate });
   const recordPrint = useMutation({
     mutationFn: (meta: { copies: number; outputMode: string }) => api.recordCoaPrintEvent(id, { event: "printDialogOpened", ...meta, _user: actor }),
     onSuccess: invalidate,
   });
-  const actions = doc ? allowedCoaActions(doc.status, isQcHead) : [];
+  const canReview = doc ? canReviewCoa(actor, doc) : false;
+  const actions = doc ? allowedCoaActions(doc.status, canReview) : [];
   const printable = doc ? actions.includes("print") && canPrintCoa(doc.status) : false;
 
   useEffect(() => {
@@ -122,8 +131,8 @@ export default function CoaDetailPage() {
           {actions.includes("submit") && <Button className="bg-primary-500 text-white hover:bg-primary-600" onClick={() => submit.mutate()}>เสร็จสิ้น</Button>}
           {actions.includes("approve") && (
             <>
-              <Button className="bg-primary-500 text-white hover:bg-primary-600" onClick={() => approve.mutate()}>QC Head อนุมัติ</Button>
-              <Button variant="destructive" disabled={!reason.trim()} onClick={() => reject.mutate()}>ไม่อนุมัติ</Button>
+              <Button className="bg-primary-500 text-white hover:bg-primary-600" onClick={() => approve.mutate()}>อนุมัติ</Button>
+              <Button variant="destructive" onClick={() => { setReason(""); setRejectOpen(true); }}>ไม่อนุมัติ</Button>
             </>
           )}
           {actions.includes("revise") && (
@@ -161,9 +170,43 @@ export default function CoaDetailPage() {
           <CoaAuditTimeline audit={doc.audit} />
         </section>
       </div>
-      <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="coa" css={COA_REPORT_CSS} onPrinted={(meta) => recordPrint.mutate(meta)} previewOnly={!printable}>
+      <PrintPreviewDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        docType="coa"
+        css={COA_REPORT_CSS}
+        onPrinted={(meta) => recordPrint.mutate(meta)}
+        previewOnly={!printable}
+        headerActions={actions.includes("approve") ? (
+          <>
+            <Button type="button" size="sm" className="gap-2" disabled={approve.isPending || reject.isPending} onClick={() => approve.mutate()}>
+              <CheckCircle2 className="h-4 w-4" />
+              อนุมัติ
+            </Button>
+            <Button type="button" variant="destructive" size="sm" className="gap-2" disabled={approve.isPending || reject.isPending} onClick={() => { setReason(""); setRejectOpen(true); }}>
+              <XCircle className="h-4 w-4" />
+              ไม่อนุมัติ
+            </Button>
+          </>
+        ) : undefined}
+      >
         <CoaReportTemplate pages={pages} />
       </PrintPreviewDialog>
+      <Dialog open={rejectOpen} onOpenChange={(open) => { if (!reject.isPending) setRejectOpen(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ไม่อนุมัติ COA {doc.coaNo || doc.petitionNoSnapshot || doc._id}</DialogTitle>
+            <DialogDescription>ระบุเหตุผลเพื่อส่งเอกสารกลับให้แก้ไข และบันทึกไว้ในประวัติเอกสาร</DialogDescription>
+          </DialogHeader>
+          <Textarea value={reason} onChange={(event) => setReason(event.target.value)} placeholder="เหตุผลที่ไม่อนุมัติ" rows={4} />
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={reject.isPending} onClick={() => setRejectOpen(false)}>ยกเลิก</Button>
+            <Button type="button" variant="destructive" disabled={!reason.trim() || reject.isPending} onClick={() => reject.mutate()}>
+              {reject.isPending ? "กำลังส่งกลับ..." : "ยืนยันไม่อนุมัติ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div ref={pdfRef} className="fixed -left-[10000px] top-0 bg-white" aria-hidden="true">
         <CoaReportTemplate pages={pages} />
       </div>

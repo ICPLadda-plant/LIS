@@ -6,6 +6,7 @@ const Petition = require('../models/Petition');
 const LabRequest = require('../models/LabRequest');
 const QCTestResult = require('../models/QCTestResult');
 const ResultDensity = require('../models/ResultDensity');
+const LegacyLabResult = require('../models/LegacyLabResult');
 const Parameter = require('../models/Parameter');
 const User = require('../models/User');
 const Role = require('../models/Role');
@@ -14,10 +15,22 @@ const { manualCoaSnapshots, validateManualCoa } = require('../lib/coaManual');
 const { aiToleranceCriteriaForCommonName, isAiContentTestItem } = require('../lib/aiToleranceCriteria');
 const { buildCoaFormOptions, buildCoaParameterOptions, applyCoaFormSelections } = require('../lib/coaForm');
 const {
+  densityBatchFamily,
   densityForBatch,
   fetchErpReferences,
+  findBestCoaHistorySample,
+  findBestDensityBatch,
   findBestLabItem,
+  findLatestAiLabItems,
+  findBestLegacyLabResult,
+  findBestRequestItem,
   formKindForCommonName,
+  isAfterDryingLabItem,
+  lotSnapshot,
+  mergeResultRows,
+  normalizeIsoDate,
+  resultRowsFromLegacyLab,
+  resultRowsFromLegacyLabs,
   resultRowsFromQc,
   sampleFromSources,
 } = require('../lib/coaErp');
@@ -29,6 +42,7 @@ const {
   applySupersession,
   assertCanTransition,
   buildCoaSnapshots,
+  canReviewCoa,
   isQcHead,
   selectedItemsFromPetition,
   writeCoaAuditEvent,
@@ -54,7 +68,7 @@ function errorWithStatus(message, status) {
 
 function errorStatus(error) {
   if (error.status) return error.status;
-  return error.message.startsWith('QC Head required') ? 403 : 400;
+  return error.message.startsWith('QC Head required') || error.message.startsWith('QC Head or COA creator required') ? 403 : 400;
 }
 
 function manualText(value) {
@@ -190,6 +204,118 @@ function commonNameRegex(value) {
   return new RegExp(tokens.map(escapeRegex).join('.*'), 'i');
 }
 
+function aiResultUpdatedTime(results, commonName) {
+  return Math.max(0, ...(results || [])
+    .filter((result) => resultRowsFromQc([result], commonName).ai)
+    .map((result) => Date.parse(result.updatedAt || result.enteredAt) || 0));
+}
+
+function aiCandidateMatchRank(candidate) {
+  if (candidate.matchKind === 'exact') return 2;
+  if (candidate.matchKind === 'sample') return 1;
+  return 0;
+}
+
+async function latestAiLabData(petitions, sample) {
+  const commonName = manualText(sample?.commonName);
+  const selection = findLatestAiLabItems(petitions, sample);
+  const hasBatch = Boolean(manualText(sample?.batchNo || sample?.lotNo));
+  const candidates = selection.candidates
+    .filter((candidate) => !hasBatch || candidate.matchKind === 'exact')
+    .slice(0, 100);
+  if (candidates.length) {
+    const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
+    const itemSeqs = [...new Set(candidates.flatMap((candidate) => candidate.items.map((item) => Number(item.seq))))];
+    const results = await QCTestResult.find({
+      petitionId: { $in: petitionIds },
+      itemSeq: { $in: itemSeqs },
+    }).sort({ updatedAt: -1 }).lean();
+    const matches = candidates.map((candidate) => {
+      const seqs = new Set(candidate.items.map((item) => Number(item.seq)));
+      const candidateResults = results.filter((result) => (
+        String(result.petitionId) === String(candidate.petition._id)
+        && seqs.has(Number(result.itemSeq))
+      ));
+      const resultData = resultRowsFromQc(candidateResults, commonName);
+      if (!resultData.ai) return null;
+      return {
+        candidate,
+        qcResults: candidateResults,
+        resultData,
+        resultTime: aiResultUpdatedTime(candidateResults, commonName),
+      };
+    }).filter(Boolean);
+    matches.sort((left, right) => (
+      aiCandidateMatchRank(right.candidate) - aiCandidateMatchRank(left.candidate)
+      || right.resultTime - left.resultTime
+      || right.candidate.approvedTime - left.candidate.approvedTime
+    ));
+    if (hasBatch && matches.length) {
+      const seen = new Set();
+      const qcResults = matches.flatMap((match) => match.qcResults).filter((result) => {
+        const key = String(result?._id || [
+          result?.petitionId, result?.itemSeq, result?.parameterId || result?.parameterName, result?.sampleRoundId,
+        ].join('\u0000'));
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      return {
+        ...selection,
+        best: matches[0].candidate,
+        qcResults,
+        resultData: resultRowsFromQc(qcResults, commonName),
+        resultTime: Math.max(...matches.map((match) => match.resultTime)),
+        source: 'petition',
+      };
+    }
+    if (matches[0]) return { ...selection, best: matches[0].candidate, ...matches[0], source: 'petition' };
+  }
+
+  if (hasBatch) {
+    return { ...selection, best: null, qcResults: [], resultData: resultRowsFromQc([], commonName), source: null };
+  }
+
+  const historyResults = await QCTestResult.find({
+    $or: [
+      { commonName: exactTrimmedRegex(commonName) },
+      { sampleName: exactTrimmedRegex(commonName) },
+    ],
+  }).sort({ updatedAt: -1 }).lean();
+  const groups = new Map();
+  for (const result of historyResults) {
+    if (isAfterDryingLabItem(result)) continue;
+    const key = String(result.petitionId || result.petitionNo || result.sampleName || result._id);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(result);
+  }
+  const historyMatches = [...groups.entries()].map(([key, qcResults]) => {
+    const resultData = resultRowsFromQc(qcResults, commonName);
+    if (!resultData.ai) return null;
+    return {
+      key,
+      qcResults,
+      resultData,
+      resultTime: aiResultUpdatedTime(qcResults, commonName),
+    };
+  }).filter(Boolean).sort((left, right) => right.resultTime - left.resultTime);
+  const history = historyMatches[0];
+  if (!history) return { ...selection, best: null, qcResults: [], resultData: resultRowsFromQc([], commonName), source: null };
+  const first = history.qcResults[0];
+  return {
+    ...selection,
+    best: null,
+    ...history,
+    source: 'history',
+    historyMatch: {
+      petitionId: String(first.petitionId || ''),
+      petitionNo: first.petitionNo || '',
+      itemSeq: Number(first.itemSeq),
+      batchNo: first.batchNo || '',
+    },
+  };
+}
+
 function activeCoaSummary(coa, sample) {
   return {
     coaId: coa._id,
@@ -276,14 +402,33 @@ function externalCoaDate(row) {
   return firstExternalValue(row, ['UpdateDate', 'SaleOrderDate', 'ShipmentDate', 'ActionDate']);
 }
 
+function externalCoaProductionDate(row) {
+  return firstExternalValue(row, [
+    'ProductionDate', 'Production Date', 'production_date', 'productionDate',
+    'MfgDate', 'MFGDate', 'Mfg Date', 'MFG Date',
+    'ManufactureDate', 'ManufacturingDate', 'manufacture_date',
+    'ProdDate', 'Prod Date',
+  ]);
+}
+
+function externalCoaLotDescription(row) {
+  return firstExternalValue(row, [
+    'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
+  ]);
+}
+
 function externalCoaRowToDocument(row) {
   const itemSeq = externalNumber(row, ['Line']) || 1;
   const saleOrderNo = firstExternalValue(row, ['SaleOrderNo']);
   const itemNo = firstExternalValue(row, ['ItemNo']);
   const tradeName = firstExternalValue(row, ['TradeName']);
   const commonName = firstExternalValue(row, ['CommonName']);
-  const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch', 'LotNo', 'Lot No.', 'Lot']);
-  const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']);
+  const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
+  const lotDescription = externalCoaLotDescription(row);
+  const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']) || lotDescription;
+  const productionDate = lotSnapshot(lotNo).productionDate
+    || lotSnapshot(lotDescription).productionDate
+    || externalCoaProductionDate(row);
   const date = externalCoaDate(row);
   const updatedAt = firstExternalValue(row, ['UpdateDate']) || date;
   const sampleSnapshot = {
@@ -295,6 +440,7 @@ function externalCoaRowToDocument(row) {
   };
   if (batchNo) sampleSnapshot.batchNo = batchNo;
   if (lotNo) sampleSnapshot.lotNo = lotNo;
+  if (productionDate) sampleSnapshot.productionDate = productionDate;
   return {
     _id: externalCoaRequestId(row),
     coaNo: null,
@@ -346,6 +492,27 @@ function externalCoaRowsToDocuments(payload) {
     documents.push(doc);
   }
   return documents;
+}
+
+function enrichExternalCoaDocumentsWithErpLots(documents, references = {}) {
+  const stockRows = Array.isArray(references.stockRows) ? references.stockRows : [];
+  const mfRows = Array.isArray(references.mfRows) ? references.mfRows : [];
+  if (!stockRows.length && !mfRows.length) return documents;
+
+  return documents.map((source) => {
+    const resolved = sampleFromSources(source, stockRows, mfRows).sample;
+    const samples = source.sampleSnapshots || [];
+    if (!samples.length || (!resolved.lotNo && !resolved.batchNo && !resolved.productionDate)) return source;
+    return {
+      ...source,
+      sampleSnapshots: samples.map((sample, index) => index === 0 ? {
+        ...sample,
+        lotNo: resolved.lotNo || sample.lotNo,
+        batchNo: resolved.batchNo || sample.batchNo,
+        productionDate: resolved.productionDate || sample.productionDate,
+      } : sample),
+    };
+  });
 }
 
 async function fetchExternalCoaDocuments() {
@@ -654,19 +821,28 @@ router.get('/', async (req, res) => {
     if (req.query.needsApproval === '1') {
       filter.status = { $in: ['pendingApproval', 'pendingRevisionApproval'] };
     }
-    const externalPromise = shouldFetchExternalCoaRequests(req.query)
+    const shouldFetchExternal = shouldFetchExternalCoaRequests(req.query);
+    const externalPromise = shouldFetchExternal
       ? fetchExternalCoaDocuments().catch((error) => {
           console.warn('[coa-documents] external COA request sync failed:', error.message);
           return [];
         })
       : Promise.resolve([]);
-    const [documents, requestedRows, externalRows] = await Promise.all([
+    const erpReferencesPromise = shouldFetchExternal
+      ? fetchErpReferences().catch((error) => {
+          console.warn('[coa-documents] ERP Lot sync failed:', error.message);
+          return { stockRows: [], mfRows: [] };
+        })
+      : Promise.resolve({ stockRows: [], mfRows: [] });
+    const [documents, requestedRows, externalRows, erpReferences] = await Promise.all([
       CoaDocument.find(filter).sort({ updatedAt: -1 }).limit(200).lean(),
       shouldIncludeRequestedRows(req.query)
         ? requestedCoaRows({ petitionNo: req.query.petitionNo })
         : Promise.resolve([]),
       externalPromise,
+      erpReferencesPromise,
     ]);
+    const enrichedExternalRows = enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences);
     const linkedExternalKeys = new Set(externalRows.length
       ? (await CoaDocument.find({
           'externalCoaRequest.saleOrderNo': { $in: externalRows.map((row) => row.externalCoaRequest.saleOrderNo) },
@@ -677,7 +853,7 @@ router.get('/', async (req, res) => {
       items: sortCoaRows([
         ...documents,
         ...requestedRows,
-        ...filterExternalCoaDocuments(externalRows, req.query)
+        ...filterExternalCoaDocuments(enrichedExternalRows, req.query)
           .filter((row) => !linkedExternalKeys.has(externalCoaKey(row.externalCoaRequest))),
       ]).slice(0, 200),
     });
@@ -720,27 +896,140 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     const source = requests.find((row) => row._id === externalRequestId);
     if (!source) throw errorWithStatus('ไม่พบคำขอ COA จาก ERP กรุณาโหลดรายการใหม่', 404);
 
-    const references = await fetchErpReferences();
-    const sourceData = sampleFromSources(source, references.stockRows, references.mfRows);
-    const sample = sourceData.sample;
-    const petitions = sample.commonName
-      ? await Petition.find({ 'items.commonName': commonNameRegex(sample.commonName) })
-        .sort({ updatedAt: -1 }).limit(200).lean()
-      : [];
-    const lab = findBestLabItem(petitions, sample);
-    const qcResults = lab.best
-      ? await QCTestResult.find({ petitionId: String(lab.best.petition._id), itemSeq: Number(lab.best.item.seq) })
-        .sort({ updatedAt: -1 }).lean()
-      : [];
-    const resultData = resultRowsFromQc(qcResults, sample.commonName);
-    let density = resultData.density;
-    if (!density && sample.batchNo) {
-      const pattern = new RegExp(escapeRegex(sample.batchNo), 'i');
-      const densityRows = await ResultDensity.find({ 'Sample name': pattern }).sort({ _id: -1 }).limit(100).lean();
-      density = densityForBatch(densityRows, sample.batchNo);
+    const sourceSample = source.sampleSnapshots?.[0] || {};
+    const petitionMatchClauses = [];
+    if (source.externalCoaRequest?.itemNo) {
+      petitionMatchClauses.push({
+        'items.itemNo': new RegExp(`^${escapeRegex(source.externalCoaRequest.itemNo)}$`, 'i'),
+      });
     }
-    if (density && !resultData.rows.some((row) => /density/i.test(row.testItem || ''))) {
-      resultData.rows.push({
+    if (sourceSample.commonName) {
+      petitionMatchClauses.push({ 'items.commonName': commonNameRegex(sourceSample.commonName) });
+    }
+    const coaHistoryMatchClauses = [];
+    if (source.externalCoaRequest?.itemNo) {
+      coaHistoryMatchClauses.push({
+        'sampleSnapshots.sampleId': exactTrimmedRegex(source.externalCoaRequest.itemNo),
+      });
+    }
+    if (sourceSample.sampleName && sourceSample.commonName) {
+      coaHistoryMatchClauses.push({
+        sampleSnapshots: {
+          $elemMatch: {
+            sampleName: exactTrimmedRegex(sourceSample.sampleName),
+            commonName: commonNameRegex(sourceSample.commonName),
+          },
+        },
+      });
+    }
+    const [references, petitions, labRequests, coaHistory, legacyLabRows] = await Promise.all([
+      fetchErpReferences(),
+      petitionMatchClauses.length
+        ? Petition.find({
+          ...(petitionMatchClauses.length === 1 ? petitionMatchClauses[0] : { $or: petitionMatchClauses }),
+          status: { $ne: 'rejected' },
+        })
+          .sort({ updatedAt: -1 }).limit(200).lean()
+        : Promise.resolve([]),
+      LabRequest.find({ batchNo: { $exists: true, $nin: ['', null] } }).lean(),
+      coaHistoryMatchClauses.length
+        ? CoaDocument.find({
+          $or: coaHistoryMatchClauses,
+          status: { $nin: ['cancelled', 'superseded', 'rejected'] },
+        }).sort({ updatedAt: -1 }).limit(100).lean()
+        : Promise.resolve([]),
+      LegacyLabResult.find({}).lean(),
+    ]);
+    const requestMatch = findBestRequestItem(petitions, source, labRequests);
+    const coaHistoryMatch = findBestCoaHistorySample(coaHistory, source);
+    const sourceData = sampleFromSources(
+      source,
+      references.stockRows,
+      references.mfRows,
+      requestMatch?.item || coaHistoryMatch?.sample,
+    );
+    const sample = sourceData.sample;
+    let authoritativeBatch = manualText(
+      sourceSample.batchNo || sourceSample.lotNo
+      || requestMatch?.item?.batchNo || requestMatch?.item?.lotNo
+      || coaHistoryMatch?.sample?.batchNo || coaHistoryMatch?.sample?.lotNo
+      || (sourceData.erpLotDescription ? sample.batchNo : ''),
+    );
+    let legacyLookupSample = authoritativeBatch
+      ? sample
+      : { ...sample, batchNo: '', lotNo: '' };
+    let legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+    let densityBatchMatch = null;
+    let densityIdentityRows = [];
+    if (!authoritativeBatch && legacyMatch?.matchKind === 'productHistory') {
+      const family = densityBatchFamily(legacyMatch.batchNo);
+      if (family) {
+        const pattern = new RegExp(`^${escapeRegex(family)}-\\d+(?:-P\\d+)?$`, 'i');
+        densityIdentityRows = await ResultDensity.find({ 'Sample name': pattern })
+          .sort({ _id: -1 }).limit(5000).lean();
+        densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyMatch.batchNo);
+        if (densityBatchMatch) {
+          sample.batchNo = densityBatchMatch.batchNo;
+          authoritativeBatch = densityBatchMatch.batchNo;
+          legacyLookupSample = sample;
+          legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+        }
+      }
+    }
+    if (legacyMatch) {
+      if (!authoritativeBatch) {
+        sample.batchNo = legacyMatch.batchNo;
+      } else {
+        if (!sample.batchNo) sample.batchNo = legacyMatch.batchNo;
+      }
+      if (!sample.manufacturer) sample.manufacturer = manualText(legacyMatch.row?.manufacturer);
+    }
+    const lab = findBestLabItem(petitions, sample);
+    const [qcResults, aiLabData] = await Promise.all([
+      lab.best
+        ? QCTestResult.find({ petitionId: String(lab.best.petition._id), itemSeq: Number(lab.best.item.seq) })
+          .sort({ updatedAt: -1 }).lean()
+        : Promise.resolve([]),
+      latestAiLabData(petitions, sample),
+    ]);
+    const resultData = resultRowsFromQc(qcResults, sample.commonName, { includeAi: false });
+    const legacyResultData = resultRowsFromLegacyLab(legacyMatch?.row, sample.commonName);
+    const legacyAiResultData = resultRowsFromLegacyLabs(legacyMatch?.matchingRows, sample.commonName);
+    const aiResultData = legacyAiResultData.ai ? legacyAiResultData : aiLabData.resultData;
+    resultData.rows = mergeResultRows(
+      resultData.rows,
+      legacyResultData.rows.filter((row) => !isAiContentTestItem(row.testItem)),
+    );
+    resultData.density ||= legacyResultData.density === '-' ? '' : legacyResultData.density;
+    resultData.analysisDate ||= legacyResultData.analysisDate;
+    const aiRow = aiResultData.rows.find((row) => isAiContentTestItem(row.testItem));
+    if (aiRow) {
+      const insertAt = resultData.rows.findIndex((row) => /density|date\s*of\s*analysis/i.test(row.testItem || ''));
+      resultData.rows.splice(insertAt < 0 ? resultData.rows.length : insertAt, 0, aiRow);
+      resultData.ai = aiResultData.ai;
+      resultData.analysisDate = aiResultData.analysisDate
+        || normalizeIsoDate(aiLabData.best?.petition?.approvedAt || aiLabData.best?.petition?.labApprovedAt)
+        || resultData.analysisDate;
+      const analysisDateRow = resultData.rows.find((row) => /date\s*of\s*analysis/i.test(row.testItem || ''));
+      if (analysisDateRow && resultData.analysisDate) analysisDateRow.result = resultData.analysisDate;
+      else if (resultData.analysisDate) resultData.rows.push({
+        testItem: 'Date of analysis', criteria: '-', result: resultData.analysisDate, unit: '', method: '',
+      });
+    }
+    let density = resultData.density;
+    if (sample.batchNo) {
+      const densityBatchFromLot = manualText(sample.lotNo).match(/^(.+)-[0-3]\d[01]\d\d{2}$/)?.[1] || '';
+      const densityLookupBatch = densityBatchMatch?.sourceBatchNo || densityBatchFromLot || sample.batchNo;
+      const pattern = new RegExp(escapeRegex(densityLookupBatch), 'i');
+      const densityRows = densityIdentityRows.length
+        ? densityIdentityRows
+        : await ResultDensity.find({ 'Sample name': pattern }).sort({ _id: -1 }).limit(100).lean();
+      density = densityForBatch(densityRows, densityLookupBatch) || density;
+    }
+    if (density) {
+      const densityRow = resultData.rows.find((row) => /density/i.test(row.testItem || ''));
+      if (densityRow) densityRow.result = density;
+      else if (!densityRow) resultData.rows.push({
         testItem: 'Density at 30°C (g/cm³)', criteria: '-', result: density, unit: 'g/cm³', method: 'DMA 501',
       });
     }
@@ -756,10 +1045,28 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       matchKind: candidate.matchKind,
       labApprovedAt: candidate.petition.labApprovedAt || null,
     }));
+    const needsDensity = /\b(?:SC|SL|EC|EW|ZC|ME)\b/i.test(sample.commonName || '');
     const warnings = [];
-    if (!sourceData.stockCandidates.length && !sourceData.mfCandidates.length) warnings.push('ไม่พบ LOT NO. จาก ERP/Stock/MF');
-    if (!lab.best) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
-    else if (lab.best.matchKind !== 'exact') warnings.push('พบผล Lab จากเลขแบชที่ใกล้เคียง กรุณาตรวจสอบก่อนบันทึก');
+    if (densityBatchMatch) {
+      warnings.push('ERP Stock ปัจจุบันไม่มี Lot นี้ ระบบจึงใช้ Batch จากประวัติ Density ที่ใกล้วันส่งสินค้ามากที่สุด แต่ไม่นำวันที่ผลิตมาใช้');
+    }
+    if (!sample.batchNo || !sample.productionDate) {
+      warnings.push('ไม่พบ Batch No. หรือวันที่ผลิตจริงจาก ERP (คำขอ COA, Stock หรือ MF)');
+    }
+    if (!lab.best && !legacyMatch && !aiResultData.ai) warnings.push('ไม่พบผล Lab ที่ชื่อสามัญและ Batch No. ตรงกัน');
+    else if (!lab.best && legacyMatch?.matchKind === 'productHistory') {
+      warnings.push('ระบบเลือก Batch จากผล Lab เดิมที่สูตรตรงกันและใกล้วันส่งสินค้า กรุณาตรวจสอบ Batch ก่อนบันทึก');
+    }
+    else if (lab.best && lab.best.matchKind !== 'exact') warnings.push('พบผล Lab จากเลขแบชที่ใกล้เคียง กรุณาตรวจสอบก่อนบันทึก');
+    const missingResultFields = [
+      !resultData.rows.some((row) => /^appearance$/i.test(row.testItem || '') && row.result && row.result !== '-') && 'Appearance',
+      !resultData.rows.some((row) => isAiContentTestItem(row.testItem) && row.result && row.result !== '-') && '%AI',
+      needsDensity && !resultData.rows.some((row) => /density/i.test(row.testItem || '') && row.result && row.result !== '-') && 'Density',
+      !resultData.analysisDate && 'Date of analysis',
+    ].filter(Boolean);
+    if (missingResultFields.length) {
+      warnings.push(`ยังไม่พบข้อมูล ${missingResultFields.join(', ')} สำหรับ Batch นี้ในฐานข้อมูล`);
+    }
     if (resultData.physical?.raw && !resultData.physical.complete) warnings.push('ผลกายภาพบางคำยังไม่มีคำแปลภาษาอังกฤษ กรุณาตรวจสอบ');
     res.json({
       externalRequestId,
@@ -778,20 +1085,31 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         matchKind: lab.best.matchKind,
         batchScore: lab.best.batchScore,
       } : null,
+      legacyMatch: legacyMatch ? {
+        id: String(legacyMatch.row?._id || ''),
+        sampleName: legacyMatch.row?.sample_name || '',
+        batchNo: legacyMatch.batchNo,
+        productionDate: legacyMatch.productionDate,
+        analysisDate: legacyMatch.analysisDate,
+        matchKind: legacyMatch.matchKind,
+        score: legacyMatch.score,
+      } : null,
       candidates,
       stockCandidates: sourceData.stockCandidates,
       mfCandidates: sourceData.mfCandidates,
       form: {
         template: formKindForCommonName(sample.commonName),
         aiCriteria: aiToleranceCriteriaForCommonName(sample.commonName) || '',
-        needsDensity: /\b(SC|SL|EC|EW|ZC)\s*$/i.test(sample.commonName || ''),
+        needsDensity,
       },
       warnings,
       dataSources: {
         erp: true,
         stock: sourceData.stockCandidates.length > 0,
         mf: sourceData.mfCandidates.length > 0,
-        lab: Boolean(lab.best),
+        lab: Boolean(lab.best || aiResultData.ai),
+        coaHistory: Boolean(coaHistoryMatch),
+        legacyLab: Boolean(legacyMatch),
         density: Boolean(density),
       },
     });
@@ -809,39 +1127,44 @@ router.get('/lab-ai-lookup', async (req, res) => {
       throw errorWithStatus('กรุณาระบุ Batch No. และชื่อสามัญเพื่อค้นหาผล %AI', 400);
     }
 
-    const petitions = await Petition.find({
-      items: {
-        $elemMatch: {
-          commonName: commonNameRegex(commonName),
-          $or: [
-            { batchNo: exactTrimmedRegex(batchNo) },
-            { lotNo: exactTrimmedRegex(batchNo) },
-          ],
-        },
-      },
-    }).sort({ updatedAt: -1 }).limit(200).lean();
-    const lab = findBestLabItem(petitions, { batchNo, commonName, sampleName });
-    if (!lab.best) {
-      return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
-    }
-
-    const qcResults = await QCTestResult.find({
-      petitionId: String(lab.best.petition._id),
-      itemSeq: Number(lab.best.item.seq),
-    }).sort({ updatedAt: -1 }).lean();
-    const resultData = resultRowsFromQc(qcResults, commonName);
+    const [petitions, legacyRows] = await Promise.all([
+      Petition.find({
+        'items.commonName': commonNameRegex(commonName),
+        status: { $ne: 'rejected' },
+      }).sort({ updatedAt: -1 }).limit(200).lean(),
+      LegacyLabResult.find({
+        batch_no: new RegExp(`(?:^|-)${escapeRegex(batchNo)}(?:(?:\\s+|-)P\\d+)?\\s*$`, 'i'),
+      }).lean(),
+    ]);
+    const lab = await latestAiLabData(petitions, { batchNo, commonName, sampleName });
+    const legacySource = {
+      sampleSnapshots: [{ sampleName, commonName }],
+      externalCoaRequest: {},
+    };
+    const legacyMatch = findBestLegacyLabResult(legacyRows, legacySource, { batchNo, commonName, sampleName });
+    const legacyResultData = resultRowsFromLegacyLabs(legacyMatch?.matchingRows, commonName);
+    const resultData = legacyResultData.ai ? legacyResultData : lab.resultData;
     const ai = resultData.rows.find((row) => isAiContentTestItem(row.testItem)) || null;
+    if (!ai) return res.json({ batchNo, commonName, ai: null, analysisDate: '', match: null });
+    const match = legacyResultData.ai ? {
+      petitionId: `legacy:${legacyMatch?.row?._id || ''}`,
+      petitionNo: 'ผล Lab เดิม',
+      itemSeq: 1,
+      batchNo: legacyMatch.batchNo,
+    } : lab.best ? {
+      petitionId: String(lab.best.petition._id),
+      petitionNo: lab.best.petition.petitionNo,
+      itemSeq: Number(lab.best.item.seq),
+      batchNo: lab.best.item.batchNo || lab.best.item.lotNo || batchNo,
+    } : lab.historyMatch;
     return res.json({
       batchNo,
       commonName,
       ai,
-      analysisDate: resultData.analysisDate || '',
-      match: {
-        petitionId: String(lab.best.petition._id),
-        petitionNo: lab.best.petition.petitionNo,
-        itemSeq: Number(lab.best.item.seq),
-        batchNo: lab.best.item.batchNo || lab.best.item.lotNo || batchNo,
-      },
+      analysisDate: resultData.analysisDate
+        || normalizeIsoDate(lab.best?.petition?.approvedAt || lab.best?.petition?.labApprovedAt)
+        || '',
+      match,
     });
   } catch (error) {
     res.status(errorStatus(error)).json({ error: error.message });
@@ -1067,10 +1390,10 @@ router.post('/:id/submit', async (req, res) => {
 router.post('/:id/approve', async (req, res) => {
   try {
     const actor = await actorFromRequest(req.body);
-    if (!isQcHead(actor)) return res.status(403).json({ error: 'อนุมัติ COA ได้เฉพาะ QC Head' });
     const doc = await CoaDocument.findById(objectId(req.params.id));
     if (!doc) return res.status(404).json({ error: 'ไม่พบ COA' });
-    assertCanTransition(doc.status, 'approve', actor);
+    if (!canReviewCoa(actor, doc)) return res.status(403).json({ error: 'อนุมัติ COA ได้เฉพาะ QC Head หรือผู้สร้างเอกสาร' });
+    assertCanTransition(doc.status, 'approve', actor, doc);
     if (doc.sourceType !== 'erpManual' && doc.petitionId) await assertLabApprovedPetition(doc.petitionId);
     const missingSnapshots = !doc.sampleSnapshots?.length || !doc.resultSnapshots?.length || !doc.trendSnapshots?.length;
     const snapshots = doc.sourceType === 'erpManual' ? validateManualCoa(doc)
@@ -1122,11 +1445,11 @@ router.post('/:id/approve', async (req, res) => {
 router.post('/:id/reject', async (req, res) => {
   try {
     const actor = await actorFromRequest(req.body);
-    if (!isQcHead(actor)) return res.status(403).json({ error: 'ปฏิเสธ COA ได้เฉพาะ QC Head' });
     const reason = String(req.body.reason || '').trim();
     if (!reason) return res.status(400).json({ error: 'ต้องระบุเหตุผลการปฏิเสธ' });
     const doc = await CoaDocument.findById(objectId(req.params.id));
     if (!doc) return res.status(404).json({ error: 'ไม่พบ COA' });
+    if (!canReviewCoa(actor, doc)) return res.status(403).json({ error: 'ปฏิเสธ COA ได้เฉพาะ QC Head หรือผู้สร้างเอกสาร' });
     const { doc: updated } = await withCoaTransaction((session) => applyCoaLifecycleAction({
       doc,
       action: 'reject',
@@ -1250,3 +1573,4 @@ module.exports.freezeSnapshots = freezeSnapshots;
 module.exports.actorFromRequest = actorFromRequest;
 module.exports.withCoaTransaction = withCoaTransaction;
 module.exports.externalCoaRowsToDocuments = externalCoaRowsToDocuments;
+module.exports.enrichExternalCoaDocumentsWithErpLots = enrichExternalCoaDocumentsWithErpLots;

@@ -92,15 +92,20 @@ function aiPercentFromCommonName(commonName) {
 
 function aiToleranceCriteriaForCommonName(commonName) {
   const source = String(commonName || '');
-  const match = source.match(/(\d+(?:\.\d+)?)\s*%/);
-  if (!match) return null;
-  const percent = normalizePercent(match[1]);
-  const afterPercent = textAfterMatchedPercent(source, match);
-  const specific = AI_TOLERANCE_CRITERIA.find((item) => (
-    item.percent === percent && item.formulation && new RegExp(`\\b${item.formulation}\\b`, 'i').test(afterPercent)
-  ));
-  const fallback = AI_TOLERANCE_CRITERIA.find((item) => item.percent === percent && !item.formulation);
-  return (specific || fallback || {}).criteria || null;
+  const percentPattern = /(\d+(?:\.\d+)?)\s*%/g;
+  const criteria = [];
+  let match;
+  while ((match = percentPattern.exec(source)) !== null) {
+    const percent = normalizePercent(match[1]);
+    const afterPercent = textAfterMatchedPercent(source, match);
+    const specific = AI_TOLERANCE_CRITERIA.find((item) => (
+      item.percent === percent && item.formulation && new RegExp(`\\b${item.formulation}\\b`, 'i').test(afterPercent)
+    ));
+    const fallback = AI_TOLERANCE_CRITERIA.find((item) => item.percent === percent && !item.formulation);
+    const selected = specific || fallback;
+    if (selected && !criteria.includes(selected.criteria)) criteria.push(selected.criteria);
+  }
+  return criteria.length ? criteria.join(' / ') : null;
 }
 
 function isAiContentTestItem(testItem) {

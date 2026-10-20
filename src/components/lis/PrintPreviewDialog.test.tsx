@@ -30,6 +30,24 @@ beforeEach(() => {
 });
 
 describe("PrintPreviewDialog auto print", () => {
+  it("renders document actions in the preview header", async () => {
+    apiMock.getPrinterConfigs.mockResolvedValue([]);
+
+    renderDialog(
+      <PrintPreviewDialog
+        open
+        onOpenChange={vi.fn()}
+        docType="coa"
+        previewOnly
+        headerActions={<button type="button">อนุมัติ</button>}
+      >
+        <div>coa html</div>
+      </PrintPreviewDialog>,
+    );
+
+    expect(await screen.findByRole("button", { name: "อนุมัติ" })).toBeInTheDocument();
+  });
+
   it("defaults to server and auto prints when a matching server printer exists", async () => {
     apiMock.getPrinterConfigs.mockResolvedValue([
       {
