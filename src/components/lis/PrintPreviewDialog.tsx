@@ -39,7 +39,6 @@ interface Props {
   headerActions?: React.ReactNode;
 }
 
-const BOX_CHROME = 18;
 const MIN_PREVIEW_HEIGHT = 180;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
@@ -90,14 +89,19 @@ function ScaledPreview({
     if (!outer || !content) return;
 
     const measure = () => {
-      const availW = outer.clientWidth - BOX_CHROME;
-      const availH = Math.max(MIN_PREVIEW_HEIGHT, outer.clientHeight - BOX_CHROME);
+      const styles = window.getComputedStyle(outer);
+      const horizontalPadding = Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+      const verticalPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+      // Keep a small rounding allowance so a sheet fitted exactly to the viewport
+      // does not repeatedly show/hide a scrollbar on devices with fractional pixels.
+      const availW = Math.max(0, outer.clientWidth - horizontalPadding - 1);
+      const availH = Math.max(MIN_PREVIEW_HEIGHT, outer.clientHeight - verticalPadding - 1);
       const natW = content.scrollWidth;
       const natH = content.scrollHeight;
       const sheet = getSheetSize(printRef.current, content);
       const widthScale = sheet.width > 0 ? availW / sheet.width : 1;
       const heightScale = sheet.height > 0 ? availH / sheet.height : 1;
-      setFitScale(Math.min(widthScale, heightScale));
+      setFitScale(Math.min(widthScale, heightScale, 1));
       setNaturalWidth(natW);
       setNaturalHeight(natH);
     };
@@ -190,7 +194,10 @@ function ScaledPreview({
           พอดีหน้า
         </Button>
       </div>
-      <div ref={outerRef} className={`min-h-0 flex-1 overflow-auto rounded border p-3 ${previewClassName ?? "bg-neutral-100"}`}>
+      <div
+        ref={outerRef}
+        className={`min-h-0 flex-1 overflow-auto rounded border p-3 [scrollbar-gutter:stable] ${previewClassName ?? "bg-neutral-100"}`}
+      >
         <div className="mx-auto" style={{ width: naturalWidth * scale, height: naturalHeight * scale }}>
           <div
             ref={contentRef}
