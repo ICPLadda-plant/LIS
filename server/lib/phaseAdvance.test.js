@@ -224,24 +224,24 @@ function originalPhaseFixture(context, side) {
   return f;
 }
 
-test('original Phase 2 triggered on QC side reopens QC only, so petition is no longer complete', async (context) => {
+test('original Phase 2 triggered on QC side reopens QC and Lab, so Lab retests its parameters too', async (context) => {
   const { petition } = originalPhaseFixture(context, 'qc');
   await maybeAdvancePhase(petition);
   assert.equal(petition.currentPhase, 2);
   assert.equal(petition.qcCompletedAt, null);
   assert.equal(petition.qcCompletedBy, undefined);
-  assert.deepEqual(petition.labApprovedAt, PAST);
-  assert.deepEqual(petition.labCompletedAt, PAST);
+  assert.equal(petition.labApprovedAt, null);
+  assert.equal(petition.labCompletedAt, null);
   assert.equal(isPetitionComplete(petition), false);
 });
 
-test('original Phase 2 triggered on Lab side reopens Lab only (completion and approval)', async (context) => {
+test('original Phase 2 triggered on Lab side reopens Lab and QC (completion and approval)', async (context) => {
   const { petition } = originalPhaseFixture(context, 'lab');
   await maybeAdvancePhase(petition);
   assert.equal(petition.labCompletedAt, null);
   assert.equal(petition.labApprovedAt, null);
   assert.equal(petition.labApprovedBy, undefined);
-  assert.deepEqual(petition.qcCompletedAt, PAST);
+  assert.equal(petition.qcCompletedAt, null);
   assert.equal(isPetitionComplete(petition), false);
 });
 

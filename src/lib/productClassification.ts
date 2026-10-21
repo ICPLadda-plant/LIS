@@ -73,6 +73,8 @@ export function getClassification(value: unknown): ClassificationType | undefine
 
   const upperValue = rawValue.toUpperCase();
   return [...classificationTypes]
+    // W/V และ W/W เป็นหน่วยความเข้มข้น ไม่ใช่ประเภทสูตรเมื่ออยู่ในชื่อสามัญ
+    .filter((item) => !COMMON_NAME_EXCLUDED_CODES.has(item.code))
     .sort((a, b) => b.code.length - a.code.length)
     .find((item) => {
       const pattern = new RegExp(`(^|[^A-Z0-9])${escapeRegExp(item.code.toUpperCase())}([^A-Z0-9]|$)`);

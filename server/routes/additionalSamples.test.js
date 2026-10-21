@@ -209,6 +209,14 @@ test('failed phase 2 results can request a new sample round', async context => {
   assert.equal(res.statusCode, 201, JSON.stringify(res.body));
 });
 
+test('failed phase 2 retest of a normal parameter can request a new sample round', async context => {
+  fixture(context, { additionalSampleRequests: [] });
+  context.mock.method(QCTestResult, 'find', () => ({ lean: async () => [{ petitionId, itemSeq: 1, parameterId, values: { value: 5 }, valuesPhase2: { value: 12 } }] }));
+  context.mock.method(Parameter, 'find', () => ({ lean: async () => [{ _id: parameterId, scope: 'qc', valueFields: [{ label: 'value', type: 'number', standardOperator: 'lte', standardValue: 10 }] }] }));
+  const res = await invoke(additional, '/:id/additional-samples', 'post', { side: 'qc', reason: 'ผลหลังอบไม่ผ่าน', items: [{ itemSeq: 1, quantity: 1 }] });
+  assert.equal(res.statusCode, 201, JSON.stringify(res.body));
+});
+
 test('request rejects unauthenticated, wrong-side, inactive and unassigned staff', async context => {
   const { writes, state } = fixture(context, { additionalSampleRequests: [], assignedTo: { employeeId: 'LAB01' } });
   const body = { side: 'lab', reason: 'ผลไม่ผ่าน', items: [{ itemSeq: 1, quantity: 1 }] };

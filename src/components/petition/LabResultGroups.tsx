@@ -55,7 +55,6 @@ export default function LabResultGroups({ groups }: Props) {
                           <tr key={row.key} className={cn("border-t border-border align-top", row.abnormal && "bg-destructive/10")}>
                             <td className="py-1.5 pr-3 break-words">
                               {row.label}{row.unit ? <span className="text-muted-foreground"> ({row.unit})</span> : null}
-                              {param.hasPhases && <span className="ml-1 text-[10px] text-amber-700 dark:text-amber-300">P{row.phase}</span>}
                             </td>
                             <td className="py-1.5 pr-3 font-mono font-semibold break-words">{row.value || "-"}</td>
                             <td className="py-1.5 pr-3 text-muted-foreground break-words">{row.standardText || "-"}</td>

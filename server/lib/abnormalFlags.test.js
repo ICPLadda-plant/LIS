@@ -23,6 +23,26 @@ describe('computeAbnormalFlags', () => {
       .toEqual({ p1: false });
   });
 
+  it('flags a retest (Phase 2) value of the same parameter that breaks the standard', () => {
+    const docs = [{ petitionId: 'p1', parameterId: 'par1', itemSeq: 1, values: { 'ค่า': 5 }, valuesPhase2: { 'ค่า': 12 } }];
+    expect(computeAbnormalFlags({ docs, params: [numberParam], petitions: [petition] }))
+      .toEqual({ p1: true });
+  });
+
+  it('checks only before/both fields in Phase 1 and after/both fields in Phase 2 for phased parameters', () => {
+    const phased = {
+      _id: 'par1',
+      hasPhases: true,
+      valueFields: [
+        { label: 'ก่อน', type: 'number', phase: 'before', standardOperator: 'lte', standardValue: 10 },
+        { label: 'หลัง', type: 'number', phase: 'after', standardOperator: 'lte', standardValue: 10 },
+      ],
+    };
+    const docs = [{ petitionId: 'p1', parameterId: 'par1', itemSeq: 1, values: { 'ก่อน': 5, 'หลัง': 99 }, valuesPhase2: { 'ก่อน': 99, 'หลัง': 5 } }];
+    expect(computeAbnormalFlags({ docs, params: [phased], petitions: [petition] }))
+      .toEqual({ p1: false });
+  });
+
   it('uses the exact substance standard before same-first-token standards', () => {
     const densityParam = {
       _id: 'density',

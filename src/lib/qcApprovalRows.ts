@@ -15,6 +15,11 @@ import {
 } from "@/lib/parameterValidation";
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange } from "@/lib/standardOperators";
 import { calculatedAiFieldKind } from "@/lib/aiCalculation";
+import { sampleRoundFor } from "@/lib/additionalSamples";
+import { isPhaseTriggerParameter, visibleFieldsForPhase } from "@/lib/phaseRetest";
+
+// ต่อท้ายชื่อแถวผลรอบตรวจซ้ำ เพื่อให้หน้าออกผลและรายงานแยกค่าก่อน/หลัง trigger (เช่น อบ 14 วัน) ได้
+export const PHASE2_ROW_SUFFIX = "ตรวจซ้ำ Phase 2";
 
 export interface ApprovalFieldRow {
   key: string;
@@ -106,9 +111,19 @@ export function buildApprovalGroups(
 
   return (petition.items ?? []).map((item) => {
     const matched = matchParametersForItem(item, parameters, idsFor(item), { petitionCategory });
+    // รายการที่ไม่มี parameter trigger (เช่น ไม่ใช่ยานำเข้าที่ต้องอบ) ไม่มีรอบตรวจซ้ำ แม้ใบเดียวกันจะเข้า Phase 2 แล้ว
+    const itemHasPhasedParam = matched.some((p) => p.hasPhases);
 
     const params: ApprovalParamGroup[] = matched.map((param) => {
       const k = resultKey(item.seq, param._id!);
+      const side = (param.scope ?? "qc") === "lab" ? "lab" : "qc";
+      const phaseState = sampleRoundFor(petition, side, item.seq) ?? petition;
+      const triggerParameterId = phaseState.phase2TriggeredBy?.parameterId ?? null;
+      const phase2Opened = itemHasPhasedParam && ((phaseState.currentPhase ?? 1) === 2 || !!phaseState.phase2DueAt);
+      const hasPhase2Values = Object.keys(v2[k] ?? {}).length > 0;
+      // รอบตรวจซ้ำใช้ parameter เดิมทุกตัวของรายการ ยกเว้นตัว trigger เอง
+      const includePhase2 = phase2Opened || hasPhase2Values ||
+        (!!param.hasPhases && !isPhaseTriggerParameter(param, triggerParameterId));
       const buildCtx = (phaseVals: Record<string, Record<string, unknown>>): ConditionContext => ({
         sameParam: phaseVals[k] ?? {},
         otherParams: (() => {
@@ -132,13 +147,14 @@ export function buildApprovalGroups(
           ? { values: v2[k] ?? {}, entries: undefined }
           : { values: v1[k] ?? {}, entries: resultByKey[k]?.entries };
         const entryList = getEntryValues(phaseResult, param);
+        const phaseFields = new Set(visibleFieldsForPhase(param, phase, triggerParameterId));
         entryList.forEach((entryValues, ei) => {
           const handledKeys = new Set<string>();
-          const entryLabel = param.multiEntry ? `รายการที่ ${ei + 1}` : "";
+          const entryLabel = [param.multiEntry ? `รายการที่ ${ei + 1}` : "", phase === 2 ? PHASE2_ROW_SUFFIX : ""]
+            .filter(Boolean)
+            .join(" · ");
           (param.valueFields ?? []).forEach((field) => {
-            const fPhase = field.phase ?? "both";
-            if (phase === 1 && fPhase === "after") return;
-            if (phase === 2 && fPhase === "before") return;
+            if (!phaseFields.has(field)) return;
             // reference fields are auto-resolved from substance standards elsewhere and intentionally omitted from approval rows
             if (field.type === "reference") return;
             handledKeys.add(field.label);
@@ -222,15 +238,15 @@ export function buildApprovalGroups(
       };
 
       pushFields(1);
-      if (param.hasPhases) pushFields(2);
+      if (includePhase2) pushFields(2);
       if ((param.valueFields ?? []).some((field) => calculatedAiFieldKind(field.label) === "ai")) {
-        rows.sort((a, b) => aiApprovalRowRank(a.label) - aiApprovalRowRank(b.label));
+        rows.sort((a, b) => a.phase - b.phase || aiApprovalRowRank(a.label) - aiApprovalRowRank(b.label));
       }
 
       return {
         parameterId: String(param._id),
         parameterName: param.name,
-        scope: (param.scope ?? "qc") === "lab" ? "lab" : "qc",
+        scope: side,
         hasPhases: !!param.hasPhases,
         rows,
       };

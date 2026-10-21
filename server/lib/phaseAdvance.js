@@ -70,19 +70,15 @@ async function maybeAdvancePhase(petition, actor = "system") {
   if (advanceOriginal) {
     petition.currentPhase = 2;
     petition.phase2UnlockedAt = now;
-    // ผล Phase 2 ยังไม่มี → ฝั่งที่ trigger ต้องยืนยันผลใหม่ (ไม่งั้นหัวหน้าออก Final Result ข้ามผล Phase 2 ได้)
-    // trigger เก่าที่ไม่มี side = เปิดทั้งสองฝั่ง
-    const side = petition.phase2TriggeredBy?.side;
-    if (side !== "lab") {
-      petition.qcCompletedAt = null;
-      petition.qcCompletedBy = undefined;
-    }
-    if (side !== "qc") {
-      petition.labCompletedAt = null;
-      petition.labCompletedBy = undefined;
-      petition.labApprovedAt = null;
-      petition.labApprovedBy = undefined;
-    }
+    // รอบตรวจซ้ำใช้ parameter เดิมทุกตัวของทั้ง QC และ Lab (เช่น อบ 14 วัน แล้วตรวจ ถ.พ. ฝั่ง QC และ %AI ฝั่ง Lab ซ้ำ)
+    // จึงเปิดให้ทั้งสองฝั่งยืนยันผลใหม่ ไม่ว่า trigger จะอยู่ฝั่งไหน — ไม่งั้นหัวหน้าออก Final Result ข้ามผล Phase 2 ได้
+    // (phase2TriggeredBy.side ยังเก็บไว้เพื่อบอกว่าใครเริ่มรอบตรวจซ้ำ)
+    petition.qcCompletedAt = null;
+    petition.qcCompletedBy = undefined;
+    petition.labCompletedAt = null;
+    petition.labCompletedBy = undefined;
+    petition.labApprovedAt = null;
+    petition.labApprovedBy = undefined;
     if (petition.status === "success") {
       petition.status = "inProgress";
       petition.completedAt = null;
