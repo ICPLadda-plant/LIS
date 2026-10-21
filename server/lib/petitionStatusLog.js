@@ -15,6 +15,7 @@ function shouldSendItemToLab(item) {
 }
 
 function hasLabTrack(petition) {
+  if (Array.isArray(petition?.routeTargets) && petition.routeTargets.length) return petition.routeTargets.includes('lab');
   if (isResearchAndDevelopmentDepartment(petition?.submittedBy?.department)) return true;
   return ((petition ?? {}).items ?? []).some((it) => shouldSendItemToLab(it));
 }

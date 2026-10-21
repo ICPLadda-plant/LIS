@@ -42,6 +42,7 @@ export const PETITION_STATUS_CONFIG: Record<
 
 // ===== Department =====
 export type PetitionDept = 'production' | 'rm' | 'fg';
+export type PetitionRouteTarget = 'qc' | 'lab';
 
 export const PETITION_DEPT_LABELS: Record<PetitionDept, string> = {
   production: 'แผนกผลิต',
@@ -234,6 +235,7 @@ interface PetitionBase {
   submittedBy: PetitionSubmitter;
   deliveredBy?: PetitionDeliverer;
   items: PetitionItem[];
+  routeTargets?: PetitionRouteTarget[];
   additionalSampleRequests?: AdditionalSampleRequest[];
   scannedAdditionalSampleId?: string;
   scannedAdditionalSampleCode?: string;

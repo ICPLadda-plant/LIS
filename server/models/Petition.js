@@ -124,6 +124,7 @@ const PetitionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    routeTargets: [{ type: String, enum: ['qc', 'lab'] }],
     status: {
       type: String,
       enum: ['deliveringQC', 'sampleSent', 'pendingReview', 'inProgress', 'success', 'approved', 'rejected'],

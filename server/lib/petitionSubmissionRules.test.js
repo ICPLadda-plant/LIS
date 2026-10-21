@@ -27,6 +27,11 @@ test('requiresQcTrack is false only for R & D submitters', () => {
   assert.strictEqual(requiresQcTrack({}), true);
 });
 
+test('requiresQcTrack honors an explicitly selected route', () => {
+  assert.strictEqual(requiresQcTrack({ submittedBy: { department: 'ควบคุมคุณภาพ' }, routeTargets: ['qc'] }), true);
+  assert.strictEqual(requiresQcTrack({ submittedBy: { department: 'ควบคุมคุณภาพ' }, routeTargets: ['lab'] }), false);
+});
+
 test('validatePetitionSubmission allows R & D submissions without deliverer or batch', () => {
   assert.strictEqual(validatePetitionSubmission({
     dept: 'production',

@@ -33,6 +33,15 @@ describe("petitionRouting", () => {
     expect(requiresQcTrack({ submittedBy: { department: "Production" } } as Petition)).toBe(true);
   });
 
+  it("honors explicit QC department route targets", () => {
+    const qcOnly = { submittedBy: { department: "ควบคุมคุณภาพ" }, routeTargets: ["qc"], items: [{ batchNo: "B-1" }] } as Petition;
+    const labOnly = { submittedBy: { department: "ควบคุมคุณภาพ" }, routeTargets: ["lab"], items: [{ batchNo: "B-2" }] } as Petition;
+    expect(requiresQcTrack(qcOnly)).toBe(true);
+    expect(hasLabTrack(qcOnly)).toBe(false);
+    expect(requiresQcTrack(labOnly)).toBe(false);
+    expect(hasLabTrack(labOnly)).toBe(true);
+  });
+
   it("lets explicit sendToLab override the batch suffix default", () => {
     expect(shouldSendItemToLab({ batchNo: "B-1" })).toBe(true);
     expect(shouldSendItemToLab({ batchNo: "B-1", sendToLab: false })).toBe(false);

@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, CheckCircle2, Factory, Printer, RotateCcw, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Factory, FlaskConical, Printer, RotateCcw, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import PageHeader from '@/components/lis/PageHeader';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
 import ItemsStep, { type ItemRowValues } from '@/components/petition/wizard/ItemsStep';
@@ -25,6 +26,7 @@ import {
   defaultSendItemToLab,
   duplicateBatchError,
   labSendOverrideNoteError,
+  isQualityControlDepartment,
   shouldSendItemToLab,
 } from '@/lib/petitionRouting';
 import {
@@ -32,7 +34,7 @@ import {
   MF_CURRENT_API_URL,
   MF_HISTORICAL_API_URL,
 } from '@/lib/mfItemDates';
-import { type Petition } from '@/types/petition.types';
+import { type Petition, type PetitionRouteTarget } from '@/types/petition.types';
 
 const ICP_LADDA_ADDRESS = '151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000';
 const ICP_LADDA_COMPANY = 'ICP Ladda Co., LTD.';
@@ -733,6 +735,8 @@ export default function ProductionPetitionNewPage({
   const [stepError, setStepError] = useState<string | null>(null);
   const [createdPetition, setCreatedPetition] = useState<Petition | null>(null);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
+  const [routeTargets, setRouteTargets] = useState<PetitionRouteTarget[] | null>(null);
 
   function validateStep(): boolean {
     setStepError(null);
@@ -797,11 +801,25 @@ export default function ProductionPetitionNewPage({
     return true;
   }
 
+  function requestSubmit() {
+    if (isQualityControlDepartment(submitterDepartment) && !routeTargets) {
+      setRouteDialogOpen(true);
+      return;
+    }
+    void handleSubmit();
+  }
+
+  function selectRoute(targets: PetitionRouteTarget[]) {
+    setRouteTargets(targets);
+    setRouteDialogOpen(false);
+    void handleSubmit(targets);
+  }
+
   function goNext() {
     if (!validateStep()) return;
     // items เป็น step ก่อน lab; ถ้าไม่มี batch ส่ง lab ให้บันทึกเลย
     if (currentStep === 'items' && labBatches.length === 0) {
-      void handleSubmit();
+      requestSubmit();
       return;
     }
     setStepIdx((i) => Math.min(STEPS.length - 1, i + 1));
@@ -814,7 +832,7 @@ export default function ProductionPetitionNewPage({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(selectedTargets = routeTargets) {
     if (!validateStep()) return;
     // Production integration requests are already validated by the source system.
     // They do not have a LIS session, so avoid the session-protected duplicate check.
@@ -841,7 +859,12 @@ export default function ProductionPetitionNewPage({
           email: submitter.email || undefined,
           department: submitterDepartment || undefined,
         },
-        items: items.map((it, idx) => ({ ...it, seq: idx + 1, sendToLab: sendToLabForSubmit(it, submitterDepartment) })),
+        items: items.map((it, idx) => ({
+          ...it,
+          seq: idx + 1,
+          sendToLab: selectedTargets ? selectedTargets.includes('lab') : sendToLabForSubmit(it, submitterDepartment),
+        })),
+        routeTargets: selectedTargets ?? undefined,
         labRequests: [],
         prodOrderNos,
         productionWorkflow: productionRequestNo ? {
@@ -1047,13 +1070,34 @@ export default function ProductionPetitionNewPage({
                 )}
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={submitting} className="w-full sm:w-auto">
+              <Button onClick={requestSubmit} disabled={submitting} className="w-full sm:w-auto">
                 <Save className="h-4 w-4" />
                 {submitting ? 'กำลังบันทึก...' : 'บันทึก'}
               </Button>
             )}
           </div>
         </div>
+
+        <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader className="border-b border-border pb-4">
+              <DialogTitle>เลือกประเภทการส่งตรวจ</DialogTitle>
+              <DialogDescription>เลือกปลายทางที่ต้องการส่งตัวอย่าง</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { targets: ['qc'] as PetitionRouteTarget[], label: 'ส่ง QC', icon: ShieldCheck },
+                { targets: ['lab'] as PetitionRouteTarget[], label: 'ส่ง LAB', icon: FlaskConical },
+                { targets: ['qc', 'lab'] as PetitionRouteTarget[], label: 'ส่งทั้ง 2', icon: CheckCircle2 },
+              ].map(({ targets, label, icon: Icon }) => (
+                <button key={label} type="button" onClick={() => selectRoute(targets)} className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:border-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                  <Icon className="h-7 w-7 text-primary" />
+                  <span className="font-semibold">{label}</span>
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
   );
 
