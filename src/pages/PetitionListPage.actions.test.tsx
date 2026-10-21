@@ -213,7 +213,7 @@ vi.mock('@/lib/api', () => ({
 
 function LocationProbe() {
   const location = useLocation();
-  return <output data-testid="location">{location.pathname}</output>;
+  return <output data-testid="location">{location.pathname}{location.search}</output>;
 }
 
 function renderPage(props: React.ComponentProps<typeof PetitionListPage> = {}, initialEntry = '/petitions') {
@@ -351,6 +351,23 @@ describe('PetitionListPage action cues', () => {
 
     expect(mocks.canAccess).toHaveBeenCalledWith('/petitions/new');
     expect(screen.getByTestId('location')).toHaveTextContent('/petitions/new');
+  });
+
+  it('asks QC department users where to send before opening the new petition form', async () => {
+    mocks.user = {
+      employeeId: 'E778',
+      email: 'qc@example.test',
+      name: 'QC User',
+      roles: ['viewer'],
+      department: 'ควบคุมคุณภาพ',
+    };
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'ยื่นคำร้องใหม่' }));
+    expect(screen.getByRole('dialog', { name: 'เลือกประเภทการส่งตรวจ' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'ส่งทั้ง 2' }));
+
+    expect(screen.getByTestId('location')).toHaveTextContent('/petitions/new?routeTargets=qc,lab');
   });
 
   it('shows approved petitions as completed instead of final-result wording', async () => {
@@ -622,8 +639,6 @@ describe('PetitionListPage action cues', () => {
 
     fireEvent.click(await screen.findByRole('checkbox', { name: `เลือก F-TEST-001 ${batchNo}` }));
     fireEvent.click(screen.getByRole('button', { name: 'ส่งตรวจคุณภาพ (1)' }));
-    expect(screen.getByRole('dialog', { name: 'เลือกประเภทการส่งตรวจ' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'ส่ง LAB' }));
 
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: 'แจ้งเตือนส่งตรวจคุณภาพ', selected: true })).toBeInTheDocument();
@@ -638,7 +653,6 @@ describe('PetitionListPage action cues', () => {
         batchNo,
         sendToLab: true,
       })],
-      routeTargets: ['lab'],
     }));
   });
 
@@ -649,15 +663,13 @@ describe('PetitionListPage action cues', () => {
 
     fireEvent.click(await screen.findByRole('checkbox', { name: 'เลือกทั้งหมดในรายการยาเกิน 6 เดือน' }));
     fireEvent.click(screen.getByRole('button', { name: 'ส่งตรวจคุณภาพ (2)' }));
-    fireEvent.click(screen.getByRole('button', { name: 'ส่งทั้ง 2' }));
 
     await waitFor(() => expect(mocks.createPetition).toHaveBeenCalledTimes(1));
     expect(mocks.createPetition).toHaveBeenCalledWith(expect.objectContaining({
       items: [
         expect.objectContaining({ itemNo: 'F-TEST-001', batchNo: 'FG260301-001', sendToLab: true }),
-        expect.objectContaining({ itemNo: 'R-TEST-002', batchNo: 'RM260201-002', sendToLab: true }),
+        expect.objectContaining({ itemNo: 'R-TEST-002', batchNo: 'RM260201-002', sendToLab: false }),
       ],
-      routeTargets: ['qc', 'lab'],
     }));
     expect(await screen.findByText('ยาทดสอบ FG +1 รายการ')).toBeInTheDocument();
   });

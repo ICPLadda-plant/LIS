@@ -1,12 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRight, CheckCircle2, Factory, FlaskConical, Printer, RotateCcw, Save, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Factory, Printer, RotateCcw, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import PageHeader from '@/components/lis/PageHeader';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
 import ItemsStep, { type ItemRowValues } from '@/components/petition/wizard/ItemsStep';
@@ -26,7 +25,6 @@ import {
   defaultSendItemToLab,
   duplicateBatchError,
   labSendOverrideNoteError,
-  isQualityControlDepartment,
   shouldSendItemToLab,
 } from '@/lib/petitionRouting';
 import {
@@ -735,8 +733,10 @@ export default function ProductionPetitionNewPage({
   const [stepError, setStepError] = useState<string | null>(null);
   const [createdPetition, setCreatedPetition] = useState<Petition | null>(null);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
-  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
-  const [routeTargets, setRouteTargets] = useState<PetitionRouteTarget[] | null>(null);
+  const routeTargets = useMemo<PetitionRouteTarget[] | null>(() => {
+    const targets = (searchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
+    return targets.length ? targets : null;
+  }, [searchParams]);
 
   function validateStep(): boolean {
     setStepError(null);
@@ -801,25 +801,11 @@ export default function ProductionPetitionNewPage({
     return true;
   }
 
-  function requestSubmit() {
-    if (isQualityControlDepartment(submitterDepartment) && !routeTargets) {
-      setRouteDialogOpen(true);
-      return;
-    }
-    void handleSubmit();
-  }
-
-  function selectRoute(targets: PetitionRouteTarget[]) {
-    setRouteTargets(targets);
-    setRouteDialogOpen(false);
-    void handleSubmit(targets);
-  }
-
   function goNext() {
     if (!validateStep()) return;
     // items เป็น step ก่อน lab; ถ้าไม่มี batch ส่ง lab ให้บันทึกเลย
     if (currentStep === 'items' && labBatches.length === 0) {
-      requestSubmit();
+      void handleSubmit();
       return;
     }
     setStepIdx((i) => Math.min(STEPS.length - 1, i + 1));
@@ -1070,7 +1056,7 @@ export default function ProductionPetitionNewPage({
                 )}
               </Button>
             ) : (
-              <Button onClick={requestSubmit} disabled={submitting} className="w-full sm:w-auto">
+              <Button onClick={() => void handleSubmit()} disabled={submitting} className="w-full sm:w-auto">
                 <Save className="h-4 w-4" />
                 {submitting ? 'กำลังบันทึก...' : 'บันทึก'}
               </Button>
@@ -1078,26 +1064,6 @@ export default function ProductionPetitionNewPage({
           </div>
         </div>
 
-        <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader className="border-b border-border pb-4">
-              <DialogTitle>เลือกประเภทการส่งตรวจ</DialogTitle>
-              <DialogDescription>เลือกปลายทางที่ต้องการส่งตัวอย่าง</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                { targets: ['qc'] as PetitionRouteTarget[], label: 'ส่ง QC', icon: ShieldCheck },
-                { targets: ['lab'] as PetitionRouteTarget[], label: 'ส่ง LAB', icon: FlaskConical },
-                { targets: ['qc', 'lab'] as PetitionRouteTarget[], label: 'ส่งทั้ง 2', icon: CheckCircle2 },
-              ].map(({ targets, label, icon: Icon }) => (
-                <button key={label} type="button" onClick={() => selectRoute(targets)} className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:border-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-                  <Icon className="h-7 w-7 text-primary" />
-                  <span className="font-semibold">{label}</span>
-                </button>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
   );
 

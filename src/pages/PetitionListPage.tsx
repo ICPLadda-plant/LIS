@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } fr
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
+  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CheckCircle2,
   FilePlus2,
   FlaskConical,
   ShieldCheck,
@@ -48,6 +48,7 @@ import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { rankSearchResults } from '@/lib/searchRanking';
 import { formatDate, formatDateTime, formatMonth } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
+import { isQualityControlDepartment } from '@/lib/petitionRouting';
 import {
   PETITION_STATUS_CONFIG,
   PETITION_STATUSES,
@@ -380,7 +381,6 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
   const [localSubmittedQualityLotKeys, setLocalSubmittedQualityLotKeys] = useState<Set<string>>(() => new Set());
   const [isSubmittingQuality, setIsSubmittingQuality] = useState(false);
   const [qualitySubmitError, setQualitySubmitError] = useState<string | null>(null);
-  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['stock', 'medicine-six-months'],
     queryFn: api.getSixMonthMedicineStock,
@@ -466,7 +466,7 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
     });
   }, [filteredKeys]);
 
-  const handleCreateQualityPetition = useCallback(async (routeTargets: PetitionRouteTarget[]) => {
+  const handleCreateQualityPetition = useCallback(async () => {
     if (selectedItems.length === 0) return;
     setIsSubmittingQuality(true);
     setQualitySubmitError(null);
@@ -493,12 +493,11 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
           lotNo: item.lotNo || undefined,
           itemNo: item.itemNo || undefined,
           testItems: 'ส่งตรวจคุณภาพ',
-          sendToLab: routeTargets.includes('lab'),
+          sendToLab: item.itemNo.trim().toUpperCase().startsWith('F'),
           note: 'ส่งตรวจคุณภาพจากรายการยาเกิน 6 เดือน',
           sampleQuantity: 1,
         })),
         cause: 'ส่งตรวจคุณภาพจากรายการยาเกิน 6 เดือน',
-        routeTargets,
       } as Parameters<typeof createPetition>[0]);
       setLocalSubmittedQualityLotKeys((current) => {
         const next = new Set(current);
@@ -515,7 +514,6 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
     } finally {
       setIsSubmittingQuality(false);
     }
-      setRouteDialogOpen(false);
   }, [onQualitySubmissionCreated, selectedItems, user?.department, user?.email, user?.employeeId, user?.name]);
 
   return (
@@ -539,7 +537,7 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
               <Button
                 type="button"
                 size="sm"
-                onClick={() => setRouteDialogOpen(true)}
+                onClick={handleCreateQualityPetition}
                 disabled={selectedItems.length === 0 || isSubmittingQuality}
               >
                 {isSubmittingQuality ? 'กำลังส่ง...' : `ส่งตรวจคุณภาพ (${selectedItems.length})`}
@@ -632,26 +630,6 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
           </div>
         </CardContent>
       </Card>
-      <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader className="border-b border-border pb-4">
-            <DialogTitle>เลือกประเภทการส่งตรวจ</DialogTitle>
-            <DialogDescription>เลือกปลายทางที่ต้องการส่งตัวอย่าง</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {[
-              { targets: ['qc'] as PetitionRouteTarget[], label: 'ส่ง QC', icon: ShieldCheck },
-              { targets: ['lab'] as PetitionRouteTarget[], label: 'ส่ง LAB', icon: FlaskConical },
-              { targets: ['qc', 'lab'] as PetitionRouteTarget[], label: 'ส่งทั้ง 2', icon: CheckCircle2 },
-            ].map(({ targets, label, icon: Icon }) => (
-              <button key={label} type="button" disabled={isSubmittingQuality} onClick={() => void handleCreateQualityPetition(targets)} className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:border-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
-                <Icon className="h-7 w-7 text-primary" />
-                <span className="font-semibold">{label}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
       {selectedItem && (
         <SixMonthMedicineDetailDrawer item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
@@ -755,6 +733,20 @@ export default function PetitionListPage({
   const canCreatePetition = canUserCreatePetition(user, canAccess(NEW_PETITION_PATH));
   const canSeeTestItems = roles.length > 0 && roles.some((r) => r !== 'viewer');
   const groupMembership = useItemGroupMembership();
+  const [newPetitionRouteOpen, setNewPetitionRouteOpen] = useState(false);
+
+  const openNewPetition = () => {
+    if (isQualityControlDepartment(department)) {
+      setNewPetitionRouteOpen(true);
+      return;
+    }
+    navigate(NEW_PETITION_PATH);
+  };
+
+  const startNewPetition = (targets: PetitionRouteTarget[]) => {
+    setNewPetitionRouteOpen(false);
+    navigate(`${NEW_PETITION_PATH}?routeTargets=${targets.join(',')}`);
+  };
 
   const status = searchParams.get('status') ?? '';
   const search =
@@ -1031,13 +1023,34 @@ export default function PetitionListPage({
           description={description}
           actions={
             canCreatePetition ? (
-              <Button onClick={() => navigate(NEW_PETITION_PATH)}>
+              <Button onClick={openNewPetition}>
                 <FilePlus2 className="h-4 w-4" />
                 ยื่นคำร้องใหม่
               </Button>
             ) : undefined
           }
         />
+
+        <Dialog open={newPetitionRouteOpen} onOpenChange={setNewPetitionRouteOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader className="border-b border-border pb-4">
+              <DialogTitle>เลือกประเภทการส่งตรวจ</DialogTitle>
+              <DialogDescription>เลือกปลายทางที่ต้องการส่งตัวอย่าง</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { targets: ['qc'] as PetitionRouteTarget[], label: 'ส่ง QC', icon: ShieldCheck },
+                { targets: ['lab'] as PetitionRouteTarget[], label: 'ส่ง LAB', icon: FlaskConical },
+                { targets: ['qc', 'lab'] as PetitionRouteTarget[], label: 'ส่งทั้ง 2', icon: CheckCircle2 },
+              ].map(({ targets, label, icon: Icon }) => (
+                <button key={label} type="button" onClick={() => startNewPetition(targets)} className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:border-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                  <Icon className="h-7 w-7 text-primary" />
+                  <span className="font-semibold">{label}</span>
+                </button>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {createdNo && (
           <div className="rounded-[10px] border border-green-500 bg-green-50 p-3 text-sm text-green-600">
