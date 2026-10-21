@@ -357,9 +357,11 @@ export default function QCTestingDetailPage() {
 
   const { data: fetchedPetition, loading: petitionLoading, error: petitionError } = usePetition(id);
   const [requestedPetition, setRequestedPetition] = useState<Petition | null>(null);
-  const petition = requestedPetition && requestedPetition._id === fetchedPetition?._id
-    && Date.parse(requestedPetition.updatedAt) >= Date.parse(fetchedPetition.updatedAt)
-    ? requestedPetition : fetchedPetition;
+  const routedPetition = (location.state as { petition?: Petition } | null)?.petition;
+  const currentPetition = fetchedPetition ?? (routedPetition?._id === id ? routedPetition : null);
+  const petition = requestedPetition && requestedPetition._id === currentPetition?._id
+    && Date.parse(requestedPetition.updatedAt) >= Date.parse(currentPetition.updatedAt)
+    ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
   const pendingSample = pendingAdditionalSample(petition, 'qc');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
@@ -870,7 +872,7 @@ export default function QCTestingDetailPage() {
     });
   }, [values, lastBatchByKey]);
 
-  if (petitionLoading) {
+  if (petitionLoading && !petition) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
@@ -1183,7 +1185,7 @@ export default function QCTestingDetailPage() {
               <button
                 key={p._id}
                 type="button"
-                onClick={() => navigate(`/qc-testing/${p._id}`)}
+                onClick={() => navigate(`/qc-testing/${p._id}`, { state: { petition: p } })}
                 className={cn(
                   'shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border transition-colors',
                   isActive
