@@ -26,6 +26,7 @@ import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSampl
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { qcReceivedAt } from '@/lib/receiveStatus';
+import { isVisibleInQcTestingQueue } from '@/lib/petitionQueueVisibility';
 import {
   type Petition,
   type AdditionalSampleRequest,
@@ -372,7 +373,9 @@ export default function QCTestingDetailPage() {
   const currentPetitionPhase = petition?.currentPhase ?? 1;
   const [selectedRoundPhases, setSelectedRoundPhases] = useState<Record<string, PetitionPhase>>({});
   const petitionCategory = getPetitionCategory(petition);
-  // Active worklist for tab-strip switcher (other petitions currently in QC)
+  // Active worklist for tab-strip switcher (other petitions currently in QC).
+  // Apply the same routing/visibility rule as /qc-testing so petitions that are
+  // active in another track do not appear only in this switcher.
   const { data: worklistData } = usePetitionList({
     status: 'pendingReview,inProgress',
     limit: 20,
@@ -1176,10 +1179,10 @@ export default function QCTestingDetailPage() {
       )}
 
       {/* Active worklist tab strip — switch between petitions currently in QC */}
-      {worklistData && worklistData.items.length > 1 && (
+      {worklistData && worklistData.items.filter(isVisibleInQcTestingQueue).length > 1 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 -mt-2">
           <span className="text-xs text-grey-500 shrink-0 mr-1">สลับไป:</span>
-          {worklistData.items.map((p) => {
+          {worklistData.items.filter(isVisibleInQcTestingQueue).map((p) => {
             const isActive = p._id === petition._id;
             return (
               <button
