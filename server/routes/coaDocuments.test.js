@@ -1496,14 +1496,35 @@ test('ERP autofill keeps ERP production date while using legacy appearance and d
     CommonName: 'EMAMECTIN BENZOATE 2.0% W/V ME', CustomerName: 'Customer',
     PackingSize: '24*500 cc', ShipmentDate: '2026-10-15T00:00:00.000Z', remark: 'COA',
   };
-  const legacyRow = {
-    _id: 'legacy-emamectin-1', sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P1',
-    production_date: '18/06/2569', test_date: '31/08/2569', sample_condition: 'Clear yellow liquid',
-    tests: [
-      { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
-      { test_name: 'Density', result: '0.946 g/cm3', method: 'DMA 501' },
-    ],
-  };
+  const legacyRows = [
+    {
+      _id: 'legacy-emamectin-1', customer_name: 'Production A',
+      sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P1',
+      production_date: '18/06/2569', test_date: '30/08/2569', sample_condition: 'Clear yellow liquid',
+      tests: [
+        { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+        { test_name: 'Density', result: '0.944 g/cm3', method: 'DMA 501' },
+      ],
+    },
+    {
+      _id: 'legacy-emamectin-2', customer_name: 'Production B',
+      sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P2',
+      production_date: '18/06/2569', test_date: '31/08/2569', sample_condition: 'Clear yellow liquid',
+      tests: [
+        { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+        { test_name: 'Density', result: '0.948 g/cm3', method: 'DMA 501' },
+      ],
+    },
+    {
+      _id: 'legacy-emamectin-excluded', customer_name: '\u0e27\u0e18\u0e32\u0e18\u0e23 \u0e2a\u0e2d\u0e19\u0e0b\u0e35',
+      sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P3',
+      production_date: '18/06/2569', test_date: '01/09/2569', sample_condition: 'Clear yellow liquid',
+      tests: [
+        { test_name: 'Emamectin bensoate', result: '9.99 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+        { test_name: 'Density', result: '9.999 g/cm3', method: 'DMA 501' },
+      ],
+    },
+  ];
   try {
     global.fetch = async (url) => {
       if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
@@ -1515,7 +1536,7 @@ test('ERP autofill keeps ERP production date while using legacy appearance and d
     Petition.find = () => sortedLimitedLean([]);
     LabRequest.find = () => ({ lean: async () => [] });
     CoaDocument.find = () => sortedLimitedLean([]);
-    LegacyLabResult.find = () => ({ lean: async () => [legacyRow] });
+    LegacyLabResult.find = () => ({ lean: async () => legacyRows });
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [] }) });
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
 

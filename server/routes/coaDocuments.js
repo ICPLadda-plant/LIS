@@ -996,13 +996,14 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     ]);
     const resultData = resultRowsFromQc(qcResults, sample.commonName, { includeAi: false });
     const legacyResultData = resultRowsFromLegacyLab(legacyMatch?.row, sample.commonName);
-    const legacyAiResultData = resultRowsFromLegacyLabs(legacyMatch?.matchingRows, sample.commonName);
-    const aiResultData = legacyAiResultData.ai ? legacyAiResultData : aiLabData.resultData;
+    const legacyBatchResultData = resultRowsFromLegacyLabs(legacyMatch?.matchingRows, sample.commonName);
+    const aiResultData = legacyBatchResultData.ai ? legacyBatchResultData : aiLabData.resultData;
     resultData.rows = mergeResultRows(
       resultData.rows,
       legacyResultData.rows.filter((row) => !isAiContentTestItem(row.testItem)),
     );
-    resultData.density ||= legacyResultData.density === '-' ? '' : legacyResultData.density;
+    resultData.density ||= legacyBatchResultData.density
+      || (legacyResultData.density === '-' ? '' : legacyResultData.density);
     resultData.analysisDate ||= legacyResultData.analysisDate;
     const aiRow = aiResultData.rows.find((row) => isAiContentTestItem(row.testItem));
     if (aiRow) {

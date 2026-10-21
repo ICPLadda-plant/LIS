@@ -6,7 +6,7 @@ const MF_URLS = [
   'https://n8n-plant.icpladda.com/webhook/item-MF-CLOSE',
 ];
 const STOCK_URL = 'https://n8n-plant.icpladda.com/webhook/api/stock-all-item';
-const EXCLUDED_AI_SUBMITTER = '\u0e27\u0e18\u0e32\u0e18\u0e23';
+const EXCLUDED_RESULT_SUBMITTER = '\u0e27\u0e18\u0e32\u0e18\u0e23';
 const GR_WP_SP_FORMULATIONS = new Set(['WG', 'WP', 'ST', 'GR', 'DS', 'SP', 'SG', 'GB']);
 const LEGACY_FORMULATIONS = new Set(['EC', 'SC', 'SL', 'WG', 'WP', 'GR', 'SP', 'ME', 'EW', 'ZC']);
 const LEGACY_IGNORED_TOKENS = new Set([
@@ -37,8 +37,8 @@ function normalizeBatch(value) {
   return text(value).toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-function isExcludedAiSubmitter(value) {
-  return normalizeText(value).replace(/\s+/g, '').includes(EXCLUDED_AI_SUBMITTER);
+function isExcludedResultSubmitter(value) {
+  return normalizeText(value).replace(/\s+/g, '').includes(EXCLUDED_RESULT_SUBMITTER);
 }
 
 function rowsFromPayload(payload) {
@@ -385,16 +385,18 @@ function aiFromQcResults(qcResults, commonName) {
   };
 }
 
-function densityFromQc(result) {
+function densityReadingsFromQc(result) {
   const rows = Array.isArray(result?.entries) && result.entries.length ? result.entries : [result?.values || {}];
+  const readings = [];
   for (const row of rows) {
     for (const [key, value] of Object.entries(row || {})) {
       if (/(?:density|ถพ)/i.test(key) && !/source|note/i.test(key) && text(value)) {
-        return text(value);
+        const reading = densityReading(value);
+        if (reading) readings.push(reading);
       }
     }
   }
-  return '';
+  return readings;
 }
 
 function findBestLabItem(petitions, sample) {
@@ -403,6 +405,7 @@ function findBestLabItem(petitions, sample) {
   const tradeName = normalizeText(sample?.sampleName);
   const candidates = [];
   for (const petition of petitions || []) {
+    if (isExcludedResultSubmitter(petition?.submittedBy?.name)) continue;
     for (const item of petition.items || []) {
       const itemCommonName = normalizeText(item.commonName);
       if (!commonName || itemCommonName !== commonName) continue;
@@ -437,7 +440,7 @@ function findLatestAiLabItems(petitions, sample) {
   if (!commonName) return { best: null, candidates: [] };
   const candidates = [];
   for (const petition of petitions || []) {
-    if (petition?.status === 'rejected' || isExcludedAiSubmitter(petition?.submittedBy?.name)) continue;
+    if (petition?.status === 'rejected' || isExcludedResultSubmitter(petition?.submittedBy?.name)) continue;
     const eligibleItems = (petition.items || []).filter((item) => (
       normalizeText(item.commonName) === commonName
       && !isAfterDryingLabItem(item)
@@ -691,7 +694,7 @@ function findBestLegacyLabResult(rows, source, sample = {}) {
     source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
   );
   const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
-  let candidates = (rows || []).map((row) => {
+  let candidates = (rows || []).filter((row) => !isExcludedResultSubmitter(row?.customer_name)).map((row) => {
     const score = legacyProductMatchScore(commonName, row?.sample_name);
     const productionDate = normalizeIsoDate(row?.production_date);
     const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
@@ -740,6 +743,18 @@ function findBestLegacyLabResult(rows, source, sample = {}) {
 
 function densityValueFromLegacyTest(result) {
   return text(result).replace(/\s*g\s*\/\s*cm(?:ยณ|³|3).*$/i, '').trim();
+}
+
+function densityReading(value) {
+  const raw = densityValueFromLegacyTest(value).replace(/,/g, '');
+  const numeric = Number(raw);
+  return raw && Number.isFinite(numeric) ? { raw, numeric } : null;
+}
+
+function averagedDensity(readings) {
+  if (!readings.length) return '';
+  if (readings.length === 1) return readings[0].raw;
+  return (readings.reduce((sum, reading) => sum + reading.numeric, 0) / readings.length).toFixed(3);
 }
 
 function resultRowsFromLegacyLab(row, commonName) {
@@ -801,18 +816,31 @@ function averagedLegacyResult(entries) {
 }
 
 function resultRowsFromLegacyLabs(rows, commonName) {
-  const eligibleRows = (rows || []).filter((row) => !isExcludedAiSubmitter(row?.customer_name));
+  const eligibleRows = (rows || []).filter((row) => !isExcludedResultSubmitter(row?.customer_name));
   const testGroups = new Map();
+  const densityReadings = [];
   for (const row of eligibleRows) {
     for (const test of row?.tests || []) {
       const testName = text(test?.test_name);
-      if (!testName || /(?:density|appearance)/i.test(testName)) continue;
+      if (!testName) continue;
+      if (/density/i.test(testName)) {
+        const reading = densityReading(test?.result);
+        if (reading) densityReadings.push(reading);
+        continue;
+      }
+      if (/appearance/i.test(testName)) continue;
       const key = normalizeText(testName);
       if (!testGroups.has(key)) testGroups.set(key, []);
       testGroups.get(key).push({ test, value: legacyResultValue(test?.result) });
     }
   }
-  if (!testGroups.size) return { rows: [], ai: null, analysisDate: '', sourceRows: eligibleRows };
+  const density = averagedDensity(densityReadings);
+  const analysisDate = eligibleRows
+    .map((row) => normalizeIsoDate(row?.test_date || row?.report_date))
+    .filter(Boolean)
+    .sort()
+    .at(-1) || '';
+  if (!testGroups.size) return { rows: [], ai: null, density, analysisDate, sourceRows: eligibleRows };
 
   const groups = [...testGroups.values()];
   const joinGroups = (selector) => groups.map((entries) => {
@@ -824,11 +852,6 @@ function resultRowsFromLegacyLabs(rows, commonName) {
   const criteria = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.criteria))?.test?.criteria));
   const method = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.method))?.test?.method));
   const valueCount = groups.reduce((sum, entries) => sum + entries.length, 0);
-  const analysisDate = eligibleRows
-    .map((row) => normalizeIsoDate(row?.test_date || row?.report_date))
-    .filter(Boolean)
-    .sort()
-    .at(-1) || '';
   const ai = { result, key: 'legacyLab', valueCount };
   const aiRow = {
     testItem: '%AI content',
@@ -837,7 +860,7 @@ function resultRowsFromLegacyLabs(rows, commonName) {
     method,
     unit: '%',
   };
-  return { rows: [aiRow], ai, analysisDate, sourceRows: eligibleRows };
+  return { rows: [aiRow], ai, density, analysisDate, sourceRows: eligibleRows };
 }
 
 function resultRowKind(row) {
@@ -987,7 +1010,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
 function resultRowsFromQc(qcResults, commonName, options = {}) {
   const physical = qcResults.map(physicalFromQc).find((entry) => entry.raw);
   const ai = options.includeAi === false ? null : aiFromQcResults(qcResults, commonName);
-  const density = qcResults.map(densityFromQc).find(Boolean) || '';
+  const density = averagedDensity(qcResults.flatMap(densityReadingsFromQc));
   const rows = [];
   if (physical?.raw) rows.push({
     testItem: 'Appearance', criteria: physical.english || physical.raw, result: 'Conform', method: 'Visual', unit: '',
@@ -1045,16 +1068,13 @@ function densityForBatch(rows, batchNo) {
     .sort((left, right) => String(right['Date & time'] || '').localeCompare(String(left['Date & time'] || '')))
     .map((row) => {
       const status = text(row['Measurement status']).toLowerCase();
-      const raw = text(row['Density [g/cm³]'] || row.density);
-      const numeric = Number(raw);
-      return { raw, numeric, usable: (!status || status === 'valid') && raw && Number.isFinite(numeric) };
+      const reading = densityReading(row['Density [g/cm³]'] || row.density);
+      return { reading, usable: (!status || status === 'valid') && Boolean(reading) };
     })
-    .filter((reading) => reading.usable);
+    .filter((entry) => entry.usable)
+    .map((entry) => entry.reading);
 
-  if (readings.length === 2) {
-    return ((readings[0].numeric + readings[1].numeric) / 2).toFixed(3);
-  }
-  return readings[0]?.raw || '';
+  return averagedDensity(readings);
 }
 
 module.exports = {
@@ -1077,7 +1097,8 @@ module.exports = {
   normalizeText,
   physicalFromQc,
   isAfterDryingLabItem,
-  isExcludedAiSubmitter,
+  isExcludedAiSubmitter: isExcludedResultSubmitter,
+  isExcludedResultSubmitter,
   resultRowsFromLegacyLab,
   resultRowsFromLegacyLabs,
   resultRowsFromQc,

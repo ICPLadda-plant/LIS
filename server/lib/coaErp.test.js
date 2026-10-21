@@ -6,6 +6,7 @@ const {
   densityForBatch,
   densityBatchFamily,
   findBestDensityBatch,
+  findBestLabItem,
   findBestLegacyLabResult,
   findLatestAiLabItems,
   findBestRequestItem,
@@ -22,10 +23,11 @@ const {
   sampleFromSources,
 } = require('./coaErp');
 
-test('averages two valid density readings from the same batch before autofill', () => {
+test('averages every valid density reading from the same batch before autofill', () => {
   const density = densityForBatch([
     { 'Sample name': '26S-ACT50-095 TOP', 'Density [g/cm³]': '1.0514', 'Measurement status': 'valid', 'Date & time': '10/17/2026 9:00 AM' },
     { 'Sample name': '26S-ACT50-095 bottom', 'Density [g/cm³]': '1.0526', 'Measurement status': 'Valid', 'Date & time': '10/17/2026 9:05 AM' },
+    { 'Sample name': '26S-ACT50-095 repeat', 'Density [g/cm³]': '1.0520', 'Measurement status': 'valid', 'Date & time': '10/17/2026 9:06 AM' },
     { 'Sample name': '26S-ACT50-096', 'Density [g/cm³]': '1.9000', 'Measurement status': 'valid', 'Date & time': '10/17/2026 9:10 AM' },
   ], '26S-ACT50-095');
 
@@ -181,24 +183,34 @@ test('legacy Lab results fill every required COA result field and clean repeat s
   assert.equal(result.rows[3].result, '2026-08-31');
 });
 
-test('legacy Lab AI excludes the named submitter and averages duplicate batch results', () => {
+test('legacy Lab excludes the named submitter and averages duplicate AI and density results', () => {
   const result = resultRowsFromLegacyLabs([
     {
       customer_name: 'Production A', test_date: '16/09/2569',
-      tests: [{ test_name: 'Omethoate', result: '51.20 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' }],
+      tests: [
+        { test_name: 'Omethoate', result: '51.20 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' },
+        { test_name: 'Density', result: '0.949 g/cm³' },
+      ],
     },
     {
       customer_name: 'Production B', test_date: '17/09/2569',
-      tests: [{ test_name: 'Omethoate', result: '51.40 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' }],
+      tests: [
+        { test_name: 'Omethoate', result: '51.40 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' },
+        { test_name: 'Density', result: '0.953 g/cm³' },
+      ],
     },
     {
       customer_name: '\u0e27\u0e18\u0e32\u0e18\u0e23 \u0e2a\u0e2d\u0e19\u0e0b\u0e35', test_date: '18/09/2569',
-      tests: [{ test_name: 'Omethoate', result: '0.0045 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' }],
+      tests: [
+        { test_name: 'Omethoate', result: '0.0045 %W/V', criteria: '47.50-52.50', method: 'CIPAC E' },
+        { test_name: 'Density', result: '9.999 g/cm³' },
+      ],
     },
   ], 'OMETHOATE 50% W/V SL');
 
   assert.equal(result.ai.result, '51.3 %W/V');
   assert.equal(result.ai.valueCount, 2);
+  assert.equal(result.density, '0.951');
   assert.equal(result.analysisDate, '2026-09-17');
   assert.equal(result.rows[0].criteria, '50% ± 2.50');
 });
@@ -501,12 +513,37 @@ test('QC results become COA rows with common-name criteria and density', () => {
   const rows = resultRowsFromQc([
     { parameterName: 'กายภาพ', values: { 'ลักษณะ': 'ของเหลวใส', 'สี': 'ขาว' }, updatedAt: '2026-09-04T03:19:13.206Z' },
     { parameterName: '%AI', values: { '%AI::glyphosate': '48.35' } },
-    { parameterName: 'ค่า ถพ.', entries: [{ 'ค่าถพ.::glyphosate': 1.158 }] },
+    {
+      parameterName: 'ค่า ถพ.',
+      entries: [
+        { 'ค่าถพ.::glyphosate': 1.1574 },
+        { 'ค่าถพ.::glyphosate': 1.1586 },
+      ],
+    },
   ], 'GLYPHOSATE 48% W/V SL');
   assert.deepEqual(rows.rows.map((row) => row.testItem), ['Appearance', '%AI content', 'Density at 30°C (g/cm³)', 'Date of analysis']);
   assert.equal(rows.rows[1].result, '48.35%');
   assert.equal(rows.rows[1].criteria, '48% ± 2.40');
   assert.equal(rows.rows[2].result, '1.158');
+});
+
+test('Lab result selection excludes the named submitter before using LIS density', () => {
+  const commonName = 'GLYPHOSATE 48% W/V SL';
+  const sample = { sampleName: 'Product A', commonName, batchNo: 'BATCH-1' };
+  const selection = findBestLabItem([
+    {
+      _id: 'excluded', updatedAt: '2026-10-20T00:00:00.000Z',
+      submittedBy: { name: '\u0e27\u0e18\u0e32\u0e18\u0e23 \u0e2a\u0e2d\u0e19\u0e0b\u0e35' },
+      items: [{ seq: 1, sampleName: 'Product A', commonName, batchNo: 'BATCH-1' }],
+    },
+    {
+      _id: 'eligible', updatedAt: '2026-10-19T00:00:00.000Z',
+      submittedBy: { name: 'Production' },
+      items: [{ seq: 1, sampleName: 'Product A', commonName, batchNo: 'BATCH-1' }],
+    },
+  ], sample);
+
+  assert.equal(selection.best.petition._id, 'eligible');
 });
 
 test('common names with multiple AI percentages receive every plus-minus criterion', () => {
