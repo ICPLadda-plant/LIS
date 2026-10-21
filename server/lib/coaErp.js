@@ -137,6 +137,33 @@ function productionDateFromRow(row, fallback = '') {
   return normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
 }
 
+function bestMfProductionDate(rows, targetDate, requestedBatch = '') {
+  const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
+  const normalizedRequestedBatch = normalizeBatch(requestedBatch);
+  const candidates = (rows || []).map((row, index) => {
+    const productionDate = productionDateFromRow(row);
+    const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
+    const batchNo = batchFromRow(row);
+    const hasTarget = Number.isFinite(targetTime) && Number.isFinite(productionTime);
+    return {
+      row,
+      index,
+      productionDate,
+      productionTime,
+      exactBatch: Boolean(normalizedRequestedBatch && normalizeBatch(batchNo) === normalizedRequestedBatch),
+      dateBucket: hasTarget && productionTime > targetTime ? 1 : 0,
+      dateDistance: hasTarget ? Math.abs(targetTime - productionTime) : -productionTime,
+    };
+  }).filter((candidate) => candidate.productionDate && Number.isFinite(candidate.productionTime));
+
+  candidates.sort((left, right) => Number(right.exactBatch) - Number(left.exactBatch)
+    || left.dateBucket - right.dateBucket
+    || left.dateDistance - right.dateDistance
+    || right.productionDate.localeCompare(left.productionDate)
+    || left.index - right.index);
+  return candidates[0] || null;
+}
+
 function suffixDatedLotFromRow(row) {
   const keys = [
     'lot_no', 'lotNo', 'LotNo', 'Lot No.', 'Lot No', 'lot', 'Lot',
@@ -906,29 +933,33 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
         || productionDateFromRow(right).localeCompare(productionDateFromRow(left))
         || Number(right.stock_qty_base || right.stock_qty || 0) - Number(left.stock_qty_base || left.stock_qty || 0);
     });
-  const mfCandidates = mfRows.filter((row) => {
+  const matchingMfRows = mfRows.filter((row) => {
     return normalizedItemNo
       ? rowMatchesItem(row, normalizedItemNo)
       : normalizeText(row.common_name || row.commonName) === normalizeText(commonName);
-  }).filter((row) => batchFromRow(row));
-  const mf = mfCandidates[0];
+  });
   const sourceSample = source?.sampleSnapshots?.[0] || {};
   const erpRequestLot = text(sourceSample.lotNo);
   const requestedBatch = text(sourceSample.batchNo || petitionItem?.batchNo);
   const requestedLot = text(erpRequestLot || petitionItem?.lotNo);
   const sourceBatch = requestedBatch || requestedLot;
+  const targetDate = normalizeIsoDate(
+    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
+  );
+  const mfDateMatch = bestMfProductionDate(matchingMfRows, targetDate, requestedBatch);
+  const mfBatchRows = matchingMfRows.filter((row) => batchFromRow(row));
+  const mf = mfBatchRows.find((row) => (
+    requestedBatch && normalizeBatch(batchFromRow(row)) === normalizeBatch(requestedBatch)
+  )) || mfBatchRows[0];
   const erpRequestProductionDate = normalizeIsoDate(sourceSample.productionDate)
     || lotSnapshot(sourceSample.lotNo || sourceSample.batchNo).productionDate;
   const mfBatch = batchFromRow(mf);
-  const mfDate = productionDateFromRow(mf);
+  const mfDate = mfDateMatch?.productionDate || productionDateFromRow(mf);
   const matchingStock = stockCandidates.find((row) => {
     const snapshot = lotSnapshot(lotFromRow(row), productionDateFromRow(row));
     return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
       || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
   });
-  const targetDate = normalizeIsoDate(
-    source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
-  );
   const datedStock = stockCandidates.find((row) => {
     if (!suffixDatedLotFromRow(row)) return false;
     const productionDate = lotSnapshot(lotFromRow(row), productionDateFromRow(row)).productionDate;
@@ -999,7 +1030,10 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
       quantity: Number(row.stock_qty_base || row.stock_qty || 0),
       itemNo: itemCodeFromRow(row),
     })),
-    mfCandidates: mfCandidates.slice(0, 10).map((row) => ({
+    mfCandidates: [
+      ...(mfDateMatch ? [mfDateMatch.row] : []),
+      ...matchingMfRows.filter((row) => row !== mfDateMatch?.row),
+    ].slice(0, 10).map((row) => ({
       batchNo: batchFromRow(row),
       productionDate: productionDateFromRow(row),
       itemNo: itemCodeFromRow(row),

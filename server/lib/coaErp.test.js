@@ -456,7 +456,7 @@ test('reads the batch field between the product name and production date', () =>
   assert.equal(result.mfCandidates[0].batchNo, 'FG260518-019');
 });
 
-test('does not use an MF row without a real batch for Batch No. or production date', () => {
+test('uses the ERP MF production date without mistaking its order number for Batch No.', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [1],
     sampleSnapshots: [{ commonName: 'COMMON A' }],
@@ -469,8 +469,25 @@ test('does not use an MF row without a real batch for Batch No. or production da
   }]);
 
   assert.equal(result.sample.batchNo, '');
-  assert.equal(result.sample.productionDate, '');
-  assert.equal(result.mfCandidates.length, 0);
+  assert.equal(result.sample.productionDate, '2026-05-18');
+  assert.equal(result.mfCandidates.length, 1);
+  assert.equal(result.mfCandidates[0].batchNo, '');
+});
+
+test('uses the nearest ERP MF production date on or before shipment for the Batch', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [1],
+    sampleSnapshots: [{ commonName: 'COMMON A', batchNo: '080' }],
+    externalCoaRequest: { itemNo: 'ITEM-A', shipmentDate: '2026-07-22T00:00:00.000Z' },
+  }, [], [
+    { item_no: 'ITEM-A', prod_order_no: 'MF26070001', create_date: '2026-07-01T00:00:00.000Z' },
+    { item_no: 'ITEM-A', prod_order_no: 'MF26070020', create_date: '2026-07-20T00:00:00.000Z' },
+    { item_no: 'ITEM-A', prod_order_no: 'MF26070025', create_date: '2026-07-25T00:00:00.000Z' },
+  ]);
+
+  assert.equal(result.sample.batchNo, '080');
+  assert.equal(result.sample.productionDate, '2026-07-20');
+  assert.equal(result.mfCandidates[0].productionDate, '2026-07-20');
 });
 
 test('reads positional Batch values after the product name and before production date', () => {
