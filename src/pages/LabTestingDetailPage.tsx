@@ -32,7 +32,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, calculateAi, calculatedAiFieldKind, formatCalculatedAi } from '@/lib/aiCalculation';
+import { aiGridClass, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
@@ -80,15 +80,7 @@ function resultKey(itemSeq: number, parameterId: string) {
 }
 
 function aiDensity(values: Record<string, unknown>, context: ConditionContext) {
-  const records = [values, ...Object.values(context.otherParams)];
-  for (const record of records) {
-    for (const [label, rawValue] of Object.entries(record)) {
-      if (!/^(density|ค่าถพ\.)$/i.test(label.trim())) continue;
-      const value = Number(rawValue);
-      if (Number.isFinite(value) && value > 0) return value;
-    }
-  }
-  return 1;
+  return findAiDensity([values, ...Object.values(context.otherParams)]);
 }
 
 const AI_FIELD_ORDER = [

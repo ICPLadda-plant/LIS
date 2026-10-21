@@ -14,7 +14,7 @@ import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStand
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { cn } from '@/lib/utils';
-import { aiGridClass, calculateAi, calculatedAiFieldKind, formatCalculatedAi } from '@/lib/aiCalculation';
+import { aiGridClass, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
 import { TimerField } from '@/components/lis/TimerField';
 import { PhotoField } from '@/components/lis/PhotoField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
@@ -88,14 +88,7 @@ function aiFieldsForParameter(fields: ParameterValueField[]) {
 }
 
 function aiDensity(values: Record<string, unknown>, context: ConditionContext) {
-  for (const record of [values, ...Object.values(context.otherParams)]) {
-    for (const [label, rawValue] of Object.entries(record)) {
-      if (!/^(density|ค่าถพ\.)$/i.test(label.trim())) continue;
-      const value = Number(rawValue);
-      if (Number.isFinite(value) && value > 0) return value;
-    }
-  }
-  return 1;
+  return findAiDensity([values, ...Object.values(context.otherParams)]);
 }
 
 export const noteLabelFor = (mainLabel: string) => `${mainLabel}__note`;
