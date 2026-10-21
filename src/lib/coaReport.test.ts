@@ -120,6 +120,24 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].samples[0].rows[0].criteria).toBe("48% ± 2.40");
   });
 
+  it("prints legacy AI ranges as center plus-minus criteria", () => {
+    const doc = {
+      sourceType: "erpManual",
+      sampleSnapshots: [{ itemSeq: 1, commonName: "Acetamiprid SP" }],
+      resultSnapshots: [{
+        itemSeq: 1,
+        testItem: "%AI content (W/W)",
+        result: "20.53%",
+        criteria: "18.80-21.20",
+      }],
+    } as CoaDocument;
+
+    const sample = buildCoaReportPages(doc)[0].samples[0];
+
+    expect(sample.aiContentCriteria).toBe("20% ± 1.20");
+    expect(sample.rows[0].criteria).toBe("20% ± 1.20");
+  });
+
   it("uses formulation-specific AI tolerance criteria when available", () => {
     const doc = {
       _id: "c-gr-specific",

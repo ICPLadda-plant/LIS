@@ -1,4 +1,5 @@
 const { lotSnapshot } = require('./coaErp');
+const { isAiContentTestItem, resolveAiToleranceCriteria } = require('./aiToleranceCriteria');
 
 // Manual ERP documents keep their entered results throughout the approval lifecycle.
 function manualCoaSnapshots(input, itemSeq) {
@@ -21,6 +22,9 @@ function manualCoaSnapshots(input, itemSeq) {
     const result = { itemSeq };
     for (const key of ['testItem', 'criteria', 'result', 'unit', 'method']) result[key] = clean(row[key]);
     if (!result.testItem || !result.criteria || !result.result) fail();
+    if (isAiContentTestItem(result.testItem)) {
+      result.criteria = resolveAiToleranceCriteria(sampleSnapshot.commonName, result.criteria) || result.criteria;
+    }
     return result;
   });
   return {
