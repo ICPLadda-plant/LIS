@@ -128,6 +128,14 @@ test('legacy Lab matching uses package type to choose the compatible formulation
   assert.equal(match.batchNo, 'DRY-OLDER');
 });
 
+test('legacy Lab AI ranges become center plus-minus criteria without a percentage in the common name', () => {
+  const result = resultRowsFromLegacyLab({
+    tests: [{ test_name: 'Acetamiprid', result: '20.53 %W/W', criteria: '18.80-21.20' }],
+  }, 'Acetamiprid SP');
+
+  assert.equal(result.rows[1].criteria, '20% ± 1.20');
+});
+
 test('legacy Lab matching rejects a different chemical with a similar name', () => {
   const source = {
     sampleSnapshots: [{ commonName: 'PHOSPHONIC ACID 40% W/V SL' }],

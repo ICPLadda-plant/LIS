@@ -81,6 +81,38 @@ function normalizePercent(value) {
   return Number.isFinite(parsed) ? String(parsed) : String(value || '').trim();
 }
 
+function decimalPlaces(value) {
+  return value.includes('.') ? value.split('.')[1].length : 0;
+}
+
+function formatRangeCenter(value, precision) {
+  return value.toFixed(precision).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+}
+
+function plusMinusAiCriteriaFromRange(criteria) {
+  const source = String(criteria || '').trim();
+  if (!source) return null;
+  let converted = false;
+  const normalized = source.replace(
+    /(-?\d+(?:\.\d+)?)\s*%?\s*[-–—]\s*(-?\d+(?:\.\d+)?)\s*%?(?:\s*W\s*\/\s*[WV])?/gi,
+    (match, lowerText, upperText) => {
+      const lower = Number(lowerText);
+      const upper = Number(upperText);
+      if (!Number.isFinite(lower) || !Number.isFinite(upper) || upper < lower) return match;
+      const sourcePrecision = Math.max(decimalPlaces(lowerText), decimalPlaces(upperText));
+      const scale = 10 ** sourcePrecision;
+      const lowerScaled = Math.round(lower * scale);
+      const upperScaled = Math.round(upper * scale);
+      const precision = sourcePrecision + (Math.abs(upperScaled - lowerScaled) % 2 ? 1 : 0);
+      const center = (lower + upper) / 2;
+      const tolerance = (upper - lower) / 2;
+      converted = true;
+      return `${formatRangeCenter(center, precision)}% ± ${tolerance.toFixed(precision)}`;
+    },
+  );
+  return converted ? normalized : null;
+}
+
 function textAfterMatchedPercent(value, match) {
   return value.slice((match.index || 0) + match[0].length).trim().toUpperCase();
 }
@@ -108,6 +140,13 @@ function aiToleranceCriteriaForCommonName(commonName) {
   return criteria.length ? criteria.join(' / ') : null;
 }
 
+function resolveAiToleranceCriteria(commonName, fallbackCriteria) {
+  return aiToleranceCriteriaForCommonName(commonName)
+    || plusMinusAiCriteriaFromRange(fallbackCriteria)
+    || String(fallbackCriteria || '').trim()
+    || null;
+}
+
 function isAiContentTestItem(testItem) {
   return /(?:%\s*AI|AI\s*content|active\s*ingredient)/i.test(String(testItem || ''));
 }
@@ -117,4 +156,6 @@ module.exports = {
   aiPercentFromCommonName,
   aiToleranceCriteriaForCommonName,
   isAiContentTestItem,
+  plusMinusAiCriteriaFromRange,
+  resolveAiToleranceCriteria,
 };

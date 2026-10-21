@@ -12,7 +12,11 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const { nextCoaNumber } = require('../lib/coaNumber');
 const { manualCoaSnapshots, validateManualCoa } = require('../lib/coaManual');
-const { aiToleranceCriteriaForCommonName, isAiContentTestItem } = require('../lib/aiToleranceCriteria');
+const {
+  aiToleranceCriteriaForCommonName,
+  isAiContentTestItem,
+  resolveAiToleranceCriteria,
+} = require('../lib/aiToleranceCriteria');
 const { buildCoaFormOptions, buildCoaParameterOptions, applyCoaFormSelections } = require('../lib/coaForm');
 const {
   densityBatchFamily,
@@ -127,6 +131,10 @@ function buildManualSnapshots(petition, selectedItemSeqs, body = {}) {
     };
     if (!selectedSet.has(itemSeq) || !normalized.testItem || !normalized.result) {
       throw errorWithStatus('รายการผลทดสอบไม่ถูกต้องหรือกรอกไม่ครบ', 400);
+    }
+    if (isAiContentTestItem(normalized.testItem)) {
+      normalized.criteria = resolveAiToleranceCriteria(sampleBySeq.get(itemSeq)?.commonName, normalized.criteria)
+        || normalized.criteria;
     }
     return normalized;
   });

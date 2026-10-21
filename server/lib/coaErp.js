@@ -1,4 +1,8 @@
-const { aiToleranceCriteriaForCommonName, isAiContentTestItem } = require('./aiToleranceCriteria');
+const {
+  aiToleranceCriteriaForCommonName,
+  isAiContentTestItem,
+  resolveAiToleranceCriteria,
+} = require('./aiToleranceCriteria');
 const { batchMatches, densityBatchForRow } = require('./densityBatch');
 
 const MF_URLS = [
@@ -802,7 +806,7 @@ function resultRowsFromLegacyLab(row, commonName) {
     },
     {
       testItem: '%AI content',
-      criteria: aiToleranceCriteriaForCommonName(commonName) || joinActive('criteria') || '-',
+      criteria: resolveAiToleranceCriteria(commonName, joinActive('criteria')) || '-',
       result: joinActive('result') || '-',
       method: joinActive('method'),
       unit: '%',
@@ -882,7 +886,7 @@ function resultRowsFromLegacyLabs(rows, commonName) {
   const ai = { result, key: 'legacyLab', valueCount };
   const aiRow = {
     testItem: '%AI content',
-    criteria: aiToleranceCriteriaForCommonName(commonName) || criteria || '-',
+    criteria: resolveAiToleranceCriteria(commonName, criteria) || '-',
     result,
     method,
     unit: '%',

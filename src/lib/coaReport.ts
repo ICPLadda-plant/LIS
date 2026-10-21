@@ -1,5 +1,5 @@
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
-import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { isAiContentTestItem, resolveAiToleranceCriteria } from "@/lib/aiToleranceCriteria";
 import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { formatDate as formatDisplayDate } from "@/lib/dateTime";
 
@@ -88,9 +88,10 @@ function aiContentResult(rows: CoaResultSnapshot[]): string {
 }
 
 function aiContentCriteria(rows: CoaResultSnapshot[], sample: CoaSampleSnapshot): string {
-  return rows.find((row) => isAiContentTestItem(row.testItem) && row.criteria && row.criteria !== "-")?.criteria
-    || aiToleranceCriteriaForCommonName(sample.commonName)
-    || "-";
+  const storedCriteria = rows.find((row) => (
+    isAiContentTestItem(row.testItem) && row.criteria && row.criteria !== "-"
+  ))?.criteria;
+  return resolveAiToleranceCriteria(sample.commonName, storedCriteria) || "-";
 }
 
 function waxBlockSizeResult(rows: CoaResultSnapshot[]): string {
@@ -126,7 +127,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
     const rows = rowsBySeq.get(sample.itemSeq) || [];
     const resolvedAiContentCriteria = aiContentCriteria(rows, sample);
     const rowsWithAiCriteria = rows.map((row) => (
-      isAiContentTestItem(row.testItem) && (!row.criteria || row.criteria === "-") && resolvedAiContentCriteria !== "-"
+      isAiContentTestItem(row.testItem) && resolvedAiContentCriteria !== "-" && row.criteria !== resolvedAiContentCriteria
         ? { ...row, criteria: resolvedAiContentCriteria }
         : row
     ));
