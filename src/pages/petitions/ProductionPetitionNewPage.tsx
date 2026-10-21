@@ -32,7 +32,7 @@ import {
   MF_CURRENT_API_URL,
   MF_HISTORICAL_API_URL,
 } from '@/lib/mfItemDates';
-import { type Petition } from '@/types/petition.types';
+import { type Petition, type PetitionRouteTarget } from '@/types/petition.types';
 
 const ICP_LADDA_ADDRESS = '151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000';
 const ICP_LADDA_COMPANY = 'ICP Ladda Co., LTD.';
@@ -733,6 +733,10 @@ export default function ProductionPetitionNewPage({
   const [stepError, setStepError] = useState<string | null>(null);
   const [createdPetition, setCreatedPetition] = useState<Petition | null>(null);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
+  const routeTargets = useMemo<PetitionRouteTarget[] | null>(() => {
+    const targets = (searchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
+    return targets.length ? targets : null;
+  }, [searchParams]);
 
   function validateStep(): boolean {
     setStepError(null);
@@ -814,7 +818,7 @@ export default function ProductionPetitionNewPage({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  async function handleSubmit() {
+  async function handleSubmit(selectedTargets = routeTargets) {
     if (!validateStep()) return;
     // Production integration requests are already validated by the source system.
     // They do not have a LIS session, so avoid the session-protected duplicate check.
@@ -841,7 +845,12 @@ export default function ProductionPetitionNewPage({
           email: submitter.email || undefined,
           department: submitterDepartment || undefined,
         },
-        items: items.map((it, idx) => ({ ...it, seq: idx + 1, sendToLab: sendToLabForSubmit(it, submitterDepartment) })),
+        items: items.map((it, idx) => ({
+          ...it,
+          seq: idx + 1,
+          sendToLab: selectedTargets ? selectedTargets.includes('lab') : sendToLabForSubmit(it, submitterDepartment),
+        })),
+        routeTargets: selectedTargets ?? undefined,
         labRequests: [],
         prodOrderNos,
         productionWorkflow: productionRequestNo ? {
@@ -1047,13 +1056,14 @@ export default function ProductionPetitionNewPage({
                 )}
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={submitting} className="w-full sm:w-auto">
+              <Button onClick={() => void handleSubmit()} disabled={submitting} className="w-full sm:w-auto">
                 <Save className="h-4 w-4" />
                 {submitting ? 'กำลังบันทึก...' : 'บันทึก'}
               </Button>
             )}
           </div>
         </div>
+
       </div>
   );
 

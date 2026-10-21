@@ -14,7 +14,7 @@ import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStand
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { cn } from '@/lib/utils';
-import { aiGridClass, calculateAi, calculatedAiFieldKind, formatCalculatedAi } from '@/lib/aiCalculation';
+import { aiGridClass, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
 import { TimerField } from '@/components/lis/TimerField';
 import { PhotoField } from '@/components/lis/PhotoField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
@@ -26,6 +26,7 @@ import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSampl
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { qcReceivedAt } from '@/lib/receiveStatus';
+import { isVisibleInQcTestingQueue } from '@/lib/petitionQueueVisibility';
 import {
   type Petition,
   type AdditionalSampleRequest,
@@ -87,14 +88,7 @@ function aiFieldsForParameter(fields: ParameterValueField[]) {
 }
 
 function aiDensity(values: Record<string, unknown>, context: ConditionContext) {
-  for (const record of [values, ...Object.values(context.otherParams)]) {
-    for (const [label, rawValue] of Object.entries(record)) {
-      if (!/^(density|ค่าถพ\.)$/i.test(label.trim())) continue;
-      const value = Number(rawValue);
-      if (Number.isFinite(value) && value > 0) return value;
-    }
-  }
-  return 1;
+  return findAiDensity([values, ...Object.values(context.otherParams)]);
 }
 
 export const noteLabelFor = (mainLabel: string) => `${mainLabel}__note`;
@@ -357,9 +351,11 @@ export default function QCTestingDetailPage() {
 
   const { data: fetchedPetition, loading: petitionLoading, error: petitionError } = usePetition(id);
   const [requestedPetition, setRequestedPetition] = useState<Petition | null>(null);
-  const petition = requestedPetition && requestedPetition._id === fetchedPetition?._id
-    && Date.parse(requestedPetition.updatedAt) >= Date.parse(fetchedPetition.updatedAt)
-    ? requestedPetition : fetchedPetition;
+  const routedPetition = (location.state as { petition?: Petition } | null)?.petition;
+  const currentPetition = fetchedPetition ?? (routedPetition?._id === id ? routedPetition : null);
+  const petition = requestedPetition && requestedPetition._id === currentPetition?._id
+    && Date.parse(requestedPetition.updatedAt) >= Date.parse(currentPetition.updatedAt)
+    ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
   const pendingSample = pendingAdditionalSample(petition, 'qc');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
@@ -370,7 +366,9 @@ export default function QCTestingDetailPage() {
   const currentPetitionPhase = petition?.currentPhase ?? 1;
   const [selectedRoundPhases, setSelectedRoundPhases] = useState<Record<string, PetitionPhase>>({});
   const petitionCategory = getPetitionCategory(petition);
-  // Active worklist for tab-strip switcher (other petitions currently in QC)
+  // Active worklist for tab-strip switcher (other petitions currently in QC).
+  // Apply the same routing/visibility rule as /qc-testing so petitions that are
+  // active in another track do not appear only in this switcher.
   const { data: worklistData } = usePetitionList({
     status: 'pendingReview,inProgress',
     limit: 20,
@@ -870,7 +868,7 @@ export default function QCTestingDetailPage() {
     });
   }, [values, lastBatchByKey]);
 
-  if (petitionLoading) {
+  if (petitionLoading && !petition) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
@@ -1174,16 +1172,16 @@ export default function QCTestingDetailPage() {
       )}
 
       {/* Active worklist tab strip — switch between petitions currently in QC */}
-      {worklistData && worklistData.items.length > 1 && (
+      {worklistData && worklistData.items.filter(isVisibleInQcTestingQueue).length > 1 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 -mt-2">
           <span className="text-xs text-grey-500 shrink-0 mr-1">สลับไป:</span>
-          {worklistData.items.map((p) => {
+          {worklistData.items.filter(isVisibleInQcTestingQueue).map((p) => {
             const isActive = p._id === petition._id;
             return (
               <button
                 key={p._id}
                 type="button"
-                onClick={() => navigate(`/qc-testing/${p._id}`)}
+                onClick={() => navigate(`/qc-testing/${p._id}`, { state: { petition: p } })}
                 className={cn(
                   'shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border transition-colors',
                   isActive

@@ -7,6 +7,7 @@ function requiresDeliveryAndBatch(body) {
 }
 
 function requiresQcTrack(petition) {
+  if (Array.isArray(petition?.routeTargets) && petition.routeTargets.length) return petition.routeTargets.includes('qc');
   return !isResearchAndDevelopmentDepartment(petition?.submittedBy?.department);
 }
 
@@ -129,6 +130,12 @@ function validatePetitionSubmission(body) {
   }
   if (!body.submittedBy?.name) {
     return 'กรุณาระบุผู้ยื่นคำขอ';
+  }
+  if (body.routeTargets != null) {
+    const targets = Array.isArray(body.routeTargets) ? body.routeTargets : [];
+    if (!targets.length || targets.some((target) => !['qc', 'lab'].includes(target))) {
+      return 'กรุณาเลือกปลายทางส่งตรวจ QC, LAB หรือทั้ง 2';
+    }
   }
   const needsDeliveryAndBatch = requiresDeliveryAndBatch(body);
   if (!Array.isArray(body.items) || body.items.length === 0) {

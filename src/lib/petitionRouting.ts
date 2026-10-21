@@ -4,6 +4,11 @@ export function isResearchAndDevelopmentDepartment(department: unknown): boolean
   return String(department ?? "").replace(/\s+/g, "").toLowerCase() === "r&d";
 }
 
+export function isQualityControlDepartment(department: unknown): boolean {
+  const normalized = String(department ?? "").replace(/\s+/g, "").toLowerCase();
+  return normalized === "ควบคุมคุณภาพ" || normalized === "qualitycontrol" || normalized === "qc";
+}
+
 export function isResearchAndDevelopmentPetition(petition: Pick<Petition, "submittedBy">): boolean {
   return isResearchAndDevelopmentDepartment(petition.submittedBy?.department);
 }
@@ -122,8 +127,9 @@ export function duplicateBatchError(
 }
 
 export function hasLabTrack(
-  petition: Pick<Petition, "submittedBy" | "items" | "labReceivedAt" | "labCompletedAt" | "labApprovedAt">,
+  petition: Pick<Petition, "submittedBy" | "items" | "routeTargets" | "labReceivedAt" | "labCompletedAt" | "labApprovedAt">,
 ): boolean {
+  if (petition.routeTargets?.length) return petition.routeTargets.includes("lab");
   return Boolean(
     isResearchAndDevelopmentPetition(petition as Petition) ||
       petition.labReceivedAt ||
@@ -133,6 +139,7 @@ export function hasLabTrack(
   );
 }
 
-export function requiresQcTrack(petition: Pick<Petition, "submittedBy">): boolean {
+export function requiresQcTrack(petition: Pick<Petition, "submittedBy" | "routeTargets">): boolean {
+  if (petition.routeTargets?.length) return petition.routeTargets.includes("qc");
   return !isResearchAndDevelopmentPetition(petition as Petition);
 }

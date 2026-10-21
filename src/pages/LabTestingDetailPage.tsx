@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   FlaskConical,
   CheckCircle2,
@@ -32,7 +32,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, calculateAi, calculatedAiFieldKind, formatCalculatedAi } from '@/lib/aiCalculation';
+import { aiGridClass, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
@@ -80,15 +80,7 @@ function resultKey(itemSeq: number, parameterId: string) {
 }
 
 function aiDensity(values: Record<string, unknown>, context: ConditionContext) {
-  const records = [values, ...Object.values(context.otherParams)];
-  for (const record of records) {
-    for (const [label, rawValue] of Object.entries(record)) {
-      if (!/^(density|ค่าถพ\.)$/i.test(label.trim())) continue;
-      const value = Number(rawValue);
-      if (Number.isFinite(value) && value > 0) return value;
-    }
-  }
-  return 1;
+  return findAiDensity([values, ...Object.values(context.otherParams)]);
 }
 
 const AI_FIELD_ORDER = [
@@ -411,15 +403,18 @@ function TestField({
 export default function LabTestingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const confirm = useConfirm();
   const flashClass = useArrivalFlash();
 
   const { data: fetchedPetition, loading: petitionLoading, error: petitionError } = usePetition(id);
   const [requestedPetition, setRequestedPetition] = useState<Petition | null>(null);
-  const petition = requestedPetition && requestedPetition._id === fetchedPetition?._id
-    && Date.parse(requestedPetition.updatedAt) >= Date.parse(fetchedPetition.updatedAt)
-    ? requestedPetition : fetchedPetition;
+  const routedPetition = (location.state as { petition?: Petition } | null)?.petition;
+  const currentPetition = fetchedPetition ?? (routedPetition?._id === id ? routedPetition : null);
+  const petition = requestedPetition && requestedPetition._id === currentPetition?._id
+    && Date.parse(requestedPetition.updatedAt) >= Date.parse(currentPetition.updatedAt)
+    ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
   const pendingSample = pendingAdditionalSample(petition, 'lab');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
@@ -735,7 +730,7 @@ export default function LabTestingDetailPage() {
     [user, entriesByKey, id, loadResults, autosaves, additionalSampleOpen, submitting, pendingDensity],
   );
 
-  if (petitionLoading) {
+  if (petitionLoading && !petition) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center h-64">
@@ -1102,7 +1097,7 @@ export default function LabTestingDetailPage() {
                   <button
                     key={p._id}
                     type="button"
-                    onClick={() => navigate(`/lab-testing/${p._id}`)}
+                    onClick={() => navigate(`/lab-testing/${p._id}`, { state: { petition: p } })}
                     className={cn(
                       'shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border transition-colors',
                       isActive

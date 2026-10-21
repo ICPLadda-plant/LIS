@@ -24,6 +24,18 @@ const rsd = (values: number[], mean: number | null) => {
   return sd != null && mean !== 0 ? (sd * 100) / mean : null;
 };
 
+export function findAiDensity(records: Record<string, unknown>[]) {
+  for (const record of records) {
+    for (const [label, rawValue] of Object.entries(record)) {
+      // ค่า ถพ. แบบรายสารจะมี key เช่น `ค่าถพ.::OMETHOATE`
+      if (!/^(density|ค่าถพ.)(?:::|$)/i.test(label.trim())) continue;
+      const value = Number(rawValue);
+      if (Number.isFinite(value) && value > 0) return value;
+    }
+  }
+  return 1;
+}
+
 export function calculateAi(values: Record<string, unknown>, density = 1): AiCalculationResult {
   const areas = numberValues(values, /area\s*inj\.?\s*[1-3]/i);
   const samples = numberValues(values, /%?\s*sample\s*[1-3]/i);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAi, calculatedAiFieldKind, formatCalculatedAi } from './aiCalculation';
+import { calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from './aiCalculation';
 
 describe('calculateAi', () => {
   it('calculates separate averages, sample RSD and AI using density', () => {
@@ -13,6 +13,11 @@ describe('calculateAi', () => {
   it('defaults missing or invalid density to one', () => {
     expect(calculateAi({ '% Sample 1': '2' }).ai).toBe(2);
     expect(calculateAi({ '% Sample 1': '2' }, 0).ai).toBe(2);
+  });
+
+  it('reads density scoped to an active ingredient', () => {
+    const density = findAiDensity([{ 'ค่าถพ.::OMETHOATE': '1.075' }]);
+    expect(calculateAi({ '% Sample 1': '50' }, density).ai).toBe(53.75);
   });
 
   it('shows two decimals normally and three significant decimal digits below one', () => {
