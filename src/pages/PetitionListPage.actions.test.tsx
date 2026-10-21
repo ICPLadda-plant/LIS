@@ -622,6 +622,8 @@ describe('PetitionListPage action cues', () => {
 
     fireEvent.click(await screen.findByRole('checkbox', { name: `เลือก F-TEST-001 ${batchNo}` }));
     fireEvent.click(screen.getByRole('button', { name: 'ส่งตรวจคุณภาพ (1)' }));
+    expect(screen.getByRole('dialog', { name: 'เลือกประเภทการส่งตรวจ' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'ส่ง LAB' }));
 
     await waitFor(() => {
       expect(screen.getByRole('tab', { name: 'แจ้งเตือนส่งตรวจคุณภาพ', selected: true })).toBeInTheDocument();
@@ -636,6 +638,7 @@ describe('PetitionListPage action cues', () => {
         batchNo,
         sendToLab: true,
       })],
+      routeTargets: ['lab'],
     }));
   });
 
@@ -646,13 +649,15 @@ describe('PetitionListPage action cues', () => {
 
     fireEvent.click(await screen.findByRole('checkbox', { name: 'เลือกทั้งหมดในรายการยาเกิน 6 เดือน' }));
     fireEvent.click(screen.getByRole('button', { name: 'ส่งตรวจคุณภาพ (2)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ส่งทั้ง 2' }));
 
     await waitFor(() => expect(mocks.createPetition).toHaveBeenCalledTimes(1));
     expect(mocks.createPetition).toHaveBeenCalledWith(expect.objectContaining({
       items: [
         expect.objectContaining({ itemNo: 'F-TEST-001', batchNo: 'FG260301-001', sendToLab: true }),
-        expect.objectContaining({ itemNo: 'R-TEST-002', batchNo: 'RM260201-002', sendToLab: false }),
+        expect.objectContaining({ itemNo: 'R-TEST-002', batchNo: 'RM260201-002', sendToLab: true }),
       ],
+      routeTargets: ['qc', 'lab'],
     }));
     expect(await screen.findByText('ยาทดสอบ FG +1 รายการ')).toBeInTheDocument();
   });

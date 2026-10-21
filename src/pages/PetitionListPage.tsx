@@ -5,7 +5,10 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CheckCircle2,
   FilePlus2,
+  FlaskConical,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import AppLayout from '@/components/lis/AppLayout';
@@ -17,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -48,6 +52,7 @@ import {
   PETITION_STATUS_CONFIG,
   PETITION_STATUSES,
   type Petition,
+  type PetitionRouteTarget,
 } from '@/types/petition.types';
 import type { SixMonthMedicineStockItem } from '@/types/stock';
 
@@ -375,6 +380,7 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
   const [localSubmittedQualityLotKeys, setLocalSubmittedQualityLotKeys] = useState<Set<string>>(() => new Set());
   const [isSubmittingQuality, setIsSubmittingQuality] = useState(false);
   const [qualitySubmitError, setQualitySubmitError] = useState<string | null>(null);
+  const [routeDialogOpen, setRouteDialogOpen] = useState(false);
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['stock', 'medicine-six-months'],
     queryFn: api.getSixMonthMedicineStock,
@@ -460,7 +466,7 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
     });
   }, [filteredKeys]);
 
-  const handleCreateQualityPetition = useCallback(async () => {
+  const handleCreateQualityPetition = useCallback(async (routeTargets: PetitionRouteTarget[]) => {
     if (selectedItems.length === 0) return;
     setIsSubmittingQuality(true);
     setQualitySubmitError(null);
@@ -487,11 +493,12 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
           lotNo: item.lotNo || undefined,
           itemNo: item.itemNo || undefined,
           testItems: 'ส่งตรวจคุณภาพ',
-          sendToLab: item.itemNo.trim().toUpperCase().startsWith('F'),
+          sendToLab: routeTargets.includes('lab'),
           note: 'ส่งตรวจคุณภาพจากรายการยาเกิน 6 เดือน',
           sampleQuantity: 1,
         })),
         cause: 'ส่งตรวจคุณภาพจากรายการยาเกิน 6 เดือน',
+        routeTargets,
       } as Parameters<typeof createPetition>[0]);
       setLocalSubmittedQualityLotKeys((current) => {
         const next = new Set(current);
@@ -508,6 +515,7 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
     } finally {
       setIsSubmittingQuality(false);
     }
+      setRouteDialogOpen(false);
   }, [onQualitySubmissionCreated, selectedItems, user?.department, user?.email, user?.employeeId, user?.name]);
 
   return (
@@ -531,7 +539,7 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
               <Button
                 type="button"
                 size="sm"
-                onClick={handleCreateQualityPetition}
+                onClick={() => setRouteDialogOpen(true)}
                 disabled={selectedItems.length === 0 || isSubmittingQuality}
               >
                 {isSubmittingQuality ? 'กำลังส่ง...' : `ส่งตรวจคุณภาพ (${selectedItems.length})`}
@@ -624,6 +632,26 @@ function SixMonthMedicineStockTab({ onQualitySubmissionCreated }: SixMonthMedici
           </div>
         </CardContent>
       </Card>
+      <Dialog open={routeDialogOpen} onOpenChange={setRouteDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader className="border-b border-border pb-4">
+            <DialogTitle>เลือกประเภทการส่งตรวจ</DialogTitle>
+            <DialogDescription>เลือกปลายทางที่ต้องการส่งตัวอย่าง</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { targets: ['qc'] as PetitionRouteTarget[], label: 'ส่ง QC', icon: ShieldCheck },
+              { targets: ['lab'] as PetitionRouteTarget[], label: 'ส่ง LAB', icon: FlaskConical },
+              { targets: ['qc', 'lab'] as PetitionRouteTarget[], label: 'ส่งทั้ง 2', icon: CheckCircle2 },
+            ].map(({ targets, label, icon: Icon }) => (
+              <button key={label} type="button" disabled={isSubmittingQuality} onClick={() => void handleCreateQualityPetition(targets)} className="flex min-h-28 flex-col items-center justify-center gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors hover:border-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
+                <Icon className="h-7 w-7 text-primary" />
+                <span className="font-semibold">{label}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
       {selectedItem && (
         <SixMonthMedicineDetailDrawer item={selectedItem} onClose={() => setSelectedItem(null)} />
       )}
