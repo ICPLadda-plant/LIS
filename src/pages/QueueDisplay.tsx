@@ -20,6 +20,7 @@ import { isVisibleInQcTestingQueue } from "@/lib/petitionQueueVisibility";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { calculateQueueItemsPerColumn } from "@/lib/queueDisplayRows";
 import { isNotificationSoundEnabled } from "@/lib/appPreferences";
+import { previewNotificationSound } from "@/lib/notificationSoundPreview";
 import { formatDate, formatTime } from "@/lib/dateTime";
 
 type QueueMode = "lab" | "qc";
@@ -302,6 +303,13 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
       setSoundReady(false);
     }
   }, []);
+
+  const testNotificationSound = useCallback(async () => {
+    // การกดปุ่มคือ user gesture จึงใช้ปลดล็อกเสียงอัตโนมัติไปพร้อมกัน
+    await activateNotificationSound();
+    const played = await previewNotificationSound("queueNew");
+    if (played) setSoundReady(true);
+  }, [activateNotificationSound]);
 
   // "Today" is bound at mount and refreshed at midnight so the board auto-clears
   // when the local day rolls over.
@@ -637,6 +645,14 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
               เปิดเสียงแจ้งเตือน
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => void testNotificationSound()}
+            className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-background px-4 py-2 font-semibold text-primary shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <Volume2 className="h-5 w-5" />
+            ทดสอบเสียง
+          </button>
           <span className="inline-flex items-center gap-2">
             <RefreshCw className="h-5 w-5" />
             อัปเดตอัตโนมัติทุก 5 วินาที

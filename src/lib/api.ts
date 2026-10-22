@@ -85,6 +85,10 @@ export interface PetitionFlowNotification {
 
 export type UserFavorites = { email: string; paths: string[] };
 export type UserSignatureResponse = { signatureUrl: string | null };
+export type PushDevice = { id: string; label: string; current: boolean; createdAt?: string };
+export type PushDevicesState = { configured: boolean; publicKey: string | null; paused: boolean; devices: PushDevice[] };
+export type PushSubscriptionPayload = { endpoint: string; keys: { p256dh: string; auth: string } };
+export type PushTestResult = { sent: number; failed: number; removed: number; total: number };
 
 // Development: BASE_URL = "/" → "/api"
 // Production:  BASE_URL = "/LIS/" → "/LIS/api"
@@ -273,6 +277,17 @@ export const api = {
   // Samples
   saveMySignature: (signatureDataUrl: string) =>
     request<UserSignatureResponse>("/profile/signature", { method: "PUT", body: JSON.stringify({ signatureDataUrl }) }),
+
+  // แจ้งเตือน PWA (Web Push) — server/routes/push.js
+  getPushDevices: (endpoint?: string) =>
+    request<PushDevicesState>(`/push/devices${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ""}`),
+  subscribePush: (subscription: PushSubscriptionPayload, deviceLabel: string) =>
+    request<PushDevicesState>("/push/subscribe", { method: "POST", body: JSON.stringify({ subscription, deviceLabel }) }),
+  unsubscribePush: (endpoint: string) =>
+    request<PushDevicesState>("/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }),
+  setPushPaused: (paused: boolean, endpoint?: string) =>
+    request<PushDevicesState>("/push/pause", { method: "POST", body: JSON.stringify({ paused, endpoint }) }),
+  sendTestPush: () => request<PushTestResult>("/push/test", { method: "POST", body: "{}" }),
 
   getSamples: () => request<SampleItem[]>("/samples"),
   createSample: (data: Partial<SampleItem>) =>

@@ -42,7 +42,7 @@ const ReviewEntrySchema = new mongoose.Schema(
   {
     action: {
       type: String,
-      enum: ['note', 'approve', 'reject', 'startTesting', 'lab-approve', 'lab-reject', 'additional-request'],
+      enum: ['note', 'approve', 'reject', 'startTesting', 'lab-approve', 'lab-reject', 'lab-recheck', 'additional-request'],
       required: true,
     },
     reviewedBy: { type: String, required: true },

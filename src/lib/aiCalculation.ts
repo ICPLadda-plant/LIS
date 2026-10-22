@@ -24,31 +24,65 @@ const rsd = (values: number[], mean: number | null) => {
   return sd != null && mean !== 0 ? (sd * 100) / mean : null;
 };
 
-export function findAiDensity(records: Record<string, unknown>[]) {
-  for (const record of records) {
-    for (const [label, rawValue] of Object.entries(record)) {
-      // ค่า ถพ. แบบรายสารจะมี key เช่น `ค่าถพ.::OMETHOATE`
-      if (!/^(density|ค่าถพ.)(?:::|$)/i.test(label.trim())) continue;
-      const value = Number(rawValue);
-      if (Number.isFinite(value) && value > 0) return value;
-    }
-  }
-  return 1;
+// รองรับ "Density", "ค่าถพ.", "ค่า ถพ.", "ค่า ถ.พ." และแบบรายสาร เช่น `ค่าถพ.::OMETHOATE`
+const DENSITY_LABEL = /^(?:density|ค่า\s*ถ\.?\s*พ\.?)\s*(?:::(.*))?$/i;
+
+const keySubstance = (label: string) => {
+  const index = label.indexOf('::');
+  return index >= 0 ? label.slice(index + 2).trim().toLowerCase() : '';
+};
+
+export function isDensityLabel(label: string) {
+  return DENSITY_LABEL.test(label.trim()) && !/__source$/i.test(label);
 }
 
-export function calculateAi(values: Record<string, unknown>, density = 1): AiCalculationResult {
-  const areas = numberValues(values, /area\s*inj\.?\s*[1-3]/i);
-  const samples = numberValues(values, /%?\s*sample\s*[1-3]/i);
+// เลือกค่า ถพ. ของสารนั้นก่อน ถ้าไม่มีใช้ค่า ถพ. รวมของตัวอย่าง; ไม่พบเลยคืน null
+export function findAiDensity(records: Record<string, unknown>[], substance = ''): number | null {
+  const wanted = substance.trim().toLowerCase();
+  let unscoped: number | null = null;
+  let anyScoped: number | null = null;
+  for (const record of records) {
+    for (const [label, rawValue] of Object.entries(record ?? {})) {
+      if (!isDensityLabel(label)) continue;
+      const value = Number(rawValue);
+      if (rawValue === '' || rawValue == null || !Number.isFinite(value) || value <= 0) continue;
+      const scoped = keySubstance(label);
+      if (wanted && scoped === wanted) return value;
+      if (!scoped) unscoped ??= value;
+      else anyScoped ??= value;
+    }
+  }
+  return unscoped ?? (wanted ? null : anyScoped);
+}
+
+// ใช้เฉพาะช่องของสารที่ระบุ ถ้าช่องไม่ได้แยกรายสารให้ใช้ช่องรวม
+const valuesForSubstance = (values: Record<string, unknown>, substance: string) => {
+  const wanted = substance.trim().toLowerCase();
+  const inputs = Object.entries(values).filter(([label]) => /(area\s*inj|sample\s*[1-3])/i.test(label));
+  const scoped = inputs.filter(([label]) => wanted && keySubstance(label) === wanted);
+  if (scoped.length) return Object.fromEntries(scoped);
+  const plain = inputs.filter(([label]) => !keySubstance(label));
+  return Object.fromEntries(plain.length || wanted ? plain : inputs);
+};
+
+export function calculateAi(values: Record<string, unknown>, density: number | null = null, substance = ''): AiCalculationResult {
+  const own = valuesForSubstance(values, substance);
+  const areas = numberValues(own, /area\s*inj\.?\s*[1-3]/i);
+  const samples = numberValues(own, /%?\s*sample\s*[1-3]/i);
   const areaAverage = average(areas);
   const sampleAverage = average(samples);
-  const safeDensity = Number.isFinite(Number(density)) && Number(density) > 0 ? Number(density) : 1;
+  const safeDensity = density != null && Number.isFinite(Number(density)) && Number(density) > 0 ? Number(density) : null;
   return {
     areaAverage,
     sampleAverage,
     areaRsd: rsd(areas, areaAverage),
     sampleRsd: rsd(samples, sampleAverage),
-    ai: sampleAverage == null ? null : sampleAverage * safeDensity,
+    ai: sampleAverage == null || safeDensity == null ? null : sampleAverage * safeDensity,
   };
+}
+
+export function aiSubstanceFromKey(key: string) {
+  return keySubstance(key);
 }
 
 export function calculatedAiFieldKind(label: string): keyof AiCalculationResult | null {

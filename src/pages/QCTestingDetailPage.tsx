@@ -14,7 +14,7 @@ import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStand
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { cn } from '@/lib/utils';
-import { aiGridClass, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
+import { aiGridClass, aiSubstanceFromKey, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
 import { TimerField } from '@/components/lis/TimerField';
 import { PhotoField } from '@/components/lis/PhotoField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
@@ -87,8 +87,9 @@ function aiFieldsForParameter(fields: ParameterValueField[]) {
   return [...generated, ...fields.filter((field) => calculatedAiFieldKind(field.label) !== 'ai' && !known.has(field.label.trim().toLowerCase()))];
 }
 
-function aiDensity(values: Record<string, unknown>, context: ConditionContext) {
-  return findAiDensity([values, ...Object.values(context.otherParams)]);
+// ค่า ถพ. มักเก็บเป็นรายการย่อย (entries) จึงต้องส่งรายการย่อยของพารามิเตอร์อื่นมาด้วย
+function aiDensity(values: Record<string, unknown>, context: ConditionContext, substance = '', entries: Record<string, unknown>[] = []) {
+  return findAiDensity([values, ...Object.values(context.otherParams), ...entries], substance);
 }
 
 export const noteLabelFor = (mainLabel: string) => `${mainLabel}__note`;
@@ -1319,6 +1320,7 @@ export default function QCTestingDetailPage() {
                   // Build the condition context for resolving conditionalMode standards:
                   // sameParam = this parameter's live values; otherParams = each OTHER
                   // matched parameter's live values for the same item, keyed by parameterId.
+                  const densityEntries = matchedParams.flatMap((p) => (p._id && p._id !== param._id ? entriesByKey[resultKey(item.seq, p._id)] ?? [] : []));
                   const condCtx: ConditionContext = {
                     sameParam: phaseValues[k] ?? {},
                     otherParams: (() => {
@@ -1354,7 +1356,7 @@ export default function QCTestingDetailPage() {
                     const outputResult = isOutputMode ? resolveConditionalOutput(unit.field, condCtx) : null;
                     const isAiParameter = (param.valueFields ?? []).some((candidate) => calculatedAiFieldKind(candidate.label) === 'ai');
                     const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
-                    const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx)) : null;
+                    const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries), aiSubstanceFromKey(unit.key)) : null;
                     const beforeRef =
                       param.hasPhases &&
                       effectivePhase === 2 &&
@@ -1484,7 +1486,7 @@ export default function QCTestingDetailPage() {
                           field={effectiveField}
                           item={item}
                           itemGroupIds={idsFor(item)}
-                          value={aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
+                          value={aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null ? '' : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
                           noteValue={srcValues[noteLabel] ?? ''}
                           hideStandard={(unit as { hiddenStandard?: boolean }).hiddenStandard === true}
                           saveInfo={saveInfoSrc?.[unit.key]}
@@ -1496,12 +1498,14 @@ export default function QCTestingDetailPage() {
                             onUnitChange(unit.key, val);
                             if (isAiParameter) {
                               const nextValues = { ...srcValues, [unit.key]: val };
-                              const derived = calculateAi(nextValues, aiDensity(nextValues, condCtx));
                               fields.forEach((candidate) => {
                                 const kind = calculatedAiFieldKind(candidate.label);
                                 if (!kind) return;
                                 expandFieldForItem(candidate, item.commonName, { includeRestrictedStandards: canSeeRestrictedStandards, category: petitionCategory })
-                                  .forEach((derivedUnit) => onUnitChange(derivedUnit.key, formatCalculatedAi(derived[kind])));
+                                  .forEach((derivedUnit) => {
+                                    const substance = aiSubstanceFromKey(derivedUnit.key);
+                                    onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries), substance)[kind]));
+                                  });
                               });
                             }
                             handleOutlierCheck(
@@ -1531,6 +1535,9 @@ export default function QCTestingDetailPage() {
                             </div>
                           );
                         })()}
+                        {aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null && calculatedAi.ai == null && (
+                          <p className="mt-1 text-xs text-muted-foreground">รอค่า ถพ.</p>
+                        )}
                         {beforeRef != null && beforeRef !== '' ? (
                           <p className="text-[10px] text-grey-400 mt-0.5">
                             ก่อน: <span className="font-mono">{String(beforeRef)}</span>

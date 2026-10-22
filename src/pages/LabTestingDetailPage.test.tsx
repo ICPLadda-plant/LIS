@@ -268,11 +268,19 @@ describe("LabTestingDetailPage", () => {
   it("enables final save and persists calculated %AI with the substance key", async () => {
     mockState.activeFixtures = {
       ...fixtures,
-      parameters: fixtures.parameters.map((parameter) => ({
-        ...parameter,
-        valueFields: parameter.valueFields.map((field) => ({ ...field, required: true })),
-      })),
-      results: [],
+      petition: {
+        ...fixtures.petition,
+        items: fixtures.petition.items.map((item) => ({ ...item, testItems: "Active Ingredient, ค่า ถพ." })),
+      },
+      parameters: [
+        ...fixtures.parameters.map((parameter) => ({
+          ...parameter,
+          valueFields: parameter.valueFields.map((field) => ({ ...field, required: true })),
+        })),
+        { _id: "density-param", name: "ค่า ถพ.", scope: "qc", shareWithLab: true, applyAll: true, multiEntry: true, valueFields: [{ label: "ค่าถพ.", type: "number" }] },
+      ],
+      // ค่า ถพ. จากเครื่อง DMA 501 ถูกเก็บเป็นรายการย่อยแบบรายสาร
+      results: [{ petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: {}, entries: [{ "ค่าถพ.::abamectin": 1.005 }] }],
     };
 
     render(<LabTestingDetailPage />);
@@ -283,6 +291,8 @@ describe("LabTestingDetailPage", () => {
       fireEvent.change(inputs[index], { target: { value } });
     });
 
+    // 68.7241 × 1.005
+    expect(await screen.findByDisplayValue("69.07")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "บันทึก" })).toBeInTheDocument());
     await waitFor(() => {
       expect(mockSaveQCResult).toHaveBeenCalledWith(expect.objectContaining({ fieldLabel: "%AI::abamectin" }));

@@ -192,6 +192,7 @@ const UserProfileMenu = ({ className }: UserProfileMenuProps) => {
         onOpenChange={setSettingsOpen}
         showSignatureAction={showSignatureAction}
         onAddSignature={handleAddSignature}
+        canTestSounds={roles.includes("admin")}
       />
     </>
   );
