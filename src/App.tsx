@@ -11,6 +11,7 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { ConfirmProvider } from "@/context/ConfirmDialog";
 import DailyCheckReminderWatcher from "@/components/lis/DailyCheckReminderWatcher";
 import PetitionFlowWatcher from "@/components/lis/PetitionFlowWatcher";
+import UrgentPetitionReminder from "@/components/lis/UrgentPetitionReminder";
 import PrivateRoute from "@/components/PrivateRoute";
 import RoutePointerLockGuard from "@/components/RoutePointerLockGuard";
 import { DevRoleSwitcher } from "@/components/DevRoleSwitcher";
@@ -120,6 +121,7 @@ const App = () => (
           <NotificationProvider>
             <DailyCheckReminderWatcher />
             <PetitionFlowWatcher />
+            <UrgentPetitionReminder />
             <SampleProvider>
               <StartupLoadingGate minimumDurationMs={1500}>
               <Suspense fallback={<RouteLoading />}>

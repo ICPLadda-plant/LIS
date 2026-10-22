@@ -1425,6 +1425,68 @@ test('ERP autofill keeps the matching LIS identifiers but uses the ERP productio
   }
 });
 
+test('ERP autofill fills the production date from MF after resolving the Batch from LIS', async () => {
+  const originals = {
+    fetch: global.fetch,
+    petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    coaFind: CoaDocument.find,
+    legacyFind: LegacyLabResult.find,
+    qcFind: QCTestResult.find,
+    densityFind: ResultDensity.find,
+  };
+  const externalRow = {
+    SaleOrderNo: 'SO-MF-DATE-1', Line: 10000, ItemNo: 'ITEM-A', TradeName: 'Trade A',
+    CommonName: 'COMMON A', ShipmentDate: '2026-09-20T00:00:00.000Z', remark: 'COA',
+  };
+  const petition = {
+    _id: 'petition-mf-date-1', petitionNo: 'P-MF-DATE-1', updatedAt: '2026-09-13T00:00:00.000Z',
+    items: [{
+      seq: 1, itemNo: 'ITEM-A', sampleName: 'Trade A', commonName: 'COMMON A',
+      batchNo: 'B-CUSTOMER', lotNo: 'LOT-CUSTOMER', productionDate: '2026-06-16',
+    }],
+  };
+  try {
+    global.fetch = async (url) => {
+      if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
+      if (String(url).includes('stock-all-item')) return { ok: true, json: async () => [] };
+      if (String(url).includes('item-MF-CLOSE')) {
+        return { ok: true, json: async () => [
+          { item_no: 'ITEM-A', prod_order_no: 'MF26090010', create_date: '2026-09-10T00:00:00.000Z' },
+          { item_no: 'ITEM-A', prod_order_no: 'MF26090018', create_date: '2026-09-18T00:00:00.000Z' },
+        ] };
+      }
+      return { ok: true, json: async () => [
+        { item_no: 'ITEM-A', prod_order_no: 'MF26090021', create_date: '2026-09-21T00:00:00.000Z' },
+      ] };
+    };
+    Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    LabRequest.find = () => ({ lean: async () => [] });
+    CoaDocument.find = () => sortedLimitedLean([]);
+    LegacyLabResult.find = () => ({ lean: async () => [] });
+    QCTestResult.find = () => ({ sort: () => ({ lean: async () => [] }) });
+    ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
+
+    const res = await invoke('/erp-autofill/:externalRequestId', 'get', {
+      params: { externalRequestId: 'external-coa-request-SO-MF-DATE-1-10000' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
+    assert.equal(res.body.sample.lotNo, 'LOT-CUSTOMER');
+    assert.equal(res.body.sample.productionDate, '2026-09-18');
+    assert.equal(res.body.dataSources.mf, true);
+  } finally {
+    global.fetch = originals.fetch;
+    Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    CoaDocument.find = originals.coaFind;
+    LegacyLabResult.find = originals.legacyFind;
+    QCTestResult.find = originals.qcFind;
+    ResultDensity.find = originals.densityFind;
+  }
+});
+
 test('ERP autofill may identify the batch from Density but does not use its production date', async () => {
   const originals = {
     fetch: global.fetch,
@@ -1496,14 +1558,35 @@ test('ERP autofill keeps ERP production date while using legacy appearance and d
     CommonName: 'EMAMECTIN BENZOATE 2.0% W/V ME', CustomerName: 'Customer',
     PackingSize: '24*500 cc', ShipmentDate: '2026-10-15T00:00:00.000Z', remark: 'COA',
   };
-  const legacyRow = {
-    _id: 'legacy-emamectin-1', sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P1',
-    production_date: '18/06/2569', test_date: '31/08/2569', sample_condition: 'Clear yellow liquid',
-    tests: [
-      { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
-      { test_name: 'Density', result: '0.946 g/cm3', method: 'DMA 501' },
-    ],
-  };
+  const legacyRows = [
+    {
+      _id: 'legacy-emamectin-1', customer_name: 'Production A',
+      sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P1',
+      production_date: '18/06/2569', test_date: '30/08/2569', sample_condition: 'Clear yellow liquid',
+      tests: [
+        { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+        { test_name: 'Density', result: '0.944 g/cm3', method: 'DMA 501' },
+      ],
+    },
+    {
+      _id: 'legacy-emamectin-2', customer_name: 'Production B',
+      sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P2',
+      production_date: '18/06/2569', test_date: '31/08/2569', sample_condition: 'Clear yellow liquid',
+      tests: [
+        { test_name: 'Emamectin bensoate', result: '2.09 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+        { test_name: 'Density', result: '0.948 g/cm3', method: 'DMA 501' },
+      ],
+    },
+    {
+      _id: 'legacy-emamectin-excluded', customer_name: '\u0e27\u0e18\u0e32\u0e18\u0e23 \u0e2a\u0e2d\u0e19\u0e0b\u0e35',
+      sample_name: 'Emamectin bensoate 2 % ME', batch_no: '20260430 P3',
+      production_date: '18/06/2569', test_date: '01/09/2569', sample_condition: 'Clear yellow liquid',
+      tests: [
+        { test_name: 'Emamectin bensoate', result: '9.99 % W/V', criteria: '1.70-2.30', method: 'CIPAC 1C' },
+        { test_name: 'Density', result: '9.999 g/cm3', method: 'DMA 501' },
+      ],
+    },
+  ];
   try {
     global.fetch = async (url) => {
       if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
@@ -1515,7 +1598,7 @@ test('ERP autofill keeps ERP production date while using legacy appearance and d
     Petition.find = () => sortedLimitedLean([]);
     LabRequest.find = () => ({ lean: async () => [] });
     CoaDocument.find = () => sortedLimitedLean([]);
-    LegacyLabResult.find = () => ({ lean: async () => [legacyRow] });
+    LegacyLabResult.find = () => ({ lean: async () => legacyRows });
     QCTestResult.find = () => ({ sort: () => ({ lean: async () => [] }) });
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
 

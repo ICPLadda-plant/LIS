@@ -37,6 +37,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 interface PetitionRefreshOptions {
   refetchOnFocus?: boolean;
   pollMs?: number;
+  /** false = ไม่ยิง request (เช่น ผู้ใช้ไม่มีสิทธิ์ที่ต้องใช้ข้อมูลนี้) */
+  enabled?: boolean;
 }
 
 function usePetitionAutoRefresh(
@@ -134,6 +136,8 @@ interface PetitionListParams {
   awaitingLabApproval?: boolean;
   labApproved?: boolean;
   labRecheckPending?: boolean;
+  /** เฉพาะงานด่วน (priority = 1) ที่ยังไม่อนุมัติ/ปฏิเสธ */
+  urgent?: boolean;
 }
 interface PetitionListResponse {
   items: Petition[];
@@ -167,10 +171,16 @@ export function usePetitionList(params: PetitionListParams, options: PetitionRef
     if (params.awaitingLabApproval) sp.set('awaitingLabApproval', 'true');
     if (params.labApproved) sp.set('labApproved', 'true');
     if (params.labRecheckPending) sp.set('labRecheckPending', 'true');
+    if (params.urgent) sp.set('urgent', 'true');
     return sp.toString();
   })();
 
+  const enabled = options.enabled ?? true;
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     let alive = true;
     if (!data) setLoading(true);
     setError(null);
@@ -187,7 +197,7 @@ export function usePetitionList(params: PetitionListParams, options: PetitionRef
     return () => {
       alive = false;
     };
-  }, [queryString, reloadKey]);
+  }, [enabled, queryString, reloadKey]);
 
   return { data, loading, error, refresh };
 }

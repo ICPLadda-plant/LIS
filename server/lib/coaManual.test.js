@@ -26,6 +26,18 @@ test('manual snapshots replace a stale production date with the six-digit Lot No
   assert.equal(snapshots.sampleSnapshots[0].productionDate, '2026-10-09');
 });
 
+test('manual snapshots save AI criteria as center plus-minus values', () => {
+  const data = input();
+  data.sample.commonName = 'Acetamiprid SP';
+  data.results.push({
+    testItem: '%AI content (W/W)', criteria: '18.80-21.20', result: '20.53%', unit: '%', method: '',
+  });
+
+  const snapshots = manualCoaSnapshots(data, 10000);
+
+  assert.equal(snapshots.resultSnapshots[1].criteria, '20% ± 1.20');
+});
+
 test('manual snapshots reject missing fields, invalid dates and empty results', () => {
   for (const mutate of [
     (data) => { data.sample.batchNo = ' '; },

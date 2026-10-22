@@ -262,6 +262,10 @@ interface PetitionBase {
   // กด Re-check ฝั่ง Lab — งานกลับไปโชว์บนบอร์ด Assign ให้เปลี่ยนผู้รับงานได้จนกว่าหัวหน้า Lab ออกผล
   labRecheckRequestedAt?: string | null;
   labRecheckRequestedBy?: string;
+  labRecheckReason?: string;
+  labRecheckCount?: number;
+  /** มีค่าเมื่อผู้รับผิดชอบกด "แก้ไข" ผล Lab ที่บันทึกแล้วและยังไม่กดบันทึก/ยกเลิก */
+  labEditSession?: { startedAt: string; startedBy?: string; reason: string } | null;
   labReturnNote?: string;
   qcReturnNote?: string;
   labRedoExplanation?: string;

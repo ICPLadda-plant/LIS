@@ -17,6 +17,8 @@ const PetitionAuditLogSchema = new mongoose.Schema(
         'resultEntered',   // QC ใส่ค่าพารามิเตอร์ครั้งแรก
         'resultUpdated',   // QC แก้ค่าพารามิเตอร์
         'recheck',         // ผู้ใช้งานขอให้ QC Head และผู้ส่งคำขอตรวจสอบซ้ำ
+        'labResultEdited', // แก้ไขผล Lab หลังบันทึก (เริ่ม/บันทึก/ยกเลิก) พร้อมเหตุผล
+        'labResultCleared', // ล้างค่าผล Lab หลังบันทึก พร้อมเหตุผล
       ],
       required: true,
     },

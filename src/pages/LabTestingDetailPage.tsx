@@ -6,6 +6,7 @@ import {
   Loader2,
   AlertCircle,
   AlertTriangle,
+  Pencil,
   RotateCcw,
   Save,
   Send,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
+import LabReasonDialog from '@/components/petition/LabReasonDialog';
 import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
 import { api, type ParameterItem, type ParameterValueField, type InstrumentSource, type InstrumentReading, type ValueProvenance } from '@/lib/api';
@@ -459,6 +461,7 @@ export default function LabTestingDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [wasReturned, setWasReturned] = useState(false);
   const [redoExplanation, setRedoExplanation] = useState('');
+  const [reasonDialog, setReasonDialog] = useState<'edit' | 'clear' | null>(null);
   const [selectedPhase, setSelectedPhase] = useState<PetitionPhase>(1);
   const autosaves = useMemo(createResultAutosaveQueue, [id]);
   useEffect(() => () => { void autosaves.flush().catch(() => {}); }, [autosaves]);
@@ -953,14 +956,36 @@ export default function LabTestingDetailPage() {
     }
   };
 
-  const handleRecheck = async () => {
+  // ผลที่บันทึกแล้ว: กด "แก้ไข"/"ล้างค่า" ต้องระบุเหตุผลก่อน (เก็บ log ฝั่ง server)
+  const handleReasonConfirm = async (reason: string) => {
+    const action = reasonDialog === 'clear' ? 'clear' : 'edit-start';
+    try {
+      const updated = await api.labResultAction(petition._id, action, reason);
+      setRequestedPetition(updated);
+      if (action === 'clear') {
+        await loadResults(petition._id);
+        toast.success('ล้างค่าผล Lab แล้ว');
+      } else {
+        toast.success('เปิดแก้ไขผล Lab แล้ว');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'ดำเนินการไม่สำเร็จ');
+      throw error;
+    }
+  };
+
+  const finishEdit = async (action: 'edit-save' | 'edit-cancel') => {
     if (submitting) return;
     setSubmitting(true);
     try {
-      await api.requestPetitionRecheck(petition._id, user?.name ?? user?.email ?? 'system');
-      toast.success('แจ้งขอตรวจสอบซ้ำไปยัง QC Head และผู้ส่งคำขอแล้ว — เปลี่ยนผู้รับงานได้ที่หน้า Assign');
+      if (action === 'edit-save') await autosaves.flush();
+      else await autosaves.flush().catch(() => {});
+      const updated = await api.labResultAction(petition._id, action);
+      setRequestedPetition(updated);
+      await loadResults(petition._id);
+      toast.success(action === 'edit-save' ? 'บันทึกการแก้ไขผล Lab เรียบร้อย' : 'ยกเลิกการแก้ไขและคืนค่าเดิมแล้ว');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'แจ้งขอตรวจสอบซ้ำไม่สำเร็จ');
+      toast.error(error instanceof Error ? error.message : 'ดำเนินการไม่สำเร็จ');
     } finally {
       setSubmitting(false);
     }
@@ -1015,8 +1040,11 @@ export default function LabTestingDetailPage() {
   const isAssigned = isFullAccess || isAssignedTo(petition.assignedTo, user);
   // ผล Lab ที่ออกแล้วแก้ไขได้จนกว่าคำร้องจะปิด Final Result; การกด
   // "แก้ไขผล Lab" จากหน้ารายการจึงต้องเปิดช่องกรอกจริงตามชื่อปุ่ม.
-  const isLocked = ['approved', 'rejected'].includes(petition.status) || !isAssigned || !!pendingSample || pendingDensity;
+  const isLocked = ['approved', 'rejected'].includes(petition.status) || !!petition.labApprovedAt || !isAssigned || !!pendingSample || pendingDensity;
   const hasSubmittedLab = !!petition.labCompletedAt;
+  const isEditingSubmitted = hasSubmittedLab && !!petition.labEditSession;
+  // บันทึกผลแล้ว = ดูอย่างเดียว จนกว่าจะกด "แก้ไข"
+  const viewOnly = hasSubmittedLab && !isEditingSubmitted;
   const switchablePetitions = (worklistData?.items ?? []).filter((p) =>
     !!labReceivedAt(p) && (p.items ?? []).some(
       (it) =>
@@ -1227,7 +1255,7 @@ export default function LabTestingDetailPage() {
                             )}
                           </div>
                           {(() => {
-                            const fieldDisabled = isLocked || phaseLocked || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
+                            const fieldDisabled = isLocked || viewOnly || phaseLocked || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
 
                             // Render a single editable render-unit. `srcValues` is the
                             // value-object to read/display from; `onUnitChange` persists a
@@ -1785,21 +1813,53 @@ export default function LabTestingDetailPage() {
             {abnormalCount > 0 && labReceivedAt(petition) && (
               <Button variant="outline" onClick={() => setAdditionalSampleOpen(true)} disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}>ขอตัวอย่างเพิ่ม</Button>
             )}
-            <Button variant="outline" onClick={handleRecheck} disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey} className="gap-2">
-              <RotateCcw className="h-4 w-4" />
-              Re-check
-            </Button>
-            <Button
-              variant={isComplete ? 'primary' : 'outline'}
-              onClick={hasSubmittedLab ? handleSaveDraft : isComplete ? handleSubmitResult : handleSaveDraft}
-              disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}
-              className="gap-2"
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isComplete ? <Send className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-              {hasSubmittedLab ? 'บันทึกการแก้ไข' : isComplete ? 'บันทึก' : 'บันทึกแบบร่าง'}
-            </Button>
+            {viewOnly ? (
+              <>
+                <Button variant="outline" onClick={() => setReasonDialog('clear')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  ล้างค่า
+                </Button>
+                <Button variant="primary" onClick={() => setReasonDialog('edit')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
+                  <Pencil className="h-4 w-4" />
+                  แก้ไข
+                </Button>
+              </>
+            ) : isEditingSubmitted ? (
+              <>
+                <Button variant="outline" onClick={() => void finishEdit('edit-cancel')} disabled={submitting}>
+                  ยกเลิก
+                </Button>
+                <Button variant="primary" onClick={() => void finishEdit('edit-save')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  บันทึก
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant={isComplete ? 'primary' : 'outline'}
+                onClick={isComplete ? handleSubmitResult : handleSaveDraft}
+                disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}
+                className="gap-2"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isComplete ? <Send className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                {isComplete ? 'บันทึก' : 'บันทึกแบบร่าง'}
+              </Button>
+            )}
           </div>
         )}
+
+        <LabReasonDialog
+          open={reasonDialog !== null}
+          onOpenChange={(open) => { if (!open) setReasonDialog(null); }}
+          title={reasonDialog === 'clear' ? 'ล้างค่าผล Lab' : 'แก้ไขผล Lab'}
+          description={reasonDialog === 'clear'
+            ? 'ค่าที่กรอกไว้ทั้งหมดจะถูกล้างเหมือนยังไม่เคยกรอก ระบบจะเก็บค่าเดิมและเหตุผลไว้ในประวัติ'
+            : 'ระบุเหตุผลที่ต้องแก้ไขผลที่บันทึกแล้ว'}
+          confirmLabel={reasonDialog === 'clear' ? 'ล้างค่า' : 'เริ่มแก้ไข'}
+          defaultReason={reasonDialog === 'edit' ? 'ใส่ค่าผิด' : ''}
+          destructive={reasonDialog === 'clear'}
+          onConfirm={handleReasonConfirm}
+        />
 
         {/* รอหัวหน้า Lab ออกผล */}
         {labItems.length > 0 && petition.labCompletedAt && !petition.labApprovedAt && (

@@ -15,6 +15,9 @@ import type {
 } from "@/types/stock";
 import { summarizeStandard } from "@/lib/stockStatus";
 import { formatDate } from "@/lib/dateTime";
+import { isUrgentPetition, prioritizeUrgentPetitions } from "@/lib/urgentPetition";
+
+export { isUrgentPetition, prioritizeUrgentPetitions };
 
 export interface MetricsCtx {
   petitions: Petition[];
@@ -429,10 +432,6 @@ export function buildQcStaffWorklist(
   return rows.sort((a, b) => timeValue(rowTime(b)) - timeValue(rowTime(a)));
 }
 
-export function prioritizeUrgentPetitions(petitions: Petition[]): Petition[] {
-  return [...petitions].sort((a, b) => Number(b.priority === 1) - Number(a.priority === 1));
-}
-
 export function qcStaffWorklistCounts(
   petitions: Petition[],
   user: LabDashboardUser | null | undefined,
@@ -759,7 +758,7 @@ export function standardTimeCoverageData(summary: StandardTimeCoverageSummary[])
 export function computeKpi(id: KpiId, ctx: MetricsCtx): KpiValue {
   const P = ctx.petitions;
   switch (id) {
-    case "urgentTotal": return { value: P.filter((petition) => petition.priority === 1).length };
+    case "urgentTotal": return { value: P.filter(isUrgentPetition).length };
     case "petitionsTotal": return { value: P.length };
     case "inProgress": return { value: countStatus(P, "inProgress") };
     case "waitingReceive": return { value: countStatus(P, "sampleSent") };

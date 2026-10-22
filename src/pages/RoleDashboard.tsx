@@ -31,6 +31,7 @@ import {
   labWorklistCounts,
   paginateLabWorklist,
   prioritizeUrgentPetitions,
+  isUrgentPetition,
   qcStaffWorklistCounts,
   type LabHeadWorklistFilter,
   type LabHeadWorkloadPeriod,
@@ -213,7 +214,7 @@ export default function RoleDashboard() {
   );
 
   const urgentIds = useMemo(
-    () => new Set(petitions.filter((petition) => petition.priority === 1).map((petition) => petition._id)),
+    () => new Set(petitions.filter(isUrgentPetition).map((petition) => petition._id)),
     [petitions],
   );
 

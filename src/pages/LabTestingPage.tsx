@@ -31,6 +31,8 @@ import { assigneeNamesForUser, isAssignedTo } from '@/lib/assignment';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
 import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
+import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
+import UrgentBadge from '@/components/lis/UrgentBadge';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
 
@@ -68,9 +70,9 @@ export default function LabTestingPage() {
     limit: 50,
   });
 
-  const petitions: Petition[] = (data?.items ?? [])
+  const petitions: Petition[] = prioritizeUrgentPetitions((data?.items ?? [])
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
-    .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user));
+    .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user)));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
@@ -105,6 +107,7 @@ export default function LabTestingPage() {
           <>
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-sky-600">{p.petitionNo}</span>
+              <UrgentBadge petition={p} />
               {returnedMap[p._id] && (
                 <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
               )}
@@ -174,7 +177,7 @@ export default function LabTestingPage() {
               navigate(`/lab-testing/${p._id}`);
             }}
           >
-            {p.labCompletedAt ? 'แก้ไขผล Lab' : 'เข้าตรวจ'}
+            {p.labCompletedAt ? 'ดูรายละเอียด' : 'เข้าตรวจ'}
           </Button>
         ) : (
           <span className="text-xs text-grey-400">รอสแกนรับ</span>

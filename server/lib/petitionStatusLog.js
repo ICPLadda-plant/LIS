@@ -159,7 +159,10 @@ function buildCurrent(petition, qc, fieldLabels, labDone) {
     })
     : null;
   const labTrack = hasLabItem
-    ? buildLabTrack({ labReceived, isAssignee: assigneeSide === 'lab', assignee, started, labDone })
+    ? buildLabTrack({
+      labReceived, isAssignee: assigneeSide === 'lab', assignee, started, labDone,
+      labApproved: !!petition.labApprovedAt,
+    })
     : null;
 
   const tracks = {};
@@ -203,10 +206,12 @@ function buildQcTrack({ qcReceived, isAssignee, assignee, started, qc, fieldLabe
   return { label: 'QC รับแล้ว' };
 }
 
-// Lab side of `current`. Returns { label } or null (omitted when lab is done).
+// Lab side of `current`. Keep the track visible after Lab finishes so callers can
+// still identify Lab-owned results such as %AI while QC continues independently.
 // `isAssignee` = the single petition assignee belongs to Lab.
-function buildLabTrack({ labReceived, isAssignee, assignee, started, labDone }) {
-  if (labDone) return null; // lab finished → drop track, QC drives from here
+function buildLabTrack({ labReceived, isAssignee, assignee, started, labDone, labApproved }) {
+  if (labApproved) return { label: 'Lab ออกผลแล้ว' };
+  if (labDone) return { label: 'Lab ตรวจครบ — รอออกผล' };
   if (!labReceived) return { label: 'Lab รอรับ' };
   if (isAssignee) {
     return started
@@ -365,8 +370,17 @@ function isLabRecheckPending(petition) {
 
 // Top-level: assemble { current, timeline } from route-loaded inputs.
 function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone) {
-  const qc = computeQcHeuristic(petition, qcResults, parameters);
-  const fieldLabels = enteredFieldLabels(qcResults);
+  const parameterById = new Map((parameters ?? []).map((param) => [String(param._id), param]));
+  // QCTestResult stores entries from both screens.  Only QC-scoped entries may
+  // drive the QC progress label; otherwise Lab %AI fields are incorrectly
+  // reported as "QC กำลังตรวจ".  Keep unknown legacy rows on QC as the safe
+  // backward-compatible default, matching the default parameter scope.
+  const qcScopedResults = (qcResults ?? []).filter((result) => {
+    const parameter = parameterById.get(String(result.parameterId));
+    return !parameter || parameter.scope !== 'lab';
+  });
+  const qc = computeQcHeuristic(petition, qcScopedResults, parameters);
+  const fieldLabels = enteredFieldLabels(qcScopedResults);
   const labRecheck = isLabRecheckPending(petition) && hasLabTrack(petition);
   // re-check = Lab ยังไม่จบ แม้เคยบันทึกผลไปแล้ว → คง track Lab ไว้
   const current = buildCurrent(petition, qc, fieldLabels, !!labDone && !labRecheck);

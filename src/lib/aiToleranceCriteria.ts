@@ -87,6 +87,38 @@ function normalizePercent(value: string): string {
   return Number.isFinite(parsed) ? String(parsed) : value.trim();
 }
 
+function decimalPlaces(value: string): number {
+  return value.includes(".") ? value.split(".")[1].length : 0;
+}
+
+function formatRangeCenter(value: number, precision: number): string {
+  return value.toFixed(precision).replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+}
+
+export function plusMinusAiCriteriaFromRange(criteria?: string): string | null {
+  const source = criteria?.trim() ?? "";
+  if (!source) return null;
+  let converted = false;
+  const normalized = source.replace(
+    /(-?\d+(?:\.\d+)?)\s*%?\s*[-–—]\s*(-?\d+(?:\.\d+)?)\s*%?(?:\s*W\s*\/\s*[WV])?/gi,
+    (_match, lowerText: string, upperText: string) => {
+      const lower = Number(lowerText);
+      const upper = Number(upperText);
+      if (!Number.isFinite(lower) || !Number.isFinite(upper) || upper < lower) return _match;
+      const sourcePrecision = Math.max(decimalPlaces(lowerText), decimalPlaces(upperText));
+      const scale = 10 ** sourcePrecision;
+      const lowerScaled = Math.round(lower * scale);
+      const upperScaled = Math.round(upper * scale);
+      const precision = sourcePrecision + (Math.abs(upperScaled - lowerScaled) % 2 ? 1 : 0);
+      const center = (lower + upper) / 2;
+      const tolerance = (upper - lower) / 2;
+      converted = true;
+      return `${formatRangeCenter(center, precision)}% ± ${tolerance.toFixed(precision)}`;
+    },
+  );
+  return converted ? normalized : null;
+}
+
 function textAfterMatchedPercent(value: string, match: RegExpMatchArray): string {
   return value.slice((match.index ?? 0) + match[0].length).trim().toUpperCase();
 }
@@ -111,6 +143,13 @@ export function aiToleranceCriteriaForCommonName(commonName?: string): string | 
     if (selected && !criteria.includes(selected.criteria)) criteria.push(selected.criteria);
   }
   return criteria.length ? criteria.join(" / ") : null;
+}
+
+export function resolveAiToleranceCriteria(commonName?: string, fallbackCriteria?: string): string | null {
+  return aiToleranceCriteriaForCommonName(commonName)
+    || plusMinusAiCriteriaFromRange(fallbackCriteria)
+    || fallbackCriteria?.trim()
+    || null;
 }
 
 export function isAiContentTestItem(testItem?: string): boolean {

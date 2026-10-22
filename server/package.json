@@ -12,7 +12,9 @@
     "seed:import": "node import-data.js",
     "test": "node scripts/run-tests.js",
     "backfill:stock-standard-label-runs": "node scripts/backfill-stock-standard-label-runs.js",
-    "backfill:stock-standard-label-runs:commit": "node scripts/backfill-stock-standard-label-runs.js --commit"
+    "backfill:stock-standard-label-runs:commit": "node scripts/backfill-stock-standard-label-runs.js --commit",
+    "backfill:ai-density": "node scripts/backfill-ai-density-results.js",
+    "backfill:ai-density:commit": "node scripts/backfill-ai-density-results.js --commit"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

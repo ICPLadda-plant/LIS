@@ -154,6 +154,10 @@ const PetitionSchema = new mongoose.Schema(
     // Assign ให้เปลี่ยนผู้รับงานได้ จนกว่าหัวหน้า Lab ออกผล (labApprovedAt ใหม่กว่า)
     labRecheckRequestedAt: Date,
     labRecheckRequestedBy: String,
+    labRecheckReason: String,
+    labRecheckCount: { type: Number, default: 0 },
+    // แก้ไขผล Lab ที่บันทึกแล้ว: snapshot ก่อนแก้ (ใช้คืนค่าตอนยกเลิก + เก็บ log ค่าเดิม)
+    labEditSession: { type: mongoose.Schema.Types.Mixed, default: null },
     // เหตุผลล่าสุดที่ track ถูกส่งกลับ (เคลียร์เมื่อผู้ทดสอบ re-confirm)
     labReturnNote: String,
     qcReturnNote: String,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Check, Trash2 } from "lucide-react";
+import { Bell, Check, Pin, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -79,6 +79,7 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
               </Button>
             )}
             {notifications.length > 0 && (
+              notifications.some(n => !n.pinned) &&
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={clearAll}>
                 <Trash2 className="w-3 h-3 mr-1" /> ล้าง
               </Button>
@@ -115,13 +116,18 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
                   className={cn(
                     "p-3 flex gap-2.5 cursor-pointer hover:bg-accent/50 transition-colors",
                     !n.read && "bg-accent/30",
+                    n.pinned && "bg-destructive/5 hover:bg-destructive/10",
                   )}
                   onClick={() => {
                     markRead(n.id);
                     if (n.link) navigate(n.link);
                   }}
                 >
-                  <span className={cn("mt-1.5 h-2 w-2 rounded-full shrink-0", levelColor[n.level])} />
+                  {n.pinned ? (
+                    <Pin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" aria-label="ปักไว้" />
+                  ) : (
+                    <span className={cn("mt-1.5 h-2 w-2 rounded-full shrink-0", levelColor[n.level])} />
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium text-foreground truncate">{n.title}</p>
@@ -131,13 +137,15 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
                     )}
                     <div className="flex items-center justify-between mt-1">
-                      <span className="text-[11px] text-muted-foreground">{formatTime(n.createdAt)}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {n.pinned ? "เตือนทุกต้นชั่วโมง" : formatTime(n.createdAt)}
+                      </span>
                       <button
                         type="button"
                         className="text-[11px] text-muted-foreground hover:text-destructive"
                         onClick={(e) => { e.stopPropagation(); dismiss(n.id); }}
                       >
-                        ลบ
+                        {n.pinned ? "ปิดชั่วคราว" : "ลบ"}
                       </button>
                     </div>
                   </div>

@@ -56,6 +56,8 @@ import {
   type PetitionRouteTarget,
 } from '@/types/petition.types';
 import type { SixMonthMedicineStockItem } from '@/types/stock';
+import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
+import UrgentBadge from '@/components/lis/UrgentBadge';
 
 const PAGE_SIZE = 20;
 const NEW_PETITION_PATH = '/petitions/new';
@@ -870,7 +872,7 @@ export default function PetitionListPage({
   );
 
   const ownedItems = useMemo(
-    () => (data?.items ? applyVisibilityFilter(data.items) : []),
+    () => (data?.items ? prioritizeUrgentPetitions(applyVisibilityFilter(data.items)) : []),
     [applyVisibilityFilter, data?.items],
   );
 
@@ -989,6 +991,7 @@ export default function PetitionListPage({
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-base font-semibold text-primary-500">{petition.petitionNo}</p>
+              <UrgentBadge petition={petition} />
               <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
               <Badge variant="blue-soft">{petitionDepartmentLabel(petition)}</Badge>
             </div>

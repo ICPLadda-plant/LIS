@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { isAiContentTestItem, resolveAiToleranceCriteria } from "@/lib/aiToleranceCriteria";
 import { aiContentTestItemForCommonName, isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { productionDateFromLotNo } from "@/lib/coaLot";
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
@@ -58,7 +58,7 @@ function resultFormFromRows(rows: CoaResultSnapshot[], commonName?: string): Res
   const appearanceCriteria = appearance?.criteria?.trim();
   return {
     analysisDate: dateValue(analysisDate?.result),
-    aiCriteria: aiToleranceCriteriaForCommonName(commonName) || ai?.criteria || "",
+    aiCriteria: resolveAiToleranceCriteria(commonName, ai?.criteria) || "",
     density: density?.result || "",
     aiResult: ai?.result || "",
     appearance: appearanceCriteria && appearanceCriteria !== "-"
@@ -151,9 +151,10 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
     };
   }, [autofill.data, editing, open]);
   useEffect(() => {
-    const aiCriteria = aiToleranceCriteriaForCommonName(sample.commonName);
-    if (!aiCriteria) return;
-    setResultForm((current) => current.aiCriteria === aiCriteria ? current : { ...current, aiCriteria });
+    setResultForm((current) => {
+      const aiCriteria = resolveAiToleranceCriteria(sample.commonName, current.aiCriteria);
+      return !aiCriteria || current.aiCriteria === aiCriteria ? current : { ...current, aiCriteria };
+    });
   }, [sample.commonName]);
   useEffect(() => {
     if (!open) {

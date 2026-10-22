@@ -46,6 +46,11 @@ async function resultRoundContext(req, res, parameter) {
     return null;
   }
   const sampleRoundId = requiredSampleRoundId(petition, side, req.body.itemSeq);
+  // ผล Lab ที่บันทึกแล้วเป็นโหมดดูอย่างเดียว — แก้ได้เฉพาะหลังกด "แก้ไข" (มี labEditSession) และก่อนออกผล
+  if (side === 'lab' && (petition.labApprovedAt || (petition.labCompletedAt && !petition.labEditSession))) {
+    res.status(409).json({ error: 'ผล Lab บันทึกแล้ว กรุณากด "แก้ไข" และระบุเหตุผลก่อนแก้ค่า' });
+    return null;
+  }
   if (pendingAdditionalSamples(petition, side).length || String(req.body.sampleRoundId || '') !== sampleRoundId) {
     res.status(409).json({ error: 'รอบตัวอย่างเปลี่ยนแปลงหรือยังไม่ได้รับ กรุณาโหลดคำขอใหม่' });
     return null;

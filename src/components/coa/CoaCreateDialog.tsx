@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { FilePlus2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { aiToleranceCriteriaForCommonName, isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { isAiContentTestItem, resolveAiToleranceCriteria } from "@/lib/aiToleranceCriteria";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,7 +65,7 @@ function coaDefaults(options: CoaSourceResult[], commonName?: string, erpAppeara
     ?? options.find((option) => option.kind === "result" && /density/i.test(option.testItem ?? ""));
   return {
     aiResult: ai?.result ?? "",
-    aiCriteria: aiToleranceCriteriaForCommonName(commonName) || ai?.criteria || "",
+    aiCriteria: resolveAiToleranceCriteria(commonName, ai?.criteria) || "",
     appearance: erpAppearance || physical?.suggestedEnglish || physical?.result || "",
     density: density?.result ?? "",
     analysisDate: "",

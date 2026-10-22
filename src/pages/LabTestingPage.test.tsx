@@ -130,7 +130,7 @@ describe('LabTestingPage assignment visibility', () => {
   });
 
   it.each(['lab-analyze', 'lab-head', 'admin'])(
-    'keeps the edit button while waiting for QC for %s',
+    'keeps the view details button while waiting for QC for %s',
     async (role) => {
       mocks.user.roles = [role];
       mocks.assignedPetition.labCompletedAt = '2026-09-16T03:00:00.000Z';
@@ -143,7 +143,7 @@ describe('LabTestingPage assignment visibility', () => {
       );
 
       expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'แก้ไขผล Lab' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'ดูรายละเอียด' })).toBeInTheDocument();
     },
   );
 });
