@@ -1,4 +1,4 @@
-import { PenLine } from "lucide-react";
+import { PenLine, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { FONT_SIZE_OPTIONS } from "@/lib/appPreferences";
+import { previewNotificationSound } from "@/lib/notificationSoundPreview";
 import type {
   AppFontFamilyPreference,
   AppFontSizePreference,
@@ -23,6 +24,7 @@ interface ProfileSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   showSignatureAction: boolean;
   onAddSignature: () => void;
+  canTestSounds?: boolean;
 }
 
 const selectClassName =
@@ -60,6 +62,7 @@ const ProfileSettingsDialog = ({
   onOpenChange,
   showSignatureAction,
   onAddSignature,
+  canTestSounds = false,
 }: ProfileSettingsDialogProps) => {
   const { preferences, setPreference, setNotificationSound } = useAppPreferences();
 
@@ -190,13 +193,27 @@ const ProfileSettingsDialog = ({
                     <span className="block text-sm font-medium text-foreground">{option.label}</span>
                     <span className="block text-xs text-muted-foreground">{option.description}</span>
                   </label>
-                  <Switch
-                    id={`profile-sound-${option.key}`}
-                    aria-label={option.label}
-                    checked={preferences.soundEnabled && preferences.notificationSounds[option.key]}
-                    disabled={!preferences.soundEnabled}
-                    onCheckedChange={(checked) => setNotificationSound(option.key, checked)}
-                  />
+                  <div className="flex shrink-0 items-center gap-3">
+                    {canTestSounds ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={`ทดสอบเสียง ${option.label}`}
+                        onClick={() => void previewNotificationSound(option.key)}
+                      >
+                        <Volume2 />
+                        ทดสอบ
+                      </Button>
+                    ) : null}
+                    <Switch
+                      id={`profile-sound-${option.key}`}
+                      aria-label={option.label}
+                      checked={preferences.soundEnabled && preferences.notificationSounds[option.key]}
+                      disabled={!preferences.soundEnabled}
+                      onCheckedChange={(checked) => setNotificationSound(option.key, checked)}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
