@@ -28,6 +28,8 @@ import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
 import { isVisibleInQcTestingQueue } from '@/lib/petitionQueueVisibility';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { rankSearchResults } from '@/lib/searchRanking';
+import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
+import UrgentBadge from '@/components/lis/UrgentBadge';
 
 
 export default function QCTestingPage() {
@@ -58,7 +60,7 @@ export default function QCTestingPage() {
     ...(data?.items ?? []),
     ...(staleReceivedData?.items ?? []),
   ].filter(isVisibleInQcTestingQueue);
-  const petitions = rankSearchResults(visiblePetitions, search, (petition) => {
+  const petitions = prioritizeUrgentPetitions(rankSearchResults(visiblePetitions, search, (petition) => {
     const items = petition.items ?? [];
     const itemNos = items.map((item) => item.itemNo).filter((itemNo) => itemNo?.trim());
     return {
@@ -72,7 +74,7 @@ export default function QCTestingPage() {
         ...items.flatMap((item) => [item.sampleName, item.commonName, item.batchNo, item.lotNo]),
       ],
     };
-  });
+  }));
 
   // Bulk-fetch abnormal flag for petitions that may have results
   // (sampleSent has no results yet, so skip it)
@@ -109,6 +111,7 @@ export default function QCTestingPage() {
           <>
             <div className="flex items-center gap-1.5">
               <span className="font-semibold text-primary-500">{p.petitionNo}</span>
+              <UrgentBadge petition={p} />
               {returnedMap[p._id] && (
                 <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
               )}

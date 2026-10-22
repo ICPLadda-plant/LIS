@@ -68,7 +68,7 @@ function unit(petition, track, stage, elapsedMin, baselineMin, overrideState) {
     petitionId: String(petition._id),
     petitionNo: petition.petitionNo,
     dept: petition.dept,
-    priority: petition.priority === 1 ? 1 : 0,
+    priority: Number(petition.priority) === 1 ? 1 : 0,
     track,
     stage,
     stageLabel: STAGE_LABELS[stage],
@@ -232,7 +232,7 @@ function buildLiveSection(petitions, { now, qcBaseline, abnormalFlags = {}, wind
   const units = allUnits.filter((u) => scopedIds.has(u.petitionId));
 
   // แหล่งเดียวกันสำหรับทั้ง counts และ ids — เพื่อไม่ให้ตัวเลขกับ id ที่ลิงก์ไปเพี้ยนกัน
-  const urgentPetitions = openPetitions.filter((p) => p.priority === 1);
+  const urgentPetitions = openPetitions.filter((p) => Number(p.priority) === 1);
   const overdueUnits = units.filter((u) => u.state === 'overdue');
   const atRiskUnits = units.filter((u) => u.state === 'atRisk');
   const unassignedUnits = units.filter((u) => u.state === 'unassigned');

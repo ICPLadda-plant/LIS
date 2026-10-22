@@ -186,6 +186,11 @@ router.get('/', async (req, res) => {
       const list = String(status).split(',').map((s) => s.trim()).filter(Boolean);
       q.status = list.length > 1 ? { $in: list } : list[0];
     }
+    // ?urgent=true → เฉพาะงานด่วนที่ยังเปิดอยู่ (ใช้โดยตัวเตือนงานด่วนทุกชั่วโมง)
+    if (req.query.urgent === 'true') {
+      q.priority = { $in: [1, '1'] };
+      if (!status) q.status = { $nin: ['approved', 'rejected'] };
+    }
 
     // ?ids=a,b,c → ดึงเฉพาะใบที่ระบุ (ใช้โดยการไฮไลท์จากแดชบอร์ด) — ไม่แบ่งหน้า
     const idsRaw = String(req.query.ids || '').trim();
@@ -248,7 +253,8 @@ router.get('/', async (req, res) => {
           { $skip: (page - 1) * limit },
           { $limit: limit },
         ]).then((rows) => rows.map((row) => Petition.hydrate(row)))
-        : Petition.find(q).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+        // งานด่วน (priority = 1) ขึ้นก่อนเสมอ เพื่อไม่ให้ตกไปอยู่หน้าถัดไปของคิว
+        : Petition.find(q).sort({ priority: -1, createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       Petition.countDocuments(q),
       Petition.countDocuments(summaryQ),
       Petition.aggregate([

@@ -49,6 +49,8 @@ const createdTime = (p: Petition) => Date.parse(p.createdAt) || 0;
 /** คิวรอมอบหมาย: งาน Re-check ขึ้นก่อนทั้งหมด แล้วเรียงตามวันที่สร้างคำขอ (เก่า → ใหม่) */
 function sortAssignQueue(petitions: Petition[]): Petition[] {
   return [...petitions].sort((a, b) => {
+    const urgent = Number(isUrgentPetition(b)) - Number(isUrgentPetition(a));
+    if (urgent !== 0) return urgent;
     const recheck = Number(isLabRecheckPending(b)) - Number(isLabRecheckPending(a));
     if (recheck !== 0) return recheck;
     const time = createdTime(a) - createdTime(b);
@@ -76,6 +78,8 @@ import {
   type PetitionAssignedMachine,
   type PetitionItem,
 } from '@/types/petition.types';
+import { isUrgentPetition, prioritizeUrgentPetitions } from '@/lib/urgentPetition';
+import UrgentBadge from '@/components/lis/UrgentBadge';
 
 type TabKey = 'normal' | 'phase2';
 
@@ -556,7 +560,7 @@ export default function PetitionAssignPage() {
   const visiblePetitions = useMemo(() => {
     const source = activeTab === 'phase2' ? phase2Petitions : normalPetitions;
     const query = search.trim().toLowerCase();
-    if (!query) return source;
+    if (!query) return prioritizeUrgentPetitions(source);
     const matches = source.filter((petition) =>
       [
         petition.petitionNo,
@@ -567,13 +571,13 @@ export default function PetitionAssignPage() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query)),
     );
-    return rankSearchResults(matches, search, (petition) => {
+    return prioritizeUrgentPetitions(rankSearchResults(matches, search, (petition) => {
       const itemNos = (petition.items ?? []).map((item) => item.itemNo).filter((itemNo) => itemNo?.trim());
       return {
         primary: itemNos.length ? itemNos : [petition.petitionNo],
         secondary: [petition.petitionNo, petition.submittedBy?.name, petitionDepartmentLabel(petition), petition.assignedTo?.name],
       };
-    });
+    }));
   }, [activeTab, normalPetitions, phase2Petitions, search]);
 
   async function assignPetition(petition: Petition, employeeIdOverride?: string): Promise<boolean> {
@@ -1159,6 +1163,7 @@ function PetitionCard({
             >
               {petition.petitionNo}
             </button>
+            <UrgentBadge petition={petition} />
             {showStatusBadge && (
               <Badge variant={statusCfg.variant} className="ml-auto shrink-0">
                 {statusCfg.label}

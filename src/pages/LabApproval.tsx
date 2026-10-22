@@ -12,6 +12,8 @@ import { DataTable, type DataTableColumn } from "@/components/lis/DataTable";
 import { petitionStatusBadge } from "@/lib/statusBadge";
 import { getAiStatus, streamDraftNote } from "@/lib/aiApi";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
+import { isUrgentPetition } from "@/lib/urgentPetition";
+import UrgentBadge from "@/components/lis/UrgentBadge";
 
 const API_BASE = import.meta.env.BASE_URL + "api";
 
@@ -47,7 +49,9 @@ const LabApproval = () => {
   const sortedPetitions = useMemo(
     () =>
       [...petitions].sort(
-        (a, b) => priorityScore(b, abnormalMap, returnedMap) - priorityScore(a, abnormalMap, returnedMap),
+        (a, b) =>
+          Number(isUrgentPetition(b)) - Number(isUrgentPetition(a)) ||
+          priorityScore(b, abnormalMap, returnedMap) - priorityScore(a, abnormalMap, returnedMap),
       ),
     [petitions, abnormalMap, returnedMap],
   );
@@ -90,6 +94,7 @@ const LabApproval = () => {
         <div>
           <div className="flex items-center gap-1.5">
             <span>{p.petitionNo}</span>
+            <UrgentBadge petition={p} />
             {returnedMap[p._id] && (
               <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
             )}

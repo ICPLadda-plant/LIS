@@ -117,6 +117,13 @@ const playNotificationSound = (sound: PetitionNotificationSound = "sampleArrival
   playAudioFile({ fallback: playSampleArrivalFallbackTone, repeat: SAMPLE_ARRIVAL_PLAY_COUNT, url: SAMPLE_ARRIVAL_SOUND_URL });
 };
 
+/** เสียงเตือนงานด่วนรายชั่วโมง — ใช้เสียงและการตั้งค่าเปิด/ปิดเดียวกับตัวอย่างมาถึง */
+// eslint-disable-next-line react-refresh/only-export-components
+export const playUrgentReminderSound = () => {
+  if (isScannerRoute()) return;
+  playNotificationSound("sampleArrival");
+};
+
 /**
  * Poll ความเคลื่อนไหวของคำขอถี่พอสำหรับแจ้งเตือนงานใหม่ แล้วยิงเข้ากระดิ่ง
  * cursor เดินหน้าเฉพาะตอน query สำเร็จ — เน็ตกระตุกแล้วต้องไม่กลืน event ที่ยังไม่เคยแสดง
