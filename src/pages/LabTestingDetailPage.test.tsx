@@ -268,11 +268,18 @@ describe("LabTestingDetailPage", () => {
   it("enables final save and persists calculated %AI with the substance key", async () => {
     mockState.activeFixtures = {
       ...fixtures,
-      parameters: fixtures.parameters.map((parameter) => ({
-        ...parameter,
-        valueFields: parameter.valueFields.map((field) => ({ ...field, required: true })),
-      })),
-      results: [],
+      petition: {
+        ...fixtures.petition,
+        items: fixtures.petition.items.map((item) => ({ ...item, testItems: "Active Ingredient, ค่า ถพ." })),
+      },
+      parameters: [
+        ...fixtures.parameters.map((parameter) => ({
+          ...parameter,
+          valueFields: parameter.valueFields.map((field) => ({ ...field, required: true })),
+        })),
+        { _id: "density-param", name: "ค่า ถพ.", scope: "qc", shareWithLab: true, applyAll: true, valueFields: [{ label: "ค่าถพ.", type: "number" }] },
+      ],
+      results: [{ petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: { "ค่าถพ.": "1.005" } }],
     };
 
     render(<LabTestingDetailPage />);

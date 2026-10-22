@@ -10,14 +10,36 @@ describe('calculateAi', () => {
     expect(result.ai).toBeCloseTo(0.0018);
   });
 
-  it('defaults missing or invalid density to one', () => {
-    expect(calculateAi({ '% Sample 1': '2' }).ai).toBe(2);
-    expect(calculateAi({ '% Sample 1': '2' }, 0).ai).toBe(2);
+  it('leaves %AI empty until a specific gravity is available', () => {
+    expect(calculateAi({ '% Sample 1': '2' }).ai).toBeNull();
+    expect(calculateAi({ '% Sample 1': '2' }, 0).ai).toBeNull();
+    expect(calculateAi({ '% Sample 1': '2' }).sampleAverage).toBe(2);
+    expect(findAiDensity([{ 'ค่าถพ.': '' }])).toBeNull();
   });
 
   it('reads density scoped to an active ingredient', () => {
     const density = findAiDensity([{ 'ค่าถพ.::OMETHOATE': '1.075' }]);
     expect(calculateAi({ '% Sample 1': '50' }, density).ai).toBe(53.75);
+  });
+
+  it('calculates OMETHOATE %AI as Sample Average × specific gravity', () => {
+    const values = { '% Sample 1': '70.4', '% Sample 2': '70.5', '% Sample 3': '70.6' };
+    const density = findAiDensity([{ 'ค่า ถพ.': '1.135' }], 'omethoate');
+    expect(formatCalculatedAi(calculateAi(values, density, 'omethoate').ai)).toBe('80.02');
+  });
+
+  it('prefers the specific gravity of the same substance and accepts spelling variants', () => {
+    const records = [{ 'ค่า ถ.พ.::ABAMECTIN': '0.950', 'ค่าถพ.::OMETHOATE': '1.135', 'Density': '1.000' }];
+    expect(findAiDensity(records, 'omethoate')).toBe(1.135);
+    expect(findAiDensity(records, 'abamectin')).toBe(0.95);
+    expect(findAiDensity(records, 'imidacloprid')).toBe(1);
+    expect(findAiDensity([{ 'ค่าถพ.::ABAMECTIN': '0.950' }], 'omethoate')).toBeNull();
+  });
+
+  it('uses each substance own sample values in multi-ingredient products', () => {
+    const values = { '% Sample 1::omethoate': '70', '% Sample 1::abamectin': '2', '%AI::omethoate': '' };
+    expect(calculateAi(values, 1.1, 'omethoate').sampleAverage).toBe(70);
+    expect(calculateAi({ '% Sample 1': '70', '%AI::omethoate': '' }, 1, 'omethoate').sampleAverage).toBe(70);
   });
 
   it('shows two decimals normally and three significant decimal digits below one', () => {

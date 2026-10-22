@@ -34,7 +34,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
+import { aiGridClass, aiSubstanceFromKey, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
@@ -81,8 +81,8 @@ function resultKey(itemSeq: number, parameterId: string) {
   return `${itemSeq}__${parameterId}`;
 }
 
-function aiDensity(values: Record<string, unknown>, context: ConditionContext) {
-  return findAiDensity([values, ...Object.values(context.otherParams)]);
+function aiDensity(values: Record<string, unknown>, context: ConditionContext, substance = '') {
+  return findAiDensity([values, ...Object.values(context.otherParams)], substance);
 }
 
 const AI_FIELD_ORDER = [
@@ -1283,7 +1283,7 @@ export default function LabTestingDetailPage() {
                               const outputResult = isOutputMode ? resolveConditionalOutput(unit.field, condCtx) : null;
                               const isAiParameter = (param.valueFields ?? []).some((candidate) => calculatedAiFieldKind(candidate.label) === 'ai');
                               const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
-                              const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx)) : null;
+                              const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key)), aiSubstanceFromKey(unit.key)) : null;
 
                               // Field-level `multiple` — repeatable list of bare value rows.
                               // Each row shares the field's standard/abnormal rule; per-row
@@ -1371,7 +1371,7 @@ export default function LabTestingDetailPage() {
                                     field={effectiveField}
                                     item={item}
                                     itemGroupIds={idsFor(item)}
-                                    value={aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
+                                    value={aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null ? '' : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
                                     noteValue={srcValues[noteLabel] ?? ''}
                                     saveInfo={saveInfoSrc?.[unit.key]}
                                     noteSaveInfo={saveInfoSrc?.[noteLabel]}
@@ -1400,12 +1400,14 @@ export default function LabTestingDetailPage() {
                                       onUnitChange(unit.key, val);
                                       if (isAiParameter) {
                                         const nextValues = { ...srcValues, [unit.key]: val };
-                                        const derived = calculateAi(nextValues, aiDensity(nextValues, condCtx));
                                         fields.forEach((candidate) => {
                                           const kind = calculatedAiFieldKind(candidate.label);
                                           if (!kind) return;
                                           expandFieldForItem(candidate, item.commonName, { category: petitionCategory })
-                                            .forEach((derivedUnit) => onUnitChange(derivedUnit.key, formatCalculatedAi(derived[kind])));
+                                            .forEach((derivedUnit) => {
+                                    const substance = aiSubstanceFromKey(derivedUnit.key);
+                                    onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance), substance)[kind]));
+                                  });
                                         });
                                       }
                                       // Manual edit after a pull → mark provenance as edited (once).
@@ -1432,7 +1434,10 @@ export default function LabTestingDetailPage() {
                                       </span>
                                     </div>
                                   )}
-                                  {beforeRef != null && beforeRef !== '' ? (
+                                  {aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null && calculatedAi.ai == null && (
+                          <p className="mt-1 text-xs text-muted-foreground">รอค่า ถพ.</p>
+                        )}
+                        {beforeRef != null && beforeRef !== '' ? (
                                     <p className="text-[10px] text-muted-foreground mt-0.5">
                                       ก่อน: <span className="font-mono">{String(beforeRef)}</span>
                                     </p>
