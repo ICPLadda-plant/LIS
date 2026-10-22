@@ -438,6 +438,31 @@ test('buildStatusLog: combines dual-track current + timeline', () => {
   assert.deepStrictEqual(out.timeline.map((t) => t.label), ['ยื่นคำขอ']);
 });
 
+test('buildStatusLog: Lab %AI results never appear as QC progress', () => {
+  const petition = {
+    status: 'inProgress',
+    items: [{ seq: 1, commonName: 'omethoate', batchNo: 'B-1' }],
+    qcReceivedAt: 'T',
+    labReceivedAt: 'T',
+    reviewHistory: [],
+  };
+  const parameters = [
+    { _id: 'density', name: 'Density', status: 'active', scope: 'qc', applyAll: true, valueFields: [{ label: 'density', type: 'number' }] },
+    { _id: 'ai', name: '%AI', status: 'active', scope: 'lab', applyAll: true, valueFields: [{ label: 'Area Inj.1', type: 'number' }, { label: '%AI', type: 'number' }] },
+  ];
+  const results = [{
+    itemSeq: 1, parameterId: 'ai', parameterName: '%AI',
+    values: { 'Area Inj.1': '100', '%AI': '48.10' }, enteredAt: '1',
+  }];
+
+  const out = buildStatusLog(petition, [], results, parameters, false);
+
+  assert.strictEqual(out.current.tracks.qc.label, 'QC รับแล้ว');
+  assert.ok(!out.current.tracks.qc.label.includes('%AI'));
+  assert.strictEqual(out.current.tracks.qc.percent, undefined);
+  assert.strictEqual(out.current.tracks.lab['%AI'], '48.10');
+});
+
 test('buildStatusLog: track result is empty before receive and waiting after receive', () => {
   const parameters = [
     { _id: 'density', name: 'ค่า ถพ.', scope: 'qc', status: 'active', applyAll: true, valueFields: [] },
