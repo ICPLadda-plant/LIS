@@ -299,16 +299,19 @@ test('current: QC completed + lab not done (Lab-assignee) → QC ตรวจค
   });
 });
 
-// dual-track — lab done drops the lab track → QC drives alone
-test('current: QC completed + lab done → QC ตรวจครบ only (lab track dropped)', () => {
+// dual-track — keep completed Lab visible while QC continues
+test('current: QC completed + lab done → both completed tracks remain visible', () => {
   const p = {
     status: 'inProgress', items: [{ batchNo: 'B-1' }],
     qcReceivedAt: 'T', labReceivedAt: 'T', qcCompletedAt: 'T',
     assignedTo: ASSIGNEE, reviewHistory: [],
   };
   assert.deepStrictEqual(buildCurrent(p, { filled: 2, total: 2, percent: 100 }, ['pH'], true), {
-    label: 'QC ตรวจครบ — รอยืนยัน',
-    tracks: { qc: { side: 'qc', label: 'QC ตรวจครบ — รอยืนยัน' } },
+    label: 'QC ตรวจครบ — รอยืนยัน | Lab ตรวจครบ — รอออกผล',
+    tracks: {
+      qc: { side: 'qc', label: 'QC ตรวจครบ — รอยืนยัน' },
+      lab: { side: 'lab', label: 'Lab ตรวจครบ — รอออกผล' },
+    },
   });
 });
 
@@ -460,6 +463,27 @@ test('buildStatusLog: Lab %AI results never appear as QC progress', () => {
   assert.strictEqual(out.current.tracks.qc.label, 'QC รับแล้ว');
   assert.ok(!out.current.tracks.qc.label.includes('%AI'));
   assert.strictEqual(out.current.tracks.qc.percent, undefined);
+  assert.strictEqual(out.current.tracks.lab['%AI'], '48.10');
+});
+
+test('buildStatusLog: completed Lab track remains visible with its %AI result', () => {
+  const petition = {
+    status: 'inProgress', items: [{ seq: 1, commonName: 'omethoate', batchNo: 'B-1' }],
+    qcReceivedAt: 'T', labReceivedAt: 'T', labCompletedAt: 'T', reviewHistory: [],
+  };
+  const parameters = [
+    { _id: 'density', name: 'Density', status: 'active', scope: 'qc', applyAll: true, valueFields: [{ label: 'density', type: 'number' }] },
+    { _id: 'ai', name: '%AI', status: 'active', scope: 'lab', applyAll: true, valueFields: [{ label: '%AI', type: 'number' }] },
+  ];
+  const results = [
+    { itemSeq: 1, parameterId: 'density', parameterName: 'Density', values: { density: '1.041' }, enteredAt: '1' },
+    { itemSeq: 1, parameterId: 'ai', parameterName: '%AI', values: { '%AI': '48.10' }, enteredAt: '2' },
+  ];
+
+  const out = buildStatusLog(petition, [], results, parameters, true);
+
+  assert.strictEqual(out.current.tracks.qc.density, '1.041');
+  assert.strictEqual(out.current.tracks.lab.label, 'Lab ตรวจครบ — รอออกผล');
   assert.strictEqual(out.current.tracks.lab['%AI'], '48.10');
 });
 

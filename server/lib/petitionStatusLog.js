@@ -159,7 +159,10 @@ function buildCurrent(petition, qc, fieldLabels, labDone) {
     })
     : null;
   const labTrack = hasLabItem
-    ? buildLabTrack({ labReceived, isAssignee: assigneeSide === 'lab', assignee, started, labDone })
+    ? buildLabTrack({
+      labReceived, isAssignee: assigneeSide === 'lab', assignee, started, labDone,
+      labApproved: !!petition.labApprovedAt,
+    })
     : null;
 
   const tracks = {};
@@ -203,10 +206,12 @@ function buildQcTrack({ qcReceived, isAssignee, assignee, started, qc, fieldLabe
   return { label: 'QC รับแล้ว' };
 }
 
-// Lab side of `current`. Returns { label } or null (omitted when lab is done).
+// Lab side of `current`. Keep the track visible after Lab finishes so callers can
+// still identify Lab-owned results such as %AI while QC continues independently.
 // `isAssignee` = the single petition assignee belongs to Lab.
-function buildLabTrack({ labReceived, isAssignee, assignee, started, labDone }) {
-  if (labDone) return null; // lab finished → drop track, QC drives from here
+function buildLabTrack({ labReceived, isAssignee, assignee, started, labDone, labApproved }) {
+  if (labApproved) return { label: 'Lab ออกผลแล้ว' };
+  if (labDone) return { label: 'Lab ตรวจครบ — รอออกผล' };
   if (!labReceived) return { label: 'Lab รอรับ' };
   if (isAssignee) {
     return started
