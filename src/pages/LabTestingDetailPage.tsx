@@ -81,8 +81,9 @@ function resultKey(itemSeq: number, parameterId: string) {
   return `${itemSeq}__${parameterId}`;
 }
 
-function aiDensity(values: Record<string, unknown>, context: ConditionContext, substance = '') {
-  return findAiDensity([values, ...Object.values(context.otherParams)], substance);
+// ค่า ถพ. มักเก็บเป็นรายการย่อย (entries) จึงต้องส่งรายการย่อยของพารามิเตอร์อื่นมาด้วย
+function aiDensity(values: Record<string, unknown>, context: ConditionContext, substance = '', entries: Record<string, unknown>[] = []) {
+  return findAiDensity([values, ...Object.values(context.otherParams), ...entries], substance);
 }
 
 const AI_FIELD_ORDER = [
@@ -1225,6 +1226,7 @@ export default function LabTestingDetailPage() {
                       // Build the condition context for resolving conditionalMode standards:
                       // sameParam = this parameter's live values; otherParams = each OTHER
                       // matched parameter's live values for the same item, keyed by parameterId.
+                      const densityEntries = matchedParams.flatMap((p) => (p._id && p._id !== param._id ? entriesByKey[resultKey(item.seq, p._id)] ?? [] : []));
                       const condCtx: ConditionContext = {
                         sameParam: phaseValues[k] ?? {},
                         otherParams: (() => {
@@ -1283,7 +1285,7 @@ export default function LabTestingDetailPage() {
                               const outputResult = isOutputMode ? resolveConditionalOutput(unit.field, condCtx) : null;
                               const isAiParameter = (param.valueFields ?? []).some((candidate) => calculatedAiFieldKind(candidate.label) === 'ai');
                               const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
-                              const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key)), aiSubstanceFromKey(unit.key)) : null;
+                              const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries), aiSubstanceFromKey(unit.key)) : null;
 
                               // Field-level `multiple` — repeatable list of bare value rows.
                               // Each row shares the field's standard/abnormal rule; per-row
@@ -1406,7 +1408,7 @@ export default function LabTestingDetailPage() {
                                           expandFieldForItem(candidate, item.commonName, { category: petitionCategory })
                                             .forEach((derivedUnit) => {
                                     const substance = aiSubstanceFromKey(derivedUnit.key);
-                                    onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance), substance)[kind]));
+                                    onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries), substance)[kind]));
                                   });
                                         });
                                       }

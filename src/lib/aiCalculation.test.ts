@@ -29,6 +29,8 @@ describe('calculateAi', () => {
   });
 
   it('prefers the specific gravity of the same substance and accepts spelling variants', () => {
+    const instrumentEntry = { 'ค่าถพ.::omethoate': 1.041, 'ค่าถพ.::omethoate__source': { source: 'instrument' } };
+    expect(findAiDensity([instrumentEntry], 'omethoate')).toBe(1.041);
     const records = [{ 'ค่า ถ.พ.::ABAMECTIN': '0.950', 'ค่าถพ.::OMETHOATE': '1.135', 'Density': '1.000' }];
     expect(findAiDensity(records, 'omethoate')).toBe(1.135);
     expect(findAiDensity(records, 'abamectin')).toBe(0.95);
