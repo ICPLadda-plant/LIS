@@ -42,7 +42,24 @@ import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { api, type MachineItem } from '@/lib/api';
 import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
-import { labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
+import { isLabRecheckPending, labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
+
+const createdTime = (p: Petition) => Date.parse(p.createdAt) || 0;
+
+/** คิวรอมอบหมาย: งาน Re-check ขึ้นก่อนทั้งหมด แล้วเรียงตามวันที่สร้างคำขอ (เก่า → ใหม่) */
+function sortAssignQueue(petitions: Petition[]): Petition[] {
+  return [...petitions].sort((a, b) => {
+    const recheck = Number(isLabRecheckPending(b)) - Number(isLabRecheckPending(a));
+    if (recheck !== 0) return recheck;
+    const time = createdTime(a) - createdTime(b);
+    if (time !== 0) return time;
+    return a._id.localeCompare(b._id);
+  });
+}
+
+const formatThaiDate = (iso: string) =>
+  new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' })
+    .format(new Date(iso));
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import { getMachineSuggestions, type MachineSuggestion } from '@/lib/aiApi';
 import { DEV_MODE, synthesizeDevAssignees } from '@/config/dev';
@@ -915,7 +932,7 @@ function AssignBoard({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overEmployee, setOverEmployee] = useState<string | null>(null);
 
-  const unassigned = useMemo(() => petitions.filter((p) => !p.assignedTo), [petitions]);
+  const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
 
   // employeeId → assigned petitions
   const assignedByEmployee = useMemo(() => {
@@ -1153,6 +1170,12 @@ function PetitionCard({
           </div>
         </div>
       </div>
+
+      {isLabRecheckPending(petition) && (
+        <p className="mt-1 pl-[22px] text-[11px] font-medium text-destructive">
+          *งาน Recheck ส่งคำร้องวันที่ {formatThaiDate(petition.createdAt)}
+        </p>
+      )}
 
       {groups.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1 pl-[22px]">

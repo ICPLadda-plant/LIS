@@ -130,6 +130,7 @@ const mockState = vi.hoisted(() => ({
 vi.mock("react-router-dom", () => ({
   useParams: () => ({ id: "petition-1" }),
   useNavigate: () => mockNavigate,
+  useLocation: () => ({ state: null }),
 }));
 
 vi.mock("@/components/lis/AppLayout", () => ({
@@ -334,7 +335,38 @@ describe("LabTestingDetailPage", () => {
     expect(screen.queryByText("QC value")).not.toBeInTheDocument();
   });
 
-  it("allows an assigned Lab user to edit a Lab result after Lab approval", async () => {
+  it("opens saved Lab results read-only with edit and clear actions", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: { ...fixtures.petition, labCompletedAt: "2026-07-13T03:00:00.000Z" },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect((await screen.findAllByRole("spinbutton"))[0]).toBeDisabled();
+    expect(screen.getByRole("button", { name: /แก้ไข/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /ล้างค่า/ })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: /^บันทึก/ })).not.toBeInTheDocument();
+  });
+
+  it("unlocks saved Lab results while an edit is open", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        labCompletedAt: "2026-07-13T03:00:00.000Z",
+        labEditSession: { startedAt: "2026-07-13T03:10:00.000Z", reason: "ใส่ค่าผิด" },
+      },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect((await screen.findAllByRole("spinbutton"))[0]).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /บันทึก/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "ยกเลิก" })).toBeEnabled();
+  });
+
+  it("locks Lab results after Lab approval", async () => {
     mockState.activeFixtures = {
       ...fixtures,
       petition: {
@@ -347,8 +379,8 @@ describe("LabTestingDetailPage", () => {
 
     render(<LabTestingDetailPage />);
 
-    expect((await screen.findAllByRole("spinbutton"))[0]).not.toBeDisabled();
-    expect(screen.getByRole("button", { name: /บันทึกการแก้ไข/ })).toBeEnabled();
+    expect((await screen.findAllByRole("spinbutton"))[0]).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /แก้ไข/ })).not.toBeInTheDocument();
   });
 
   it("keeps an assigned Lab item visible and prevents completion when no parameter matches", async () => {

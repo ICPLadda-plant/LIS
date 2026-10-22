@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FlaskConical, Loader2, AlertTriangle, CheckCircle2, ClipboardCheck } from "lucide-react";
+import { FlaskConical, Loader2, AlertTriangle, CheckCircle2, ClipboardCheck, RotateCcw } from "lucide-react";
+import LabReasonDialog from "@/components/petition/LabReasonDialog";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +44,7 @@ export default function LabApprovalReviewPage() {
 
   const { data: labRequests, refresh: refreshLabRequests } = useLabRequestsByPetition(id);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [recheckOpen, setRecheckOpen] = useState(false);
   const currentReview = labRequests?.[0]?.labAgreementReview ?? null;
 
   useEffect(() => {
@@ -88,6 +90,18 @@ export default function LabApprovalReviewPage() {
       setSubmitting(false);
     }
   }, [petition, user, confirm, navigate]);
+
+  const handleRecheck = useCallback(async (reason: string) => {
+    if (!petition) return;
+    try {
+      await api.requestPetitionRecheck(petition._id, reason);
+      toast.success("ส่ง Re-check แล้ว — งานกลับเข้าคิวรอมอบหมาย");
+      navigate("/lab-approval");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ส่ง Re-check ไม่สำเร็จ");
+      throw error;
+    }
+  }, [petition, navigate]);
 
   const handleSaveReview = useCallback(async (draft) => {
     if (!petition) return;
@@ -215,6 +229,16 @@ export default function LabApprovalReviewPage() {
           <div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
             <div className="flex flex-wrap items-center justify-end gap-3">
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRecheckOpen(true)}
+                disabled={submitting}
+                className="gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Re-check
+              </Button>
+              <Button
                 variant="primary"
                 size="sm"
                 onClick={() => { pendingApproveRef.current = true; setReviewDialogOpen(true); }}
@@ -227,6 +251,16 @@ export default function LabApprovalReviewPage() {
             </div>
           </div>
         )}
+
+        <LabReasonDialog
+          open={recheckOpen}
+          onOpenChange={setRecheckOpen}
+          title="Re-check งาน Lab"
+          description="ผล Lab ปัจจุบันจะถูกล้าง (เก็บค่าเดิมไว้ในประวัติ) และงานจะกลับไปรอมอบหมายใหม่โดยอยู่ลำดับบนสุด"
+          confirmLabel="ส่ง Re-check"
+          destructive
+          onConfirm={handleRecheck}
+        />
 
         <LabAgreementReviewDialog
           open={reviewDialogOpen}

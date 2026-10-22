@@ -174,7 +174,7 @@ export default function LabTestingPage() {
               navigate(`/lab-testing/${p._id}`);
             }}
           >
-            {p.labCompletedAt ? 'แก้ไขผล Lab' : 'เข้าตรวจ'}
+            {p.labCompletedAt ? 'ดูรายละเอียด' : 'เข้าตรวจ'}
           </Button>
         ) : (
           <span className="text-xs text-grey-400">รอสแกนรับ</span>

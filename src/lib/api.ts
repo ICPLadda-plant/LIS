@@ -922,10 +922,19 @@ export const api = {
     }),
   getPetition: (petitionId: string) =>
     request<import("@/types/petition.types").Petition>(`/petitions/${petitionId}`),
-  requestPetitionRecheck: (petitionId: string, actor?: string) =>
-    request(`/petitions/status-petition-log`, {
+  requestPetitionRecheck: (petitionId: string, reason: string) =>
+    request<import("@/types/petition.types").Petition>(`/petitions/${petitionId}/lab-recheck`, {
       method: "POST",
-      body: JSON.stringify({ petitionId, actor }),
+      body: JSON.stringify({ reason }),
+    }),
+  labResultAction: (
+    petitionId: string,
+    action: "edit-start" | "edit-save" | "edit-cancel" | "clear",
+    reason?: string,
+  ) =>
+    request<import("@/types/petition.types").Petition>(`/petitions/${petitionId}/lab-result-action`, {
+      method: "POST",
+      body: JSON.stringify({ action, reason }),
     }),
   findRejectedByBatch: (batchNo: string, employeeId: string) => {
     const qs = new URLSearchParams({ batchNo, employeeId }).toString();

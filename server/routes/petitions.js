@@ -8,6 +8,7 @@ const Approval = require('../models/Approval');
 const RealtimeDensity = require('../models/RealtimeDensity');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
 const { buildSearchRankingStages } = require('../lib/searchRanking');
+const { labResultDocs, snapshotOf, clearLabResults, restoreLabResults } = require('../lib/labResultActions');
 const {
   bellDescribe,
   isCollapsibleDuplicate,
@@ -831,6 +832,130 @@ router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
   }
 }));
 
+// ———————————————————————————————————————————————————————————————
+// แก้ไข / ล้างค่า ผล Lab หลังบันทึก (ก่อนหัวหน้า Lab ออกผล) — ต้องระบุเหตุผลและเก็บ log ทุกครั้ง
+// POST /api/petitions/:id/lab-result-action  { action: 'edit-start' | 'edit-save' | 'edit-cancel' | 'clear', reason? }
+// ———————————————————————————————————————————————————————————————
+router.post('/:id/lab-result-action', serializePetitionWrite(async (req, res) => {
+  try {
+    const action = String(req.body?.action || '').trim();
+    if (!['edit-start', 'edit-save', 'edit-cancel', 'clear'].includes(action)) return badRequest(res, 'action ไม่ถูกต้อง');
+    const reason = String(req.body?.reason || '').trim();
+    if (['edit-start', 'clear'].includes(action) && !reason) return badRequest(res, 'กรุณาระบุเหตุผล');
+    if (reason.length > 2000) return badRequest(res, 'เหตุผลยาวเกินไป');
+
+    const doc = await Petition.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!canTestSide(user, doc, 'lab')) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์แก้ไขผล Lab นี้' } });
+    if (['success', 'approved', 'rejected'].includes(doc.status) || doc.labApprovedAt) {
+      return res.status(409).json({ error: { message: 'ผล Lab ออกผลแล้ว ไม่สามารถแก้ไขหรือล้างค่าได้' } });
+    }
+    if (!doc.labCompletedAt) return res.status(409).json({ error: { message: 'ยังไม่ได้บันทึกผล Lab' } });
+
+    const actor = user.name || user.email;
+    const now = new Date();
+    const session = doc.labEditSession || null;
+    let note;
+    let metadata;
+
+    if (action === 'edit-start') {
+      if (session) return res.status(409).json({ error: { message: 'มีการแก้ไขผลค้างอยู่ กรุณาบันทึกหรือยกเลิกก่อน' } });
+      const before = snapshotOf(await labResultDocs(doc._id));
+      doc.labEditSession = { startedAt: now, startedBy: actor, reason, snapshot: before };
+      note = `เริ่มแก้ไขผล Lab: ${reason}`;
+      metadata = { side: 'lab', action, reason };
+    } else if (action === 'edit-save' || action === 'edit-cancel') {
+      if (!session) return res.status(409).json({ error: { message: 'ไม่มีการแก้ไขผลที่เปิดอยู่' } });
+      if (action === 'edit-cancel') await restoreLabResults(doc._id, session.snapshot);
+      const after = action === 'edit-save' ? snapshotOf(await labResultDocs(doc._id)) : session.snapshot;
+      doc.labEditSession = null;
+      note = action === 'edit-save' ? `บันทึกการแก้ไขผล Lab: ${session.reason}` : `ยกเลิกการแก้ไขผล Lab: ${session.reason}`;
+      metadata = { side: 'lab', action, reason: session.reason, startedAt: session.startedAt, startedBy: session.startedBy, before: session.snapshot, after };
+    } else {
+      if (session) await restoreLabResults(doc._id, session.snapshot);
+      const before = await clearLabResults(doc._id);
+      doc.labEditSession = null;
+      doc.labCompletedAt = null;
+      doc.labCompletedBy = undefined;
+      note = `ล้างค่าผล Lab: ${reason}`;
+      metadata = { side: 'lab', action, reason, before, after: [], assignedTo: doc.assignedTo || null };
+    }
+    doc.markModified('labEditSession');
+    await doc.save();
+    await PetitionAuditLog.create({
+      petitionId: doc._id, petitionNo: doc.petitionNo,
+      event: action === 'clear' ? 'labResultCleared' : 'labResultEdited',
+      fromStatus: doc.status, toStatus: doc.status, actor, note, metadata,
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
+// POST /api/petitions/:id/lab-recheck  { reason } → หัวหน้า Lab สั่ง Re-check:
+// ล้างผล Lab (เก็บ snapshot ใน log), ยกเลิกผู้รับงาน แล้วส่งกลับเข้าคิวรอมอบหมายใหม่
+router.post('/:id/lab-recheck', serializePetitionWrite(async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return badRequest(res, 'กรุณาระบุเหตุผลการ Re-check');
+    if (reason.length > 2000) return badRequest(res, 'เหตุผลยาวเกินไป');
+    const doc = await Petition.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!normalizeRoles(user).some((role) => role === 'admin' || role === 'lab-head')) {
+      return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์สั่ง Re-check งาน Lab' } });
+    }
+    if (!hasLabTrack(doc) || ['success', 'approved', 'rejected'].includes(doc.status) || doc.labApprovedAt) {
+      return res.status(409).json({ error: { message: 'คำร้องนี้ Re-check ฝั่ง Lab ไม่ได้' } });
+    }
+    if (!doc.labCompletedAt) return res.status(409).json({ error: { message: 'ผู้ทดสอบ Lab ยังไม่ได้บันทึกผล' } });
+
+    const actor = user.name || user.email;
+    const now = new Date();
+    const fromStatus = doc.status;
+    if (doc.labEditSession) await restoreLabResults(doc._id, doc.labEditSession.snapshot);
+    const before = await clearLabResults(doc._id);
+    const previousAssignee = doc.assignedTo ? { ...doc.assignedTo.toObject?.() ?? doc.assignedTo } : null;
+    const previousMachines = (doc.assignedMachines || []).map((m) => m.toObject?.() ?? m);
+    const round = (doc.labRecheckCount || 0) + 1;
+
+    doc.labEditSession = null;
+    doc.markModified('labEditSession');
+    doc.labCompletedAt = null;
+    doc.labCompletedBy = undefined;
+    doc.labApprovedAt = null;
+    doc.labApprovedBy = undefined;
+    doc.assignedTo = undefined;
+    doc.assignedMachines = [];
+    doc.labRecheckRequestedAt = now;
+    doc.labRecheckRequestedBy = actor;
+    doc.labRecheckReason = reason;
+    doc.labRecheckCount = round;
+    doc.status = 'pendingReview';
+    doc.reviewHistory.push({ action: 'lab-recheck', reviewedBy: actor, reviewedAt: now, note: reason });
+    await doc.save();
+    const payload = {
+      event: 'recheck', fromStatus, toStatus: doc.status, actor,
+      note: `หัวหน้า Lab สั่ง Re-check รอบที่ ${round}: ${reason}`,
+      metadata: {
+        side: 'lab', reason, round, before, after: [],
+        previousAssignee, previousMachines,
+        recipients: ['qc-head', 'requester'],
+        recipientEmployeeIds: doc.submittedBy?.employeeId ? [String(doc.submittedBy.employeeId)] : [],
+      },
+    };
+    await PetitionAuditLog.create({ petitionId: doc._id, petitionNo: doc.petitionNo, ...payload });
+    notifyPetitionEvent(doc, payload);
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 // POST /api/petitions/:id/lab-reject  → หัวหน้า Lab ส่งผล Lab กลับให้ผู้ทดสอบแก้ (ไม่ใช่ reject ทั้งใบ).
 router.post('/:id/lab-reject', serializePetitionWrite(async (req, res) => {
   try {
@@ -1139,7 +1264,7 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 router.patch('/:id', serializePetitionWrite(async (req, res) => {
   try {
     const updates = { ...req.body };
-    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
+    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
     if (Object.keys(updates).some(key => key.startsWith('$') || key.includes('.') || managedFields.includes(key))) return badRequest(res, 'ข้อมูลสถานะและรอบตัวอย่างต้องเปลี่ยนผ่านขั้นตอนที่กำหนด');
     let actor = updates.actor;
     delete updates.actor;
