@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useAppPreferences } from "@/context/AppPreferencesContext";
 import { FONT_SIZE_OPTIONS } from "@/lib/appPreferences";
 import { previewNotificationSound } from "@/lib/notificationSoundPreview";
+import PwaPushSettings from "@/components/lis/PwaPushSettings";
 import type {
   AppFontFamilyPreference,
   AppFontSizePreference,
@@ -218,6 +219,8 @@ const ProfileSettingsDialog = ({
               ))}
             </div>
           </section>
+
+          <PwaPushSettings />
         </div>
       </DialogContent>
     </Dialog>

@@ -26,6 +26,7 @@
     "multer": "^2.1.1",
     "pdf-to-printer": "^5.8.0",
     "puppeteer-core": "^25.1.0",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

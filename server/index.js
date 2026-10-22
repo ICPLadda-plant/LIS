@@ -107,6 +107,7 @@ mountApi('/print', require('./routes/print'));
 mountApi('/ai', require('./routes/ai'));
 mountApi('/validation-ai', require('./routes/validationAi'));
 mountApi('/line', require('./routes/line')); // LINE webhook + group registry
+mountApi('/push', require('./routes/push')); // แจ้งเตือน PWA (Web Push) ต่อเครื่อง
 mountApi('/dev', require('./routes/dev')); // dev-only helpers (gated by ALLOW_DEV_STATUS)
 
 const healthHandler = (_req, res) => res.json({ status: 'ok' });
