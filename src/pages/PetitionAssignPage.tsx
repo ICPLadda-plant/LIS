@@ -8,6 +8,7 @@ import {
   GripVertical,
   Hand,
   Inbox,
+  PackageOpen,
   QrCode,
   Search,
   UserCheck,
@@ -784,17 +785,7 @@ export default function PetitionAssignPage() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">รอรับตัวอย่าง</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-foreground">
-                  {allPetitions.filter((petition) => !petition.assignedTo && !labReceivedAt(petition)).length}
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">คำร้องรอ assign</CardTitle>
@@ -949,6 +940,24 @@ function AssignBoard({
   const [overEmployee, setOverEmployee] = useState<string | null>(null);
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
+  // แยกคำร้องที่ Lab ยังไม่รับตัวอย่าง ("ส่งตัวอย่างแล้ว") ไปพักไว้ เพราะยังลากมอบหมายไม่ได้
+  const awaitingReceive = useMemo(() => unassigned.filter((p) => !labReceivedAt(p)), [unassigned]);
+  const readyToAssign = useMemo(() => unassigned.filter((p) => !!labReceivedAt(p)), [unassigned]);
+
+  const renderPoolCard = (petition: Petition) => (
+    <PetitionCard
+      key={petition._id}
+      petition={petition}
+      groups={groupsByPetition.get(petition._id) ?? []}
+      methodByCode={methodByCode}
+      dragging={draggingId === petition._id}
+      canDragRole={canAssign}
+      onClaim={canClaim ? () => onClaimPetition(petition._id) : undefined}
+      onDragStart={() => setDraggingId(petition._id)}
+      onDragEnd={() => setDraggingId(null)}
+      onClick={() => onPetitionClick(petition._id)}
+    />
+  );
 
   // employeeId → assigned petitions
   const assignedByEmployee = useMemo(() => {
@@ -996,37 +1005,43 @@ function AssignBoard({
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
+      <div className="space-y-4">
+      {/* คำร้องที่ส่งตัวอย่างแล้ว แต่ Lab ยังไม่รับ */}
+      {awaitingReceive.length > 0 && (
+        <div className="rounded-[10px] border border-border bg-muted/50 p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <PackageOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-semibold text-foreground">รอรับตัวอย่าง</span>
+            <Badge variant="gray-soft" className="ml-auto font-normal">
+              {awaitingReceive.length}
+            </Badge>
+          </div>
+          <p className="mb-2 text-xs text-muted-foreground">รับตัวอย่างก่อน แล้วการ์ดจะย้ายไปงานรอมอบหมาย</p>
+          <div className="max-h-[36vh] space-y-2 overflow-y-auto pr-0.5">
+            {awaitingReceive.map(renderPoolCard)}
+          </div>
+        </div>
+      )}
+
       {/* Unassigned pool */}
       <div className="rounded-[10px] border border-border bg-muted/50 p-3">
         <div className="mb-2 flex items-center gap-2">
           <Inbox className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">งานรอมอบหมาย</span>
           <Badge variant="gray-soft" className="ml-auto font-normal">
-            {unassigned.length}
+            {readyToAssign.length}
           </Badge>
         </div>
         <div className="max-h-[72vh] space-y-2 overflow-y-auto pr-0.5">
-          {unassigned.length === 0 ? (
+          {readyToAssign.length === 0 ? (
             <div className="rounded-md border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
               {emptyPoolText}
             </div>
           ) : (
-            unassigned.map((petition) => (
-              <PetitionCard
-                key={petition._id}
-                petition={petition}
-                groups={groupsByPetition.get(petition._id) ?? []}
-                methodByCode={methodByCode}
-                dragging={draggingId === petition._id}
-                canDragRole={canAssign}
-                onClaim={canClaim ? () => onClaimPetition(petition._id) : undefined}
-                onDragStart={() => setDraggingId(petition._id)}
-                onDragEnd={() => setDraggingId(null)}
-                onClick={() => onPetitionClick(petition._id)}
-              />
-            ))
+            readyToAssign.map(renderPoolCard)
           )}
         </div>
+      </div>
       </div>
 
       {/* Staff cards (drop zones) */}
