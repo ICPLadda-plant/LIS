@@ -604,6 +604,10 @@ export default function PetitionAssignPage() {
       };
     }));
   }, [allPetitions, search]);
+  const awaitingReceive = useMemo(
+    () => visiblePetitions.filter((petition) => !petition.assignedTo && !labReceivedAt(petition)),
+    [visiblePetitions],
+  );
 
   async function assignPetition(petition: Petition, employeeIdOverride?: string, claim = false): Promise<boolean> {
     if (!labReceivedAt(petition)) {
@@ -839,6 +843,33 @@ export default function PetitionAssignPage() {
               </div>
             </div>
 
+            {/* คำร้องที่ส่งตัวอย่างแล้ว แต่ Lab ยังไม่รับ: พักไว้ด้านบน เพราะยังลากมอบหมายไม่ได้ */}
+            {awaitingReceive.length > 0 && (
+              <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
+                <div className="mb-3 flex items-center gap-2">
+                  <PackageOpen className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">รอรับตัวอย่าง</span>
+                  <Badge variant="gray-soft" className="font-normal">{awaitingReceive.length}</Badge>
+                  <span className="ml-auto text-xs text-muted-foreground">รับตัวอย่างก่อน แล้วการ์ดจะย้ายลงไปงานรอมอบหมาย</span>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                  {awaitingReceive.map((petition) => (
+                    <PetitionCard
+                      key={petition._id}
+                      petition={petition}
+                      groups={groupsByPetition.get(petition._id) ?? []}
+                      methodByCode={methodByCode}
+                      dragging={false}
+                      canDragRole={false}
+                      onDragStart={() => {}}
+                      onDragEnd={() => {}}
+                      onClick={() => navigate(`/petition/${petition._id}`)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
               <PageToolbar
                 search={{
@@ -941,7 +972,6 @@ function AssignBoard({
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
   // แยกคำร้องที่ Lab ยังไม่รับตัวอย่าง ("ส่งตัวอย่างแล้ว") ไปพักไว้ เพราะยังลากมอบหมายไม่ได้
-  const awaitingReceive = useMemo(() => unassigned.filter((p) => !labReceivedAt(p)), [unassigned]);
   const readyToAssign = useMemo(() => unassigned.filter((p) => !!labReceivedAt(p)), [unassigned]);
 
   const renderPoolCard = (petition: Petition) => (
@@ -1005,24 +1035,6 @@ function AssignBoard({
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
-      <div className="space-y-4">
-      {/* คำร้องที่ส่งตัวอย่างแล้ว แต่ Lab ยังไม่รับ */}
-      {awaitingReceive.length > 0 && (
-        <div className="rounded-[10px] border border-border bg-muted/50 p-3">
-          <div className="mb-2 flex items-center gap-2">
-            <PackageOpen className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold text-foreground">รอรับตัวอย่าง</span>
-            <Badge variant="gray-soft" className="ml-auto font-normal">
-              {awaitingReceive.length}
-            </Badge>
-          </div>
-          <p className="mb-2 text-xs text-muted-foreground">รับตัวอย่างก่อน แล้วการ์ดจะย้ายไปงานรอมอบหมาย</p>
-          <div className="max-h-[36vh] space-y-2 overflow-y-auto pr-0.5">
-            {awaitingReceive.map(renderPoolCard)}
-          </div>
-        </div>
-      )}
-
       {/* Unassigned pool */}
       <div className="rounded-[10px] border border-border bg-muted/50 p-3">
         <div className="mb-2 flex items-center gap-2">
@@ -1041,7 +1053,6 @@ function AssignBoard({
             readyToAssign.map(renderPoolCard)
           )}
         </div>
-      </div>
       </div>
 
       {/* Staff cards (drop zones) */}
