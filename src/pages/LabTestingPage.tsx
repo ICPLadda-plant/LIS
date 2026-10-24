@@ -67,10 +67,12 @@ export default function LabTestingPage() {
     dept: dept || undefined,
     assignedToEmployeeId,
     assignedToNames,
+    labPending: true,
     limit: 50,
   });
 
   const petitions: Petition[] = prioritizeUrgentPetitions((data?.items ?? [])
+    .filter((p) => !p.labApprovedAt)
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user)));
 

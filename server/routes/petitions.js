@@ -187,6 +187,8 @@ router.get('/', async (req, res) => {
       const list = String(status).split(',').map((s) => s.trim()).filter(Boolean);
       q.status = list.length > 1 ? { $in: list } : list[0];
     }
+    // ?labPending=true → ซ่อนคำร้องที่ Lab อนุมัติผลแล้ว (งานฝั่ง Lab จบ ย้ายไปหน้าผลวิเคราะห์ Lab)
+    if (req.query.labPending === 'true') q.labApprovedAt = null;
     // ?urgent=true → เฉพาะงานด่วนที่ยังเปิดอยู่ (ใช้โดยตัวเตือนงานด่วนทุกชั่วโมง)
     if (req.query.urgent === 'true') {
       q.priority = { $in: [1, '1'] };

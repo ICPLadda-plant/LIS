@@ -136,6 +136,8 @@ interface PetitionListParams {
   awaitingLabApproval?: boolean;
   labApproved?: boolean;
   labRecheckPending?: boolean;
+  /** ซ่อนคำร้องที่ Lab อนุมัติผลแล้ว */
+  labPending?: boolean;
   /** เฉพาะงานด่วน (priority = 1) ที่ยังไม่อนุมัติ/ปฏิเสธ */
   urgent?: boolean;
 }
@@ -171,6 +173,7 @@ export function usePetitionList(params: PetitionListParams, options: PetitionRef
     if (params.awaitingLabApproval) sp.set('awaitingLabApproval', 'true');
     if (params.labApproved) sp.set('labApproved', 'true');
     if (params.labRecheckPending) sp.set('labRecheckPending', 'true');
+    if (params.labPending) sp.set('labPending', 'true');
     if (params.urgent) sp.set('urgent', 'true');
     return sp.toString();
   })();

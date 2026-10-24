@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LabTestingPage from './LabTestingPage';
@@ -130,7 +130,7 @@ describe('LabTestingPage assignment visibility', () => {
   });
 
   it.each(['lab-analyze', 'lab-head', 'admin'])(
-    'keeps the view details button while waiting for QC for %s',
+    'hides petitions after the lab result is approved for %s',
     async (role) => {
       mocks.user.roles = [role];
       mocks.assignedPetition.labCompletedAt = '2026-09-16T03:00:00.000Z';
@@ -142,8 +142,8 @@ describe('LabTestingPage assignment visibility', () => {
         </MemoryRouter>,
       );
 
-      expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'ดูรายละเอียด' })).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByText('P-LAB-ASSIGNED')).not.toBeInTheDocument());
+      expect(screen.queryByText(/ผล Lab ออกแล้ว/)).not.toBeInTheDocument();
     },
   );
 });
