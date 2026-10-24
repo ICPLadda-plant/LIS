@@ -784,7 +784,17 @@ export default function PetitionAssignPage() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">รอรับตัวอย่าง</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-foreground">
+                  {allPetitions.filter((petition) => !petition.assignedTo && !labReceivedAt(petition)).length}
+                </div>
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">คำร้องรอ assign</CardTitle>
