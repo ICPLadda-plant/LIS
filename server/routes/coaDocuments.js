@@ -620,6 +620,7 @@ async function actorFromRequest(body = {}) {
     name: String(user.name || requestedActor.name || email).trim(),
     email,
     role: activeRole,
+    ...(user.signatureUrl ? { signatureUrl: String(user.signatureUrl).trim() } : {}),
     activeRole,
     roles,
     permissions,

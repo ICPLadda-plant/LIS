@@ -81,9 +81,10 @@ describe("CoaReportTemplate", () => {
       remark: "",
       approvedBy: "QC Head",
       approvedAt: "20/08/2569",
+      approvedSignatureUrl: "/LIS/uploads/signatures/qc-head.png",
     };
 
-    render(<CoaReportTemplate pages={[page]} />);
+    const { rerender } = render(<CoaReportTemplate pages={[page]} />);
 
     expect(screen.getByText("CERTIFICATE OF ANALYSIS")).toBeInTheDocument();
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Trade Herbicide (Glyphosate 48% SL GR)");
@@ -95,6 +96,10 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("Date of analysis")).toHaveAttribute("colspan", "2");
     expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("05/09/2026");
     expect(screen.getByText("(สิริพิชญ์ สงสมพันธ์)")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "ลายเซ็นผู้อนุมัติ" })).toHaveAttribute("src", "/LIS/uploads/signatures/qc-head.png");
+
+    rerender(<CoaReportTemplate pages={[{ ...page, approvedAt: "-" }]} />);
+    expect(screen.queryByRole("img", { name: "ลายเซ็นผู้อนุมัติ" })).not.toBeInTheDocument();
   });
 
   it("uses the attached sand layout when Bromadiolone ends with SG", () => {

@@ -267,7 +267,7 @@ test('buildCoaSnapshots includes multi-entry and phase-two lab values without in
 
 test('actorFromRequest uses stored active user roles instead of caller supplied privileges', async () => {
   const restore = stubActorLookup({
-    user: { name: 'Stored Staff', email: 'staff@example.com', role: 'qc-staff', roles: ['qc-staff'], status: 'active', position: 'QC Staff' },
+    user: { name: 'Stored Staff', email: 'staff@example.com', role: 'qc-staff', roles: ['qc-staff'], status: 'active', position: 'QC Staff', signatureUrl: '/LIS/uploads/signatures/staff.png' },
   });
   try {
     const actor = await router.actorFromRequest({
@@ -275,6 +275,7 @@ test('actorFromRequest uses stored active user roles instead of caller supplied 
     });
     assert.equal(actor.name, 'Stored Staff');
     assert.equal(actor.role, 'qc-staff');
+    assert.equal(actor.signatureUrl, '/LIS/uploads/signatures/staff.png');
     assert.deepEqual(actor.permissions, []);
     assert.equal(isQcHead(actor), false);
   } finally {

@@ -15,6 +15,7 @@ export const COA_REPORT_CSS = `
 .coa-muted { color: #555; }
 .coa-sign { margin-top: 14mm; text-align: center; }
 .coa-line { display: inline-block; min-width: 62mm; border-bottom: 0.8pt dotted #000; }
+.coa-signature-image { display: block; max-width: 62mm; height: 18mm; margin: 0 auto -2mm; object-fit: contain; }
 .coa-special-page { padding: 24mm 22mm 18mm; }
 .coa-special-title { margin-top: 0; text-align: center; font-size: 14pt; font-weight: 700; letter-spacing: 0; }
 .coa-special-meta { margin-top: 7mm; text-align: right; line-height: 1.7; }
@@ -44,6 +45,12 @@ export const COA_REPORT_CSS = `
 
 function dayMonthYear(value: string) {
   return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");
+}
+
+function ApprovalSignature({ page }: { page: CoaReportPage }) {
+  return page.approvedAt !== "-" && page.approvedSignatureUrl
+    ? <img className="coa-signature-image" src={page.approvedSignatureUrl} alt="ลายเซ็นผู้อนุมัติ" />
+    : null;
 }
 
 function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSample; hideDensity?: boolean }) {
@@ -128,6 +135,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
       </table>
 
       <div className="coa-special-sign">
+        <ApprovalSignature page={page} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
@@ -192,6 +200,7 @@ function LiquidCoaPage({ page, index }: { page: CoaReportPage; index: number }) 
       </table>
 
       <div className="coa-special-sign">
+        <ApprovalSignature page={page} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
@@ -257,6 +266,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
       </table>
 
       <div className="coa-brom-sign">
+        <ApprovalSignature page={page} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
@@ -315,6 +325,7 @@ function StandardCoaPage({ page, index }: { page: CoaReportPage; index: number }
       ))}
       <div style={{ marginTop: "6mm" }}>Remark: {page.remark || "-"}</div>
       <div className="coa-sign">
+        <ApprovalSignature page={page} />
         <span className="coa-line" />
         <div>QC Head</div>
         <div>{page.approvedBy} - {page.approvedAt}</div>

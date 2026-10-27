@@ -30,6 +30,7 @@ export type CoaReportPage = {
   remark: string;
   approvedBy: string;
   approvedAt: string;
+  approvedSignatureUrl?: string;
 };
 
 function formatDate(iso?: string): string {
@@ -162,6 +163,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       remark: doc.remark || "",
       approvedBy: doc.approval?.approvedBy?.name || "-",
       approvedAt: formatDate(doc.approval?.approvedAt),
+      approvedSignatureUrl: doc.approval?.approvedAt ? doc.approval.approvedBy?.signatureUrl || "" : "",
     };
   });
 }

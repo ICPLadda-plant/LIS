@@ -43,6 +43,7 @@ export default function CoaDetailPage() {
     name: user?.name,
     email: user?.email,
     role: activeRole,
+    signatureUrl: user?.signatureUrl,
     activeRole,
     roles,
     permissions: user?.permissions ?? [],
