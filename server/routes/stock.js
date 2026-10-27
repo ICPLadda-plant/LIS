@@ -1,6 +1,8 @@
 const express = require('express');
 const fs = require('fs');
 const router = express.Router();
+// คงเหลือต่ำกว่านี้ (mg/ml) ถือว่าขวดหมด กันเศษทศนิยมจากการลบหลายครั้ง
+const EMPTY_REMAINING_EPSILON = 1e-6;
 const { StockStandard, StockSolvent, StockGlassware } = require('../models/Stock');
 const StockTransaction = require('../models/StockTransaction');
 const { buildSearchRankingStages } = require('../lib/searchRanking');
@@ -617,7 +619,8 @@ async function adjustStockUnitDeduction(tx, diff) {
       { new: true },
     );
     if (!updated) throw new Error('ปริมาณคงเหลือไม่พอ');
-    if (Number(updated.volume?.remaining) <= 0) {
+    if (Number(updated.volume?.remaining) <= EMPTY_REMAINING_EPSILON) {
+      updated.volume.remaining = 0;
       updated.status = 'empty';
       await updated.save();
     }
@@ -703,7 +706,12 @@ async function deductMgFromUnit(qrId, mg, meta = {}) {
   );
   if (!updated) throw new Error('ปริมาณคงเหลือไม่พอ');
   const before = updated.volume.remaining + deductionAmount; // pre-decrement value, atomically consistent
-  if (updated.volume.remaining <= 0) { updated.status = 'empty'; await updated.save(); }
+  // เศษทศนิยมจากการลบหลายครั้ง (เช่น 1e-12) ให้ถือว่าหมด
+  if (updated.volume.remaining <= EMPTY_REMAINING_EPSILON) {
+    updated.volume.remaining = 0;
+    updated.status = 'empty';
+    await updated.save();
+  }
   const std = await StockStandard.findOne({ code: updated.itemCode });
   await logTransaction({
     itemType: 'standard',

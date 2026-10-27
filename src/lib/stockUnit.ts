@@ -90,7 +90,8 @@ export function unitDerivedStatus(
 ): UnitDerivedStatus {
   if (u.status === "discarded") return "discarded";
   const remaining = u.volume?.remaining;
-  if (u.status === "empty" || (remaining != null && Number(remaining) <= 0)) return "empty";
+  // เศษทศนิยมเล็กมาก (เช่น 1e-12 mg) ถือว่าหมด
+  if (u.status === "empty" || (remaining != null && Number(remaining) <= 1e-6)) return "empty";
   if (u.exp && new Date(u.exp).getTime() < now.getTime()) return "expired";
   return "active";
 }
