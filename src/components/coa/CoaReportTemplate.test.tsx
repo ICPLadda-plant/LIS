@@ -80,6 +80,7 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("48.2%")).toBeInTheDocument();
     expect(screen.getByText("Date of analysis")).toHaveAttribute("colspan", "2");
     expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("05/09/2026");
+    expect(screen.getByText("(สิริพิชญ์ สงสมพันธ์)")).toBeInTheDocument();
   });
 
   it("uses the attached sand layout when Bromadiolone ends with SG", () => {

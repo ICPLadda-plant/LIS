@@ -128,7 +128,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
 
       <div className="coa-special-sign">
         <span className="coa-line" />
-        <div>(สิริพรญ์ สงสมพันธ์)</div>
+        <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
       </div>
     </section>
