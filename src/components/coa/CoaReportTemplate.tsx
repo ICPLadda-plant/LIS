@@ -1,4 +1,5 @@
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
+import SIRIPICH_SIGNATURE_URL from "@/assets/siripich-signature.png";
 import type { CoaReportPage, CoaReportSample } from "@/lib/coaReport";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
@@ -47,9 +48,10 @@ function dayMonthYear(value: string) {
   return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");
 }
 
-function ApprovalSignature({ page }: { page: CoaReportPage }) {
-  return page.approvedAt !== "-" && page.approvedSignatureUrl
-    ? <img className="coa-signature-image" src={page.approvedSignatureUrl} alt="ลายเซ็นผู้อนุมัติ" />
+function ApprovalSignature({ page, fallbackUrl }: { page: CoaReportPage; fallbackUrl?: string }) {
+  const signatureUrl = page.approvedSignatureUrl || fallbackUrl;
+  return page.approvedAt !== "-" && signatureUrl
+    ? <img className="coa-signature-image" src={signatureUrl} alt="ลายเซ็นผู้อนุมัติ" />
     : null;
 }
 
@@ -135,7 +137,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
       </table>
 
       <div className="coa-special-sign">
-        <ApprovalSignature page={page} />
+        <ApprovalSignature page={page} fallbackUrl={SIRIPICH_SIGNATURE_URL} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
@@ -200,7 +202,7 @@ function LiquidCoaPage({ page, index }: { page: CoaReportPage; index: number }) 
       </table>
 
       <div className="coa-special-sign">
-        <ApprovalSignature page={page} />
+        <ApprovalSignature page={page} fallbackUrl={SIRIPICH_SIGNATURE_URL} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
@@ -266,7 +268,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
       </table>
 
       <div className="coa-brom-sign">
-        <ApprovalSignature page={page} />
+        <ApprovalSignature page={page} fallbackUrl={SIRIPICH_SIGNATURE_URL} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>

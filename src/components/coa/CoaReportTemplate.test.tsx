@@ -98,6 +98,9 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("(สิริพิชญ์ สงสมพันธ์)")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "ลายเซ็นผู้อนุมัติ" })).toHaveAttribute("src", "/LIS/uploads/signatures/qc-head.png");
 
+    rerender(<CoaReportTemplate pages={[{ ...page, approvedSignatureUrl: undefined }]} />);
+    expect(screen.getByRole("img", { name: "ลายเซ็นผู้อนุมัติ" }).getAttribute("src")).toContain("siripich-signature.png");
+
     rerender(<CoaReportTemplate pages={[{ ...page, approvedAt: "-" }]} />);
     expect(screen.queryByRole("img", { name: "ลายเซ็นผู้อนุมัติ" })).not.toBeInTheDocument();
   });
