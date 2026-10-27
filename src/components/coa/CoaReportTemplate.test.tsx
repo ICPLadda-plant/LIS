@@ -23,6 +23,21 @@ describe("CoaReportTemplate", () => {
     },
   );
 
+  it("shows a selected Appearance result before the batch number", () => {
+    const pages = buildCoaReportPages({
+      coaNo: "00012026",
+      sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade A", commonName: "GLYPHOSATE 48% SL", batchNo: "20260430" }],
+      resultSnapshots: [{ itemSeq: 1, testItem: "Appearance", criteria: "Clear liquid", result: "Conform" }],
+      formSelections: [{ itemSeq: 1, resultKeys: ["appearance"] }],
+    } as Parameters<typeof buildCoaReportPages>[0]);
+
+    render(<CoaReportTemplate pages={pages} />);
+
+    const rows = screen.getAllByRole("row");
+    expect(rows.findIndex((row) => row.textContent?.includes("Conform")))
+      .toBeLessThan(rows.findIndex((row) => row.textContent?.includes("BATCH NO.")));
+  });
+
   it("renders the special GR/WP/SP COA form", () => {
     const page: CoaReportPage = {
       template: "grWpSp",

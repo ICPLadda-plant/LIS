@@ -46,17 +46,22 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
   const rows = hideDensity
     ? sample.rows.filter((row) => !/\bdensity\b/i.test(row.testItem || ""))
     : sample.rows;
+  const appearanceRows = rows.filter((row) => /^appearance$/i.test(row.testItem?.trim() ?? ""));
+  const remainingRows = rows.filter((row) => !/^appearance$/i.test(row.testItem?.trim() ?? ""));
+
+  const renderRows = (selectedRows: typeof rows) => selectedRows.map((row, index) => (
+    <tr key={`${row.testItem}-${index}`}>
+      <td>{row.testItem}</td>
+      <td>{row.criteria === "-" ? "" : row.criteria}</td>
+      <td>{row.result}{row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</td>
+    </tr>
+  ));
 
   return (
     <>
+      {renderRows(appearanceRows)}
       <tr><td colSpan={2}>BATCH NO.</td><td>{sample.batchLabel === "-" ? "" : sample.batchLabel}</td></tr>
-      {rows.map((row, index) => (
-        <tr key={index}>
-          <td>{row.testItem}</td>
-          <td>{row.criteria === "-" ? "" : row.criteria}</td>
-          <td>{row.result}{row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</td>
-        </tr>
-      ))}
+      {renderRows(remainingRows)}
     </>
   );
 }
