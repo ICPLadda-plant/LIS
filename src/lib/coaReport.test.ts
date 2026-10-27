@@ -70,6 +70,7 @@ describe("buildCoaReportPages", () => {
     const pages = buildCoaReportPages(doc);
 
     expect(pages[0].template).toBe("grWpSp");
+    expect(pages[0].issueDate).toBe("August 20, 2026");
     expect(pages[0].samples[0].product).toBe("Trade Herbicide (Glyphosate 48% SL GR)");
     expect(pages[0].samples[0].manufacturingDate).toBe("15/08/2026");
     expect(pages[0].samples[0].expiredDate).toBe("15/08/2028");
@@ -288,6 +289,7 @@ describe("buildCoaReportPages", () => {
     const pages = buildCoaReportPages(doc);
 
     expect(pages[0].template).toBe("bromadiolone0005");
+    expect(pages[0].issueDate).toBe("August 20, 2026");
     expect(pages[0].samples[0].product).toBe("Red Wax Block (BROMADIOLONE 0.005%)");
     expect(pages[0].samples[0].batchLabel).toBe("LOT-008 / B-008");
     expect(pages[0].samples[0].aiContentResult).toBe("0.0051%");

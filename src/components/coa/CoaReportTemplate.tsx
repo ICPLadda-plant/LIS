@@ -94,7 +94,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
       <h1 className="coa-special-title">CERTIFICATE OF ANALYSIS</h1>
       <div className="coa-special-meta">
         <div>NO. {page.coaNo === "-" ? "" : page.coaNo}</div>
-        <div>Month Date, ค.ศ.</div>
+        <div>{page.issueDate === "-" ? "" : page.issueDate}</div>
       </div>
 
       <div className="coa-special-fields">
@@ -220,7 +220,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
       <h1 className="coa-brom-title">CERTIFICATE OF ANALYSIS</h1>
       <div className="coa-brom-meta">
         <div>NO. {page.coaNo === "-" ? "" : page.coaNo}</div>
-        <div>Month DATE, ค.ศ.</div>
+        <div>{page.issueDate === "-" ? "" : page.issueDate}</div>
       </div>
 
       <div className="coa-brom-fields">

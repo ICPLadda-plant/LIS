@@ -156,7 +156,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       template,
       coaNo: doc.coaNo || "-",
       revision: doc.revision || 0,
-      issueDate: template === "liquid" ? formatEnglishDate(doc.approval?.approvedAt) : formatDate(doc.approval?.approvedAt),
+      issueDate: template === "standard" ? formatDate(doc.approval?.approvedAt) : formatEnglishDate(doc.approval?.approvedAt),
       petitionNo: doc.petitionNoSnapshot || "-",
       customer: doc.customerSnapshot || {},
       samples: group,

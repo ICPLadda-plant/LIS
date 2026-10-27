@@ -57,7 +57,7 @@ describe("CoaReportTemplate", () => {
       template: "grWpSp",
       coaNo: "00052026",
       revision: 0,
-      issueDate: "20/08/2569",
+      issueDate: "August 20, 2026",
       petitionNo: "P-2608-0005",
       customer: {},
       samples: [{
@@ -87,6 +87,8 @@ describe("CoaReportTemplate", () => {
     const { rerender } = render(<CoaReportTemplate pages={[page]} />);
 
     expect(screen.getByText("CERTIFICATE OF ANALYSIS")).toBeInTheDocument();
+    expect(screen.getByText("August 20, 2026")).toBeInTheDocument();
+    expect(screen.queryByText("Month Date, ค.ศ.")).not.toBeInTheDocument();
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Trade Herbicide (Glyphosate 48% SL GR)");
     expect(screen.getByText(/MANUFACTURING DATE/).closest("div")).toHaveTextContent("MANUFACTURING DATE : 15/08/2026");
     expect(screen.getByText(/EXPIRED DATE/).closest("div")).toHaveTextContent("EXPIRED DATE : 15/08/2028");
@@ -258,7 +260,7 @@ describe("CoaReportTemplate", () => {
       template: "bromadiolone0005",
       coaNo: "00082026",
       revision: 0,
-      issueDate: "20/08/2569",
+      issueDate: "August 20, 2026",
       petitionNo: "P-2608-0008",
       customer: {},
       samples: [{
@@ -287,6 +289,8 @@ describe("CoaReportTemplate", () => {
     render(<CoaReportTemplate pages={[page]} />);
 
     expect(screen.getByText("CERTIFICATE OF ANALYSIS")).toBeInTheDocument();
+    expect(screen.getByText("August 20, 2026")).toBeInTheDocument();
+    expect(screen.queryByText("Month DATE, ค.ศ.")).not.toBeInTheDocument();
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Red Wax Block (BROMADIOLONE 0.005%)");
     expect(screen.getByText("Red wax block")).toBeInTheDocument();
     expect(screen.getByText("0.005% ± 0.00125")).toBeInTheDocument();
