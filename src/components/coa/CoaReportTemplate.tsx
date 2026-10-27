@@ -54,7 +54,8 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
   const remainingRows = rows.filter((row) => !/^appearance$/i.test(row.testItem?.trim() ?? ""));
 
   const renderRows = (selectedRows: typeof rows) => selectedRows.map((row, index) => {
-    const result = `${row.result}${row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}`;
+    const hasUnit = row.unit === "%" ? row.result?.includes("%") : row.result?.endsWith(row.unit || "");
+    const result = `${row.result}${row.unit && !hasUnit ? ` ${row.unit}` : ""}`;
     return /date\s*of\s*analysis/i.test(row.testItem || "") ? (
       <tr key={`${row.testItem}-${index}`}><td colSpan={2}>{row.testItem}</td><td>{dayMonthYear(result)}</td></tr>
     ) : (
