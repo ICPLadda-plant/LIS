@@ -1,8 +1,20 @@
 const express = require('express');
 const fs = require('fs');
 const router = express.Router();
-// คงเหลือต่ำกว่านี้ (mg/ml) ถือว่าขวดหมด กันเศษทศนิยมจากการลบหลายครั้ง
-const EMPTY_REMAINING_EPSILON = 1e-6;
+const { normalizeQuantity, EMPTY_REMAINING_EPSILON } = require('../lib/stockQuantity');
+
+// หลัง $inc ค่าใน DB อาจมีเศษทศนิยม — ปัดให้เรียบร้อยและตั้งสถานะหมดถ้าเหลือ 0
+async function settleRemainingAfterInc(unit) {
+  const raw = Number(unit.volume?.remaining) || 0;
+  const clean = normalizeQuantity(raw);
+  let changed = clean !== raw;
+  if (changed) unit.volume.remaining = clean;
+  if (clean <= EMPTY_REMAINING_EPSILON && unit.status !== 'empty') {
+    unit.status = 'empty';
+    changed = true;
+  }
+  if (changed) await unit.save();
+}
 const { StockStandard, StockSolvent, StockGlassware } = require('../models/Stock');
 const StockTransaction = require('../models/StockTransaction');
 const { buildSearchRankingStages } = require('../lib/searchRanking');
@@ -619,11 +631,7 @@ async function adjustStockUnitDeduction(tx, diff) {
       { new: true },
     );
     if (!updated) throw new Error('ปริมาณคงเหลือไม่พอ');
-    if (Number(updated.volume?.remaining) <= EMPTY_REMAINING_EPSILON) {
-      updated.volume.remaining = 0;
-      updated.status = 'empty';
-      await updated.save();
-    }
+    await settleRemainingAfterInc(updated);
     return;
   }
 
@@ -705,13 +713,8 @@ async function deductMgFromUnit(qrId, mg, meta = {}) {
     { new: true },
   );
   if (!updated) throw new Error('ปริมาณคงเหลือไม่พอ');
-  const before = updated.volume.remaining + deductionAmount; // pre-decrement value, atomically consistent
-  // เศษทศนิยมจากการลบหลายครั้ง (เช่น 1e-12) ให้ถือว่าหมด
-  if (updated.volume.remaining <= EMPTY_REMAINING_EPSILON) {
-    updated.volume.remaining = 0;
-    updated.status = 'empty';
-    await updated.save();
-  }
+  const before = normalizeQuantity(updated.volume.remaining + deductionAmount); // pre-decrement value, atomically consistent
+  await settleRemainingAfterInc(updated);
   const std = await StockStandard.findOne({ code: updated.itemCode });
   await logTransaction({
     itemType: 'standard',
