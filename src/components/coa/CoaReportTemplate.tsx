@@ -42,6 +42,10 @@ export const COA_REPORT_CSS = `
 .coa-root h1, .coa-root th, .coa-title, .print-heading { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT} !important; }
 `;
 
+function dayMonthYear(value: string) {
+  return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");
+}
+
 function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSample; hideDensity?: boolean }) {
   const rows = hideDensity
     ? sample.rows.filter((row) => !/\bdensity\b/i.test(row.testItem || ""))
@@ -52,7 +56,7 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
   const renderRows = (selectedRows: typeof rows) => selectedRows.map((row, index) => {
     const result = `${row.result}${row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}`;
     return /date\s*of\s*analysis/i.test(row.testItem || "") ? (
-      <tr key={`${row.testItem}-${index}`}><td colSpan={2}>{row.testItem}</td><td>{result}</td></tr>
+      <tr key={`${row.testItem}-${index}`}><td colSpan={2}>{row.testItem}</td><td>{dayMonthYear(result)}</td></tr>
     ) : (
       <tr key={`${row.testItem}-${index}`}>
         <td>{row.testItem}</td>

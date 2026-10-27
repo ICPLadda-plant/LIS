@@ -137,7 +137,7 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("Appearance")).toBeInTheDocument();
     expect(screen.getByText("%AI content (W/W)")).toBeInTheDocument();
     expect(screen.getByText("Date of analysis")).toHaveAttribute("colspan", "2");
-    expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("2026-10-19");
+    expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("19-10-2026");
     expect(screen.queryByText(/Density at 30/)).not.toBeInTheDocument();
     expect(screen.queryByText("1.120")).not.toBeInTheDocument();
   });
