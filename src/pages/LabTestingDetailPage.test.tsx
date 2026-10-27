@@ -194,6 +194,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 
 describe("LabTestingDetailPage", () => {
+  // ค่า ถพ. ที่ QC บันทึกแล้ว เพื่อให้ Lab กรอก %AI ได้
+  const savedDensity: QCTestResult = { petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: { "ค่าถพ.": "1.005" } } as QCTestResult;
+
   beforeEach(() => {
     mockNavigate.mockClear();
     mockState.activeFixtures = fixtures;
@@ -348,6 +351,7 @@ describe("LabTestingDetailPage", () => {
   it("opens saved Lab results read-only with edit and clear actions", async () => {
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: { ...fixtures.petition, labCompletedAt: "2026-07-13T03:00:00.000Z" },
     };
 
@@ -362,6 +366,7 @@ describe("LabTestingDetailPage", () => {
   it("unlocks saved Lab results while an edit is open", async () => {
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: {
         ...fixtures.petition,
         labCompletedAt: "2026-07-13T03:00:00.000Z",
@@ -416,6 +421,7 @@ describe("LabTestingDetailPage", () => {
   it("does not complete Lab while another routed item has no Lab parameter", async () => {
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: {
         ...fixtures.petition,
         items: [

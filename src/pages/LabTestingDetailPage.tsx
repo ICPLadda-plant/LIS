@@ -565,7 +565,17 @@ export default function LabTestingDetailPage() {
 
   const pendingDensity = !!petition && !isResearchAndDevelopmentPetition(petition) &&
     (petition.items ?? []).filter(shouldSendItemToLab).some((item) => {
-      const sgParam = matchLabParametersForItem(petition, item, allParameters, idsFor(item)).find(
+      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+      // %AI คำนวณจากค่า ถพ. เสมอ → ถ้ายังไม่มีค่า ถพ. ที่บันทึกไว้ของรายการนี้ ห้ามกรอกผล
+      const needsAiDensity = matched.some((param) => param.scope === 'lab' &&
+        param.valueFields?.some((field) => calculatedAiFieldKind(field.label) === 'ai'));
+      if (needsAiDensity) {
+        const records = savedResults
+          .filter((row) => row.itemSeq === item.seq)
+          .flatMap((row) => [row.values ?? {}, ...((row.entries ?? []) as Record<string, unknown>[])]);
+        if (findAiDensity(records) == null) return true;
+      }
+      const sgParam = matched.find(
         (param) => param.scope === 'qc' && param.shareWithLab &&
           param.valueFields?.some((field) => field.label === SG_FIELD_LABEL),
       );
