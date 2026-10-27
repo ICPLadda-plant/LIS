@@ -20,7 +20,8 @@ interface BottleLike {
 
 function hasRemainingStock(u: BottleLike): boolean {
   const remaining = u.volume?.remaining;
-  return remaining == null || Number(remaining) > 0;
+  // เศษทศนิยมเล็กมาก (เช่น 1e-12 mg) ถือว่าหมด
+  return remaining == null || Number(remaining) > 1e-6;
 }
 
 export function isUsableBottle(u: BottleLike, now: Date = new Date()): boolean {
