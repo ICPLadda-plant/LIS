@@ -1371,7 +1371,7 @@ test('ERP autofill averages duplicate legacy Lab results and excludes the named 
   }
 });
 
-test('ERP autofill keeps the matching LIS identifiers but uses the ERP production date', async () => {
+test('ERP autofill keeps the production date paired with the matching LIS Lot', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1414,7 +1414,7 @@ test('ERP autofill keeps the matching LIS identifiers but uses the ERP productio
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'FG260912-001');
-    assert.equal(res.body.sample.productionDate, '2026-09-15');
+    assert.equal(res.body.sample.productionDate, '2026-09-12');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;

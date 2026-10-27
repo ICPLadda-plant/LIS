@@ -955,8 +955,8 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const mf = mfBatchRows.find((row) => (
     requestedBatch && normalizeBatch(batchFromRow(row)) === normalizeBatch(requestedBatch)
   )) || mfBatchRows[0];
-  const erpRequestProductionDate = normalizeIsoDate(sourceSample.productionDate)
-    || lotSnapshot(sourceSample.lotNo || sourceSample.batchNo).productionDate;
+  const erpRequestProductionDate = lotSnapshot(requestedLot || requestedBatch).productionDate
+    || normalizeIsoDate(sourceSample.productionDate);
   const mfBatch = batchFromRow(mf);
   const mfDate = mfDateMatch?.productionDate || productionDateFromRow(mf);
   const matchingStock = stockCandidates.find((row) => {
@@ -985,7 +985,11 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     : '';
   const erpProductionDate = erpRequestLot
     ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
-    : erpStockProductionDate || erpRequestProductionDate || normalizeIsoDate(mfDate);
+    : authoritativeErpLot?.productionDate
+      || erpRequestProductionDate
+      || matchingStockLot?.productionDate
+      || normalizeIsoDate(mfDate)
+      || erpStockProductionDate;
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
   const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;

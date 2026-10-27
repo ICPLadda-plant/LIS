@@ -50,6 +50,13 @@ function dateValue(value?: string) {
   return value?.match(/^\d{4}-\d{2}-\d{2}/)?.[0] || value || "";
 }
 
+function productionDateForSample(sample: CoaSampleSnapshot) {
+  return productionDateFromLotNo(sample.batchNo)
+    || productionDateFromLotNo(sample.lotNo)
+    || sample.productionDate?.slice(0, 10)
+    || "";
+}
+
 function resultFormFromRows(rows: CoaResultSnapshot[], commonName?: string): ResultForm {
   const appearance = rows.find((row) => /^appearance$/i.test(row.testItem?.trim() || ""));
   const ai = rows.find((row) => isAiContentTestItem(row.testItem));
@@ -125,7 +132,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
     const source = request.sampleSnapshots[0] || { itemSeq: request.selectedItemSeqs[0] || 1 };
     setSample({
       ...source,
-      productionDate: productionDateFromLotNo(source.lotNo) || source.productionDate?.slice(0, 10) || "",
+      productionDate: productionDateForSample(source),
     });
     setResultForm(resultFormFromRows(request.resultSnapshots, source.commonName));
     setRemark(request.remark || "");
@@ -136,12 +143,10 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   }, [open, request, reset]);
   useEffect(() => {
     if (!open || editing || !autofill.data) return;
-    setSample((current) => ({
-      ...current,
-      ...autofill.data.sample,
-      productionDate: productionDateFromLotNo(autofill.data.sample.lotNo)
-        || autofill.data.sample.productionDate?.slice(0, 10) || "",
-    }));
+    setSample((current) => {
+      const next = { ...current, ...autofill.data.sample };
+      return { ...next, productionDate: productionDateForSample(next) };
+    });
     const nextResultForm = resultFormFromRows(autofill.data.results, autofill.data.sample.commonName);
     setResultForm(nextResultForm);
     autoFilledResultValues.current = {
@@ -230,12 +235,15 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   function selectStockLot(lotNo: string) {
     const selected = autofill.data?.stockCandidates.find((candidate) => candidate.lotNo === lotNo);
     if (!selected) return;
-    setSample((current) => ({
-      ...current,
-      lotNo: selected.lotNo,
-      batchNo: selected.batchNo,
-      productionDate: productionDateFromLotNo(selected.lotNo) || selected.productionDate,
-    }));
+    setSample((current) => {
+      const next = {
+        ...current,
+        lotNo: selected.lotNo,
+        batchNo: selected.batchNo,
+        productionDate: selected.productionDate,
+      };
+      return { ...next, productionDate: productionDateForSample(next) };
+    });
   }
   const sampleFields: Array<[keyof CoaSampleSnapshot, string, string?]> = [
     ["sampleName", "ชื่อการค้า *"], ["commonName", "ชื่อสามัญ *"], ["batchNo", "Batch No. *"],
@@ -300,12 +308,11 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
             <Input id={`manual-${key}`} type={type || "text"} required={label.endsWith("*")} maxLength={1000}
               value={String(sample[key] || "")} onChange={(event) => {
                 const value = event.target.value;
-                const lotProductionDate = key === "lotNo" ? productionDateFromLotNo(value) : "";
-                setSample((current) => ({
-                  ...current,
-                  [key]: value,
-                  ...(lotProductionDate ? { productionDate: lotProductionDate } : {}),
-                }));
+                setSample((current) => {
+                  const next = { ...current, [key]: value };
+                  const inferredDate = key === "batchNo" || key === "lotNo" ? productionDateForSample(next) : "";
+                  return { ...next, ...(inferredDate ? { productionDate: inferredDate } : {}) };
+                });
               }} />
           </div>)}
         </div>
