@@ -162,7 +162,7 @@ function describeStandard(field: ParameterValueField): string {
 }
 
 function formatLabLabelToleranceRange(rv: ReturnType<typeof resolveLabelTolerance>, unit: string): string {
-  return formatLabelToleranceRange(rv, unit, { showAutoPass: true, multiline: true, autoPassLabel: 'ผ่านเกณฑ์ 25%' });
+  return formatLabelToleranceRange(rv, unit);
 }
 
 interface TestFieldProps {
