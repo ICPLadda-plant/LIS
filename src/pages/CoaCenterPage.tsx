@@ -14,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import CoaCreateDialog from "@/components/coa/CoaCreateDialog";
 import CoaManualDialog from "@/components/coa/CoaManualDialog";
 import CoaManualRequestDialog from "@/components/coa/CoaManualRequestDialog";
-import CoaSamplePreview from "@/components/coa/CoaSamplePreview";
 import CoaReportTemplate, { COA_REPORT_CSS } from "@/components/coa/CoaReportTemplate";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import { DEV_MODE } from "@/config/dev";
@@ -1136,14 +1135,6 @@ export default function CoaCenterPage() {
               placeholder="ค้นหา COA / คำร้อง"
             />
           </div>
-
-          {showCreateActions && (
-            <CoaSamplePreview
-              className="bg-card"
-              title="ตัวอย่างการสร้างฟอร์ม COA 1 ใบ"
-              description="ตัวอย่างเอกสารที่แสดงเมื่ออยู่ในแท็บขอ COA"
-            />
-          )}
 
           {showAllYearFolders && (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
