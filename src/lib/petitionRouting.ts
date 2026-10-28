@@ -148,6 +148,57 @@ export function isQcAndLabPetition(petition: Pick<Petition, "routeTargets"> | nu
   return Boolean(petition?.routeTargets?.includes("qc") && petition.routeTargets.includes("lab"));
 }
 
+function sampleAmount(value: unknown): number | null {
+  const match = String(value ?? "").replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+type QcLabSampleItem = {
+  sampleName?: string;
+  commonName?: string;
+  batchNo?: unknown;
+  sampleQuantity?: number;
+  labelQuantity?: string;
+  labelQuantities?: string[];
+};
+
+/**
+ * เลือกตัวอย่างของฝั่ง QC หรือ LAB สำหรับคำร้องที่ส่งทั้งสองฝั่ง
+ * ปริมาณน้อยกว่า = QC, มากกว่า = LAB
+ * - คำร้องใหม่: 1 รายการ 2 ตัวอย่าง → คืน 1 ตัวอย่างของฝั่งนั้น
+ * - คำร้องเก่า: กรอกแยก 2 รายการ (ชื่อ + batch เดียวกัน) → คืนรายการของฝั่งนั้น
+ */
+export function pickQcLabSideItems<T extends QcLabSampleItem>(
+  petition: Pick<Petition, "submittedBy" | "items" | "routeTargets" | "labReceivedAt" | "labCompletedAt" | "labApprovedAt"> | null | undefined,
+  items: T[],
+  side: "qc" | "lab",
+): T[] {
+  if (!petition || !(isQcAndLabPetition(petition) || (requiresQcTrack(petition) && hasLabTrack(petition)))) return items;
+  const better = (a: number | null, b: number | null) =>
+    a !== null && (b === null || (side === "lab" ? a > b : a < b));
+  const groups = new Map<string, T[]>();
+  const order: string[] = [];
+  items.forEach((item, index) => {
+    const batch = String(item.batchNo ?? "").trim().toUpperCase();
+    const key = batch ? [String(item.sampleName ?? item.commonName ?? "").trim().toUpperCase(), batch].join("|") : `#${index}`;
+    if (!groups.has(key)) { groups.set(key, []); order.push(key); }
+    groups.get(key)!.push(item);
+  });
+  return order.map((key) => {
+    const group = groups.get(key)!;
+    if (group.length > 1) {
+      return group.reduce((chosen, item) =>
+        better(sampleAmount(item.labelQuantities?.[0] ?? item.labelQuantity), sampleAmount(chosen.labelQuantities?.[0] ?? chosen.labelQuantity)) ? item : chosen);
+    }
+    const item = group[0];
+    const quantities = (item.labelQuantities ?? []).filter((q) => String(q ?? "").trim());
+    if (item.sampleQuantity !== 2 || quantities.length !== 2) return item;
+    const [a, b] = quantities.map(sampleAmount);
+    const pick = better(b, a) ? quantities[1] : quantities[0];
+    return { ...item, sampleQuantity: 1, labelQuantity: pick, labelQuantities: [pick] };
+  });
+}
+
 /**
  * คำร้องส่งทั้ง QC และ LAB: ตัวอย่างเดียวกัน (ชื่อ + batch) ถือเป็นรายการเดียว
  * คำร้องเก่าที่กรอกแยก 2 รายการจะแสดง/กรอกผลเฉพาะรายการแรก
