@@ -355,7 +355,7 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
 type LabTestRow = { testItem: string; method: string };
 
 function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, labTestsBySeq = {} }: { lr: LabRequest; petition: Petition; items: PetitionItem[]; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown>; labTestsBySeq?: Record<number, LabTestRow[]> }) {
-  const sampleReceivedAt = petition.labReceivedAt || petition.receivedAt || petition.sampleSentAt || null;
+  const sampleReceivedAt = petition.labReceivedAt || null;
   const receivedDateTime = sampleReceivedAt ? new Date(sampleReceivedAt) : null;
   const receivedTime = receivedDateTime && !Number.isNaN(receivedDateTime.getTime())
     ? `${String(receivedDateTime.getHours()).padStart(2, '0')}.${String(receivedDateTime.getMinutes()).padStart(2, '0')} น.`
