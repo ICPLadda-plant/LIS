@@ -352,7 +352,9 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
   );
 }
 
-function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }: { lr: LabRequest; petition: Petition; items: PetitionItem[]; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown> }) {
+type LabTestRow = { testItem: string; method: string };
+
+function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, labTestsBySeq = {} }: { lr: LabRequest; petition: Petition; items: PetitionItem[]; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown>; labTestsBySeq?: Record<number, LabTestRow[]> }) {
   const receivedDateTime = petition.receivedAt ? new Date(petition.receivedAt) : null;
   const receivedTime = receivedDateTime
     ? `${String(receivedDateTime.getHours()).padStart(2, '0')}.${String(receivedDateTime.getMinutes()).padStart(2, '0')} น.`
@@ -519,6 +521,11 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
                 <td>{item.testUnit ?? ''}</td>
                 <td>
                   {item.testItems ?? ''}
+                  {(labTestsBySeq[item.seq] ?? []).map((test, testIndex) => (
+                    <div key={`lab-test-${testIndex}`} className="pr-note">
+                      {test.testItem}{test.method && test.method !== '-' ? ` : ${test.method.replace(/\s*\n\s*/g, ' ')}` : ''}
+                    </div>
+                  ))}
                   {Object.entries(requestValues).filter(([key, value]) => !key.startsWith('ค่าถพ.\u0000') && key.endsWith(`\u0000${item.batchNo}\u0000${item.sampleName}`) && value !== '').map(([key, value]) => <div key={key} className="pr-note">{key.split('\u0000')[0]}: {String(value)}</div>)}
                 </td>
                 <td>{item.sampleId ?? ''}</td>
@@ -589,9 +596,24 @@ interface Props {
   qcResults?: QCTestResult[];
   sgParam?: SgParameter | null;
   requestValues?: Record<string, unknown>;
+  /** หน้าใบรายงานผล Lab (เรียงตาม petition.items) ใช้เติมรายการทดสอบ/วิธีทดสอบ */
+  labReportPages?: Array<{ rows: LabTestRow[] }>;
 }
 
-export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {} }: Props) {
+export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [] }: Props) {
+  const labTestsBySeq: Record<number, LabTestRow[]> = {};
+  const labTestsBySample = new Map<string, LabTestRow[]>();
+  const sampleKey = (item: PetitionItem) => `${String(item.batchNo ?? '').trim()}|${item.sampleName ?? ''}`;
+  (petition.items ?? []).forEach((item, index) => {
+    const rows = labReportPages[index]?.rows ?? [];
+    if (!rows.length) return;
+    labTestsBySeq[item.seq] = rows;
+    if (!labTestsBySample.has(sampleKey(item))) labTestsBySample.set(sampleKey(item), rows);
+  });
+  // ตัวอย่างเดียวกันที่กรอกแยกรายการ (QC + LAB) ใช้รายการทดสอบชุดเดียวกัน
+  (petition.items ?? []).forEach((item) => {
+    if (!labTestsBySeq[item.seq] && labTestsBySample.has(sampleKey(item))) labTestsBySeq[item.seq] = labTestsBySample.get(sampleKey(item))!;
+  });
   const labItems = pickQcLabSideItems(petition, petition.items.filter((it) => shouldSendItemToLab(it)), 'lab');
   const itemsToShow = labItems.length > 0 ? labItems : petition.items.filter((it) => it.seq === labRequest.sampleSeq);
   // เลขที่ใบนำส่งใช้ค่าเดียวทั้งใบ (default = เลขคำขอ) — ดึงจากรายการที่ใบนี้อ้างถึง
@@ -605,7 +627,7 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
           submissionNo={submissionNo}
           customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
         />
-        <PageTwo lr={labRequest} petition={petition} items={itemsToShow} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} />
+        <PageTwo lr={labRequest} petition={petition} items={itemsToShow} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
       </div>
     </>
   );

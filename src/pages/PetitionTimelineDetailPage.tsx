@@ -629,7 +629,7 @@ export default function PetitionTimelineDetailPage() {
     </div>
 
     {labelPrintOpen && <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label"><SampleLabelPrintTemplate petition={petition} /></PrintPreviewDialog>}
-    {servicePrintOpen && labRequests?.[0] && <PrintPreviewDialog open={servicePrintOpen} onOpenChange={setServicePrintOpen} docType="service-request"><PetitionPrintTemplate labRequest={labRequests[0]} petition={petition} qcResults={qcResults} sgParam={sgParameter} requestValues={requestValues} /></PrintPreviewDialog>}
+    {servicePrintOpen && labRequests?.[0] && <PrintPreviewDialog open={servicePrintOpen} onOpenChange={setServicePrintOpen} docType="service-request"><PetitionPrintTemplate labRequest={labRequests[0]} petition={petition} qcResults={qcResults} sgParam={sgParameter} requestValues={requestValues} labReportPages={labReportPages} /></PrintPreviewDialog>}
     {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {labResultOpen && <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" css={LAB_REPORT_CSS}><LabResultReportTemplate pages={labReportPages} /></PrintPreviewDialog>}

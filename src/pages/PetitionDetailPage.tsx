@@ -551,7 +551,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
 
               {hasLabRequests && (
                 <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="service-request">
-                  <PetitionPrintTemplate labRequest={labRequests![0]} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} />
+                  <PetitionPrintTemplate labRequest={labRequests![0]} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labReportPages={labReportPages} />
                 </PrintPreviewDialog>
               )}
               {data && (
