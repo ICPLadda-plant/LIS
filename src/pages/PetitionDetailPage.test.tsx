@@ -130,7 +130,7 @@ vi.mock('@/lib/petitionPrintability', () => ({
   canPrintPreReport: () => false,
   canPrintSampleLabel: () => false,
   canPrintLabResult: (petition: { status?: string; labApprovedAt?: string; labCompletedAt?: string }) =>
-    petition?.status === 'approved' && !!(petition?.labApprovedAt || petition?.labCompletedAt),
+    !!petition?.labApprovedAt || (petition?.status === 'approved' && !!petition?.labCompletedAt),
 }));
 
 vi.mock('@/lib/labResultReport', () => ({
@@ -172,7 +172,19 @@ describe('PetitionDetailPage request summary', () => {
     expect(screen.getByRole('heading', { name: 'รายการตัวอย่าง (1)' })).toBeInTheDocument();
   });
 
-  it('hides the print lab-result action when QC has not confirmed Final Result', () => {
+  it('hides the print lab-result action when Lab only completed results and QC has not confirmed Final Result', () => {
+    Object.assign(mocks.petition, {
+      status: 'success',
+      labApprovedAt: undefined,
+      labCompletedAt: '2026-07-14T00:00:00.000Z',
+    });
+
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the print lab-result action once Lab approves results, before QC Final Result', async () => {
     Object.assign(mocks.petition, {
       status: 'success',
       labApprovedAt: '2026-07-14T00:00:00.000Z',
@@ -180,7 +192,7 @@ describe('PetitionDetailPage request summary', () => {
 
     renderPage();
 
-    expect(screen.queryByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeInTheDocument());
   });
 
   it('shows the print lab-result action when Lab has issued results and QC has confirmed Final Result', async () => {

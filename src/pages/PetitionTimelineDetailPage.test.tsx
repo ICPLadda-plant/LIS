@@ -600,10 +600,21 @@ describe("PetitionTimelineDetailPage", () => {
     expect(documentButtons[2]).toHaveClass("border-red-500");
   });
 
-  it("hides the lab-result print button when QC has not confirmed Final Result", async () => {
+  it("shows the lab-result print button once Lab approves results, before QC Final Result", async () => {
     Object.assign(mocks.petition, {
       status: "success",
       labApprovedAt: "2026-07-14T00:00:00.000Z",
+    });
+    renderDetail();
+    await screen.findByRole("heading", { name: "P-2607-001" });
+    expect(await screen.findByRole("button", { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeInTheDocument();
+  });
+
+  it("hides the lab-result print button when Lab only completed results and QC has not confirmed Final Result", async () => {
+    Object.assign(mocks.petition, {
+      status: "success",
+      labApprovedAt: undefined,
+      labCompletedAt: "2026-07-14T00:00:00.000Z",
     });
     renderDetail();
     await screen.findByRole("heading", { name: "P-2607-001" });

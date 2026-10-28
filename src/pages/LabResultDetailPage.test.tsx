@@ -111,7 +111,14 @@ beforeEach(() => {
 });
 
 describe('LabResultDetailPage print action', () => {
-  it('disables the print lab-result button when QC has not confirmed Final Result', () => {
+  it('enables the print lab-result button once Lab approves results, before QC Final Result', () => {
+    renderPage();
+
+    expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeEnabled();
+  });
+
+  it('disables the print lab-result button when Lab only completed results and QC has not confirmed Final Result', () => {
+    Object.assign(mocks.petition, { labApprovedAt: undefined, labCompletedAt: '2026-07-14T00:00:00.000Z' });
     renderPage();
 
     expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeDisabled();
