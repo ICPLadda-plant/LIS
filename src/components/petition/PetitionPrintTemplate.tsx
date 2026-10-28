@@ -84,7 +84,7 @@ function PageOne({ lr, submissionNo }: { lr: LabRequest; submissionNo: string })
           <b>เรื่อง: การทบทวนข้อตกลงการบริการทดสอบ</b>
         </div>
         <div className="pr-p1-meta-row">
-          <b>อ้างอิงใบขอรับบริการเลขที่</b>{' '}
+          <b>อ้างอิงใบขอรับบริการเลขที่ TA</b>{' '}
           <span className="pr-line pr-line-md">{submissionNo}</span>
         </div>
         <div className="pr-p1-meta-row">

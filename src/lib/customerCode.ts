@@ -3,9 +3,10 @@
  * (หน้า 1 — "รหัสลูกค้า"). department เป็น free-text เลยต้อง normalize ก่อน map.
  *
  *   ผลิต 1–5      → TI P01–TI P05
- *   inter trade   → TI INT
+ *   อินเตอร์เทรด   → TI INT
  *   QC            → TI QC
- *   วิจัยพัฒนา     → TI RD
+ *   R & D         → TI RD
+ *   คลังสินค้า     → TI WH
  *
  * ถ้า map ไม่ได้ (เช่น HR ส่งมาแค่ "ผลิต" ไม่มีเลขสาย) คืนค่า department เดิม
  * เพื่อไม่ให้ข้อมูลหายไปจากเอกสาร.
@@ -19,9 +20,10 @@ export function customerCodeFromDepartment(dept?: string | null): string {
   const prod = norm.match(/(?:ผลิต|prod(?:uction)?)\s*([1-5])/);
   if (prod) return `TI P0${prod[1]}`;
 
-  if (norm.includes("inter")) return "TI INT";
+  if (/inter|อินเตอร์|อินเทอร์/.test(norm)) return "TI INT";
   if (/วิจัย|r\s*&?\s*d|\brd\b/.test(norm)) return "TI RD";
   if (/\bqc\b|คิวซี/.test(norm)) return "TI QC";
+  if (/คลังสินค้า|คลัง|warehouse|\bwh\b/.test(norm)) return "TI WH";
 
   return raw; // map ไม่ได้ → คงค่าเดิม
 }
