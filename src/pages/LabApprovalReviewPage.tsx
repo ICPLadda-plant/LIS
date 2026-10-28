@@ -241,7 +241,12 @@ export default function LabApprovalReviewPage() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => { pendingApproveRef.current = true; setReviewDialogOpen(true); }}
+                onClick={() => {
+                  // ใบทบทวนกรอกครบแล้ว → ไปยืนยันออกผลเลย ไม่ต้องเปิดใบทบทวนซ้ำ
+                  if (isReviewFilled(currentReview)) { runApprove(); return; }
+                  pendingApproveRef.current = true;
+                  setReviewDialogOpen(true);
+                }}
                 disabled={submitting}
                 className="gap-2"
               >
