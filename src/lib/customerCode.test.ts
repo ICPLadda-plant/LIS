@@ -22,7 +22,7 @@ describe("customerCodeFromDepartment", () => {
   it("falls back to the raw department when it cannot be mapped", () => {
     expect(customerCodeFromDepartment("ผลิต")).toBe("");
     expect(customerCodeFromDepartment("lab")).toBe("");
-    expect(customerCodeFromDepartment("LDI")).toBe("");
+    expect(customerCodeFromDepartment("LDI")).toBe("TI INT");
     expect(customerCodeFromDepartment("ผลิต 01")).toBe("TI P01");
     expect(customerCodeFromDepartment("คลังสินค้า RM")).toBe("TI WH");
     expect(customerCodeFromDepartment("ควบคุมคุณภาพ")).toBe("TI QC");

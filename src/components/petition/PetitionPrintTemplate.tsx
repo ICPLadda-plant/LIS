@@ -91,7 +91,7 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
           <b>รหัสลูกค้า</b>{' '}
           <span className="pr-line pr-line-sm">{customerCode}</span>
           <span> / </span>
-          <span className="pr-line pr-line-xs">{createdDate.y}</span>
+          <span className="pr-line pr-line-xs" />
         </div>
 
         <div className="pr-p1-notify">
