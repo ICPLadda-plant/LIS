@@ -47,4 +47,4 @@ server/uploads/param-files/*
 # backup ข้อมูลก่อนรันสคริปต์ซ่อมฐานข้อมูล
 server/scripts/backups/
 
-actions-runner
+actions-runner-LIS
