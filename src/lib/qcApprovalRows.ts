@@ -184,8 +184,8 @@ export function buildApprovalGroups(
                 const labelParts = [unit.field.label, valueLabel, entryLabel].filter(Boolean);
                 const hiddenStandard = (unit as { hiddenStandard?: boolean }).hiddenStandard === true;
                 // label-% tolerance unit: 3-zone verdict. Only "fail" (outside เกณฑ์กรม) marks
-                // the row abnormal; "review" is still within เกณฑ์กรม so it shows as ปกติ and
-                // standardText carries the "รอหัวหน้าอนุมัติ" note instead.
+                // the row abnormal; "review" is still within เกณฑ์กรม so it shows as ปกติ
+                // with no extra status note.
                 let rowStandardText: string;
                 let rowAbnormal: boolean;
                 if (unit.labelTolerance) {
@@ -195,11 +195,7 @@ export function buildApprovalGroups(
                     multiline: true,
                     autoPassLabel: "ผ่านเกณฑ์ 25%",
                   });
-                  const statusNote = rv.status === "review"
-                    ? "รอหัวหน้าอนุมัติ"
-                    : rv.status === "fail"
-                      ? "เกินช่วงที่อนุมัติได้"
-                      : "";
+                  const statusNote = rv.status === "fail" ? "เกินช่วงที่อนุมัติได้" : "";
                   rowStandardText = [range, statusNote].filter(Boolean).join(" · ");
                   rowAbnormal = rv.status === "fail";
                 } else {
