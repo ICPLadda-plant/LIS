@@ -39,7 +39,7 @@ import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFiel
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
-import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isResearchAndDevelopmentPetition, mergeQcLabDuplicateItems, shouldSendItemToLab } from '@/lib/petitionRouting';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import {
   type Petition,
@@ -779,7 +779,7 @@ export default function LabTestingDetailPage() {
   const allLabBatchItems = isResearchAndDevelopmentPetition(petition)
     ? (petition.items ?? [])
     : (petition.items ?? []).filter((it) => shouldSendItemToLab(it));
-  const labItems = allLabBatchItems;
+  const labItems = mergeQcLabDuplicateItems(petition, allLabBatchItems);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((param) => param.scope === 'lab'),
   );

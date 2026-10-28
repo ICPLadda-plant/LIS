@@ -143,3 +143,27 @@ export function requiresQcTrack(petition: Pick<Petition, "submittedBy" | "routeT
   if (petition.routeTargets?.length) return petition.routeTargets.includes("qc");
   return !isResearchAndDevelopmentPetition(petition as Petition);
 }
+
+export function isQcAndLabPetition(petition: Pick<Petition, "routeTargets"> | null | undefined): boolean {
+  return Boolean(petition?.routeTargets?.includes("qc") && petition.routeTargets.includes("lab"));
+}
+
+/**
+ * คำร้องส่งทั้ง QC และ LAB: ตัวอย่างเดียวกัน (ชื่อ + batch) ถือเป็นรายการเดียว
+ * คำร้องเก่าที่กรอกแยก 2 รายการจะแสดง/กรอกผลเฉพาะรายการแรก
+ */
+export function mergeQcLabDuplicateItems<T extends { sampleName?: string; commonName?: string; batchNo?: unknown }>(
+  petition: Pick<Petition, "routeTargets"> | null | undefined,
+  items: T[],
+): T[] {
+  if (!isQcAndLabPetition(petition)) return items;
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const batch = String(item.batchNo ?? "").trim().toUpperCase();
+    if (!batch) return true;
+    const key = [String(item.sampleName ?? item.commonName ?? "").trim().toUpperCase(), batch].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}

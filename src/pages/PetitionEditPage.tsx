@@ -15,7 +15,7 @@ import {
   updateLabRequest,
   createLabRequest,
 } from '@/hooks/usePetition';
-import { duplicateBatchError, labSendOverrideNoteError, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { duplicateBatchError, isQcAndLabPetition, labSendOverrideNoteError, shouldSendItemToLab } from '@/lib/petitionRouting';
 import type { LabRequest } from '@/types/labRequest.types';
 
 type StepKey = 'items' | 'lab';
@@ -270,7 +270,7 @@ export default function PetitionEditPage() {
         return false;
       }
       const duplicateError = duplicateBatchError(items, {
-        allowDuplicates: data?.dept === 'production',
+        allowDuplicates: data?.dept === 'production' && !isQcAndLabPetition(data),
       });
       if (duplicateError) {
         setStepError(duplicateError);
@@ -424,6 +424,7 @@ export default function PetitionEditPage() {
               <ItemsStep
                 value={items}
                 onChange={setItems}
+                splitQcLab={isQcAndLabPetition(data)}
                 submitter={submitter}
                 onSubmitterChange={setSubmitter}
                 submitterReadOnly
