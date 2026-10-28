@@ -1194,7 +1194,7 @@ export default function LabTestingDetailPage() {
             <Card key={item.seq} className="overflow-hidden">
               <CardHeader className="bg-muted pb-3">
                 <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-                  <span>รายการที่ {item.seq}: {item.sampleName || '-'}</span>
+                  <span>รายการที่ {item.seq}: {item.commonName || item.sampleName || '-'}</span>
                   {item.batchNo && (
                     <Badge variant="blue-soft" className="font-normal">
                       Batch: {item.batchNo}
