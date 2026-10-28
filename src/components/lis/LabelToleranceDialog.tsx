@@ -238,11 +238,13 @@ type Props = {
   field: ParameterValueField;
   onClose: () => void;
   onSave: (next: LabelToleranceRule[]) => void;
+  focusRuleIndex?: number | null;
 };
 
-export function LabelToleranceDialog({ open, field, onClose, onSave }: Props) {
+export function LabelToleranceDialog({ open, field, onClose, onSave, focusRuleIndex = null }: Props) {
   const [list, setList] = useState<LabelToleranceRule[]>(field.labelToleranceStandards ?? []);
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
+  const [focusSet, setFocusSet] = useState<Set<number> | null>(null);
   const ruleRefs = useRef<Array<HTMLDivElement | null>>([]);
   const pendingScrollIndex = useRef<number | null>(null);
   const { user } = useAuth();
@@ -256,10 +258,12 @@ export function LabelToleranceDialog({ open, field, onClose, onSave }: Props) {
     if (open) {
       const initialList = field.labelToleranceStandards ?? [];
       setList(initialList);
-      setCollapsed(Object.fromEntries(initialList.map((_, index) => [index, true])));
+      const focused = focusRuleIndex != null && focusRuleIndex < initialList.length ? focusRuleIndex : null;
+      setCollapsed(Object.fromEntries(initialList.map((_, index) => [index, index !== focused])));
+      setFocusSet(focused != null ? new Set([focused]) : null);
       pendingScrollIndex.current = null;
     }
-  }, [field.labelToleranceStandards, open]);
+  }, [field.labelToleranceStandards, open, focusRuleIndex]);
 
   const hasInvalid = useMemo(() => list.some(isRuleInvalid), [list]);
   const { data: masterRows = [] } = useQuery<MasterItemRow[]>({
@@ -309,6 +313,7 @@ export function LabelToleranceDialog({ open, field, onClose, onSave }: Props) {
 
   const addRule = () => setList((prev) => {
     pendingScrollIndex.current = 0;
+    setFocusSet((current) => (current ? new Set([0, ...[...current].map((n) => n + 1)]) : current));
     setCollapsed((current) => {
       const next: Record<number, boolean> = { 0: false };
       for (const [key, value] of Object.entries(current)) {
@@ -349,6 +354,9 @@ export function LabelToleranceDialog({ open, field, onClose, onSave }: Props) {
 
   const removeRule = (index: number) => {
     setList((prev) => prev.filter((_, i) => i !== index));
+    setFocusSet((current) => (current
+      ? new Set([...current].filter((n) => n !== index).map((n) => (n > index ? n - 1 : n)))
+      : current));
     setCollapsed((prev) => {
       const next: Record<number, boolean> = {};
       for (const [key, value] of Object.entries(prev)) {
@@ -423,7 +431,7 @@ export function LabelToleranceDialog({ open, field, onClose, onSave }: Props) {
           </div>
           */}
           <div className="flex items-center justify-between">
-            <Label className="text-sm">กฎ ({list.length})</Label>
+            <Label className="text-sm">{focusSet ? `กฎที่เลือก (${focusSet.size} จาก ${list.length})` : `กฎ (${list.length})`}</Label>
             <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={addRule}>
               <Plus className="h-4 w-4" />
               เพิ่มกฎ
@@ -435,6 +443,7 @@ export function LabelToleranceDialog({ open, field, onClose, onSave }: Props) {
           ) : null}
 
           {list.map((rule, index) => {
+            if (focusSet && !focusSet.has(index)) return null;
             const normalized = normalizeRuleModes(rule);
             const autoMode = normalized.autoMode as BandModeOption;
             const headMode = normalized.headMode as BandModeOption;

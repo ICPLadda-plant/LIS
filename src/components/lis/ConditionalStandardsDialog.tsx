@@ -35,18 +35,24 @@ type Props = {
   resultMode: "standard" | "output";
   onClose: () => void;
   onSave: (next: StandardRule[]) => void;
+  focusRuleIndex?: number | null;
 };
 
 export function ConditionalStandardsDialog({
-  open, field, allParameters, currentParameterId, siblingFields, resultMode, onClose, onSave,
+  open, field, allParameters, currentParameterId, siblingFields, resultMode, onClose, onSave, focusRuleIndex = null,
 }: Props) {
   const unit = field.unit ?? "";
   const [rules, setRules] = useState<StandardRule[]>(field.conditionalStandards ?? []);
+  const [focusSet, setFocusSet] = useState<Set<number> | null>(null);
 
   useEffect(() => {
-    if (open) setRules(field.conditionalStandards ?? []);
+    if (open) {
+      const initial = field.conditionalStandards ?? [];
+      setRules(initial);
+      setFocusSet(focusRuleIndex != null && focusRuleIndex < initial.length ? new Set([focusRuleIndex]) : null);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, focusRuleIndex]);
 
   // ตัวเลือก field ต้นทาง: พี่น้อง (paramId=null) + field ของ parameter อื่น
   const sources: SourceOption[] = [
@@ -64,23 +70,34 @@ export function ConditionalStandardsDialog({
 
   const patchRule = (i: number, patch: Partial<StandardRule>) =>
     setRules((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  const moveRule = (i: number, dir: -1 | 1) =>
+  const moveRule = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= rules.length) return;
+    setFocusSet((current) => (current
+      ? new Set([...current].map((n) => (n === i ? j : n === j ? i : n)))
+      : current));
     setRules((prev) => {
-      const j = i + dir;
-      if (j < 0 || j >= prev.length) return prev;
       const next = [...prev];
       [next[i], next[j]] = [next[j], next[i]];
       return next;
     });
-  const removeRule = (i: number) => setRules((prev) => prev.filter((_, idx) => idx !== i));
+  };
+  const removeRule = (i: number) => {
+    setFocusSet((current) => (current
+      ? new Set([...current].filter((n) => n !== i).map((n) => (n > i ? n - 1 : n)))
+      : current));
+    setRules((prev) => prev.filter((_, idx) => idx !== i));
+  };
   const defaultCondOp = resultMode === "output" ? "between" : "eq";
-  const addRule = (withCondition: boolean) =>
+  const addRule = (withCondition: boolean) => {
+    setFocusSet((current) => (current ? new Set([...current, rules.length]) : current));
     setRules((prev) => [...prev, {
       label: "",
       conditions: withCondition ? [{ sourceFieldLabel: sources[0]?.label ?? "", op: defaultCondOp, value: "" }] : [],
       operator: "between", value: null, value2: null,
       ...(resultMode === "output" ? { outputText: "", outputKind: "normal" as const } : {}),
     }]);
+  };
 
   const patchCond = (ri: number, ci: number, patch: Partial<StandardCondition>) =>
     setRules((prev) => prev.map((r, idx) => idx !== ri ? r : {
@@ -111,7 +128,7 @@ export function ConditionalStandardsDialog({
           {rules.length === 0 && (
             <p className="text-xs text-muted-foreground">ยังไม่มีกฎ — กดเพิ่มกฎด้านล่าง</p>
           )}
-          {rules.map((rule, ri) => (
+          {rules.map((rule, ri) => (focusSet && !focusSet.has(ri) ? null : (
             <div key={ri} className="rounded-lg border p-3 space-y-2 bg-muted/30">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono text-muted-foreground">#{ri + 1}</span>
@@ -252,7 +269,7 @@ export function ConditionalStandardsDialog({
                 {resultMode === "output" ? describeOutputRule(rule) : describeRule(rule, unit)}
               </p>
             </div>
-          ))}
+          )))}
         </div>
 
         <div className="flex gap-2">

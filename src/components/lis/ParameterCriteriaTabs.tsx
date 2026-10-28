@@ -368,7 +368,7 @@ export function ParameterCriteriaTabs({
                   <TableCell className="text-right">
                     <EditButton
                       label={`แก้ไขกฎ ${row.fieldLabel}`}
-                      onClick={() => onEditField("conditional", row.parameterId, row.fieldIndex)}
+                      onClick={() => onEditField("conditional", row.parameterId, row.fieldIndex, row.ruleIndex)}
                     />
                   </TableCell>
                 </TableRow>
@@ -405,7 +405,7 @@ export function ParameterCriteriaTabs({
                       <span className="font-medium tabular-nums">{row.selectorText}</span>
                       <EditButton
                         label={`แก้ไขเกณฑ์ %สาร ${row.fieldLabel}`}
-                        onClick={() => onEditField("labelTolerance", row.parameterId, row.fieldIndex)}
+                        onClick={() => onEditField("labelTolerance", row.parameterId, row.fieldIndex, row.ruleIndex)}
                       />
                     </div>
                   </TableCell>
