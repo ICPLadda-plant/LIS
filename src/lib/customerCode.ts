@@ -22,7 +22,7 @@ export function customerCodeFromDepartment(dept?: string | null): string {
 
   if (/inter|อินเตอร์|อินเทอร์/.test(norm)) return "TI INT";
   if (/วิจัย|r\s*&?\s*d|\brd\b/.test(norm)) return "TI RD";
-  if (/\bqc\b|คิวซี/.test(norm)) return "TI QC";
+  if (/\bqc\b|คิวซี|ควบคุมคุณภาพ/.test(norm)) return "TI QC";
   if (/คลังสินค้า|คลัง|warehouse|\bwh\b/.test(norm)) return "TI WH";
 
   return raw; // map ไม่ได้ → คงค่าเดิม
