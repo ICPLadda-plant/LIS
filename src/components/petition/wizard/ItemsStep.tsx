@@ -75,6 +75,21 @@ interface Props {
   allowManualItemFields?: boolean;
   masterItemOptions?: PetitionMasterItemOption[];
   masterItemsLoading?: boolean;
+  /** ส่งทั้ง QC และ LAB: บังคับ 2 ตัวอย่าง ปริมาณน้อยกว่าไป QC มากกว่าไป LAB */
+  splitQcLab?: boolean;
+}
+
+function quantityNumber(value: string | undefined): number | null {
+  const match = String(value ?? '').replace(/,/g, '').match(/-?\d+(\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+/** คืนปลายทางของแต่ละตัวอย่าง (index 0/1) ตามปริมาณ หรือ null ถ้ายังตัดสินไม่ได้ */
+export function qcLabSampleTargets(quantities: string[]): Array<'QC' | 'LAB'> | null {
+  const a = quantityNumber(quantities[0]);
+  const b = quantityNumber(quantities[1]);
+  if (a === null || b === null || a === b) return null;
+  return a < b ? ['QC', 'LAB'] : ['LAB', 'QC'];
 }
 
 function parseSampleQuantityInput(value: string): number | undefined {
@@ -157,7 +172,13 @@ export default function ItemsStep({
   allowManualItemFields = false,
   masterItemOptions = [],
   masterItemsLoading = false,
+  splitQcLab = false,
 }: Props) {
+  useEffect(() => {
+    if (!splitQcLab || !value.some((item) => item.sampleQuantity !== 2)) return;
+    onChange(value.map((item) => (item.sampleQuantity === 2 ? item : { ...item, sampleQuantity: 2 })));
+  }, [splitQcLab, value, onChange]);
+
   function setItem(idx: number, patch: Partial<ItemRowValues>) {
     onChange(value.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
@@ -298,7 +319,8 @@ export default function ItemsStep({
           const batchNoId = `batch-no-${idx}`;
           const packageUnitId = `package-unit-${idx}`;
           const labelQuantityId = `label-quantity-${idx}`;
-          const sentQuantityInputs = labelQuantityInputs(it);
+          const sentQuantityInputs = labelQuantityInputs(splitQcLab ? { ...it, sampleQuantity: 2 } : it);
+          const sampleTargets = splitQcLab ? qcLabSampleTargets(sentQuantityInputs) : null;
           return (
             <div key={idx} className="rounded-[10px] border border-grey-200 p-4">
               <div className="mb-3 flex items-center justify-between">
@@ -405,10 +427,13 @@ export default function ItemsStep({
                     min={1}
                     step={1}
                     inputMode="numeric"
-                    value={it.sampleQuantity ?? ''}
+                    value={splitQcLab ? 2 : it.sampleQuantity ?? ''}
                     onChange={(e) => setItem(idx, { sampleQuantity: parseSampleQuantityInput(e.target.value) })}
-                    disabled={itemsReadOnly}
+                    disabled={itemsReadOnly || splitQcLab}
                   />
+                  {splitQcLab && (
+                    <p className="mt-1 text-xs text-muted-foreground">ส่งทั้ง QC และ LAB ระบบกำหนด 2 ตัวอย่างอัตโนมัติ</p>
+                  )}
                 </div>
                 {sentQuantityInputs.length === 1 ? (
                   <div>
@@ -424,12 +449,18 @@ export default function ItemsStep({
                 ) : (
                   <div className="sm:col-span-2 rounded-lg border bg-card p-3">
                     <div className="mb-3 text-sm font-medium text-foreground">ปริมาณที่ส่งแต่ละตัวอย่าง</div>
+                    {splitQcLab && (
+                      <p className="mb-3 text-xs text-muted-foreground">ปริมาณน้อยกว่าส่ง QC ปริมาณมากกว่าส่ง LAB</p>
+                    )}
                     <div className="space-y-2">
                       {sentQuantityInputs.map((sentQuantity, quantityIndex) => {
                         const inputId = `${labelQuantityId}-${quantityIndex}`;
                         return (
                           <div key={inputId} className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)] sm:items-end">
-                            <div className="pb-2 text-sm font-semibold text-primary">รายการที่ {quantityIndex + 1}</div>
+                            <div className="pb-2 text-sm font-semibold text-primary">
+                              ตัวอย่างที่ {quantityIndex + 1}
+                              {sampleTargets && <span className="ml-1 text-foreground">· ส่ง {sampleTargets[quantityIndex]}</span>}
+                            </div>
                             <div>
                               <Label htmlFor={inputId} className="sr-only">ปริมาณที่ส่ง {quantityIndex + 1}</Label>
                               <Input

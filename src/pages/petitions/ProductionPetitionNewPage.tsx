@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import PageHeader from '@/components/lis/PageHeader';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
-import ItemsStep, { type ItemRowValues } from '@/components/petition/wizard/ItemsStep';
+import ItemsStep, { qcLabSampleTargets, type ItemRowValues } from '@/components/petition/wizard/ItemsStep';
 import type { SubmitterValues } from '@/components/petition/wizard/SubmitterPicker';
 import LabRequestStep, { type LabRequestRowValues } from '@/components/petition/wizard/LabRequestStep';
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
@@ -737,6 +737,7 @@ export default function ProductionPetitionNewPage({
     const targets = (searchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
     return targets.length ? targets : null;
   }, [searchParams]);
+  const splitQcLab = Boolean(routeTargets?.includes('qc') && routeTargets.includes('lab'));
 
   function validateStep(): boolean {
     setStepError(null);
@@ -792,10 +793,18 @@ export default function ProductionPetitionNewPage({
         setStepError(overrideNoteError);
         return false;
       }
-      const duplicateError = duplicateBatchError(items, { allowDuplicates: true });
+      const duplicateError = duplicateBatchError(items, { allowDuplicates: !splitQcLab });
       if (duplicateError) {
-        setStepError(duplicateError);
+        setStepError(splitQcLab ? `${duplicateError} — ส่งทั้ง QC และ LAB ให้กรอก batch เดียวกันเป็นรายการเดียว ระบบแบ่ง 2 ตัวอย่างให้อัตโนมัติ` : duplicateError);
         return false;
+      }
+      if (splitQcLab) {
+        for (const it of items) {
+          if (!qcLabSampleTargets(it.labelQuantities ?? [])) {
+            setStepError(`ตัวอย่างลำดับ ${it.seq}: กรุณากรอกปริมาณทั้ง 2 ตัวอย่างเป็นตัวเลขที่ไม่เท่ากัน (น้อยกว่าส่ง QC มากกว่าส่ง LAB)`);
+            return false;
+          }
+        }
       }
     }
     return true;
@@ -847,6 +856,7 @@ export default function ProductionPetitionNewPage({
         },
         items: items.map((it, idx) => ({
           ...it,
+          ...(splitQcLab ? { sampleQuantity: 2 } : {}),
           seq: idx + 1,
           sendToLab: selectedTargets ? selectedTargets.includes('lab') : sendToLabForSubmit(it, submitterDepartment),
         })),
@@ -1022,6 +1032,7 @@ export default function ProductionPetitionNewPage({
                 itemsReadOnly={integrationMode}
                 allowManualItemFields={!masterItemSelectionRequired}
                 masterItemOptions={masterItemOptions}
+                splitQcLab={splitQcLab}
                 masterItemsLoading={masterItemsLoading}
               />
             )}
