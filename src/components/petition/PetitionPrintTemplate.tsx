@@ -1,6 +1,6 @@
 import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
-import { customerCodeFromDepartment } from '@/lib/customerCode';
+import { customerCodeForPetition } from '@/lib/customerCode';
 import { shouldSendItemToLab } from '@/lib/petitionRouting';
 import type { Petition, PetitionItem, QCTestResult } from '@/types/petition.types';
 import type { LabRequest } from '@/types/labRequest.types';
@@ -60,7 +60,7 @@ function toArray<T extends string>(v: T | T[] | null | undefined): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
-function PageOne({ lr, submissionNo }: { lr: LabRequest; submissionNo: string }) {
+function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissionNo: string; customerCode: string }) {
   const sa = lr.serviceAgreement;
   const lar = lr.labAgreementReview;
   const createdDate = splitBuddhist(lr.createdAt);
@@ -89,7 +89,7 @@ function PageOne({ lr, submissionNo }: { lr: LabRequest; submissionNo: string })
         </div>
         <div className="pr-p1-meta-row">
           <b>รหัสลูกค้า</b>{' '}
-          <span className="pr-line pr-line-sm">{customerCodeFromDepartment(requester?.department)}</span>
+          <span className="pr-line pr-line-sm">{customerCode}</span>
           <span> / </span>
           <span className="pr-line pr-line-xs">{createdDate.y}</span>
         </div>
@@ -603,7 +603,11 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
     <>
       <style>{PRINT_CSS}</style>
       <div className="pr-root">
-        <PageOne lr={labRequest} submissionNo={submissionNo} />
+        <PageOne
+          lr={labRequest}
+          submissionNo={submissionNo}
+          customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
+        />
         <PageTwo lr={labRequest} petition={petition} items={itemsToShow} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} />
       </div>
     </>
