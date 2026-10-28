@@ -72,7 +72,8 @@ export default function LabResultDetailPage() {
   const report = <LabResultReportTemplate pages={pages} />;
   const labResultPrintable = petition ? canPrintLabResult(petition) && pages.length > 0 : false;
   const bromadiolonePage = pages.find((page) => /BROMADIOLONE\s+0\.005%/i.test(page.sample?.name ?? ""));
-  const bromadiolonePrintable = Boolean(petition && petition.status === "approved" && bromadiolonePage);
+  // ใบคำนวณ Bromadiolone พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ
+  const bromadiolonePrintable = Boolean(petition && (petition.labCompletedAt || petition.labApprovedAt) && bromadiolonePage);
 
   if (loading) {
     return (
