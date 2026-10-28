@@ -245,7 +245,7 @@ describe("LabTestingDetailPage", () => {
         ...fixtures.petition,
         items: [
           { ...fixtures.petition.items[0], labelQuantity: "100 ml" },
-          { ...fixtures.petition.items[0], seq: 2, labelQuantity: "5 g, 6 g", labelQuantities: ["5 g", "6 g"] },
+          { ...fixtures.petition.items[0], seq: 2, batchNo: "OTHER-BATCH-1", labelQuantity: "5 g, 6 g", labelQuantities: ["5 g", "6 g"] },
         ],
       },
     };
@@ -255,6 +255,23 @@ describe("LabTestingDetailPage", () => {
     expect(await screen.findByText("ปริมาณที่ส่ง: 100 ml")).toBeInTheDocument();
     expect(screen.getByText("ปริมาณที่ส่ง: ตัวอย่างที่ 1: 5 g · ตัวอย่างที่ 2: 6 g")).toBeInTheDocument();
     expect(await screen.findAllByText("Area Inj.1")).toHaveLength(2);
+  });
+
+  it("shows a sample sent to both QC and Lab once even when an old petition listed it twice", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          { ...fixtures.petition.items[0] },
+          { ...fixtures.petition.items[0], seq: 2 },
+        ],
+      },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findAllByText("Area Inj.1")).toHaveLength(1);
   });
 
   it("expands a legacy %AI parameter into input, average, and RSD fields", async () => {

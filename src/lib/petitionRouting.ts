@@ -153,10 +153,11 @@ export function isQcAndLabPetition(petition: Pick<Petition, "routeTargets"> | nu
  * คำร้องเก่าที่กรอกแยก 2 รายการจะแสดง/กรอกผลเฉพาะรายการแรก
  */
 export function mergeQcLabDuplicateItems<T extends { sampleName?: string; commonName?: string; batchNo?: unknown }>(
-  petition: Pick<Petition, "routeTargets"> | null | undefined,
+  petition: Pick<Petition, "submittedBy" | "items" | "routeTargets" | "labReceivedAt" | "labCompletedAt" | "labApprovedAt"> | null | undefined,
   items: T[],
 ): T[] {
-  if (!isQcAndLabPetition(petition)) return items;
+  // คำร้องเก่าอาจไม่มี routeTargets — ดูจากเส้นทางจริงว่าไปทั้ง QC และ LAB
+  if (!petition || !(isQcAndLabPetition(petition) || (requiresQcTrack(petition) && hasLabTrack(petition)))) return items;
   const seen = new Set<string>();
   return items.filter((item) => {
     const batch = String(item.batchNo ?? "").trim().toUpperCase();
