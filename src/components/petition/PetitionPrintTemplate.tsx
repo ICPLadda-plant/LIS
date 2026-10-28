@@ -355,8 +355,9 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
 type LabTestRow = { testItem: string; method: string };
 
 function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, labTestsBySeq = {} }: { lr: LabRequest; petition: Petition; items: PetitionItem[]; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown>; labTestsBySeq?: Record<number, LabTestRow[]> }) {
-  const receivedDateTime = petition.receivedAt ? new Date(petition.receivedAt) : null;
-  const receivedTime = receivedDateTime
+  const sampleReceivedAt = petition.labReceivedAt || petition.receivedAt || petition.sampleSentAt || null;
+  const receivedDateTime = sampleReceivedAt ? new Date(sampleReceivedAt) : null;
+  const receivedTime = receivedDateTime && !Number.isNaN(receivedDateTime.getTime())
     ? `${String(receivedDateTime.getHours()).padStart(2, '0')}.${String(receivedDateTime.getMinutes()).padStart(2, '0')} น.`
     : '';
   const td = new Set(lr.testDelivery ?? []);
@@ -385,7 +386,7 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, 
               </div>
               <div className="pr-fill-row">
                 <span>วันที่รับตัวอย่าง :</span>
-                <span className="pr-line-fill">{buddhistShort(petition.receivedAt)}</span>
+                <span className="pr-line-fill">{buddhistShort(sampleReceivedAt)}</span>
               </div>
               <div className="pr-fill-row">
                 <span>เวลา :</span>
