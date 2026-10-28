@@ -217,7 +217,8 @@ export function buildApprovalGroups(
           });
           if (options?.includeResultOnlyFields) {
             Object.entries(entryValues).forEach(([key, raw]) => {
-              if (handledKeys.has(key) || key.endsWith("__note")) return;
+              // __note / __source are internal sibling fields (note text, provenance JSON), never result rows
+              if (handledKeys.has(key) || key.endsWith("__note") || key.endsWith("__source")) return;
               rows.push({
                 key: `${k}__extra__${key}__p${phase}__e${ei}`,
                 label: [key.replace("::", " — "), entryLabel].filter(Boolean).join(" · "),
