@@ -216,7 +216,7 @@ function buildLabTrack({ labReceived, isAssignee, assignee, started, labDone, la
   if (isAssignee) {
     return started
       ? { label: `Lab ${assignee.name} รับงานแล้ว · กำลังตรวจ` }
-      : { label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน' };
+      : { label: 'เจ้าหน้าที่กำลังวิเคราะห์' };
   }
   return { label: 'Lab รับแล้ว' };
 }

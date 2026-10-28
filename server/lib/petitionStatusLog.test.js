@@ -229,10 +229,10 @@ test('current: both received + Lab-assignee + not started → QC รับแล
     qcReceivedAt: 'T', labReceivedAt: 'T', assignedTo: LAB_ASSIGNEE, reviewHistory: [],
   };
   assert.deepStrictEqual(buildCurrent(p, QC0, [], false), {
-    label: 'QC รับแล้ว | Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน',
+    label: 'QC รับแล้ว | เจ้าหน้าที่กำลังวิเคราะห์',
     tracks: {
       qc: { side: 'qc', label: 'QC รับแล้ว' },
-      lab: { side: 'lab', label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน' },
+      lab: { side: 'lab', label: 'เจ้าหน้าที่กำลังวิเคราะห์' },
     },
   });
 });
