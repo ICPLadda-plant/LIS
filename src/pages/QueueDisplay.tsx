@@ -293,16 +293,31 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
     alertAudioRef.current = audio;
 
     try {
-      audio.muted = true;
+      // ทดสอบแบบไม่ mute แต่ปิดความดัง เพราะเบราว์เซอร์ยอมให้เล่นแบบ mute เสมอ
+      // ถ้าใช้ muted จะคิดว่าปลดล็อกแล้วทั้งที่เสียงจริงยังถูกบล็อก
+      audio.muted = false;
+      audio.volume = 0;
       await audio.play();
       audio.pause();
       audio.currentTime = 0;
-      audio.muted = false;
+      audio.volume = 1;
       setSoundReady(true);
     } catch {
+      audio.volume = 1;
       setSoundReady(false);
     }
   }, []);
+
+  // เปิดเสียงอัตโนมัติ: ลองทันทีตอนโหลด (ผ่านถ้าเว็บได้รับอนุญาตเล่นเสียง)
+  // ถ้ายังถูกบล็อก จะปลดล็อกเมื่อมีการคลิก/แตะ/กดคีย์ครั้งแรกที่ใดก็ได้บนหน้า
+  useEffect(() => {
+    if (soundReady) return;
+    void activateNotificationSound();
+    const unlock = () => void activateNotificationSound();
+    const events = ["pointerdown", "keydown", "touchstart"] as const;
+    events.forEach((name) => window.addEventListener(name, unlock, { capture: true }));
+    return () => events.forEach((name) => window.removeEventListener(name, unlock, { capture: true }));
+  }, [activateNotificationSound, soundReady]);
 
   const testNotificationSound = useCallback(async () => {
     // การกดปุ่มคือ user gesture จึงใช้ปลดล็อกเสียงอัตโนมัติไปพร้อมกัน

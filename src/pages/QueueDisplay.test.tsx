@@ -105,17 +105,28 @@ describe("QueueDisplay", () => {
     vi.unstubAllGlobals();
   });
 
-  it("requires one user gesture to arm queue notification audio", async () => {
+  it("arms queue notification audio automatically when the browser allows it", async () => {
     render(<QueueDisplay mode="qc" />);
-
-    const enableSoundButton = screen.getByRole("button", { name: "เปิดเสียงแจ้งเตือน" });
-    enableSoundButton.click();
 
     await waitFor(() => {
       expect(audioPlay).toHaveBeenCalledOnce();
       expect(screen.queryByRole("button", { name: "เปิดเสียงแจ้งเตือน" })).not.toBeInTheDocument();
     });
     expect(audioPause).toHaveBeenCalledOnce();
+  });
+
+  it("arms queue notification audio on the first interaction anywhere when autoplay is blocked", async () => {
+    audioPlay.mockRejectedValueOnce(new Error("NotAllowedError"));
+    render(<QueueDisplay mode="qc" />);
+
+    await waitFor(() => expect(audioPlay).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: "เปิดเสียงแจ้งเตือน" })).toBeInTheDocument();
+
+    window.dispatchEvent(new Event("pointerdown"));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "เปิดเสียงแจ้งเตือน" })).not.toBeInTheDocument();
+    });
   });
 
   it("shows stale received deliveringQC petitions in the QC progress column", async () => {
