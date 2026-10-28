@@ -71,8 +71,22 @@ export default function LabResultDetailPage() {
 
   const report = <LabResultReportTemplate pages={pages} />;
   const labResultPrintable = petition ? canPrintLabResult(petition) && pages.length > 0 : false;
-  // ใบคำนวณใช้ได้ทุกสาร: แสดงเมื่อรายการมีค่า Area Inj / % Sample
-  const calcPages = pages.filter(hasCalculationData);
+  // ใบคำนวณใช้ได้ทุกสาร: หัวกระดาษจากหน้ารายงาน แต่ค่าดิบ (Area Inj / % Sample) มาจาก groups
+  // ของหน้านี้ ซึ่งเปิด includeResultOnlyFields — รายงาน Lab ปกติไม่มีแถวเหล่านี้
+  const calcPages = pages
+    .map((page, i) => {
+      const seq = petition?.items?.[i]?.seq;
+      const group = groups.find((g) => g.seq === seq);
+      if (!group) return page;
+      const rows = group.params.flatMap((p) => p.rows.map((r) => ({
+        testItem: `${r.label}${r.unit ? ` (${r.unit})` : ""}`,
+        result: r.value || "-",
+        criteria: "-",
+        method: "-",
+      })));
+      return { ...page, rows: [...rows, ...page.rows] };
+    })
+    .filter(hasCalculationData);
   // พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ
   const calcPrintable = Boolean(petition && (petition.labCompletedAt || petition.labApprovedAt) && calcPages.length > 0);
 
