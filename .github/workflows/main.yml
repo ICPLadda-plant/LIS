@@ -12,4 +12,3 @@ jobs:
         working-directory: C:\laragon\www\LIS
     steps:
       - run: git pull
-      - run: npm run build
