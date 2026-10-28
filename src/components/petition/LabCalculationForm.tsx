@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import type { LabReportPage } from "@/lib/labReport";
 
@@ -14,6 +15,9 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-line-row { display: grid; grid-template-columns: 37mm 37mm 37mm 37mm 37mm; gap: 18mm; margin-top: 7mm; font-size: 10pt; }
 .brom-form-control-row { display: grid; grid-template-columns: 96mm 74mm; gap: 18mm; margin-top: 8mm; font-size: 10pt; }
 .brom-form-control-row > div { min-width: 0; white-space: nowrap; }
+.brom-form-input { width: 26mm; border: 0; border-bottom: .6pt solid #000; background: transparent; text-align: center; font: inherit; color: #000; padding: 0 1mm 1mm; margin: 0 2mm; outline: none; }
+.brom-form-input:focus { background: #eef6ff; }
+@media print { .brom-form-input { background: transparent !important; } }
 .brom-form-line { display: block; border-bottom: .6pt solid #000; min-height: 7mm; }
 .brom-form-line-cell { text-align: center; }
 .brom-form-line-cell .brom-form-line { display: block; border-bottom: .6pt solid #000; min-height: 7mm; padding-top: 2mm; }
@@ -59,7 +63,19 @@ function triple(list: string[]): string[] {
   return [0, 1, 2].map((i) => list[i] || "-");
 }
 
-export default function LabCalculationForm({ page }: { page: LabReportPage }) {
+type ControlValues = { value: string; low: string; high: string };
+
+function readControl(key: string | undefined, fallback: ControlValues): ControlValues {
+  if (!key || typeof localStorage === "undefined") return fallback;
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || "null");
+    return saved && typeof saved === "object" ? { ...fallback, ...saved } : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export default function LabCalculationForm({ page, storageKey }: { page: LabReportPage; storageKey?: string }) {
   const { commonName, strength, form } = parseSampleName(page.sample.name);
   const aiResult = firstValue(page, /^%\s*AI/i, "-");
   const area = [
@@ -75,6 +91,24 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
   ];
   const standardNo = firstValue(page, /standard/i, page.sample.sampleNo || "-");
   const solventNo = firstValue(page, /solvent/i, page.sample.submissionNo || "-");
+  // Control Sample: ค่าที่ได้ + ช่วงยอมรับ (ต่ำ–สูง) — ผู้ใช้กรอกในหน้าตัวอย่างก่อนพิมพ์
+  // ค่า value ของ input ถูกเขียนเป็น attribute โดย React จึงติดไปกับ HTML ที่ส่งพิมพ์; จำไว้ใน localStorage
+  const [control, setControl] = useState<ControlValues>(() =>
+    readControl(storageKey, { value: firstValue(page, /control/i, ""), low: "", high: "" }),
+  );
+  useEffect(() => {
+    if (!storageKey || typeof localStorage === "undefined") return;
+    try { localStorage.setItem(storageKey, JSON.stringify(control)); } catch { /* storage full/blocked */ }
+  }, [storageKey, control]);
+  const controlInput = (field: keyof ControlValues, label: string) => (
+    <input
+      className="brom-form-input"
+      aria-label={label}
+      inputMode="decimal"
+      value={control[field]}
+      onChange={(e) => setControl((prev) => ({ ...prev, [field]: e.target.value }))}
+    />
+  );
 
   return (
     <div className="brom-form-root">
@@ -87,7 +121,12 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
         <div className="brom-form-heading" style={{ marginTop: "4mm", gridTemplateColumns: "42% 58%" }}><div>เลขที่ Standard <span className="brom-form-field">{standardNo}</span></div><div>เลขที่ Solvent number <span className="brom-form-field">{solventNo}</span></div></div>
         <div className="brom-form-section">System suitability</div>
         <div className="brom-form-line-row">{['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Average', '% RSD (ไม่เกิน 2 %)'].map((label, index) => <div className="brom-form-line-cell" key={label}>{label}<span className="brom-form-line">{area[index]}</span></div>)}</div>
-        <div className="brom-form-control-row"><div>Control&nbsp; Sample = &nbsp;{firstValue(page, /control/i, "-")} % WW</div></div>
+        <div className="brom-form-control-row" style={{ display: "block" }}>
+          <div>
+            Control&nbsp; Sample&nbsp; ={controlInput("value", "ค่า Control Sample")}% WW
+            <span style={{ marginLeft: "12mm" }}>{controlInput("low", "ช่วงยอมรับต่ำสุด")}-{controlInput("high", "ช่วงยอมรับสูงสุด")}</span>
+          </div>
+        </div>
         <div className="brom-form-line-row" style={{ marginTop: "8mm" }}>{['% Sample 1', '% Sample 2', '% Sample 3', 'Average', '% RSD (ไม่เกิน 2 %)'].map((label, index) => <div className="brom-form-line-cell" key={label}>{label}<span className="brom-form-line">{sample[index]}</span></div>)}</div>
         <div className="brom-form-summary"><div className="brom-form-summary-row"><span>Average</span><span className="brom-form-line">{sampleAverage}</span><span>% W/W</span></div><div className="brom-form-summary-row"><span>Density</span><span className="brom-form-line">{firstValue(page, /density|ถพ\.?/i, "1.000")}</span><span>g/cm³</span></div><div className="brom-form-summary-row"><span>Report</span><span className="brom-form-line">{aiResult}</span><span>% W/W</span></div><div className="brom-form-summary-row"><span>Date</span><span className="brom-form-line">{page.reportDate || "-"}</span><span>&nbsp;</span></div></div>
         <div className="brom-form-signatures"><div>Analyst <span className="brom-form-signature-line" /><div className="brom-form-signature-name">(..........{page.analystName || "-"}..........)</div></div><div>Approved <span className="brom-form-signature-line" /><div className="brom-form-signature-name">(..........{page.labHeadName || "-"}..........)</div></div></div>
