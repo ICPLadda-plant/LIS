@@ -477,8 +477,7 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
             <col style={{ width: '5%' }} />
             <col style={{ width: '6.5%' }} />
             <col style={{ width: '6.5%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '7.5%' }} />
+            <col style={{ width: '19.5%' }} />
             <col style={{ width: '4.5%' }} />
             <col style={{ width: '3.25%' }} />
             <col style={{ width: '3.25%' }} />
@@ -495,7 +494,6 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
               <th rowSpan={3}>จำนวนหน่วยบรรจุ</th>
               <th rowSpan={3}>หน่วยทดสอบ</th>
               <th rowSpan={3}>รายการทดสอบ</th>
-              <th rowSpan={3}>หมายเหตุ</th>
               <th colSpan={4} className="pr-officer-head">สำหรับเจ้าหน้าที่</th>
             </tr>
             <tr>
@@ -523,19 +521,18 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
                   {item.testItems ?? ''}
                   {Object.entries(requestValues).filter(([key, value]) => !key.startsWith('ค่าถพ.\u0000') && key.endsWith(`\u0000${item.batchNo}\u0000${item.sampleName}`) && value !== '').map(([key, value]) => <div key={key} className="pr-note">{key.split('\u0000')[0]}: {String(value)}</div>)}
                 </td>
-                <td>{item.note ?? ''}</td>
                 <td>{item.sampleId ?? ''}</td>
                 <td className="pr-center">{item.condition === 'normal' ? '✓' : ''}</td>
                 <td className="pr-center">{item.condition === 'defective' ? '✓' : ''}</td>
                 <td />
               </tr>
             )) : (
-              <tr><td colSpan={14} className="pr-center">ไม่พบรายการตัวอย่างที่อ้างอิง</td></tr>
+              <tr><td colSpan={13} className="pr-center">ไม่พบรายการตัวอย่างที่อ้างอิง</td></tr>
             )}
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={11} className="pr-officer-filler" />
+              <td colSpan={10} className="pr-officer-filler" />
               <td colSpan={2} className="pr-center pr-officer-sum">ราคา</td>
               <td />
             </tr>
