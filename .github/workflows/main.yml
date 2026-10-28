@@ -1,0 +1,14 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, windows]
+    defaults:
+      run:
+        working-directory: C:\laragon\www\LIS
+    steps:
+      - run: git pull
