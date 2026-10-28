@@ -153,7 +153,7 @@ export default function LabResultDetailPage() {
       </PrintPreviewDialog>
       {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" css={LAB_CALCULATION_CSS}>
         {calcPages.map((page, i) => (
-          <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} storageKey={`lis.calcControl.${petition?._id ?? ""}.${i}`} />
+          <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} />
         ))}
       </PrintPreviewDialog>}
     </AppLayout>

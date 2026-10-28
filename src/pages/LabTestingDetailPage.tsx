@@ -34,7 +34,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, aiSubstanceFromKey, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from '@/lib/aiCalculation';
+import { aiGridClass, aiSubstanceFromKey, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
@@ -95,7 +95,10 @@ function hasSpecificGravityParam(params: ParameterItem[]) {
 const AI_FIELD_ORDER = [
   'Area Inj.1', 'Area Inj.2', 'Area Inj.3',
   '% Sample 1', '% Sample 2', '% Sample 3',
-  'Area Average', 'Area %RSD', '% Sample Average', '% Sample %RSD', '%AI',
+  'Area Average', 'Area %RSD', '% Sample Average', '% Sample %RSD',
+  // Control Sample + ช่วงยอมรับ — กรอกเองแล้วไปแสดงในใบคำนวณ (LabCalculationForm)
+  CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL,
+  '%AI',
 ] as const;
 
 function aiFieldsForParameter(fields: ParameterValueField[]) {
@@ -105,7 +108,7 @@ function aiFieldsForParameter(fields: ParameterValueField[]) {
   const generated = AI_FIELD_ORDER.map((label): ParameterValueField => (label === '%AI' ? aiField! : byLabel.get(label.toLowerCase())) ?? ({
     label,
     type: 'float',
-    unit: label.includes('Sample') || label === '%AI' ? '%' : undefined,
+    unit: CONTROL_LABELS.has(label) ? undefined : label.includes('Sample') || label === '%AI' ? '%' : undefined,
   }));
   const known = new Set(AI_FIELD_ORDER.map((label) => label.toLowerCase()));
   return [...generated, ...fields.filter((field) => calculatedAiFieldKind(field.label) !== 'ai' && !known.has(field.label.trim().toLowerCase()))];

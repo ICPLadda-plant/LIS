@@ -268,6 +268,36 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("% Sample %RSD")).toBeInTheDocument();
   });
 
+  it("lets Lab enter Control Sample and its acceptance range on %AI, saved with the result", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: fixtures.petition.items.map((item) => ({ ...item, testItems: "Active Ingredient, ค่า ถพ." })),
+      },
+      parameters: [
+        ...fixtures.parameters,
+        { _id: "density-param", name: "ค่า ถพ.", scope: "qc", shareWithLab: true, applyAll: true, multiEntry: true, valueFields: [{ label: "ค่าถพ.", type: "number" }] },
+      ],
+      results: [{ petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: {}, entries: [{ "ค่าถพ.::abamectin": 1.005 }] }],
+    };
+    render(<LabTestingDetailPage />);
+
+    const label = await screen.findByText("Control Sample");
+    expect(screen.getByText("Control ช่วงต่ำสุด")).toBeInTheDocument();
+    expect(screen.getByText("Control ช่วงสูงสุด")).toBeInTheDocument();
+
+    let box: HTMLElement | null = label.parentElement;
+    while (box && !box.querySelector("input")) box = box.parentElement;
+    const input = box!.querySelector("input")!;
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { value: "0.24949" } });
+
+    await waitFor(() => {
+      expect(mockSaveQCResult).toHaveBeenCalledWith(expect.objectContaining({ fieldLabel: "Control Sample", value: "0.24949" }));
+    }, { timeout: 2000 });
+  });
+
   it("enables final save and persists calculated %AI with the substance key", async () => {
     mockState.activeFixtures = {
       ...fixtures,
