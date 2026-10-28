@@ -82,8 +82,14 @@ function resultKey(itemSeq: number, parameterId: string) {
 }
 
 // ค่า ถพ. มักเก็บเป็นรายการย่อย (entries) จึงต้องส่งรายการย่อยของพารามิเตอร์อื่นมาด้วย
-function aiDensity(values: Record<string, unknown>, context: ConditionContext, substance = '', entries: Record<string, unknown>[] = []) {
-  return findAiDensity([values, ...Object.values(context.otherParams), ...entries], substance);
+// ตัวอย่างที่ไม่มีพารามิเตอร์ ถพ. ให้ใช้ ถพ. = 1.00
+export const DEFAULT_AI_DENSITY = 1;
+function aiDensity(values: Record<string, unknown>, context: ConditionContext, substance = '', entries: Record<string, unknown>[] = [], hasSgParam = true) {
+  return findAiDensity([values, ...Object.values(context.otherParams), ...entries], substance) ?? (hasSgParam ? null : DEFAULT_AI_DENSITY);
+}
+
+function hasSpecificGravityParam(params: ParameterItem[]) {
+  return params.some((param) => param.scope === 'qc' && param.valueFields?.some((field) => field.label === SG_FIELD_LABEL));
 }
 
 const AI_FIELD_ORDER = [
@@ -566,7 +572,9 @@ export default function LabTestingDetailPage() {
   const pendingDensity = !!petition && !isResearchAndDevelopmentPetition(petition) &&
     (petition.items ?? []).filter(shouldSendItemToLab).some((item) => {
       const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
-      // %AI คำนวณจากค่า ถพ. เสมอ → ถ้ายังไม่มีค่า ถพ. ที่บันทึกไว้ของรายการนี้ ห้ามกรอกผล
+      // ตัวอย่างที่ไม่มีพารามิเตอร์ ถพ. → Lab กรอกได้ทันที โดยใช้ ถพ. = 1.00
+      if (!hasSpecificGravityParam(matched)) return false;
+      // %AI คำนวณจากค่า ถพ. → ถ้ายังไม่มีค่า ถพ. ที่บันทึกไว้ของรายการนี้ ห้ามกรอกผล
       const needsAiDensity = matched.some((param) => param.scope === 'lab' &&
         param.valueFields?.some((field) => calculatedAiFieldKind(field.label) === 'ai'));
       if (needsAiDensity) {
@@ -1237,6 +1245,7 @@ export default function LabTestingDetailPage() {
                       // sameParam = this parameter's live values; otherParams = each OTHER
                       // matched parameter's live values for the same item, keyed by parameterId.
                       const densityEntries = matchedParams.flatMap((p) => (p._id && p._id !== param._id ? entriesByKey[resultKey(item.seq, p._id)] ?? [] : []));
+                      const hasSgParam = hasSpecificGravityParam(matchedParams);
                       const condCtx: ConditionContext = {
                         sameParam: phaseValues[k] ?? {},
                         otherParams: (() => {
@@ -1295,7 +1304,7 @@ export default function LabTestingDetailPage() {
                               const outputResult = isOutputMode ? resolveConditionalOutput(unit.field, condCtx) : null;
                               const isAiParameter = (param.valueFields ?? []).some((candidate) => calculatedAiFieldKind(candidate.label) === 'ai');
                               const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
-                              const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries), aiSubstanceFromKey(unit.key)) : null;
+                              const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries, hasSgParam), aiSubstanceFromKey(unit.key)) : null;
 
                               // Field-level `multiple` — repeatable list of bare value rows.
                               // Each row shares the field's standard/abnormal rule; per-row
@@ -1418,7 +1427,7 @@ export default function LabTestingDetailPage() {
                                           expandFieldForItem(candidate, item.commonName, { category: petitionCategory })
                                             .forEach((derivedUnit) => {
                                     const substance = aiSubstanceFromKey(derivedUnit.key);
-                                    onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries), substance)[kind]));
+                                    onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries, hasSgParam), substance)[kind]));
                                   });
                                         });
                                       }
