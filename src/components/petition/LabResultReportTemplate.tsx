@@ -14,6 +14,7 @@ export const LAB_REPORT_CSS = `
 .lr-center { text-align: center; }
 .lr-right { text-align: right; }
 .lr-italic { font-style: italic; }
+.lr-method { white-space: pre-line; }
 .lr-half { width: 50%; }
 .lr-logo { height: 16mm; margin-bottom: 1.5mm; }
 .lr-hd-mid { text-align: center; vertical-align: middle; font-weight: 700; font-size: 13pt; }
@@ -135,7 +136,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
                     <td className="lr-center">{r.testItem}</td>
                     <td className="lr-center">{r.result}</td>
                     <td className="lr-center">{r.criteria}</td>
-                    <td className="lr-center">{r.method}</td>
+                    <td className="lr-center lr-method">{r.method}</td>
                   </tr>
                 ))
               ) : (
