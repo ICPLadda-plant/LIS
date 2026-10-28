@@ -130,7 +130,7 @@ vi.mock('@/lib/petitionPrintability', () => ({
   canPrintPreReport: () => false,
   canPrintSampleLabel: () => false,
   canPrintLabResult: (petition: { status?: string; labApprovedAt?: string; labCompletedAt?: string }) =>
-    petition?.status === 'approved' && !!(petition?.labApprovedAt || petition?.labCompletedAt),
+    !!(petition?.labApprovedAt || petition?.labCompletedAt),
 }));
 
 vi.mock('@/lib/labResultReport', () => ({
@@ -172,10 +172,11 @@ describe('PetitionDetailPage request summary', () => {
     expect(screen.getByRole('heading', { name: 'รายการตัวอย่าง (1)' })).toBeInTheDocument();
   });
 
-  it('hides the print lab-result action when QC has not confirmed Final Result', () => {
+  it('hides the print lab-result action when Lab has not issued results yet', () => {
     Object.assign(mocks.petition, {
       status: 'success',
-      labApprovedAt: '2026-07-14T00:00:00.000Z',
+      labApprovedAt: undefined,
+      labCompletedAt: undefined,
     });
 
     renderPage();

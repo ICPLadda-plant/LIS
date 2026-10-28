@@ -600,10 +600,11 @@ describe("PetitionTimelineDetailPage", () => {
     expect(documentButtons[2]).toHaveClass("border-red-500");
   });
 
-  it("hides the lab-result print button when QC has not confirmed Final Result", async () => {
+  it("hides the lab-result print button when Lab has not issued results yet", async () => {
     Object.assign(mocks.petition, {
       status: "success",
-      labApprovedAt: "2026-07-14T00:00:00.000Z",
+      labApprovedAt: undefined,
+      labCompletedAt: undefined,
     });
     renderDetail();
     await screen.findByRole("heading", { name: "P-2607-001" });
