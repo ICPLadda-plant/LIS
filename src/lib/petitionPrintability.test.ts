@@ -42,11 +42,11 @@ describe('canPrintLabResult', () => {
   it('false when Lab has neither completed nor issued results', () => {
     expect(canPrintLabResult({ status: 'approved' })).toBe(false);
   });
-  it('true when Lab is complete even before QC confirms Final Result', () => {
-    expect(canPrintLabResult({ status: 'success', labCompletedAt: '2026-07-15T00:00:00.000Z' })).toBe(true);
+  it('false when Lab is complete but QC has not confirmed Final Result', () => {
+    expect(canPrintLabResult({ status: 'success', labCompletedAt: '2026-07-15T00:00:00.000Z' })).toBe(false);
   });
-  it('true when Lab has issued results even before QC confirms Final Result', () => {
-    expect(canPrintLabResult({ status: 'success', labApprovedAt: '2026-07-15T00:00:00.000Z' })).toBe(true);
+  it('false when Lab has issued results but QC has not confirmed Final Result', () => {
+    expect(canPrintLabResult({ status: 'success', labApprovedAt: '2026-07-15T00:00:00.000Z' })).toBe(false);
   });
   it('true when labCompletedAt is set and QC has confirmed Final Result', () => {
     expect(canPrintLabResult({ status: 'approved', labCompletedAt: '2026-07-15T00:00:00.000Z' })).toBe(true);

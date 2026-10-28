@@ -111,10 +111,10 @@ beforeEach(() => {
 });
 
 describe('LabResultDetailPage print action', () => {
-  it('enables the print lab-result button as soon as Lab issued results, before QC confirms', () => {
+  it('disables the print lab-result button when QC has not confirmed Final Result', () => {
     renderPage();
 
-    expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeDisabled();
   });
 
   it('enables the print lab-result button when QC has confirmed Final Result', () => {
