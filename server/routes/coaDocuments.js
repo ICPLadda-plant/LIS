@@ -490,16 +490,19 @@ function externalCoaRowToDocument(row) {
 }
 
 function externalCoaRowsToDocuments(payload) {
-  const seen = new Set();
-  const documents = [];
-  for (const row of normalizeExternalPayload(payload)) {
-    if (!isExternalCoaRequest(row)) continue;
-    const doc = externalCoaRowToDocument(row);
-    if (seen.has(doc._id)) continue;
-    seen.add(doc._id);
-    documents.push(doc);
-  }
-  return documents;
+  const latestById = new Map();
+  normalizeExternalPayload(payload).forEach((row, index) => {
+    const id = externalCoaRequestId(row);
+    const timestamp = Date.parse(externalCoaDate(row) || '');
+    const current = latestById.get(id);
+    if (!current || (Number.isFinite(timestamp) ? timestamp : index) >= current.sortValue) {
+      latestById.set(id, { row, sortValue: Number.isFinite(timestamp) ? timestamp : index });
+    }
+  });
+  return [...latestById.values()]
+    .map(({ row }) => row)
+    .filter(isExternalCoaRequest)
+    .map(externalCoaRowToDocument);
 }
 
 function enrichExternalCoaDocumentsWithErpLots(documents, references = {}) {
@@ -521,6 +524,58 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}) {
       } : sample),
     };
   });
+}
+
+function attachDensityToExternalCoaDocuments(documents, densityRows = []) {
+  return documents.map((doc) => {
+    const sample = doc.sampleSnapshots?.[0];
+    const density = densityForBatch(densityRows, sample?.batchNo);
+    if (!sample || !density) return doc;
+    return {
+      ...doc,
+      resultSnapshots: [
+        ...(doc.resultSnapshots || []).filter((row) => !/density/i.test(row.testItem || '')),
+        {
+          itemSeq: sample.itemSeq,
+          testItem: 'Density at 30°C (g/cm³)',
+          criteria: '-',
+          result: density,
+          unit: 'g/cm³',
+          method: 'DMA 501',
+        },
+      ],
+    };
+  });
+}
+
+function enrichExternalCoaDocumentsWithHistory(documents, sourceDocuments, historyDocuments) {
+  const sourceById = new Map(sourceDocuments.map((doc) => [doc._id, doc]));
+  return documents.map((doc) => {
+    const sourceSample = sourceById.get(doc._id)?.sampleSnapshots?.[0] || {};
+    if (sourceSample.batchNo || sourceSample.lotNo) return doc;
+    const history = findBestCoaHistorySample(historyDocuments, doc);
+    const historyBatch = manualText(history?.sample?.batchNo || history?.sample?.lotNo);
+    if (!historyBatch || !doc.sampleSnapshots?.length) return doc;
+    return {
+      ...doc,
+      sampleSnapshots: doc.sampleSnapshots.map((sample, index) => (
+        index === 0 ? { ...sample, batchNo: historyBatch } : sample
+      )),
+    };
+  });
+}
+
+async function enrichExternalCoaDocumentsWithDensity(documents) {
+  if (mongoose.connection.readyState !== 1) return documents;
+  const batches = [...new Set(documents.flatMap((doc) => (
+    (doc.sampleSnapshots || []).map((sample) => String(sample.batchNo || '').trim()).filter(Boolean)
+  )))];
+  if (!batches.length) return documents;
+  const batchPattern = batches.map(escapeRegex).join('|');
+  const densityRows = await ResultDensity.find({
+    'Sample name': new RegExp(`(?:^|\\s)(?:B\\.)?(?:${batchPattern})(?:-P\\d+)?$`, 'i'),
+  }).sort({ _id: -1 }).limit(Math.min(5000, batches.length * 100)).lean();
+  return attachDensityToExternalCoaDocuments(documents, densityRows);
 }
 
 async function fetchExternalCoaDocuments() {
@@ -852,7 +907,24 @@ router.get('/', async (req, res) => {
       externalPromise,
       erpReferencesPromise,
     ]);
-    const enrichedExternalRows = enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences);
+    const externalItemNos = [...new Set(externalRows
+      .map((row) => row.externalCoaRequest?.itemNo)
+      .filter(Boolean))];
+    const externalCoaHistory = externalItemNos.length
+      ? await CoaDocument.find({
+        'sampleSnapshots.sampleId': { $in: externalItemNos },
+        status: { $nin: ['cancelled', 'superseded', 'rejected'] },
+      }).sort({ updatedAt: -1 }).limit(500).lean()
+      : [];
+    const externalRowsWithCurrentBatch = enrichExternalCoaDocumentsWithHistory(
+      enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences),
+      externalRows,
+      externalCoaHistory,
+    );
+    const enrichedExternalRows = await enrichExternalCoaDocumentsWithDensity(externalRowsWithCurrentBatch).catch((error) => {
+      console.warn('[coa-documents] Density sync failed:', error.message);
+      return externalRowsWithCurrentBatch;
+    });
     const linkedExternalKeys = new Set(externalRows.length
       ? (await CoaDocument.find({
           'externalCoaRequest.saleOrderNo': { $in: externalRows.map((row) => row.externalCoaRequest.saleOrderNo) },
@@ -1602,3 +1674,5 @@ module.exports.actorFromRequest = actorFromRequest;
 module.exports.withCoaTransaction = withCoaTransaction;
 module.exports.externalCoaRowsToDocuments = externalCoaRowsToDocuments;
 module.exports.enrichExternalCoaDocumentsWithErpLots = enrichExternalCoaDocumentsWithErpLots;
+module.exports.attachDensityToExternalCoaDocuments = attachDensityToExternalCoaDocuments;
+module.exports.enrichExternalCoaDocumentsWithHistory = enrichExternalCoaDocumentsWithHistory;

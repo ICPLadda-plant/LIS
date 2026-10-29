@@ -502,6 +502,61 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   assert.equal(docs[0].externalCoaRequest.appearance, 'เม็ดยาสีแดง');
 });
 
+test('externalCoaRowsToDocuments keeps the latest ERP update before checking the COA mark', () => {
+  const base = { SaleOrderNo: 'SO-LATEST', Line: 10000, ItemNo: 'F-1' };
+  const removed = router.externalCoaRowsToDocuments([
+    { ...base, UpdateDate: '2026-10-01T08:00:00.000Z', remark: 'ส่งพร้อม COA' },
+    { ...base, UpdateDate: '2026-10-02T08:00:00.000Z', remark: 'ไม่ขอเอกสาร' },
+  ]);
+  assert.deepEqual(removed, []);
+
+  const [latest] = router.externalCoaRowsToDocuments([
+    { ...base, UpdateDate: '2026-10-01T08:00:00.000Z', TradeName: 'Old name', remark: 'COA' },
+    { ...base, UpdateDate: '2026-10-03T08:00:00.000Z', TradeName: 'Updated name', remark: 'COA' },
+  ]);
+  assert.equal(latest.sampleSnapshots[0].sampleName, 'Updated name');
+  assert.equal(latest.updatedAt, '2026-10-03T08:00:00.000Z');
+});
+
+test('attachDensityToExternalCoaDocuments adds averaged valid Density for the resolved Batch', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-DENSITY', Line: 10000, BatchNo: '26S-ABC-001', remark: 'COA',
+  }]);
+  const [enriched] = router.attachDensityToExternalCoaDocuments([source], [
+    { 'Sample name': '26S-ABC-001', 'Measurement status': 'valid', 'Density [g/cm³]': '1.1000', 'Date & time': '10/29/2026 9:00 AM' },
+    { 'Sample name': '26S-ABC-001-P1', 'Measurement status': 'valid', 'Density [g/cm³]': '1.2000', 'Date & time': '10/29/2026 9:05 AM' },
+    { 'Sample name': '26S-ABC-001', 'Measurement status': 'Error', 'Density [g/cm³]': '9.9999', 'Date & time': '10/29/2026 9:10 AM' },
+  ]);
+
+  assert.deepEqual(enriched.resultSnapshots, [{
+    itemSeq: 10000,
+    testItem: 'Density at 30°C (g/cm³)',
+    criteria: '-',
+    result: '1.150',
+    unit: 'g/cm³',
+    method: 'DMA 501',
+  }]);
+});
+
+test('enrichExternalCoaDocumentsWithHistory resolves the current Batch before Density lookup', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-HISTORY', Line: 10000, ItemNo: 'F-1', TradeName: 'Trade A', CommonName: 'COMMON A', remark: 'COA',
+  }]);
+  const withErpLot = {
+    ...source,
+    sampleSnapshots: [{ ...source.sampleSnapshots[0], batchNo: 'FG261029-021', lotNo: 'FG261029-021' }],
+  };
+  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withErpLot], [source], [{
+    _id: 'coa-history',
+    status: 'approved',
+    updatedAt: '2026-10-29T08:00:00.000Z',
+    sampleSnapshots: [{ sampleId: 'F-1', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: '013' }],
+  }]);
+
+  assert.equal(enriched.sampleSnapshots[0].batchNo, '013');
+  assert.equal(enriched.sampleSnapshots[0].lotNo, 'FG261029-021');
+});
+
 test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', () => {
   const [doc] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO26040022',
