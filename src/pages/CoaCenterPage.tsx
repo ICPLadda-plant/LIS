@@ -67,11 +67,10 @@ function formatProductionDate(value?: string | null) {
   return date.toLocaleDateString("en-GB");
 }
 
-function lotLabel(sample: CoaSampleSnapshot) {
-  const lot = sample.lotNo?.trim();
+function batchProductionLabel(sample: CoaSampleSnapshot) {
   const batch = sample.batchNo?.trim();
   const productionDate = formatProductionDate(sample.productionDate);
-  return [lot, batch, productionDate].filter(Boolean).join(" / ");
+  return [batch, productionDate].filter(Boolean).join(" / ");
 }
 
 function customerName(doc: CoaDocument) {
@@ -833,7 +832,7 @@ export default function CoaCenterPage() {
       customerName(doc),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.sampleName)),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName)),
-      joinValues(doc.sampleSnapshots?.map(lotLabel)),
+      joinValues(doc.sampleSnapshots?.map(batchProductionLabel)),
     ].join(" ").toLowerCase().includes(query)), query, (doc) => {
       const samples = doc.sampleSnapshots ?? [];
       const codes = [doc.coaNo, doc.petitionNoSnapshot, ...samples.flatMap((sample) => [sample.lotNo, sample.batchNo])];
@@ -842,7 +841,7 @@ export default function CoaCenterPage() {
         secondary: [
           workflowStageLabels[workflowStageFor(doc)],
           customerName(doc),
-          ...samples.flatMap((sample) => [sample.sampleName, sample.commonName, lotLabel(sample)]),
+          ...samples.flatMap((sample) => [sample.sampleName, sample.commonName, batchProductionLabel(sample)]),
         ],
       };
     });
@@ -1197,7 +1196,7 @@ export default function CoaCenterPage() {
                   <th className="px-4 py-3">ชื่อการค้า</th>
                   {showCompanyColumn && <th className="px-4 py-3">ชื่อลูกค้า</th>}
                   {showCommonNameColumn && <th className="px-4 py-3">ชื่อสามัญ</th>}
-                  {showLotColumn && <th className="px-4 py-3">LOT No. (แบช+วันที่ผลิต)</th>}
+                  {showLotColumn && <th className="px-4 py-3">BATCH No. (แบช + วันที่ผลิตตามฉลาก)</th>}
                   {showStatusColumn && <th className="px-4 py-3">สถานะ</th>}
                   {showCommandColumn && <th className="px-4 py-3">คำสั่ง</th>}
                 </tr>
@@ -1250,7 +1249,7 @@ export default function CoaCenterPage() {
                     <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map((sample) => sample.sampleName))}</td>
                     {showCompanyColumn && <td className="px-4 py-3">{customerName(doc)}</td>}
                     {showCommonNameColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName))}</td>}
-                    {showLotColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map(lotLabel))}</td>}
+                    {showLotColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map(batchProductionLabel))}</td>}
                     {showStatusColumn && (
                       <td className="px-4 py-3">
                         <Badge variant={workflowStageBadgeVariantFor(workflowStageFor(doc))}>
