@@ -415,6 +415,39 @@ test('GET / includes requested COA rows for Lab-approved petitions without COA d
   }
 });
 
+test('GET / does not truncate COA documents after 200 rows', async () => {
+  const originals = {
+    coaFind: CoaDocument.find,
+    petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    fetch: global.fetch,
+  };
+  try {
+    const documents = Array.from({ length: 205 }, (_, index) => ({
+      _id: `coa-${index}`,
+      status: 'approved',
+      selectedItemSeqs: [1],
+      sampleSnapshots: [],
+      resultSnapshots: [],
+      createdAt: new Date(2026, 9, 29, 12, 0, index).toISOString(),
+    }));
+    CoaDocument.find = () => sortedLimitedLean(documents);
+    Petition.find = () => sortedLimitedLean([]);
+    LabRequest.find = () => ({ lean: async () => [] });
+    global.fetch = async () => ({ ok: true, status: 200, text: async () => '[]', json: async () => [] });
+
+    const res = await invoke('/', 'get');
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.items.length, 205);
+  } finally {
+    CoaDocument.find = originals.coaFind;
+    Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    global.fetch = originals.fetch;
+  }
+});
+
 test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   const docs = router.externalCoaRowsToDocuments(JSON.stringify([
     {

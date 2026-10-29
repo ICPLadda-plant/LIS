@@ -726,7 +726,6 @@ async function requestedCoaRows({ petitionNo } = {}) {
   if (petitionNo) petitionFilter.petitionNo = new RegExp(escapeRegex(String(petitionNo).trim()), 'i');
   const petitions = await Petition.find(petitionFilter)
     .sort({ labApprovedAt: -1 })
-    .limit(100)
     .lean();
   const petitionIds = petitions.map((petition) => petition._id);
   if (!petitionIds.length) return [];
@@ -846,7 +845,7 @@ router.get('/', async (req, res) => {
         })
       : Promise.resolve({ stockRows: [], mfRows: [] });
     const [documents, requestedRows, externalRows, erpReferences] = await Promise.all([
-      CoaDocument.find(filter).sort({ updatedAt: -1 }).limit(200).lean(),
+      CoaDocument.find(filter).sort({ updatedAt: -1 }).lean(),
       shouldIncludeRequestedRows(req.query)
         ? requestedCoaRows({ petitionNo: req.query.petitionNo })
         : Promise.resolve([]),
@@ -866,7 +865,7 @@ router.get('/', async (req, res) => {
         ...requestedRows,
         ...filterExternalCoaDocuments(enrichedExternalRows, req.query)
           .filter((row) => !linkedExternalKeys.has(externalCoaKey(row.externalCoaRequest))),
-      ]).slice(0, 200),
+      ]),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
