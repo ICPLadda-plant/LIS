@@ -918,6 +918,7 @@ export default function PetitionAssignPage() {
                 methodByCode={methodByCode}
                 machineById={machineById}
                 canAssign={canManage}
+                selfEmployee={canManage ? null : selfEmployee}
                 canClaim={canClaim}
                 onDropPetition={(petitionId, employeeId) => setDropTarget({ petitionId, employeeId })}
                 onUnassignPetition={unassignPetition}
@@ -961,6 +962,8 @@ interface AssignBoardProps {
   methodByCode: Map<string, MethodDoc>;
   machineById: Map<string, MachineItem>;
   canAssign: boolean;
+  /** เจ้าหน้าที่ Lab ที่ไม่ใช่หัวหน้า: แสดงเฉพาะช่องงานของตัวเอง */
+  selfEmployee?: EmployeeAssignee | null;
   canClaim: boolean;
   onDropPetition: (petitionId: string, employeeId: string) => void;
   onUnassignPetition: (petitionId: string) => void;
@@ -983,6 +986,7 @@ function AssignBoard({
   methodByCode,
   machineById,
   canAssign,
+  selfEmployee,
   canClaim,
   onDropPetition,
   onUnassignPetition,
@@ -1029,6 +1033,17 @@ function AssignBoard({
   // Columns = every assignable employee, plus any employee that already has an
   // assignment here but is missing from the current staff list (kept visible).
   const columns = useMemo<BoardColumn[]>(() => {
+    if (selfEmployee) {
+      // จับคู่ด้วยรหัสพนักงานก่อน ถ้าบัญชีไม่มีรหัสให้ใช้ชื่อแทน
+      const selfId = selfEmployee.employeeId
+        || [...assignedByEmployee.entries()].find(([, list]) => list[0].assignedTo?.name === selfEmployee.name)?.[0]
+        || '';
+      return [{
+        employeeId: selfId,
+        name: selfEmployee.name,
+        department: employees.find((e) => e.employeeId === selfId)?.department ?? selfEmployee.department,
+      }];
+    }
     const known = new Set(employees.map((e) => e.employeeId));
     const cols: BoardColumn[] = employees.map((e) => ({
       employeeId: e.employeeId,
@@ -1041,7 +1056,7 @@ function AssignBoard({
       cols.push({ employeeId: id, name: info?.name ?? id, department: info?.department ?? '' });
     });
     return cols;
-  }, [employees, assignedByEmployee]);
+  }, [employees, assignedByEmployee, selfEmployee]);
 
   function handleDrop(employeeId: string) {
     if (draggingId) onDropPetition(draggingId, employeeId);
