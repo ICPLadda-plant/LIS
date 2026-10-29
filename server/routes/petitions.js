@@ -1345,6 +1345,37 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 }));
 
 // POST /api/petitions/:id/claim { machines } → เจ้าหน้าที่ Lab รับงานเองช่วงมอบหมายอิสระ
+// DELETE /api/petitions/:id/assign → หัวหน้า Lab ดึงงานที่เจ้าหน้าที่ยังไม่เริ่มกลับไปรอมอบหมาย
+router.delete('/:id/assign', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!isLabAssignHead(user)) return res.status(403).json({ error: { message: 'เฉพาะหัวหน้า Lab ที่ยกเลิกการมอบหมายได้' } });
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const assignee = doc.assignedTo;
+    if (!assignee?.employeeId) return res.json(doc);
+    if (assignee.acceptedAt || doc.labCompletedAt) {
+      return res.status(409).json({ error: { message: `${assignee.name} เริ่มงานแล้ว จึงย้ายกลับไปรอมอบหมายไม่ได้` } });
+    }
+    const actor = user.name || user.email;
+    doc.assignedTo = undefined;
+    doc.assignedMachines = [];
+    await doc.save();
+    logAudit(doc, {
+      event: 'unassigned',
+      fromStatus: doc.status,
+      toStatus: doc.status,
+      actor,
+      note: `ยกเลิกการมอบหมาย ${assignee.name} (ย้ายกลับไปรอมอบหมาย)`,
+      metadata: { side: 'lab', previousAssignee: assignee },
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 // POST /api/petitions/:id/accept → เจ้าหน้าที่ที่ถูก assign กดรับงาน (เริ่มนับเวลาวิเคราะห์)
 router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
   try {

@@ -716,6 +716,26 @@ export default function PetitionAssignPage() {
     if (ok) setDropTarget(null);
   }
 
+  async function unassignPetition(petitionId: string) {
+    const petition = allPetitions.find((p) => p._id === petitionId);
+    if (!petition?.assignedTo) return;
+    if (petition.assignedTo.acceptedAt) {
+      toast.error(`${petition.assignedTo.name} เริ่มงานแล้ว จึงย้ายกลับไปรอมอบหมายไม่ได้`);
+      return;
+    }
+    setSavingId(petition._id);
+    try {
+      await api.delete<Petition>(`/petitions/${petition._id}/assign`);
+      toast.success(`ย้าย ${petition.petitionNo} กลับไปรอมอบหมายแล้ว`);
+      requestPetitionNotificationsRefresh();
+      refreshPetitions();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'ยกเลิกการมอบหมายไม่สำเร็จ');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   const boardLoading = loading || employeesLoading || machinesLoading;
 
   return (
@@ -900,6 +920,7 @@ export default function PetitionAssignPage() {
                 canAssign={canManage}
                 canClaim={canClaim}
                 onDropPetition={(petitionId, employeeId) => setDropTarget({ petitionId, employeeId })}
+                onUnassignPetition={unassignPetition}
                 onClaimPetition={(petitionId) => setDropTarget({ petitionId, employeeId: selfEmployee?.employeeId ?? '', claim: true })}
                 onPetitionClick={(id) => navigate(`/petition/${id}`)}
                 emptyPoolText="ไม่มีคำร้องที่รอ assign"
@@ -942,6 +963,7 @@ interface AssignBoardProps {
   canAssign: boolean;
   canClaim: boolean;
   onDropPetition: (petitionId: string, employeeId: string) => void;
+  onUnassignPetition: (petitionId: string) => void;
   onClaimPetition: (petitionId: string) => void;
   onPetitionClick: (id: string) => void;
   emptyPoolText: string;
@@ -963,12 +985,14 @@ function AssignBoard({
   canAssign,
   canClaim,
   onDropPetition,
+  onUnassignPetition,
   onClaimPetition,
   onPetitionClick,
   emptyPoolText,
 }: AssignBoardProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overEmployee, setOverEmployee] = useState<string | null>(null);
+  const [overPool, setOverPool] = useState(false);
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
   // แยกคำร้องที่ Lab ยังไม่รับตัวอย่าง ("ส่งตัวอย่างแล้ว") ไปพักไว้ เพราะยังลากมอบหมายไม่ได้
@@ -1025,6 +1049,11 @@ function AssignBoard({
     setOverEmployee(null);
   }
 
+  // งานที่มอบหมายแล้วแต่เจ้าหน้าที่ยังไม่กดรับ ลากกลับมาที่ "งานรอมอบหมาย" ได้
+  const draggingAssigned = draggingId
+    ? petitions.find((p) => p._id === draggingId && p.assignedTo && !p.assignedTo.acceptedAt)
+    : undefined;
+
   if (loading) {
     return (
       <div className="rounded-[10px] border border-border bg-card py-12 text-center text-muted-foreground">
@@ -1036,7 +1065,28 @@ function AssignBoard({
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
       {/* Unassigned pool */}
-      <div className="rounded-[10px] border border-border bg-muted/50 p-3">
+      <div
+        onDragOver={(e) => {
+          if (!canAssign || !draggingAssigned) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          if (!overPool) setOverPool(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverPool(false);
+        }}
+        onDrop={(e) => {
+          if (!canAssign || !draggingAssigned) return;
+          e.preventDefault();
+          onUnassignPetition(draggingAssigned._id);
+          setDraggingId(null);
+          setOverPool(false);
+        }}
+        className={cn(
+          'rounded-[10px] border bg-muted/50 p-3 transition-colors',
+          overPool ? 'border-primary/60 bg-primary/10 ring-2 ring-primary/30' : 'border-border',
+        )}
+      >
         <div className="mb-2 flex items-center gap-2">
           <Inbox className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">งานรอมอบหมาย</span>
