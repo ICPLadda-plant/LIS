@@ -168,11 +168,13 @@ async function ensureCollections() {
 }
 
 mongoose.connect(MONGODB_URI)
-  .then(async () => {
+  .then(() => {
     console.log('✅ Connected to MongoDB');
     loadAllModels();
-    await ensureCollections();
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    ensureCollections().catch((err) => {
+      console.error('❌ Collection initialization error:', err.message);
+    });
   })
   .catch(err => {
     console.error('❌ MongoDB connection error:', err.message);
