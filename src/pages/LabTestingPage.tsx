@@ -83,11 +83,11 @@ export default function LabTestingPage() {
     setAcceptingId(p._id);
     try {
       await api.post<Petition>(`/petitions/${p._id}/accept`, { employeeId: user?.employeeId });
-      toast.success(`รับงาน ${p.petitionNo} แล้ว`);
+      toast.success(`เริ่มงาน ${p.petitionNo} แล้ว`);
       refresh();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || 'รับงานไม่สำเร็จ กรุณาลองใหม่');
+      toast.error(msg || 'เริ่มงานไม่สำเร็จ กรุณาลองใหม่');
     } finally {
       setAcceptingId(null);
     }
@@ -202,7 +202,7 @@ export default function LabTestingPage() {
               void acceptPetition(p);
             }}
           >
-            {acceptingId === p._id ? 'กำลังรับงาน...' : 'รับงาน'}
+            {acceptingId === p._id ? 'กำลังเริ่มงาน...' : 'เริ่มงาน'}
           </Button>
         ) : labReceivedAt(p) ? (
           <Button
