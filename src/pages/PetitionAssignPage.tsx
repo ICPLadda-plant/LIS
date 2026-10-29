@@ -65,6 +65,7 @@ const formatThaiDate = (iso: string) =>
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import { getMachineSuggestions, type MachineSuggestion } from '@/lib/aiApi';
 import { DEV_MODE, synthesizeDevAssignees } from '@/config/dev';
+import { isAssignedTo } from '@/lib/assignment';
 import { parseSubstances } from '@/lib/substances';
 import { readSlotMethods, machineMatchesMethod, type MethodDoc } from '@/lib/methodRegistry';
 import { groupMachineMethods } from '@/lib/assignMachineGrouping';
@@ -1034,10 +1035,10 @@ function AssignBoard({
   // assignment here but is missing from the current staff list (kept visible).
   const columns = useMemo<BoardColumn[]>(() => {
     if (selfEmployee) {
-      // จับคู่ด้วยรหัสพนักงานก่อน ถ้าบัญชีไม่มีรหัสให้ใช้ชื่อแทน
-      const selfId = selfEmployee.employeeId
-        || [...assignedByEmployee.entries()].find(([, list]) => list[0].assignedTo?.name === selfEmployee.name)?.[0]
-        || '';
+      // ใช้ isAssignedTo (รหัสพนักงานก่อน แล้วชื่อ รวมชื่อแฝงของ dev role) เหมือนหน้า Lab
+      const selfId = [...assignedByEmployee.entries()]
+        .find(([, list]) => isAssignedTo(list[0].assignedTo, selfEmployee))?.[0]
+        || selfEmployee.employeeId;
       return [{
         employeeId: selfId,
         name: selfEmployee.name,
