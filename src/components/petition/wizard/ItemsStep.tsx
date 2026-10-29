@@ -399,7 +399,7 @@ export default function ItemsStep({
                       id={commonNameId}
                       value={it.commonName}
                       onChange={(e) => setCommonName(idx, e.target.value)}
-                      disabled={itemsReadOnly || commonNameLocked}
+                      disabled={allowManualItemFields ? itemsReadOnly : commonNameLocked}
                       placeholder={commonNameLocked ? 'เติมอัตโนมัติจาก Master Item' : 'Master Item ไม่มีชื่อสามัญ กรุณากรอก'}
                     />
                   )}
@@ -419,7 +419,7 @@ export default function ItemsStep({
                     id={packageUnitId}
                     value={it.packageUnit}
                     onChange={(e) => setItem(idx, { packageUnit: e.target.value })}
-                    disabled={itemsReadOnly || packageUnitLocked}
+                    disabled={allowManualItemFields ? itemsReadOnly : packageUnitLocked}
                     placeholder={allowManualItemFields ? 'กรอกขนาดบรรจุ หรือเลือกจาก Master Item' : packageUnitLocked ? 'เติมอัตโนมัติจาก Master Item' : 'Master Item ไม่มีขนาดบรรจุ กรุณากรอก'}
                   />
                 </div>
@@ -471,7 +471,8 @@ export default function ItemsStep({
                                 id={inputId}
                                 value={sentQuantity}
                                 onChange={(e) => setItem(idx, labelQuantityPatch(it, quantityIndex, e.target.value))}
-                                disabled={itemsReadOnly}
+                                // คำขอจาก Production ส่งปริมาณมาค่าเดียว แต่ส่ง QC+LAB ต้องใช้ 2 ค่า จึงเปิดให้กรอกเพิ่มได้
+                                disabled={itemsReadOnly && !splitQcLab}
                                 placeholder="เช่น 100 ml"
                               />
                             </div>
