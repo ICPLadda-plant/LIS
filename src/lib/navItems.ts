@@ -28,6 +28,8 @@ export type NavItem = {
   path: string;
 };
 
+export const LAB_ASSIGN_PATH = "/petition/assign";
+
 export const NAV_ITEMS: NavItem[] = [
   { icon: ShieldCheck, label: "Validation", path: "/validation" },
   { icon: Home, label: "หน้าแรก", path: "/home" },
