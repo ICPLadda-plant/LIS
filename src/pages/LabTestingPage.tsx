@@ -128,7 +128,9 @@ export default function LabTestingPage() {
   const petitions: Petition[] = prioritizeUrgentPetitions((data?.items ?? [])
     .filter((p) => !p.labApprovedAt)
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
-    .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user)));
+    .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
+    // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
+    .filter((p) => !canReceiveAndClaim || p.assignedTo || labReceivedAt(p)));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
