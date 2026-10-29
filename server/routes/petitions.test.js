@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 const router = require('./petitions');
 const Petition = require('../models/Petition');
 const DocumentNumberConfig = require('../models/DocumentNumberConfig');
+const User = require('../models/User');
+const LabFreeAssign = require('../models/LabFreeAssign');
 
 function handler(path, method) {
   const layer = router.stack.find((entry) => entry.route
@@ -26,11 +28,28 @@ function response() {
   };
 }
 
-async function invoke(path, method, { body = {}, params = {}, query = {} } = {}) {
+async function invoke(path, method, { body = {}, params = {}, query = {}, headers = {} } = {}) {
   const res = response();
-  await handler(path, method)({ body, params, query }, res);
+  const get = (name) => headers[Object.keys(headers).find((key) => key.toLowerCase() === String(name).toLowerCase())];
+  await handler(path, method)({ body, params, query, headers: {}, get }, res);
   return res;
 }
+
+// จำลองผู้ใช้ที่ล็อกอิน (currentUser หา User จาก header X-LIS-User) + สถานะมอบหมายอิสระ
+async function withLabUser(user, freeUntil, run) {
+  const originals = { userFindOne: User.findOne, freeFindOne: LabFreeAssign.findOne };
+  User.findOne = () => ({ lean: async () => user });
+  LabFreeAssign.findOne = () => ({ lean: async () => (freeUntil === undefined ? null : { key: 'lab', freeUntil, setBy: 'Head' }) });
+  try {
+    return await run({ 'X-LIS-User': user?.email || '' });
+  } finally {
+    User.findOne = originals.userFindOne;
+    LabFreeAssign.findOne = originals.freeFindOne;
+  }
+}
+
+const LAB_HEAD = { _id: 'u-head', email: 'head@lab.test', name: 'Lab Head', roles: ['lab-head'], status: 'active' };
+const ANALYST = { _id: 'u-a', email: 'a@lab.test', name: 'Analyst A', employeeId: 'E77', roles: ['lab-analyze'], status: 'active' };
 
 test('GET / filters assigned petitions by current assignee before pagination', async () => {
   const originals = {
@@ -117,10 +136,11 @@ test('PATCH /:id/assign requires Lab receipt, not QC receipt', async () => {
     let saved = false;
     Petition.findOne = async () => ({ status: 'pendingReview', qcReceivedAt: new Date(), receivedAt: new Date() });
     Petition.prototype.save = async () => { saved = true; };
-    const res = await invoke('/:id/assign', 'patch', {
+    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/assign', 'patch', {
       params: { id: 'P-2609-0001' },
       body: { employeeId: 'E1', name: 'Analyst' },
-    });
+      headers,
+    }));
     assert.equal(res.statusCode, 409);
     assert.match(res.body.error.message, /Lab ต้องรับตัวอย่างก่อน/);
     assert.equal(saved, false);
@@ -129,6 +149,69 @@ test('PATCH /:id/assign requires Lab receipt, not QC receipt', async () => {
     Petition.prototype.save = originalSave;
   }
 });
+
+test('PATCH /:id/assign is read-only for non-head Lab staff', async () => {
+  const res = await withLabUser(ANALYST, undefined, (headers) => invoke('/:id/assign', 'patch', {
+    params: { id: 'P-2609-0001' },
+    body: { employeeId: 'E1', name: 'Analyst' },
+    headers,
+  }));
+  assert.equal(res.statusCode, 403);
+});
+
+test('PUT /lab-free-assign is head-only and rejects past or over-long windows', async () => {
+  const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  const denied = await withLabUser(ANALYST, undefined, (headers) => invoke('/lab-free-assign', 'put', { body: { until: future }, headers }));
+  assert.equal(denied.statusCode, 403);
+  const past = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/lab-free-assign', 'put', { body: { until: new Date(Date.now() - 1000).toISOString() }, headers }));
+  assert.equal(past.statusCode, 400);
+  const tooLong = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/lab-free-assign', 'put', { body: { until: new Date(Date.now() + 8 * 24 * 3600 * 1000).toISOString() }, headers }));
+  assert.equal(tooLong.statusCode, 400);
+});
+
+test('POST /:id/claim needs an open free-assign window', async () => {
+  const expired = new Date(Date.now() - 1000);
+  const res = await withLabUser(ANALYST, expired, (headers) => invoke('/:id/claim', 'post', { params: { id: 'P-2609-0001' }, headers }));
+  assert.equal(res.statusCode, 403);
+  assert.match(res.body.error.message, /มอบหมายอิสระ/);
+});
+
+test('POST /:id/claim refuses work that already has an assignee', async () => {
+  const originalFindOne = Petition.findOne;
+  try {
+    Petition.findOne = async () => ({ status: 'inProgress', labReceivedAt: new Date(), assignedTo: { employeeId: 'E1', name: 'Someone' } });
+    const res = await withLabUser(ANALYST, new Date(Date.now() + 3600 * 1000), (headers) => invoke('/:id/claim', 'post', { params: { id: 'P-2609-0001' }, headers }));
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body.error.message, /มีผู้รับงานนี้แล้ว/);
+  } finally {
+    Petition.findOne = originalFindOne;
+  }
+});
+
+test('POST /:id/claim assigns the work to the logged-in analyst, ignoring body identity', async () => {
+  const originalFindOne = Petition.findOne;
+  const doc = {
+    status: 'pendingReview',
+    labReceivedAt: new Date(),
+    async save() { throw new Error('stop-after-assign'); },
+  };
+  try {
+    Petition.findOne = async () => doc;
+    const res = await withLabUser(ANALYST, new Date(Date.now() + 3600 * 1000), (headers) => invoke('/:id/claim', 'post', {
+      params: { id: 'P-2609-0001' },
+      body: { employeeId: 'HACK', machines: [] },
+      headers,
+    }));
+    assert.match(res.body.error.message, /stop-after-assign/);
+    assert.equal(doc.assignedTo.employeeId, 'E77');
+    assert.equal(doc.assignedTo.name, 'Analyst A');
+    assert.equal(doc.assignedTo.assignedBy, 'Analyst A');
+    assert.equal(doc.status, 'inProgress');
+  } finally {
+    Petition.findOne = originalFindOne;
+  }
+});
+
 
 test('PATCH /:id cannot bypass Lab receipt through a general update', async () => {
   const res = await invoke('/:id', 'patch', {

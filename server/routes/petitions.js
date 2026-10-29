@@ -20,6 +20,7 @@ const QCTestResult = require('../models/QCTestResult');
 const Parameter = require('../models/Parameter');
 const LabRequest = require('../models/LabRequest');
 const StandardTime = require('../models/StandardTime');
+const LabFreeAssign = require('../models/LabFreeAssign');
 const { buildStatusLog, hasLabTrack, shouldSendItemToLab, isPetitionComplete } = require('../lib/petitionStatusLog');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { router: additionalSamplesRouter, changeAdditionalSampleState, currentUser, canTestSide } = require('./additionalSamples');
@@ -186,6 +187,8 @@ router.get('/', async (req, res) => {
       const list = String(status).split(',').map((s) => s.trim()).filter(Boolean);
       q.status = list.length > 1 ? { $in: list } : list[0];
     }
+    // ?labPending=true → ซ่อนคำร้องที่ Lab อนุมัติผลแล้ว (งานฝั่ง Lab จบ ย้ายไปหน้าผลวิเคราะห์ Lab)
+    if (req.query.labPending === 'true') q.labApprovedAt = null;
     // ?urgent=true → เฉพาะงานด่วนที่ยังเปิดอยู่ (ใช้โดยตัวเตือนงานด่วนทุกชั่วโมง)
     if (req.query.urgent === 'true') {
       q.priority = { $in: [1, '1'] };
@@ -596,6 +599,16 @@ router.get('/batch-exists', async (req, res) => {
 });
 
 // GET /api/petitions/scan/:code
+// GET /api/petitions/lab-free-assign → สถานะโหมดมอบหมายอิสระ (หมดเวลาแล้วถือว่าปิด)
+// ต้องอยู่ก่อน GET /:id ไม่งั้น "lab-free-assign" จะถูกตีความเป็นเลขคำร้อง
+router.get('/lab-free-assign', async (_req, res) => {
+  try {
+    res.json(await readLabFreeAssign());
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
 router.get('/scan/:code', async (req, res) => {
   try {
     const code = decodeURIComponent(req.params.code || '').trim();
@@ -1202,64 +1215,162 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
   }
 }));
 
-// PATCH /api/petitions/:id/assign
+// ===== มอบหมายงาน Lab =====
+// หัวหน้า Lab (หรือ admin) เท่านั้นที่มอบหมาย/เปลี่ยนผู้รับงานได้ ส่วนเจ้าหน้าที่ Lab (lab-analyze)
+// กดรับงานเองได้เฉพาะช่วงที่หัวหน้าเปิด "มอบหมายอิสระ" ไว้ และเฉพาะงานที่ยังไม่มีผู้รับ
+const FREE_ASSIGN_MAX_MS = 7 * 24 * 60 * 60 * 1000;
+
+function isLabAssignHead(user) {
+  return normalizeRoles(user).some((role) => role === 'admin' || role === 'lab-head');
+}
+
+function canClaimLabWork(user) {
+  return isLabAssignHead(user) || normalizeRoles(user).includes('lab-analyze');
+}
+
+async function readLabFreeAssign() {
+  const doc = await LabFreeAssign.findOne({ key: 'lab' }).lean();
+  const until = doc?.freeUntil && new Date(doc.freeUntil).getTime() > Date.now() ? new Date(doc.freeUntil) : null;
+  return { active: Boolean(until), freeUntil: until ? until.toISOString() : null, setBy: until ? doc.setBy || '' : '' };
+}
+
+function petitionQuery(id) {
+  return mongoose.Types.ObjectId.isValid(id) ? { _id: id } : { petitionNo: id };
+}
+
+function labNotReceived(doc) {
+  return !doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt);
+}
+
+// ตั้ง assignedTo + เครื่องที่เลือก แล้วบันทึก audit — ใช้ร่วมกันทั้งหัวหน้ามอบหมายและเจ้าหน้าที่รับงานเอง
+async function applyLabAssignment(doc, assignee, machines, { actor, note, claimed = false }) {
+  const prevStatus = doc.status;
+  doc.assignedTo = {
+    employeeId: String(assignee.employeeId).trim(),
+    name: String(assignee.name).trim(),
+    department: assignee.department ? String(assignee.department).trim() : undefined,
+    position: assignee.position ? String(assignee.position).trim() : undefined,
+    assignedAt: new Date(),
+    assignedBy: actor ? String(actor).trim() : undefined,
+  };
+
+  if (Array.isArray(machines)) {
+    const cleaned = machines
+      .filter((m) => m && m.machineId && m.code && m.name)
+      .map((m) => ({
+        machineId: String(m.machineId).trim(),
+        code: String(m.code).trim(),
+        name: String(m.name).trim(),
+        location: m.location ? String(m.location).trim() : undefined,
+        sampleName: m.sampleName ? String(m.sampleName).trim() : undefined,
+        commonName: m.commonName ? String(m.commonName).trim() : undefined,
+      }));
+    for (const machine of cleaned) {
+      const standard = await matchStandardTime(machine);
+      if (!standard) continue;
+      machine.standardTimeId = String(standard._id);
+      machine.estimatedMinutes = standard.standardTimeMin;
+      machine.estimatedSource = `${standard.instrument} / ${standard.analysisName}`;
+    }
+    doc.assignedMachines = cleaned;
+  }
+
+  if (doc.status === 'pendingReview') doc.status = 'inProgress';
+
+  await doc.save();
+  const machineNote = doc.assignedMachines?.length ? ` (เครื่อง: ${doc.assignedMachines.map((m) => m.code).join(', ')})` : '';
+  logAudit(doc, {
+    event: 'assigned',
+    fromStatus: prevStatus,
+    toStatus: doc.status,
+    actor: actor || 'system',
+    note: `${note}${machineNote}`,
+    metadata: { assignee: doc.assignedTo, machines: doc.assignedMachines, claimed },
+  });
+  return doc;
+}
+
+// PUT /api/petitions/lab-free-assign { until: ISO | null } → หัวหน้า Lab เปิด/ปิดมอบหมายอิสระ
+router.put('/lab-free-assign', async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!isLabAssignHead(user)) return res.status(403).json({ error: { message: 'เฉพาะหัวหน้า Lab ที่เปิดมอบหมายอิสระได้' } });
+    const raw = req.body?.until;
+    let freeUntil = null;
+    if (raw) {
+      freeUntil = new Date(raw);
+      const ms = freeUntil.getTime() - Date.now();
+      if (Number.isNaN(ms) || ms <= 0) return badRequest(res, 'เวลาสิ้นสุดต้องอยู่ในอนาคต');
+      if (ms > FREE_ASSIGN_MAX_MS) return badRequest(res, 'เปิดมอบหมายอิสระได้ไม่เกิน 7 วัน');
+    }
+    const actor = user.name || user.email;
+    await LabFreeAssign.findOneAndUpdate(
+      { key: 'lab' },
+      { freeUntil, setBy: freeUntil ? actor : '' },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+    res.json(await readLabFreeAssign());
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+});
+
+// PATCH /api/petitions/:id/assign → หัวหน้า Lab มอบหมาย/เปลี่ยนผู้รับงาน
 router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
   try {
-    const { employeeId, name, department, position, assignedBy, machines } = req.body || {};
+    const { employeeId, name, department, position, machines } = req.body || {};
     if (!employeeId || !name) return badRequest(res, 'กรุณาเลือกเจ้าหน้าที่');
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!isLabAssignHead(user)) return res.status(403).json({ error: { message: 'เฉพาะหัวหน้า Lab ที่มอบหมายงานได้' } });
 
-    const q = mongoose.Types.ObjectId.isValid(req.params.id)
-      ? { _id: req.params.id }
-      : { petitionNo: req.params.id };
-
-    const doc = await Petition.findOne(q);
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
-    if (!doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt)) {
+    if (labNotReceived(doc)) {
       return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้' } });
     }
 
-    const prevStatus = doc.status;
-    doc.assignedTo = {
-      employeeId: String(employeeId).trim(),
-      name: String(name).trim(),
-      department: department ? String(department).trim() : undefined,
-      position: position ? String(position).trim() : undefined,
-      assignedAt: new Date(),
-      assignedBy: assignedBy ? String(assignedBy).trim() : undefined,
-    };
+    await applyLabAssignment(doc, { employeeId, name, department, position }, machines, {
+      actor: user.name || user.email,
+      note: `มอบหมายให้ ${String(name).trim()}`,
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
 
-    if (Array.isArray(machines)) {
-      const cleaned = machines
-        .filter((m) => m && m.machineId && m.code && m.name)
-        .map((m) => ({
-          machineId: String(m.machineId).trim(),
-          code: String(m.code).trim(),
-          name: String(m.name).trim(),
-          location: m.location ? String(m.location).trim() : undefined,
-          sampleName: m.sampleName ? String(m.sampleName).trim() : undefined,
-          commonName: m.commonName ? String(m.commonName).trim() : undefined,
-        }));
-      for (const machine of cleaned) {
-        const standard = await matchStandardTime(machine);
-        if (!standard) continue;
-        machine.standardTimeId = String(standard._id);
-        machine.estimatedMinutes = standard.standardTimeMin;
-        machine.estimatedSource = `${standard.instrument} / ${standard.analysisName}`;
-      }
-      doc.assignedMachines = cleaned;
+// POST /api/petitions/:id/claim { machines } → เจ้าหน้าที่ Lab รับงานเองช่วงมอบหมายอิสระ
+router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!canClaimLabWork(user)) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์รับงาน Lab' } });
+    const freeAssign = await readLabFreeAssign();
+    if (!freeAssign.active && !isLabAssignHead(user)) {
+      return res.status(403).json({ error: { message: 'หัวหน้า Lab ยังไม่ได้เปิดมอบหมายอิสระ หรือหมดเวลาแล้ว' } });
+    }
+    // dev role จำลองไม่มี record ใน DB จึงไม่มี employeeId — ใช้ค่าที่ส่งมาแทนเฉพาะกรณีนั้น
+    const employeeId = user.employeeId || (!user._id ? String(req.body?.employeeId || '').trim() : '');
+    if (!employeeId) return badRequest(res, 'บัญชีนี้ยังไม่ได้ผูกรหัสพนักงาน จึงรับงานไม่ได้');
+
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (labNotReceived(doc)) {
+      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะรับงานได้' } });
+    }
+    if (doc.assignedTo?.employeeId) {
+      return res.status(409).json({ error: { message: `มีผู้รับงานนี้แล้ว (${doc.assignedTo.name})` } });
     }
 
-    if (doc.status === 'pendingReview') doc.status = 'inProgress';
-
-    await doc.save();
-    logAudit(doc, {
-      event: 'assigned',
-      fromStatus: prevStatus,
-      toStatus: doc.status,
-      actor: assignedBy || 'system',
-      note: `มอบหมายให้ ${doc.assignedTo.name}${doc.assignedMachines?.length ? ` (เครื่อง: ${doc.assignedMachines.map((m) => m.code).join(', ')})` : ''}`,
-      metadata: { assignee: doc.assignedTo, machines: doc.assignedMachines },
-    });
+    const name = user.name || user.email;
+    await applyLabAssignment(doc, {
+      employeeId,
+      name,
+      department: user.department,
+      position: user.position,
+    }, req.body?.machines, { actor: name, note: `${name} รับงานเอง (มอบหมายอิสระ)`, claimed: true });
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });

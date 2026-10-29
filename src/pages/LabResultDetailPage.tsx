@@ -14,7 +14,7 @@ import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import LabResultGroups from "@/components/petition/LabResultGroups";
 import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/LabResultReportTemplate";
-import BromadioloneAnalysisForm, { BROMADIOLONE_ANALYSIS_CSS } from "@/components/petition/BromadioloneAnalysisForm";
+import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationData } from "@/components/petition/LabCalculationForm";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import type { QCTestResult } from "@/types/petition.types";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,8 +71,24 @@ export default function LabResultDetailPage() {
 
   const report = <LabResultReportTemplate pages={pages} />;
   const labResultPrintable = petition ? canPrintLabResult(petition) && pages.length > 0 : false;
-  const bromadiolonePage = pages.find((page) => /BROMADIOLONE\s+0\.005%/i.test(page.sample?.name ?? ""));
-  const bromadiolonePrintable = Boolean(petition && petition.status === "approved" && bromadiolonePage);
+  // ใบคำนวณใช้ได้ทุกสาร: หัวกระดาษจากหน้ารายงาน แต่ค่าดิบ (Area Inj / % Sample) มาจาก groups
+  // ของหน้านี้ ซึ่งเปิด includeResultOnlyFields — รายงาน Lab ปกติไม่มีแถวเหล่านี้
+  const calcPages = pages
+    .map((page, i) => {
+      const seq = petition?.items?.[i]?.seq;
+      const group = groups.find((g) => g.seq === seq);
+      if (!group) return page;
+      const rows = group.params.flatMap((p) => p.rows.map((r) => ({
+        testItem: `${r.label}${r.unit ? ` (${r.unit})` : ""}`,
+        result: r.value || "-",
+        criteria: "-",
+        method: "-",
+      })));
+      return { ...page, rows: [...rows, ...page.rows] };
+    })
+    .filter(hasCalculationData);
+  // พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ
+  const calcPrintable = Boolean(petition && (petition.labCompletedAt || petition.labApprovedAt) && calcPages.length > 0);
 
   if (loading) {
     return (
@@ -107,8 +123,8 @@ export default function LabResultDetailPage() {
               <Button variant="primary-outline" onClick={() => labResultPrintable && setPrintOpen(true)} disabled={!labResultPrintable} className="gap-2">
                 <Printer className="h-4 w-4" /> พิมพ์ผลวิเคราะห์ Lab
               </Button>
-              {bromadiolonePage && <Button variant="primary-outline" onClick={() => bromadiolonePrintable && setBromPrintOpen(true)} disabled={!bromadiolonePrintable} className="gap-2">
-                <Printer className="h-4 w-4" /> พิมพ์แบบคำนวณ Bromadiolone
+              {calcPages.length > 0 && <Button variant="primary-outline" onClick={() => calcPrintable && setBromPrintOpen(true)} disabled={!calcPrintable} className="gap-2">
+                <Printer className="h-4 w-4" /> พิมพ์ใบคำนวณ
               </Button>}
             </div>
           }
@@ -135,8 +151,10 @@ export default function LabResultDetailPage() {
       <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="coa" css={LAB_REPORT_CSS}>
         {report}
       </PrintPreviewDialog>
-      {bromadiolonePage && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" css={BROMADIOLONE_ANALYSIS_CSS}>
-        <BromadioloneAnalysisForm page={bromadiolonePage} />
+      {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" css={LAB_CALCULATION_CSS}>
+        {calcPages.map((page, i) => (
+          <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} />
+        ))}
       </PrintPreviewDialog>}
     </AppLayout>
   );

@@ -4,6 +4,7 @@ import { useParams, useNavigate, Navigate, useLocation, useSearchParams } from '
 import { FlaskConical, CheckCircle2, Loader2, AlertCircle, AlertTriangle, RotateCcw, Save, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
+import { mergeQcLabDuplicateItems } from '@/lib/petitionRouting';
 import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
 import { api, type ParameterItem, type ParameterValueField } from '@/lib/api';
@@ -889,7 +890,7 @@ export default function QCTestingDetailPage() {
     );
   }
 
-  const items = petition.items ?? [];
+  const items = mergeQcLabDuplicateItems(petition, petition.items ?? []);
 
   // 2-phase support
   // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1

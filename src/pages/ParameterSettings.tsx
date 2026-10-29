@@ -3654,6 +3654,7 @@ export default function ParameterSettings() {
             currentParameterId={criteriaParameter?._id}
             siblingFields={(criteriaParameter?.valueFields ?? []).filter((_, index) => index !== criteriaEditor.fieldIndex)}
             resultMode={criteriaField.conditionalResult ?? "standard"}
+            focusRuleIndex={criteriaEditor.ruleIndex}
             onClose={closeCriteriaEditor}
             onSave={(next) => handleSaveCriteriaField({ ...criteriaField, conditionalStandards: next })}
           />
@@ -3661,6 +3662,7 @@ export default function ParameterSettings() {
           <LabelToleranceDialog
             open
             field={criteriaField}
+            focusRuleIndex={criteriaEditor.ruleIndex}
             onClose={closeCriteriaEditor}
             onSave={(next) => handleSaveCriteriaField({ ...criteriaField, labelToleranceStandards: next })}
           />

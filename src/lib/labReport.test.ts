@@ -115,15 +115,22 @@ describe("buildLabReportPages", () => {
     expect(p.labHeadName).toBe("นคร");
   });
 
-  it("แถวผลกรองเฉพาะ scope=lab, method='-'", () => {
+  it("แถวผลกรองเฉพาะ scope=lab และใช้วิธีทดสอบตาม FM-QP-07-01-002", () => {
     const p = pages[0];
     expect(p.rows).toHaveLength(1); // qc row ถูกตัดออก
     expect(p.rows[0]).toEqual({
       testItem: "Glyphosate (%w/v)",
       result: "48.2",
       criteria: "45.5-50.5",
-      method: "-",
+      method: "HPLC\nJ. Henriet and H.H. Povlsen. 1988. Analysis of Technical and Formulated Pesticides. CIPAC Handbook. Vol. D. P. 100-105.",
     });
+  });
+
+  it("แถวที่ไม่ใช่สารออกฤทธิ์ยังแสดงวิธีทดสอบเป็น '-'", () => {
+    const [page] = buildLabReportPages(petition, labRequests, [
+      { ...groups[0], params: [{ ...groups[0].params[0], parameterName: "ความหนาแน่น", rows: [{ ...groups[0].params[0].rows[0], label: "Density" }] }] },
+    ]);
+    expect(page.rows[0].method).toBe("-");
   });
 
   it("prints only the head reviewer range and keeps the percent unit for label tolerance criteria", () => {

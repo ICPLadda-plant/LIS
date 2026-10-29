@@ -5,12 +5,11 @@ import {
   ArrowRight,
   ClipboardCheck,
   Cog,
-  FlaskConical,
   GripVertical,
-  Hourglass,
+  Hand,
   Inbox,
+  PackageOpen,
   QrCode,
-  RefreshCw,
   Search,
   UserCheck,
   Users,
@@ -34,8 +33,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import LabFreeAssignControl from '@/components/petition/LabFreeAssignControl';
+import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import { useAuth } from '@/hooks/useAuth';
 import { usePetitionList } from '@/hooks/usePetition';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
@@ -81,8 +81,6 @@ import {
 import { isUrgentPetition, prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
 
-type TabKey = 'normal' | 'phase2';
-
 // One substance within a commonName (split by "+"), with the AND-set of method
 // codes the simple-method config assigned to it. `methods.length === 0` means
 // "not yet configured" → that slot blocks Assign.
@@ -125,13 +123,6 @@ function sampleSeqLabel(group: SubstanceGroup): string {
     .filter((seq) => seq !== undefined && seq !== null)
     .sort((a, b) => a - b)
     .join('+');
-}
-
-// Phase 2 = either explicitly advanced or timer elapsed but list hasn't been refreshed
-function isPhase2Petition(petition: Petition): boolean {
-  if (petition.currentPhase === 2) return true;
-  if (petition.phase2DueAt && new Date(petition.phase2DueAt) <= new Date()) return true;
-  return false;
 }
 
 interface EmployeeAssignee {
@@ -217,6 +208,50 @@ function groupHasUnassignable(group: SubstanceGroup, methodByCode: Map<string, M
 export default function PetitionAssignPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  // หัวหน้า Lab / admin มอบหมายงานได้; เจ้าหน้าที่ Lab ดูได้อย่างเดียว ยกเว้นช่วง "มอบหมายอิสระ" ที่กดรับงานเองได้
+  const userRoles = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
+  const canManage = userRoles.some((role) => role === 'admin' || role === 'lab-head');
+  const canClaimRole = canManage || userRoles.includes('lab-analyze');
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const { data: freeAssign = null, refetch: refetchFreeAssign } = useQuery({
+    queryKey: ['lab-free-assign'],
+    queryFn: async () => (await api.get<LabFreeAssignState>('/petitions/lab-free-assign')).data.data,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+  const freeAssignActive = isFreeAssignActive(freeAssign, now);
+  const canClaim = canClaimRole && !canManage && freeAssignActive;
+  const [freeAssignSaving, setFreeAssignSaving] = useState(false);
+  const selfEmployee: EmployeeAssignee | null = user
+    ? {
+        id: 0,
+        employeeId: user.employeeId ?? '',
+        name: user.name || user.email || '',
+        department: 'Lab',
+        position: '',
+        empType: 'self',
+        isActive: true,
+      }
+    : null;
+
+  async function changeFreeAssign(until: Date | null): Promise<boolean> {
+    setFreeAssignSaving(true);
+    try {
+      await api.put('/petitions/lab-free-assign', { until: until ? until.toISOString() : null });
+      await refetchFreeAssign();
+      toast.success(until ? 'เปิดมอบหมายอิสระแล้ว' : 'ปิดมอบหมายอิสระแล้ว');
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'บันทึกมอบหมายอิสระไม่สำเร็จ');
+      return false;
+    } finally {
+      setFreeAssignSaving(false);
+    }
+  }
   const {
     data: pendingData,
     loading: pendingLoading,
@@ -267,11 +302,10 @@ export default function PetitionAssignPage() {
     useState<Record<string, Record<string, Record<string, string>>>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<TabKey>('normal');
   const [scanOpen, setScanOpen] = useState(false);
   const [machineSuggestions, setMachineSuggestions] = useState<Record<string, MachineSuggestion[]>>({});
-  // A petition dragged onto a staff card → open the machine-picking dialog.
-  const [dropTarget, setDropTarget] = useState<{ petitionId: string; employeeId: string } | null>(null);
+  // A petition dragged onto a staff card (or "รับงาน" in free-assign mode) → open the machine-picking dialog.
+  const [dropTarget, setDropTarget] = useState<{ petitionId: string; employeeId: string; claim?: boolean } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -548,17 +582,8 @@ export default function PetitionAssignPage() {
     [queuePetitions],
   );
 
-  const phase2Petitions = useMemo(
-    () => allPetitions.filter(isPhase2Petition),
-    [allPetitions],
-  );
-  const normalPetitions = useMemo(
-    () => allPetitions.filter((p) => !isPhase2Petition(p)),
-    [allPetitions],
-  );
-
   const visiblePetitions = useMemo(() => {
-    const source = activeTab === 'phase2' ? phase2Petitions : normalPetitions;
+    const source = allPetitions;
     const query = search.trim().toLowerCase();
     if (!query) return prioritizeUrgentPetitions(source);
     const matches = source.filter((petition) =>
@@ -578,9 +603,13 @@ export default function PetitionAssignPage() {
         secondary: [petition.petitionNo, petition.submittedBy?.name, petitionDepartmentLabel(petition), petition.assignedTo?.name],
       };
     }));
-  }, [activeTab, normalPetitions, phase2Petitions, search]);
+  }, [allPetitions, search]);
+  const awaitingReceive = useMemo(
+    () => visiblePetitions.filter((petition) => !petition.assignedTo && !labReceivedAt(petition)),
+    [visiblePetitions],
+  );
 
-  async function assignPetition(petition: Petition, employeeIdOverride?: string): Promise<boolean> {
+  async function assignPetition(petition: Petition, employeeIdOverride?: string, claim = false): Promise<boolean> {
     if (!labReceivedAt(petition)) {
       toast.error('Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้');
       return false;
@@ -590,7 +619,7 @@ export default function PetitionAssignPage() {
       return false;
     }
     const employeeId = employeeIdOverride || petition.assignedTo?.employeeId || '';
-    const employee = employeeById.get(employeeId);
+    const employee = claim ? selfEmployee : employeeById.get(employeeId);
     if (!employee) {
       toast.error('กรุณาเลือกเจ้าหน้าที่');
       return false;
@@ -621,25 +650,35 @@ export default function PetitionAssignPage() {
 
     setSavingId(petition._id);
     try {
-      await api.patch<Petition>(`/petitions/${petition._id}/assign`, {
-        ...({
+      if (claim) {
+        // server ใช้ตัวตนจาก session; employeeId ใช้เฉพาะ role จำลองตอน dev
+        await api.post<Petition>(`/petitions/${petition._id}/claim`, {
           employeeId: employee.employeeId,
-          name: employee.name,
-          department: employee.department,
-          position: employee.position,
-          assignedBy: user?.name || user?.email,
-        } satisfies PetitionAssignee),
-        machines: machinesPayload,
-      });
+          machines: machinesPayload,
+        });
+      } else {
+        await api.patch<Petition>(`/petitions/${petition._id}/assign`, {
+          ...({
+            employeeId: employee.employeeId,
+            name: employee.name,
+            department: employee.department,
+            position: employee.position,
+          } satisfies PetitionAssignee),
+          machines: machinesPayload,
+        });
+      }
       const machineSummary = machinesPayload.length
         ? ` (เครื่อง: ${machinesPayload.map((m) => m.code).join(', ')})`
         : '';
-      toast.success(`Assign ${petition.petitionNo} ให้ ${employee.name}${machineSummary} แล้ว`);
+      toast.success(claim
+        ? `รับงาน ${petition.petitionNo}${machineSummary} แล้ว`
+        : `Assign ${petition.petitionNo} ให้ ${employee.name}${machineSummary} แล้ว`);
       requestPetitionNotificationsRefresh();
       refreshPetitions();
       return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'บันทึก assignment ไม่สำเร็จ');
+      if (claim) refreshPetitions();
       return false;
     } finally {
       setSavingId(null);
@@ -653,7 +692,7 @@ export default function PetitionAssignPage() {
   // person in /employees/assignees. Reuse saved assignee data so dropping on
   // that fallback column still opens machine selection instead of doing nothing.
   const dropEmployee = dropTarget
-    ? employeeById.get(dropTarget.employeeId) ?? (() => {
+    ? dropTarget.claim ? selfEmployee : employeeById.get(dropTarget.employeeId) ?? (() => {
         const saved = allPetitions.find(
           (petition) => petition.assignedTo?.employeeId === dropTarget.employeeId,
         )?.assignedTo;
@@ -673,7 +712,7 @@ export default function PetitionAssignPage() {
 
   async function confirmDropAssign() {
     if (!dropTarget || !dropPetition) return;
-    const ok = await assignPetition(dropPetition, dropTarget.employeeId);
+    const ok = await assignPetition(dropPetition, dropTarget.employeeId, !!dropTarget.claim);
     if (ok) setDropTarget(null);
   }
 
@@ -692,23 +731,26 @@ export default function PetitionAssignPage() {
         <div className="space-y-5">
           <PageHeader
             title="Assign คำร้องให้เจ้าหน้าที่"
-            description="รับตัวอย่าง Lab ก่อน แล้วลากคำร้องไปวางบนการ์ดเจ้าหน้าที่เพื่อเลือกเครื่องและ assign"
+            description={canManage
+              ? 'รับตัวอย่าง Lab ก่อน แล้วลากคำร้องไปวางบนการ์ดเจ้าหน้าที่เพื่อเลือกเครื่องและ assign'
+              : canClaim
+                ? 'ช่วงมอบหมายอิสระ: กด "รับงาน" ที่คำร้องเพื่อเลือกเครื่องและรับงานนั้นเป็นของคุณ'
+                : 'ดูการมอบหมายงาน Lab ได้อย่างเดียว หัวหน้า Lab เป็นผู้มอบหมายงาน'}
             actions={
               <div className="flex flex-wrap items-center gap-2">
-                <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
-                  <QrCode className="h-4 w-4" />
-                  รับตัวอย่าง
-                </Button>
-                <Button
-                  variant="primary-outline"
-                  onClick={() => {
-                    refreshPetitions();
-                    toast.info('กำลังโหลดรายการคำร้องล่าสุด');
-                  }}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  รีเฟรช
-                </Button>
+                {canManage && (
+                  <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
+                    <QrCode className="h-4 w-4" />
+                    รับตัวอย่าง
+                  </Button>
+                )}
+                <LabFreeAssignControl
+                  state={freeAssign}
+                  active={freeAssignActive}
+                  canManage={canManage}
+                  saving={freeAssignSaving}
+                  onChange={changeFreeAssign}
+                />
               </div>
             }
           />
@@ -740,14 +782,14 @@ export default function PetitionAssignPage() {
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
                 <p>งานรอ assign: <span className="font-medium text-foreground">{allPetitions.filter((petition) => !petition.assignedTo).length}</span></p>
-                <p>คำร้องพร้อมทำต่อ: <span className="font-medium text-foreground">{normalPetitions.length}</span></p>
-                <p>คำร้อง Phase 2: <span className="font-medium text-foreground">{phase2Petitions.length}</span></p>
+                <p>คำร้องทั้งหมดในบอร์ด: <span className="font-medium text-foreground">{allPetitions.length}</span></p>
+                <p>มอบหมายอิสระ: <span className="font-medium text-foreground">{freeAssignActive ? 'เปิดอยู่' : 'ปิด'}</span></p>
                 <p>หลักการ assign: <span className="font-medium text-foreground">แยกผู้รับผิดชอบตามฝั่ง QC และ Lab</span></p>
               </CardContent>
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">คำร้องรอ assign</CardTitle>
@@ -770,17 +812,6 @@ export default function PetitionAssignPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-                  <Hourglass className="h-3.5 w-3.5 text-amber-500" />
-                  Phase 2 (หลังอบ)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-600">{phase2Petitions.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">เจ้าหน้าที่ที่เลือกได้</CardTitle>
               </CardHeader>
               <CardContent>
@@ -799,24 +830,7 @@ export default function PetitionAssignPage() {
             </div>
           )}
 
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
-            <TabsList className="w-full sm:w-auto">
-              <TabsTrigger value="normal" className="gap-2">
-                <ClipboardCheck className="h-4 w-4" />
-                คำร้องปกติ
-                <Badge variant="gray-soft" className="ml-1 font-normal">
-                  {normalPetitions.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="phase2" className="gap-2">
-                <FlaskConical className="h-4 w-4" />
-                หลังอบเสร็จ (เลือกทำ)
-                <Badge variant="yellow-soft" className="ml-1 font-normal">
-                  {phase2Petitions.length}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
-
+          <div>
             <div className="hidden mt-3 rounded-[10px] border border-border bg-card p-3 text-card-foreground">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -829,6 +843,33 @@ export default function PetitionAssignPage() {
               </div>
             </div>
 
+            {/* คำร้องที่ส่งตัวอย่างแล้ว แต่ Lab ยังไม่รับ: พักไว้ด้านบน เพราะยังลากมอบหมายไม่ได้ */}
+            {awaitingReceive.length > 0 && (
+              <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
+                <div className="mb-3 flex items-center gap-2">
+                  <PackageOpen className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">รอรับตัวอย่าง</span>
+                  <Badge variant="gray-soft" className="font-normal">{awaitingReceive.length}</Badge>
+                  <span className="ml-auto text-xs text-muted-foreground">รับตัวอย่างก่อน แล้วการ์ดจะย้ายลงไปงานรอมอบหมาย</span>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                  {awaitingReceive.map((petition) => (
+                    <PetitionCard
+                      key={petition._id}
+                      petition={petition}
+                      groups={groupsByPetition.get(petition._id) ?? []}
+                      methodByCode={methodByCode}
+                      dragging={false}
+                      canDragRole={false}
+                      onDragStart={() => {}}
+                      onDragEnd={() => {}}
+                      onClick={() => navigate(`/petition/${petition._id}`)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
               <PageToolbar
                 search={{
@@ -838,13 +879,17 @@ export default function PetitionAssignPage() {
                 }}
                 right={
                   <div className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-                    คำร้องที่ยังไม่รับตัวอย่างจะลากเพื่อ assign ไม่ได้
+                    {canManage
+                      ? 'คำร้องที่ยังไม่รับตัวอย่างจะลากเพื่อ assign ไม่ได้'
+                      : canClaim
+                        ? 'กดรับงานได้เฉพาะคำร้องที่ยังไม่มีผู้รับ'
+                        : 'โหมดดูอย่างเดียว'}
                   </div>
                 }
               />
             </div>
 
-            <TabsContent value="normal" className="mt-3">
+            <div className="mt-3">
               <AssignBoard
                 petitions={visiblePetitions}
                 loading={boardLoading}
@@ -852,31 +897,15 @@ export default function PetitionAssignPage() {
                 groupsByPetition={groupsByPetition}
                 methodByCode={methodByCode}
                 machineById={machineById}
+                canAssign={canManage}
+                canClaim={canClaim}
                 onDropPetition={(petitionId, employeeId) => setDropTarget({ petitionId, employeeId })}
+                onClaimPetition={(petitionId) => setDropTarget({ petitionId, employeeId: selfEmployee?.employeeId ?? '', claim: true })}
                 onPetitionClick={(id) => navigate(`/petition/${id}`)}
                 emptyPoolText="ไม่มีคำร้องที่รอ assign"
               />
-            </TabsContent>
-
-            <TabsContent value="phase2" className="mt-3 space-y-3">
-              <div className="rounded-[10px] border border-amber-200 bg-amber-50/40 p-3 text-xs text-amber-800">
-                <Hourglass className="inline h-3.5 w-3.5 mr-1" />
-                คำร้องที่ผ่าน Phase 1 แล้ว และ trigger (เช่น timer อบ) ครบกำหนด — ลากไปวางบนเจ้าหน้าที่เพื่อทำ Phase 2 ต่อ
-              </div>
-              <AssignBoard
-                petitions={visiblePetitions}
-                loading={boardLoading}
-                employees={employees}
-                groupsByPetition={groupsByPetition}
-                methodByCode={methodByCode}
-                machineById={machineById}
-                onDropPetition={(petitionId, employeeId) => setDropTarget({ petitionId, employeeId })}
-                onPetitionClick={(id) => navigate(`/petition/${id}`)}
-                emptyPoolText="ยังไม่มีคำร้อง Phase 2 ที่รอเลือก"
-                showPhase2Badge
-              />
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
         </div>
 
         <MachineAssignDialog
@@ -891,6 +920,7 @@ export default function PetitionAssignPage() {
           isGroupSatisfied={isGroupSatisfied}
           machineSuggestions={machineSuggestions}
           saving={!!dropPetition && savingId === dropPetition._id}
+          confirmLabel={dropTarget?.claim ? 'รับงาน' : undefined}
           onConfirm={confirmDropAssign}
           onClose={() => setDropTarget(null)}
         />
@@ -909,10 +939,12 @@ interface AssignBoardProps {
   groupsByPetition: Map<string, SubstanceGroup[]>;
   methodByCode: Map<string, MethodDoc>;
   machineById: Map<string, MachineItem>;
+  canAssign: boolean;
+  canClaim: boolean;
   onDropPetition: (petitionId: string, employeeId: string) => void;
+  onClaimPetition: (petitionId: string) => void;
   onPetitionClick: (id: string) => void;
   emptyPoolText: string;
-  showPhase2Badge?: boolean;
 }
 
 interface BoardColumn {
@@ -928,15 +960,34 @@ function AssignBoard({
   groupsByPetition,
   methodByCode,
   machineById,
+  canAssign,
+  canClaim,
   onDropPetition,
+  onClaimPetition,
   onPetitionClick,
   emptyPoolText,
-  showPhase2Badge,
 }: AssignBoardProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overEmployee, setOverEmployee] = useState<string | null>(null);
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
+  // แยกคำร้องที่ Lab ยังไม่รับตัวอย่าง ("ส่งตัวอย่างแล้ว") ไปพักไว้ เพราะยังลากมอบหมายไม่ได้
+  const readyToAssign = useMemo(() => unassigned.filter((p) => !!labReceivedAt(p)), [unassigned]);
+
+  const renderPoolCard = (petition: Petition) => (
+    <PetitionCard
+      key={petition._id}
+      petition={petition}
+      groups={groupsByPetition.get(petition._id) ?? []}
+      methodByCode={methodByCode}
+      dragging={draggingId === petition._id}
+      canDragRole={canAssign}
+      onClaim={canClaim ? () => onClaimPetition(petition._id) : undefined}
+      onDragStart={() => setDraggingId(petition._id)}
+      onDragEnd={() => setDraggingId(null)}
+      onClick={() => onPetitionClick(petition._id)}
+    />
+  );
 
   // employeeId → assigned petitions
   const assignedByEmployee = useMemo(() => {
@@ -990,28 +1041,16 @@ function AssignBoard({
           <Inbox className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">งานรอมอบหมาย</span>
           <Badge variant="gray-soft" className="ml-auto font-normal">
-            {unassigned.length}
+            {readyToAssign.length}
           </Badge>
         </div>
         <div className="max-h-[72vh] space-y-2 overflow-y-auto pr-0.5">
-          {unassigned.length === 0 ? (
+          {readyToAssign.length === 0 ? (
             <div className="rounded-md border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
               {emptyPoolText}
             </div>
           ) : (
-            unassigned.map((petition) => (
-              <PetitionCard
-                key={petition._id}
-                petition={petition}
-                groups={groupsByPetition.get(petition._id) ?? []}
-                methodByCode={methodByCode}
-                dragging={draggingId === petition._id}
-                onDragStart={() => setDraggingId(petition._id)}
-                onDragEnd={() => setDraggingId(null)}
-                onClick={() => onPetitionClick(petition._id)}
-                showPhase2Badge={showPhase2Badge}
-              />
-            ))
+            readyToAssign.map(renderPoolCard)
           )}
         </div>
       </div>
@@ -1030,6 +1069,7 @@ function AssignBoard({
               <div
                 key={col.employeeId}
                 onDragOver={(e) => {
+                  if (!canAssign) return;
                   e.preventDefault();
                   e.dataTransfer.dropEffect = 'move';
                   if (overEmployee !== col.employeeId) setOverEmployee(col.employeeId);
@@ -1041,6 +1081,7 @@ function AssignBoard({
                   }
                 }}
                 onDrop={(e) => {
+                  if (!canAssign) return;
                   e.preventDefault();
                   handleDrop(col.employeeId);
                 }}
@@ -1072,7 +1113,7 @@ function AssignBoard({
                         isOver ? 'border-primary/50 text-primary' : 'border-border text-muted-foreground',
                       )}
                     >
-                      ลากงานมาวางที่นี่
+                      {canAssign ? 'ลากงานมาวางที่นี่' : 'ยังไม่มีงาน'}
                     </div>
                   ) : (
                     assigned.map((petition) => (
@@ -1083,10 +1124,10 @@ function AssignBoard({
                         methodByCode={methodByCode}
                         machineById={machineById}
                         dragging={draggingId === petition._id}
+                        canDragRole={canAssign}
                         onDragStart={() => setDraggingId(petition._id)}
                         onDragEnd={() => setDraggingId(null)}
                         onClick={() => onPetitionClick(petition._id)}
-                        showPhase2Badge={showPhase2Badge}
                         assigned
                       />
                     ))
@@ -1107,10 +1148,13 @@ interface PetitionCardProps {
   methodByCode: Map<string, MethodDoc>;
   machineById?: Map<string, MachineItem>;
   dragging: boolean;
+  /** หัวหน้า Lab / admin เท่านั้นที่ลากเพื่อมอบหมายได้ */
+  canDragRole: boolean;
+  /** มีค่าเมื่ออยู่ในช่วงมอบหมายอิสระ — แสดงปุ่ม "รับงาน" */
+  onClaim?: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onClick: () => void;
-  showPhase2Badge?: boolean;
   assigned?: boolean;
 }
 
@@ -1119,10 +1163,11 @@ function PetitionCard({
   groups,
   methodByCode,
   dragging,
+  canDragRole,
+  onClaim,
   onDragStart,
   onDragEnd,
   onClick,
-  showPhase2Badge,
   assigned,
 }: PetitionCardProps) {
   const statusCfg = labAssignBoardStatusBadge(petition, assigned);
@@ -1131,7 +1176,8 @@ function PetitionCard({
     .map((m) => m.code)
     .filter(Boolean) as string[];
   const blocked = groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode));
-  const canDrag = !!labReceivedAt(petition);
+  const received = !!labReceivedAt(petition);
+  const canDrag = canDragRole && received;
 
   return (
     <Card
@@ -1151,7 +1197,9 @@ function PetitionCard({
       )}
     >
       <div className="flex items-start gap-1.5">
-        <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+        {canDragRole && (
+          <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <button
@@ -1202,11 +1250,6 @@ function PetitionCard({
       )}
 
       <div className="mt-1.5 flex flex-wrap items-center gap-1 pl-[22px]">
-        {showPhase2Badge && (
-          <Badge variant="yellow-soft" className="font-normal">
-            Phase 2
-          </Badge>
-        )}
         {assigned && machineCodes.length > 0 && (
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <Cog className="h-3 w-3 text-muted-foreground" />
@@ -1217,6 +1260,21 @@ function PetitionCard({
           <Badge variant="red-soft" className="font-normal">
             ยังตั้ง method ไม่ครบ
           </Badge>
+        )}
+        {onClaim && !assigned && received && !blocked && (
+          <Button
+            size="sm"
+            variant="primary"
+            className="ml-auto h-7 gap-1 px-2 text-xs"
+            draggable={false}
+            onClick={(e) => {
+              e.stopPropagation();
+              onClaim();
+            }}
+          >
+            <Hand className="h-3.5 w-3.5" />
+            รับงาน
+          </Button>
         )}
       </div>
     </Card>
@@ -1239,6 +1297,8 @@ interface MachineAssignDialogProps {
   isGroupSatisfied: (petition: Petition, group: SubstanceGroup) => boolean;
   machineSuggestions: Record<string, MachineSuggestion[]>;
   saving: boolean;
+  /** ข้อความปุ่มยืนยัน — ใช้ "รับงาน" ตอนเจ้าหน้าที่รับงานเอง */
+  confirmLabel?: string;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -1255,6 +1315,7 @@ function MachineAssignDialog({
   isGroupSatisfied,
   machineSuggestions,
   saving,
+  confirmLabel,
   onConfirm,
   onClose,
 }: MachineAssignDialogProps) {
@@ -1419,7 +1480,7 @@ function MachineAssignDialog({
                     <span className="inline-block">
                       <Button variant="primary" disabled>
                         <ClipboardCheck className="h-4 w-4" />
-                        {isReassign ? 'บันทึก' : 'Assign'}
+                        {confirmLabel ?? (isReassign ? 'บันทึก' : 'Assign')}
                       </Button>
                     </span>
                   </TooltipTrigger>
@@ -1428,7 +1489,7 @@ function MachineAssignDialog({
               ) : (
                 <Button variant="primary" disabled={confirmDisabled} onClick={onConfirm}>
                   <ClipboardCheck className="h-4 w-4" />
-                  {saving ? 'กำลังบันทึก...' : isReassign ? 'บันทึก' : 'Assign'}
+                  {saving ? 'กำลังบันทึก...' : confirmLabel ?? (isReassign ? 'บันทึก' : 'Assign')}
                 </Button>
               )}
             </DialogFooter>

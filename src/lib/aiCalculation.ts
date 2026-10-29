@@ -85,6 +85,15 @@ export function aiSubstanceFromKey(key: string) {
   return keySubstance(key);
 }
 
+// ช่อง Control Sample ของ parameter %AI (ผู้ใช้กรอกในหน้าการทดสอบ Lab; ใบคำนวณอ่านไปแสดง)
+export const CONTROL_SAMPLE_LABEL = 'Control Sample';
+export const CONTROL_LOW_LABEL = 'Control ช่วงต่ำสุด';
+export const CONTROL_HIGH_LABEL = 'Control ช่วงสูงสุด';
+export const CONTROL_LABELS = new Set<string>([CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL]);
+export function isControlSampleLabel(label: string) {
+  return CONTROL_LABELS.has(label.trim());
+}
+
 export function calculatedAiFieldKind(label: string): keyof AiCalculationResult | null {
   const normalized = label.trim().toLowerCase();
   if (/^%?ai(?:\s*[-—:]|$)|%ai\s*(result|ผลลัพธ์)/i.test(normalized)) return 'ai';
@@ -106,6 +115,7 @@ export function formatCalculatedAi(value: number | null) {
 export function aiGridClass(label: string) {
   const kind = calculatedAiFieldKind(label);
   if (kind === 'ai') return 'sm:col-span-6';
+  if (isControlSampleLabel(label)) return 'sm:col-span-2';
   if (kind === 'areaAverage' || kind === 'areaRsd' || kind === 'sampleAverage' || kind === 'sampleRsd') return 'sm:col-span-3';
   if (/^(area\s*inj\.?|%\s*sample)/i.test(label.trim())) return 'sm:col-span-2';
   return '';

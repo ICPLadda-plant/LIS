@@ -1,7 +1,7 @@
 import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
-import { customerCodeFromDepartment } from '@/lib/customerCode';
-import { shouldSendItemToLab } from '@/lib/petitionRouting';
+import { customerCodeForPetition } from '@/lib/customerCode';
+import { pickQcLabSideItems, shouldSendItemToLab } from '@/lib/petitionRouting';
 import type { Petition, PetitionItem, QCTestResult } from '@/types/petition.types';
 import type { LabRequest } from '@/types/labRequest.types';
 import { resolveSpecificGravity, type SgParameter } from '@/lib/formSpecificGravity';
@@ -60,7 +60,7 @@ function toArray<T extends string>(v: T | T[] | null | undefined): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
-function PageOne({ lr, submissionNo }: { lr: LabRequest; submissionNo: string }) {
+function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissionNo: string; customerCode: string }) {
   const sa = lr.serviceAgreement;
   const lar = lr.labAgreementReview;
   const createdDate = splitBuddhist(lr.createdAt);
@@ -84,14 +84,14 @@ function PageOne({ lr, submissionNo }: { lr: LabRequest; submissionNo: string })
           <b>เรื่อง: การทบทวนข้อตกลงการบริการทดสอบ</b>
         </div>
         <div className="pr-p1-meta-row">
-          <b>อ้างอิงใบขอรับบริการเลขที่</b>{' '}
+          <b>อ้างอิงใบขอรับบริการเลขที่ TA</b>{' '}
           <span className="pr-line pr-line-md">{submissionNo}</span>
         </div>
         <div className="pr-p1-meta-row">
           <b>รหัสลูกค้า</b>{' '}
-          <span className="pr-line pr-line-sm">{customerCodeFromDepartment(requester?.department)}</span>
+          <span className="pr-line pr-line-sm">{customerCode}</span>
           <span> / </span>
-          <span className="pr-line pr-line-xs">{createdDate.y}</span>
+          <span className="pr-line pr-line-xs" />
         </div>
 
         <div className="pr-p1-notify">
@@ -352,9 +352,12 @@ function PageOne({ lr, submissionNo }: { lr: LabRequest; submissionNo: string })
   );
 }
 
-function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }: { lr: LabRequest; petition: Petition; items: PetitionItem[]; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown> }) {
-  const receivedDateTime = petition.receivedAt ? new Date(petition.receivedAt) : null;
-  const receivedTime = receivedDateTime
+type LabTestRow = { testItem: string; method: string };
+
+function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, labTestsBySeq = {} }: { lr: LabRequest; petition: Petition; items: PetitionItem[]; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown>; labTestsBySeq?: Record<number, LabTestRow[]> }) {
+  const sampleReceivedAt = petition.labReceivedAt || null;
+  const receivedDateTime = sampleReceivedAt ? new Date(sampleReceivedAt) : null;
+  const receivedTime = receivedDateTime && !Number.isNaN(receivedDateTime.getTime())
     ? `${String(receivedDateTime.getHours()).padStart(2, '0')}.${String(receivedDateTime.getMinutes()).padStart(2, '0')} น.`
     : '';
   const td = new Set(lr.testDelivery ?? []);
@@ -383,7 +386,7 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
               </div>
               <div className="pr-fill-row">
                 <span>วันที่รับตัวอย่าง :</span>
-                <span className="pr-line-fill">{buddhistShort(petition.receivedAt)}</span>
+                <span className="pr-line-fill">{buddhistShort(sampleReceivedAt)}</span>
               </div>
               <div className="pr-fill-row">
                 <span>เวลา :</span>
@@ -477,8 +480,7 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
             <col style={{ width: '5%' }} />
             <col style={{ width: '6.5%' }} />
             <col style={{ width: '6.5%' }} />
-            <col style={{ width: '12%' }} />
-            <col style={{ width: '7.5%' }} />
+            <col style={{ width: '19.5%' }} />
             <col style={{ width: '4.5%' }} />
             <col style={{ width: '3.25%' }} />
             <col style={{ width: '3.25%' }} />
@@ -495,7 +497,6 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
               <th rowSpan={3}>จำนวนหน่วยบรรจุ</th>
               <th rowSpan={3}>หน่วยทดสอบ</th>
               <th rowSpan={3}>รายการทดสอบ</th>
-              <th rowSpan={3}>หมายเหตุ</th>
               <th colSpan={4} className="pr-officer-head">สำหรับเจ้าหน้าที่</th>
             </tr>
             <tr>
@@ -521,21 +522,25 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {} }
                 <td>{item.testUnit ?? ''}</td>
                 <td>
                   {item.testItems ?? ''}
+                  {(labTestsBySeq[item.seq] ?? []).filter((test, testIndex, all) => all.findIndex((other) => (other.method || other.testItem) === (test.method || test.testItem)) === testIndex).map((test, testIndex) => (
+                    <div key={`lab-test-${testIndex}`} className="pr-note">
+                      {test.method && test.method !== '-' ? test.method.replace(/\s*\n\s*/g, ' ') : test.testItem}
+                    </div>
+                  ))}
                   {Object.entries(requestValues).filter(([key, value]) => !key.startsWith('ค่าถพ.\u0000') && key.endsWith(`\u0000${item.batchNo}\u0000${item.sampleName}`) && value !== '').map(([key, value]) => <div key={key} className="pr-note">{key.split('\u0000')[0]}: {String(value)}</div>)}
                 </td>
-                <td>{item.note ?? ''}</td>
                 <td>{item.sampleId ?? ''}</td>
                 <td className="pr-center">{item.condition === 'normal' ? '✓' : ''}</td>
                 <td className="pr-center">{item.condition === 'defective' ? '✓' : ''}</td>
                 <td />
               </tr>
             )) : (
-              <tr><td colSpan={14} className="pr-center">ไม่พบรายการตัวอย่างที่อ้างอิง</td></tr>
+              <tr><td colSpan={13} className="pr-center">ไม่พบรายการตัวอย่างที่อ้างอิง</td></tr>
             )}
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={11} className="pr-officer-filler" />
+              <td colSpan={10} className="pr-officer-filler" />
               <td colSpan={2} className="pr-center pr-officer-sum">ราคา</td>
               <td />
             </tr>
@@ -592,10 +597,25 @@ interface Props {
   qcResults?: QCTestResult[];
   sgParam?: SgParameter | null;
   requestValues?: Record<string, unknown>;
+  /** หน้าใบรายงานผล Lab (เรียงตาม petition.items) ใช้เติมรายการทดสอบ/วิธีทดสอบ */
+  labReportPages?: Array<{ rows: LabTestRow[] }>;
 }
 
-export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {} }: Props) {
-  const labItems = petition.items.filter((it) => shouldSendItemToLab(it));
+export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [] }: Props) {
+  const labTestsBySeq: Record<number, LabTestRow[]> = {};
+  const labTestsBySample = new Map<string, LabTestRow[]>();
+  const sampleKey = (item: PetitionItem) => `${String(item.batchNo ?? '').trim()}|${item.sampleName ?? ''}`;
+  (petition.items ?? []).forEach((item, index) => {
+    const rows = labReportPages[index]?.rows ?? [];
+    if (!rows.length) return;
+    labTestsBySeq[item.seq] = rows;
+    if (!labTestsBySample.has(sampleKey(item))) labTestsBySample.set(sampleKey(item), rows);
+  });
+  // ตัวอย่างเดียวกันที่กรอกแยกรายการ (QC + LAB) ใช้รายการทดสอบชุดเดียวกัน
+  (petition.items ?? []).forEach((item) => {
+    if (!labTestsBySeq[item.seq] && labTestsBySample.has(sampleKey(item))) labTestsBySeq[item.seq] = labTestsBySample.get(sampleKey(item))!;
+  });
+  const labItems = pickQcLabSideItems(petition, petition.items.filter((it) => shouldSendItemToLab(it)), 'lab');
   const itemsToShow = labItems.length > 0 ? labItems : petition.items.filter((it) => it.seq === labRequest.sampleSeq);
   // เลขที่ใบนำส่งใช้ค่าเดียวทั้งใบ (default = เลขคำขอ) — ดึงจากรายการที่ใบนี้อ้างถึง
   const submissionNo = itemsToShow[0]?.submissionNo ?? petition.items[0]?.submissionNo ?? '';
@@ -603,8 +623,12 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
     <>
       <style>{PRINT_CSS}</style>
       <div className="pr-root">
-        <PageOne lr={labRequest} submissionNo={submissionNo} />
-        <PageTwo lr={labRequest} petition={petition} items={itemsToShow} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} />
+        <PageOne
+          lr={labRequest}
+          submissionNo={submissionNo}
+          customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
+        />
+        <PageTwo lr={labRequest} petition={petition} items={itemsToShow} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
       </div>
     </>
   );

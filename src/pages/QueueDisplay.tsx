@@ -51,7 +51,19 @@ const NEW_SAMPLE_SOUND_URL = `${import.meta.env.BASE_URL}sound/new.mp3`;
 const petitionHasLabItems = (petition: Petition) =>
   petition.items.some((item) => shouldSendItemToLab(item));
 
+// เวลาที่ฝั่งของบอร์ดนี้ "ออกผล" แล้ว: Lab = ออกผล Lab (labApprovedAt), QC = ยืนยันผล QC (qcCompletedAt)
+// ถ้า Lab ถูกขอตรวจซ้ำหลังออกผล ให้ถือว่ายังไม่ออกผล
+const sideResultAt = (petition: Petition, mode: QueueMode): string | null => {
+  if (mode === "qc") return petition.qcCompletedAt ?? null;
+  const approvedAt = petition.labApprovedAt;
+  if (!approvedAt) return null;
+  const recheckAt = petition.labRecheckRequestedAt;
+  if (recheckAt && new Date(approvedAt).getTime() < new Date(recheckAt).getTime()) return null;
+  return approvedAt;
+};
+
 const queueStatusFor = (petition: Petition, mode: QueueMode): PetitionStatus => {
+  if (sideResultAt(petition, mode)) return "success";
   if (mode === "qc" && petition.status === "deliveringQC" && isVisibleInQcTestingQueue(petition)) {
     return "inProgress";
   }
@@ -129,12 +141,12 @@ const QUEUE_STATUS_QUERIES: Record<QueueMode, Record<QueueGroup["id"], string>> 
   lab: {
     new: "sampleSent",
     progress: "pendingReview,inProgress",
-    done: "success",
+    done: "deliveringQC,success,approved",
   },
   qc: {
     new: "sampleSent",
     progress: "pendingReview,inProgress,deliveringQC",
-    done: "success",
+    done: "success,approved",
   },
 };
 
@@ -293,16 +305,31 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
     alertAudioRef.current = audio;
 
     try {
-      audio.muted = true;
+      // ทดสอบแบบไม่ mute แต่ปิดความดัง เพราะเบราว์เซอร์ยอมให้เล่นแบบ mute เสมอ
+      // ถ้าใช้ muted จะคิดว่าปลดล็อกแล้วทั้งที่เสียงจริงยังถูกบล็อก
+      audio.muted = false;
+      audio.volume = 0;
       await audio.play();
       audio.pause();
       audio.currentTime = 0;
-      audio.muted = false;
+      audio.volume = 1;
       setSoundReady(true);
     } catch {
+      audio.volume = 1;
       setSoundReady(false);
     }
   }, []);
+
+  // เปิดเสียงอัตโนมัติ: ลองทันทีตอนโหลด (ผ่านถ้าเว็บได้รับอนุญาตเล่นเสียง)
+  // ถ้ายังถูกบล็อก จะปลดล็อกเมื่อมีการคลิก/แตะ/กดคีย์ครั้งแรกที่ใดก็ได้บนหน้า
+  useEffect(() => {
+    if (soundReady) return;
+    void activateNotificationSound();
+    const unlock = () => void activateNotificationSound();
+    const events = ["pointerdown", "keydown", "touchstart"] as const;
+    events.forEach((name) => window.addEventListener(name, unlock, { capture: true }));
+    return () => events.forEach((name) => window.removeEventListener(name, unlock, { capture: true }));
+  }, [activateNotificationSound, soundReady]);
 
   const testNotificationSound = useCallback(async () => {
     // การกดปุ่มคือ user gesture จึงใช้ปลดล็อกเสียงอัตโนมัติไปพร้อมกัน
@@ -355,11 +382,10 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
       .filter((petition) => groupStatuses.includes(queueStatusFor(petition, mode)))
       .filter((petition) => (mode === "lab" ? petitionHasLabItems(petition) : true))
       .filter((petition) =>
-        // Only the "done" board resets per local day so finished samples don't
-        // pile up across days. Waiting / in-progress rows stay visible regardless
-        // of when they entered the queue.
+        // บอร์ด "เรียบร้อยแล้ว" แสดงเฉพาะงานที่ฝั่งนี้ออกผลในวันนี้ ไม่สนวันที่ส่งตัวอย่าง
+        // งานรอ/กำลังทำยังแสดงตามเดิมไม่ว่าเข้าคิวเมื่อไร
         queueStatusFor(petition, mode) === "success"
-          ? isSameLocalDay(petition.completedAt ?? petition.updatedAt, today)
+          ? isSameLocalDay(sideResultAt(petition, mode) ?? petition.completedAt ?? petition.updatedAt, today)
           : true,
       )
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());

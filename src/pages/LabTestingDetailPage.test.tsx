@@ -194,6 +194,9 @@ vi.mock("@/lib/api", async (importOriginal) => {
 });
 
 describe("LabTestingDetailPage", () => {
+  // ค่า ถพ. ที่ QC บันทึกแล้ว เพื่อให้ Lab กรอก %AI ได้
+  const savedDensity: QCTestResult = { petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: { "ค่าถพ.": "1.005" } } as QCTestResult;
+
   beforeEach(() => {
     mockNavigate.mockClear();
     mockState.activeFixtures = fixtures;
@@ -242,7 +245,7 @@ describe("LabTestingDetailPage", () => {
         ...fixtures.petition,
         items: [
           { ...fixtures.petition.items[0], labelQuantity: "100 ml" },
-          { ...fixtures.petition.items[0], seq: 2, labelQuantity: "5 g, 6 g", labelQuantities: ["5 g", "6 g"] },
+          { ...fixtures.petition.items[0], seq: 2, batchNo: "OTHER-BATCH-1", labelQuantity: "5 g, 6 g", labelQuantities: ["5 g", "6 g"] },
         ],
       },
     };
@@ -254,6 +257,23 @@ describe("LabTestingDetailPage", () => {
     expect(await screen.findAllByText("Area Inj.1")).toHaveLength(2);
   });
 
+  it("shows a sample sent to both QC and Lab once even when an old petition listed it twice", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          { ...fixtures.petition.items[0] },
+          { ...fixtures.petition.items[0], seq: 2 },
+        ],
+      },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findAllByText("Area Inj.1")).toHaveLength(1);
+  });
+
   it("expands a legacy %AI parameter into input, average, and RSD fields", async () => {
     render(<LabTestingDetailPage />);
 
@@ -263,6 +283,36 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("% Sample 3")).toBeInTheDocument();
     expect(screen.getByText("Area Average")).toBeInTheDocument();
     expect(screen.getByText("% Sample %RSD")).toBeInTheDocument();
+  });
+
+  it("lets Lab enter Control Sample and its acceptance range on %AI, saved with the result", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: fixtures.petition.items.map((item) => ({ ...item, testItems: "Active Ingredient, ค่า ถพ." })),
+      },
+      parameters: [
+        ...fixtures.parameters,
+        { _id: "density-param", name: "ค่า ถพ.", scope: "qc", shareWithLab: true, applyAll: true, multiEntry: true, valueFields: [{ label: "ค่าถพ.", type: "number" }] },
+      ],
+      results: [{ petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: {}, entries: [{ "ค่าถพ.::abamectin": 1.005 }] }],
+    };
+    render(<LabTestingDetailPage />);
+
+    const label = await screen.findByText("Control Sample");
+    expect(screen.getByText("Control ช่วงต่ำสุด")).toBeInTheDocument();
+    expect(screen.getByText("Control ช่วงสูงสุด")).toBeInTheDocument();
+
+    let box: HTMLElement | null = label.parentElement;
+    while (box && !box.querySelector("input")) box = box.parentElement;
+    const input = box!.querySelector("input")!;
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { value: "0.24949" } });
+
+    await waitFor(() => {
+      expect(mockSaveQCResult).toHaveBeenCalledWith(expect.objectContaining({ fieldLabel: "Control Sample", value: "0.24949" }));
+    }, { timeout: 2000 });
   });
 
   it("enables final save and persists calculated %AI with the substance key", async () => {
@@ -348,6 +398,7 @@ describe("LabTestingDetailPage", () => {
   it("opens saved Lab results read-only with edit and clear actions", async () => {
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: { ...fixtures.petition, labCompletedAt: "2026-07-13T03:00:00.000Z" },
     };
 
@@ -362,6 +413,7 @@ describe("LabTestingDetailPage", () => {
   it("unlocks saved Lab results while an edit is open", async () => {
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: {
         ...fixtures.petition,
         labCompletedAt: "2026-07-13T03:00:00.000Z",
@@ -416,6 +468,7 @@ describe("LabTestingDetailPage", () => {
   it("does not complete Lab while another routed item has no Lab parameter", async () => {
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: {
         ...fixtures.petition,
         items: [

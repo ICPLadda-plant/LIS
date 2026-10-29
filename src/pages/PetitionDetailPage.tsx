@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { petitionStatusBadge } from '@/lib/statusBadge';
+import { serviceLabRequestFor } from '@/lib/serviceLabRequest';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -269,6 +270,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
           const canEdit = data.status === 'deliveringQC' && isRequester;
           const canDelete = isAdmin || (data.status === 'deliveringQC' && isRequester);
           const hasLabRequests = (labRequests?.length ?? 0) > 0;
+          const serviceLabRequest = serviceLabRequestFor(data, labRequests);
           const isResultMode = mode === 'result';
 
           return (
@@ -324,7 +326,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                           พิมพ์ฉลาก
                         </Button>
                       )}
-                      {!isResultMode && hasLabRequests && (
+                      {!isResultMode && serviceLabRequest && (
                         <Button
                           variant="primary-outline"
                           size="sm"
@@ -549,9 +551,9 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
 
               </div>
 
-              {hasLabRequests && (
+              {serviceLabRequest && (
                 <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="service-request">
-                  <PetitionPrintTemplate labRequest={labRequests![0]} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} />
+                  <PetitionPrintTemplate labRequest={serviceLabRequest} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labReportPages={labReportPages} />
                 </PrintPreviewDialog>
               )}
               {data && (

@@ -23,7 +23,11 @@ export function canPrintPreReport(petition: PrintabilityInput): boolean {
   return petition.status !== 'approved';
 }
 
-/** ผลวิเคราะห์ Lab พิมพ์ได้เมื่อหัวหน้า QC ออก Final Result แล้ว และมีผล Lab ให้พิมพ์ */
+/**
+ * ผลวิเคราะห์ Lab พิมพ์ได้ทันทีเมื่อ Lab อนุมัติผลแล้ว ไม่ต้องรอหัวหน้า QC ออก Final Result
+ * ถ้า Lab แค่ออกผล (ยังไม่อนุมัติ) ต้องรอ Final Result ก่อน
+ */
 export function canPrintLabResult(petition: PrintabilityInput): boolean {
-  return petition.status === 'approved' && !!(petition.labCompletedAt || petition.labApprovedAt);
+  if (petition.labApprovedAt) return true;
+  return petition.status === 'approved' && !!petition.labCompletedAt;
 }

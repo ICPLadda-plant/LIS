@@ -6,7 +6,6 @@ import {
   fieldValueList,
   getEntryValues,
   isFieldAbnormal,
-  isLabelToleranceAbnormal,
   resolveConditionalOutput,
   resolveFieldStandard,
   resolveLabelTolerance,
@@ -184,9 +183,9 @@ export function buildApprovalGroups(
                 const valueLabel = unit.field.multiple ? `ค่าที่ ${vi + 1}` : "";
                 const labelParts = [unit.field.label, valueLabel, entryLabel].filter(Boolean);
                 const hiddenStandard = (unit as { hiddenStandard?: boolean }).hiddenStandard === true;
-                // label-% tolerance unit: 3-zone verdict. review+fail mark the row abnormal
-                // (draws head-QC attention) but stay approvable via the server abnormal-flags
-                // path; standardText carries the resolved range + a status note.
+                // label-% tolerance unit: 3-zone verdict. Only "fail" (outside เกณฑ์กรม) marks
+                // the row abnormal; "review" is still within เกณฑ์กรม so it shows as ปกติ
+                // with no extra status note.
                 let rowStandardText: string;
                 let rowAbnormal: boolean;
                 if (unit.labelTolerance) {
@@ -196,13 +195,9 @@ export function buildApprovalGroups(
                     multiline: true,
                     autoPassLabel: "ผ่านเกณฑ์ 25%",
                   });
-                  const statusNote = rv.status === "review"
-                    ? "รอหัวหน้าอนุมัติ"
-                    : rv.status === "fail"
-                      ? "เกินช่วงที่อนุมัติได้"
-                      : "";
+                  const statusNote = rv.status === "fail" ? "เกินช่วงที่อนุมัติได้" : "";
                   rowStandardText = [range, statusNote].filter(Boolean).join(" · ");
-                  rowAbnormal = isLabelToleranceAbnormal(unit.labelTolerance.std, unit.labelTolerance.rawSpec, raw);
+                  rowAbnormal = rv.status === "fail";
                 } else {
                   rowStandardText = hiddenStandard ? "" : (isOutputMode ? (outputRes?.text || (outputRes?.kind === "abnormal" ? "ตกเกณฑ์" : "")) : standardText);
                   rowAbnormal = hiddenStandard ? false : (isOutputMode ? outputRes?.kind === "abnormal" : isFieldAbnormal(effectiveField, raw));
@@ -222,7 +217,8 @@ export function buildApprovalGroups(
           });
           if (options?.includeResultOnlyFields) {
             Object.entries(entryValues).forEach(([key, raw]) => {
-              if (handledKeys.has(key) || key.endsWith("__note")) return;
+              // __note / __source are internal sibling fields (note text, provenance JSON), never result rows
+              if (handledKeys.has(key) || key.endsWith("__note") || key.endsWith("__source")) return;
               rows.push({
                 key: `${k}__extra__${key}__p${phase}__e${ei}`,
                 label: [key.replace("::", " — "), entryLabel].filter(Boolean).join(" · "),

@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
+const { normalizeQuantity } = require('../lib/stockQuantity');
 
 const VolumeSchema = new mongoose.Schema({
-  initial: { type: Number, default: 0 },
-  remaining: { type: Number, default: 0 },
+  initial: { type: Number, default: 0, set: normalizeQuantity },
+  remaining: { type: Number, default: 0, set: normalizeQuantity },
   unit: { type: String, enum: ['ml', 'mg', 'g'], default: 'mg' },
 }, { _id: false });
 

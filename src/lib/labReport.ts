@@ -2,6 +2,7 @@ import type { LabRequest } from "@/types/labRequest.types";
 import type { Petition, PetitionItem } from "@/types/petition.types";
 import type { ApprovalItemGroup } from "@/lib/qcApprovalRows";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
+import { pesticideTestMethod } from "@/lib/pesticideTestMethods";
 
 export interface LabReportRow {
   testItem: string;
@@ -84,7 +85,19 @@ function labReportCriteriaText(standardText: string): string {
   return numericParts.join(" · ");
 }
 
-function rowsForItem(group: ApprovalItemGroup | undefined): LabReportRow[] {
+const AI_CONTENT_PATTERN = /%\s*a\.?i\b|\bai\b|สารออกฤทธิ์|ปริมาณสาร/iu;
+
+// วิธีทดสอบตาม FM-QP-07-01-002: จับจากชื่อสารใน label ก่อน ถ้าเป็นแถวปริมาณสารออกฤทธิ์ค่อยใช้ชื่อสามัญของตัวอย่าง
+function methodForRow(label: string, parameterName: string, commonName?: string): string {
+  const fromLabel = pesticideTestMethod(label.split(" · ")[0]);
+  if (fromLabel) return fromLabel;
+  if (AI_CONTENT_PATTERN.test(label) || AI_CONTENT_PATTERN.test(parameterName)) {
+    return pesticideTestMethod(commonName) || DASH;
+  }
+  return DASH;
+}
+
+function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string): LabReportRow[] {
   if (!group) return [];
   const out: LabReportRow[] = [];
   group.params
@@ -96,7 +109,7 @@ function rowsForItem(group: ApprovalItemGroup | undefined): LabReportRow[] {
           testItem: `${r.label}${unit}`,
           result: r.value || DASH,
           criteria: r.standardText ? labReportCriteriaText(r.standardText) : DASH,
-          method: DASH,
+          method: methodForRow(r.label, p.parameterName, commonName || group.commonName),
         });
       });
     });
@@ -162,7 +175,7 @@ export function buildLabReportPages(
         reportedDate: reportedDate || DASH,
         condition: physicalDescription(group) || conditionText(item.condition),
       },
-      rows: rowsForItem(group),
+      rows: rowsForItem(group, item.commonName),
       analystName,
       labHeadName,
       remark: petition.conclusionNote || "",

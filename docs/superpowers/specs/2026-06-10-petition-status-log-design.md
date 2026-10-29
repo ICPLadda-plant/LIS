@@ -90,10 +90,10 @@ Unknown/unmapped events are skipped (timeline shows milestones only, not every a
 ```jsonc
 // example: both sides received, the single assignee is a Lab analyst
 current: {
-  label: "QC รับแล้ว | Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน",
+  label: "QC รับแล้ว | เจ้าหน้าที่กำลังวิเคราะห์",
   tracks: {
     qc:  { side: "qc", label: "QC รับแล้ว" },
-    lab: { side: "lab", label: "Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน" }
+    lab: { side: "lab", label: "เจ้าหน้าที่กำลังวิเคราะห์" }
   }
 }
 ```
@@ -137,7 +137,7 @@ QC progress (the `filled`-based rows) is shown regardless of `assigneeSide`, sin
 |---|---|
 | `labDone` | *(track omitted)* |
 | `!labReceived` | `Lab รอรับ` |
-| `isAssignee && !started` | `Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน` |
+| `isAssignee && !started` | `เจ้าหน้าที่กำลังวิเคราะห์` |
 | `isAssignee && started` | `Lab {assignee.name} รับงานแล้ว · กำลังตรวจ` |
 | else (received, not this side's assignment) | `Lab รับแล้ว` |
 

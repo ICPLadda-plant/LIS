@@ -1,6 +1,7 @@
 // Derives a human-readable status_log ({ current, timeline }) for a petition.
 // Pure functions — NO DB access. The route loads inputs and calls buildStatusLog.
 const { defaultSendItemToLab, isLabBatchNo, isMandatoryLabProduct, isResearchAndDevelopmentDepartment, requiresQcTrack } = require('./petitionSubmissionRules');
+const { estimateTrackEnd, formatThai } = require('./petitionEstimate');
 
 // Lab batch rule (mirrors src/types/petition.types.ts isLabBatch):
 // last char of trimmed batchNo is '1' or '6'.
@@ -216,7 +217,7 @@ function buildLabTrack({ labReceived, isAssignee, assignee, started, labDone, la
   if (isAssignee) {
     return started
       ? { label: `Lab ${assignee.name} รับงานแล้ว · กำลังตรวจ` }
-      : { label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน' };
+      : { label: 'เจ้าหน้าที่กำลังวิเคราะห์' };
   }
   return { label: 'Lab รับแล้ว' };
 }
@@ -369,7 +370,7 @@ function isLabRecheckPending(petition) {
 }
 
 // Top-level: assemble { current, timeline } from route-loaded inputs.
-function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone) {
+function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone, now = new Date()) {
   const parameterById = new Map((parameters ?? []).map((param) => [String(param._id), param]));
   // QCTestResult stores entries from both screens.  Only QC-scoped entries may
   // drive the QC progress label; otherwise Lab %AI fields are incorrectly
@@ -408,6 +409,23 @@ function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone) {
     current.tracks.lab['%AI'] = petition.labReceivedAt && needsAi
       ? (ai == null ? 'รอ LAB ใส่ผล' : labRecheck ? 'ตรวจสอบใหม่' : String(ai))
       : '';
+  }
+  // เวลาที่คาดว่าจะได้รับผล ต่อฝั่ง · ฝั่งที่จบแล้วใช้เวลาจริง (qcCompletedAt / labApprovedAt)
+  const setExpected = (track, doneAt, estimate) => {
+    const at = doneAt ? new Date(doneAt) : estimate();
+    track.expectedAt = at ? at.toISOString() : null;
+    track.expectedText = at ? formatThai(at) : '';
+  };
+  if (current.tracks?.qc) {
+    const qcParams = (parameters ?? []).filter((p) => p.status === 'active' && (p.scope ?? 'qc') !== 'lab');
+    const qcTaskCount = (petition.items ?? [])
+      .reduce((n, item) => n + qcParams.filter((p) => qcParamAppliesToItem(p, item)).length, 0);
+    setExpected(current.tracks.qc, petition.qcCompletedAt,
+      () => estimateTrackEnd(petition, 'qc', { qcTaskCount, now }));
+  }
+  if (current.tracks?.lab) {
+    setExpected(current.tracks.lab, labRecheck ? null : petition.labApprovedAt,
+      () => estimateTrackEnd(petition, 'lab', { now }));
   }
   return { current, timeline, testResults };
 }
