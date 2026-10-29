@@ -318,6 +318,10 @@ export default function ItemsStep({
           const commonNameId = `common-name-${idx}`;
           const batchNoId = `batch-no-${idx}`;
           const packageUnitId = `package-unit-${idx}`;
+          // Master Item บางตัวไม่มีชื่อสามัญ/ขนาดบรรจุ — เปิดให้กรอกเองเฉพาะช่องที่ master ว่าง ไม่งั้นส่งคำขอไม่ได้
+          const pickedMaster = allowManualItemFields ? null : findMatchingPetitionMasterItem(masterItemOptions, it);
+          const commonNameLocked = !allowManualItemFields && (!pickedMaster || Boolean(pickedMaster.commonName?.trim()));
+          const packageUnitLocked = !allowManualItemFields && (!pickedMaster || Boolean(pickedMaster.packageUnit?.trim()));
           const labelQuantityId = `label-quantity-${idx}`;
           const sentQuantityInputs = labelQuantityInputs(splitQcLab ? { ...it, sampleQuantity: 2 } : it);
           const sampleTargets = splitQcLab ? qcLabSampleTargets(sentQuantityInputs) : null;
@@ -395,8 +399,8 @@ export default function ItemsStep({
                       id={commonNameId}
                       value={it.commonName}
                       onChange={(e) => setCommonName(idx, e.target.value)}
-                      disabled
-                      placeholder="เติมอัตโนมัติจาก Master Item"
+                      disabled={itemsReadOnly || commonNameLocked}
+                      placeholder={commonNameLocked ? 'เติมอัตโนมัติจาก Master Item' : 'Master Item ไม่มีชื่อสามัญ กรุณากรอก'}
                     />
                   )}
                 </div>
@@ -415,8 +419,8 @@ export default function ItemsStep({
                     id={packageUnitId}
                     value={it.packageUnit}
                     onChange={(e) => setItem(idx, { packageUnit: e.target.value })}
-                    disabled={itemsReadOnly || !allowManualItemFields}
-                    placeholder={allowManualItemFields ? 'กรอกขนาดบรรจุ หรือเลือกจาก Master Item' : 'เติมอัตโนมัติจาก Master Item'}
+                    disabled={itemsReadOnly || packageUnitLocked}
+                    placeholder={allowManualItemFields ? 'กรอกขนาดบรรจุ หรือเลือกจาก Master Item' : packageUnitLocked ? 'เติมอัตโนมัติจาก Master Item' : 'Master Item ไม่มีขนาดบรรจุ กรุณากรอก'}
                   />
                 </div>
                 <div>
@@ -527,8 +531,8 @@ function MasterItemPicker({
     if (!value.sampleName) return null;
     return options.find((option) => (
       option.sampleName === value.sampleName &&
-      (!value.commonName || option.commonName === value.commonName) &&
-      (!value.packageUnit || option.packageUnit === value.packageUnit)
+      (!value.commonName || !option.commonName?.trim() || option.commonName === value.commonName) &&
+      (!value.packageUnit || !option.packageUnit?.trim() || option.packageUnit === value.packageUnit)
     )) ?? null;
   }, [options, value.commonName, value.packageUnit, value.sampleName]);
 
@@ -636,8 +640,8 @@ function ManualActiveIngredientMasterPicker({
     if (!value.sampleName) return null;
     return options.find((option) => (
       option.sampleName === value.sampleName &&
-      (!value.commonName || option.commonName === value.commonName) &&
-      (!value.packageUnit || option.packageUnit === value.packageUnit)
+      (!value.commonName || !option.commonName?.trim() || option.commonName === value.commonName) &&
+      (!value.packageUnit || !option.packageUnit?.trim() || option.packageUnit === value.packageUnit)
     )) ?? null;
   }, [options, value.commonName, value.packageUnit, value.sampleName]);
 
