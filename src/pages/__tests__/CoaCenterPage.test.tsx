@@ -140,6 +140,7 @@ vi.mock("@/lib/api", () => ({
     submitCoaDocument: vi.fn().mockResolvedValue({}),
     approveCoaDocument: vi.fn().mockResolvedValue({}),
     rejectCoaDocument: vi.fn().mockResolvedValue({}),
+    deleteCoaDocument: vi.fn().mockResolvedValue({ ok: true }),
     getPrinterConfigs: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -797,5 +798,17 @@ describe("CoaCenterPage", () => {
     expect(screen.getByText("Customer D")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "พิมพ์ COA 00032026" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "บันทึกไฟล์ PDF COA 00032026" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "ลบ COA 00032026" })).toBeEnabled();
+  });
+
+  it("confirms before deleting an approved COA", async () => {
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    renderPage();
+    await screen.findByText("00012026");
+    fireEvent.click(screen.getByRole("button", { name: "สถานะ อนุมัติแล้ว" }));
+    fireEvent.click(await screen.findByRole("button", { name: "ลบ COA 00032026" }));
+    await waitFor(() => expect(api.deleteCoaDocument).toHaveBeenCalledWith("c4", {
+      _user: expect.objectContaining({ email: "qc-head@example.com" }),
+    }));
   });
 });

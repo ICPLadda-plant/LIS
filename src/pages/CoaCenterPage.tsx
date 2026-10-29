@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, Trash2, TrendingUp, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -596,6 +596,8 @@ export default function CoaCenterPage() {
     permissions: user?.permissions ?? [],
     position: user?.position,
   };
+  const canDeleteCoa = roles.some((role) => role.replace(/[\s-]+/g, "_").toLowerCase() === "qc_head")
+    || user?.permissions?.includes("coa.approve");
   const invalidateCoaDocuments = () => queryClient.invalidateQueries({ queryKey: ["coa", "documents"] });
   const syncCoaDocument = (doc: CoaDocument) => {
     queryClient.setQueryData<{ items: CoaDocument[] }>(["coa", "documents"], (current) => {
@@ -623,6 +625,10 @@ export default function CoaCenterPage() {
       setRejectDoc(null);
       setRejectReason("");
     },
+  });
+  const deleteCoa = useMutation({
+    mutationFn: (id: string) => api.deleteCoaDocument(id, { _user: actor }),
+    onSuccess: invalidateCoaDocuments,
   });
 
   function handleReject(doc: CoaDocument) {
@@ -726,6 +732,15 @@ export default function CoaCenterPage() {
       return;
     }
     approve.mutate(doc._id);
+  }
+
+  function handleDelete(doc: CoaDocument) {
+    if (!window.confirm(`ยืนยันลบ COA ${coaDisplayNo(doc)}? การลบนี้ย้อนกลับไม่ได้`)) return;
+    if (isDemoCoaDocument(doc)) {
+      setDemoCoa(null);
+      return;
+    }
+    deleteCoa.mutate(doc._id);
   }
 
   function handleSaveDemoEdit() {
@@ -1319,6 +1334,23 @@ export default function CoaCenterPage() {
                           <FileDown className="h-4 w-4" />
                           บันทึกไฟล์ PDF
                         </Button>
+                        {canDeleteCoa && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="mt-2 gap-2"
+                            disabled={deleteCoa.isPending}
+                            aria-label={`ลบ COA ${coaDisplayNo(doc)}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDelete(doc);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            ลบ
+                          </Button>
+                        )}
                       </td>
                     )}
                     {showApprovalActions && (

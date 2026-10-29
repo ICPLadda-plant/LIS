@@ -73,6 +73,36 @@ function stubActorLookup({
   };
 }
 
+test('DELETE /:id allows QC Head and removes the COA with its audit log', async () => {
+  const originals = {
+    findById: CoaDocument.findById,
+    deleteOne: CoaDocument.deleteOne,
+    auditDeleteMany: CoaAuditLog.deleteMany,
+  };
+  const restoreActor = stubActorLookup();
+  const deleted = [];
+  try {
+    CoaDocument.findById = async () => ({ _id: '507f1f77bcf86cd799439011' });
+    CoaAuditLog.deleteMany = async (filter) => { deleted.push(['audit', filter.coaId.toString()]); };
+    CoaDocument.deleteOne = async (filter) => { deleted.push(['document', filter._id.toString()]); };
+    const res = await invoke('/:id', 'delete', {
+      params: { id: '507f1f77bcf86cd799439011' },
+      body: { _user: { email: 'qc@example.com' } },
+    });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body, { ok: true });
+    assert.deepEqual(deleted, [
+      ['audit', '507f1f77bcf86cd799439011'],
+      ['document', '507f1f77bcf86cd799439011'],
+    ]);
+  } finally {
+    CoaDocument.findById = originals.findById;
+    CoaDocument.deleteOne = originals.deleteOne;
+    CoaAuditLog.deleteMany = originals.auditDeleteMany;
+    restoreActor();
+  }
+});
+
 test('ERP manual creation, editing, submit, approval and revision preserve entered results without Lab lookup', async () => {
   const originals = { fetch: global.fetch, create: CoaDocument.create, findById: CoaDocument.findById,
     auditCreate: CoaAuditLog.create, petitionFindById: Petition.findById };

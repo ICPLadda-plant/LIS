@@ -1027,6 +1027,8 @@ export const api = {
     request<CoaDocument>(`/coa-documents/${id}/revise`, { method: "POST", body: JSON.stringify(body) }),
   cancelCoaDocument: (id: string, body: { reason: string; _user?: unknown }) =>
     request<CoaDocument>(`/coa-documents/${id}/cancel`, { method: "POST", body: JSON.stringify(body) }),
+  deleteCoaDocument: (id: string, body: { _user?: unknown }) =>
+    request<{ ok: true }>(`/coa-documents/${id}`, { method: "DELETE", body: JSON.stringify(body) }),
   recordCoaPrintEvent: (id: string, body: { event: string; copies: number; outputMode: string; _user?: unknown }) =>
     request<CoaDocument>(`/coa-documents/${id}/print-event`, { method: "POST", body: JSON.stringify(body) }),
 
