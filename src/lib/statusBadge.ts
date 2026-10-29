@@ -76,7 +76,7 @@ export function petitionStatusSteps(petition: Petition): PetitionStatusStep[] {
     steps.push({ key: "assigned", label: "Assign", done: !!petition.assignedTo || closed });
   }
   if (hasQc) {
-    steps.push({ key: "qc", label: "QC กำลังวิเคราะห์", done: qcDone });
+    steps.push({ key: "qc", label: qcDone ? "บันทึกผลแล้ว" : "QC กำลังวิเคราะห์", done: qcDone });
   }
   if (hasLab) {
     steps.push(
