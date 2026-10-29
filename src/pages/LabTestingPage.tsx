@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FlaskConical, AlertTriangle, RotateCcw, QrCode } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen } from 'lucide-react';
+import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import AppLayout from '@/components/lis/AppLayout';
@@ -60,14 +60,33 @@ export default function LabTestingPage() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const canClaimRole = normalizeRoles(user).some((r) => ['admin', 'lab-head', 'lab-analyze'].includes(r));
-  const { data: freeAssign = null } = useQuery({
-    queryKey: ['lab-free-assign'],
-    queryFn: async () => (await api.get<LabFreeAssignState>('/petitions/lab-free-assign')).data.data,
-    enabled: canClaimRole,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-  });
+  const [freeAssign, setFreeAssign] = useState<LabFreeAssignState | null>(null);
+  useEffect(() => {
+    if (!canClaimRole) return;
+    let alive = true;
+    const load = () => {
+      Promise.resolve()
+        .then(() => api.get<LabFreeAssignState>('/petitions/lab-free-assign'))
+        .then((res) => { if (alive) setFreeAssign(res.data.data ?? null); })
+        .catch(() => { /* ปิดปุ่มไว้ถ้าโหลดสถานะไม่ได้ */ });
+    };
+    load();
+    const timer = window.setInterval(load, 30_000);
+    window.addEventListener('focus', load);
+    return () => { alive = false; window.clearInterval(timer); window.removeEventListener('focus', load); };
+  }, [canClaimRole]);
   const canReceiveAndClaim = canClaimRole && isFreeAssignActive(freeAssign, new Date());
+  const [scanCode, setScanCode] = useState<string | undefined>(undefined);
+  // ช่วงมอบหมายอิสระ: โชว์คำร้องที่ส่งตัวอย่างแล้วแต่ Lab ยังไม่รับ ให้ทุกคนกดรับได้
+  const { data: awaitingData, refresh: refreshAwaiting } = usePetitionList(
+    { page: 1, limit: 100, status: 'sampleSent,pendingReview', search, dept: dept || undefined },
+    { enabled: canReceiveAndClaim, refetchOnFocus: true, pollMs: 30_000 },
+  );
+  const awaitingReceive = canReceiveAndClaim
+    ? prioritizeUrgentPetitions((awaitingData?.items ?? []).filter(
+      (p) => isVisibleInAssignQueue(p) && !p.assignedTo && !labReceivedAt(p),
+    ))
+    : [];
 
   useEffect(() => {
     api.getParameters()
@@ -245,7 +264,7 @@ export default function LabTestingPage() {
           }
           description={`${petitions.length} รายการ`}
           actions={canReceiveAndClaim ? (
-            <Button variant="primary" onClick={() => setScanOpen(true)}>
+            <Button variant="primary" onClick={() => { setScanCode(undefined); setScanOpen(true); }}>
               <QrCode className="h-4 w-4" />
               รับตัวอย่าง
             </Button>
@@ -255,8 +274,9 @@ export default function LabTestingPage() {
         <LabScanAcceptModal
           open={scanOpen}
           claimOnReceive
+          initialCode={scanCode}
           onClose={() => setScanOpen(false)}
-          onAccepted={() => { refresh(); }}
+          onAccepted={() => { refresh(); refreshAwaiting(); }}
         />
 
         <PageToolbar
@@ -279,6 +299,43 @@ export default function LabTestingPage() {
             </Select>
           }
         />
+
+        {awaitingReceive.length > 0 && (
+          <section className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <PackageOpen className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-base font-semibold text-foreground">รอรับตัวอย่าง</h2>
+              <Badge variant="gray-soft" className="font-normal">{awaitingReceive.length}</Badge>
+              <span className="ml-auto text-xs text-muted-foreground">กดการ์ดเพื่อรับตัวอย่าง งานจะมอบหมายให้คุณทันที</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              {awaitingReceive.map((p) => (
+                <button
+                  key={p._id}
+                  type="button"
+                  onClick={() => { setScanCode(p.petitionNo); setScanOpen(true); }}
+                  className="rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate font-semibold text-primary">{p.petitionNo}</span>
+                    <UrgentBadge petition={p} />
+                    <Badge variant={labTrackStatusBadge(p).variant} className="ml-auto shrink-0">{labTrackStatusBadge(p).label}</Badge>
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {p.submittedBy?.name ?? '-'} · {petitionDepartmentLabel(p)}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {labItemsFor(p).map((it) => (
+                      <span key={it.seq} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-foreground">
+                        {it.commonName || it.sampleName} #{it.seq}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {parametersError && <p role="alert" className="text-sm text-destructive">โหลดพารามิเตอร์ Lab ไม่สำเร็จ กรุณารีเฟรชหน้า</p>}
 
