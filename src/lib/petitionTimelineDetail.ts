@@ -51,8 +51,9 @@ export type TimelineDetailHeader = {
   startAt: string;
   startKind: "received" | "submitted";
   endAt: string;
-  endKind: "actual" | "estimated" | "unreceived";
+  endKind: "actual" | "estimated" | "unreceived" | "waiting";
   overdue: boolean;
+  approximate?: boolean;
 };
 export type TimelineDetailItemTab = {
   seq: number;
@@ -145,6 +146,7 @@ function buildHeaderTiming(
     endAt: estimate.at,
     endKind: estimate.kind,
     overdue: estimate.kind === "estimated" && new Date(estimate.at).getTime() < now.getTime(),
+    approximate: !!estimate.approximate,
   };
 }
 
@@ -412,6 +414,7 @@ function activityLabel(entry: PetitionAuditLogEntry): string {
   switch (entry.event) {
     case "created": return "สร้างคำร้อง";
     case "received": return metadataString(entry.metadata, "side") === "lab" ? "Lab รับตัวอย่าง" : "QC รับตัวอย่าง";
+    case "accepted": return entry.note?.trim() || "เจ้าหน้าที่รับงาน";
     case "assigned": {
       const assignee = metadataString(entry.metadata, "assignee") ?? metadataObjectName(entry.metadata, "assignee");
       return `มอบหมาย${assignee ? `ให้ ${assignee}` : "งาน"}`;

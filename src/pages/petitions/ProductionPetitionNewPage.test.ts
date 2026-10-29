@@ -183,3 +183,20 @@ describe('R&D integration request rules', () => {
     });
   });
 });
+
+describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
+  it('merges two rows of the same batch into one item with two quantities', () => {
+    const items = makeInitialItemsFromQuery(new URLSearchParams(
+      'routeTargets=qc,lab&sampleName=Foo,Foo&batchNo=B1,B1&qty=50,200&unit=ml',
+    ));
+    expect(items).toHaveLength(1);
+    expect(items[0].labelQuantities).toEqual(['50 ml', '200 ml']);
+  });
+
+  it('keeps different batches as separate items', () => {
+    const items = makeInitialItemsFromQuery(new URLSearchParams(
+      'routeTargets=qc,lab&sampleName=Foo,Foo&batchNo=B1,B2&qty=50,200&unit=ml',
+    ));
+    expect(items.map((item) => item.batchNo)).toEqual(['B1', 'B2']);
+  });
+});

@@ -22,6 +22,7 @@ const LabRequest = require('../models/LabRequest');
 const StandardTime = require('../models/StandardTime');
 const LabFreeAssign = require('../models/LabFreeAssign');
 const { buildStatusLog, hasLabTrack, shouldSendItemToLab, isPetitionComplete } = require('../lib/petitionStatusLog');
+const { refreshLabExpected } = require('../lib/petitionEstimate');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { router: additionalSamplesRouter, changeAdditionalSampleState, currentUser, canTestSide } = require('./additionalSamples');
 const { normalizeRoles } = require('../lib/roles');
@@ -717,9 +718,16 @@ router.post('/status-petition-log', serializePetitionWrite(async (req, res) => {
       return res.status(409).json({ error: { message: 'คำร้องนี้ขอตรวจสอบซ้ำฝั่ง Lab ไม่ได้' } });
     }
     const actor = user.name || user.email;
+    petition.labRecheckRequestedAt = new Date();
+    petition.labRecheckRequestedBy = actor;
+    refreshLabExpected(petition);
     await Petition.updateOne(
       { _id: petition._id },
-      { $set: { labRecheckRequestedAt: new Date(), labRecheckRequestedBy: actor } },
+      { $set: {
+        labRecheckRequestedAt: petition.labRecheckRequestedAt,
+        labRecheckRequestedBy: actor,
+        ...(petition.labExpected ? { labExpected: petition.labExpected } : {}),
+      } },
     );
     const payload = {
       event: 'recheck',
@@ -954,6 +962,7 @@ router.post('/:id/lab-recheck', serializePetitionWrite(async (req, res) => {
     doc.labRecheckRequestedBy = actor;
     doc.labRecheckReason = reason;
     doc.labRecheckCount = round;
+    refreshLabExpected(doc);
     doc.status = 'pendingReview';
     doc.reviewHistory.push({ action: 'lab-recheck', reviewedBy: actor, reviewedAt: now, note: reason });
     await doc.save();
@@ -1245,13 +1254,16 @@ function labNotReceived(doc) {
 // ตั้ง assignedTo + เครื่องที่เลือก แล้วบันทึก audit — ใช้ร่วมกันทั้งหัวหน้ามอบหมายและเจ้าหน้าที่รับงานเอง
 async function applyLabAssignment(doc, assignee, machines, { actor, note, claimed = false }) {
   const prevStatus = doc.status;
+  const now = new Date();
   doc.assignedTo = {
     employeeId: String(assignee.employeeId).trim(),
     name: String(assignee.name).trim(),
     department: assignee.department ? String(assignee.department).trim() : undefined,
     position: assignee.position ? String(assignee.position).trim() : undefined,
-    assignedAt: new Date(),
+    assignedAt: now,
     assignedBy: actor ? String(actor).trim() : undefined,
+    // รับงานเอง (มอบหมายอิสระ) = รับงานทันที; หัวหน้า assign → รอเจ้าหน้าที่กดรับ
+    ...(claimed ? { acceptedAt: now, acceptedBy: String(assignee.name).trim() } : {}),
   };
 
   if (Array.isArray(machines)) {
@@ -1274,6 +1286,7 @@ async function applyLabAssignment(doc, assignee, machines, { actor, note, claime
     }
     doc.assignedMachines = cleaned;
   }
+  refreshLabExpected(doc);
 
   if (doc.status === 'pendingReview') doc.status = 'inProgress';
 
@@ -1342,6 +1355,74 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 }));
 
 // POST /api/petitions/:id/claim { machines } → เจ้าหน้าที่ Lab รับงานเองช่วงมอบหมายอิสระ
+// DELETE /api/petitions/:id/assign → หัวหน้า Lab ดึงงานที่เจ้าหน้าที่ยังไม่เริ่มกลับไปรอมอบหมาย
+router.delete('/:id/assign', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!isLabAssignHead(user)) return res.status(403).json({ error: { message: 'เฉพาะหัวหน้า Lab ที่ยกเลิกการมอบหมายได้' } });
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const assignee = doc.assignedTo;
+    if (!assignee?.employeeId) return res.json(doc);
+    if (assignee.acceptedAt || doc.labCompletedAt) {
+      return res.status(409).json({ error: { message: `${assignee.name} เริ่มงานแล้ว จึงย้ายกลับไปรอมอบหมายไม่ได้` } });
+    }
+    const actor = user.name || user.email;
+    doc.assignedTo = undefined;
+    doc.assignedMachines = [];
+    await doc.save();
+    logAudit(doc, {
+      event: 'unassigned',
+      fromStatus: doc.status,
+      toStatus: doc.status,
+      actor,
+      note: `ยกเลิกการมอบหมาย ${assignee.name} (ย้ายกลับไปรอมอบหมาย)`,
+      metadata: { side: 'lab', previousAssignee: assignee },
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
+// POST /api/petitions/:id/accept → เจ้าหน้าที่ที่ถูก assign กดรับงาน (เริ่มนับเวลาวิเคราะห์)
+router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const assignee = doc.assignedTo;
+    if (!assignee?.employeeId) return res.status(409).json({ error: { message: 'งานนี้ยังไม่ได้มอบหมาย' } });
+    if (['success', 'approved', 'rejected'].includes(doc.status)) return badRequest(res, 'งานนี้ปิดแล้ว');
+    if (assignee.acceptedAt) return res.json(doc);
+    const name = user.name || user.email;
+    const employeeId = user.employeeId || (!user._id ? String(req.body?.employeeId || '').trim() : '');
+    const isAssignee = (employeeId && employeeId === assignee.employeeId)
+      || (name && String(name).trim() === assignee.name);
+    if (!isAssignee && !isLabAssignHead(user)) {
+      return res.status(403).json({ error: { message: `งานนี้มอบหมายให้ ${assignee.name}` } });
+    }
+    doc.assignedTo.acceptedAt = new Date();
+    doc.assignedTo.acceptedBy = name;
+    doc.markModified('assignedTo');
+    refreshLabExpected(doc);
+    await doc.save();
+    logAudit(doc, {
+      event: 'accepted',
+      fromStatus: doc.status,
+      toStatus: doc.status,
+      actor: name,
+      note: `${assignee.name} รับงาน`,
+      metadata: { side: 'lab', assignee: doc.assignedTo },
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
   try {
     const user = await currentUser(req);
@@ -1381,7 +1462,7 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
 router.patch('/:id', serializePetitionWrite(async (req, res) => {
   try {
     const updates = { ...req.body };
-    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
+    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'labExpected', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
     if (Object.keys(updates).some(key => key.startsWith('$') || key.includes('.') || managedFields.includes(key))) return badRequest(res, 'ข้อมูลสถานะและรอบตัวอย่างต้องเปลี่ยนผ่านขั้นตอนที่กำหนด');
     let actor = updates.actor;
     delete updates.actor;

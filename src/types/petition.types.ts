@@ -133,6 +133,8 @@ export interface PetitionAssignee {
   position?: string;
   assignedAt?: string;
   assignedBy?: string;
+  acceptedAt?: string | null;
+  acceptedBy?: string;
 }
 
 export interface PetitionAssignedMachine {
@@ -158,6 +160,7 @@ export type PetitionAuditEvent =
   | 'updated'
   | 'deleted'
   | 'received'
+  | 'accepted'
   | 'resultEntered'
   | 'resultUpdated';
 
@@ -182,6 +185,7 @@ export const PETITION_AUDIT_EVENT_LABELS: Record<PetitionAuditEvent, string> = {
   updated: 'แก้ไขข้อมูล',
   deleted: 'ลบคำร้อง',
   received: 'รับตัวอย่าง',
+  accepted: 'เจ้าหน้าที่รับงาน',
   resultEntered: 'ใส่ค่า QC',
   resultUpdated: 'แก้ค่า QC',
 };
@@ -264,6 +268,14 @@ interface PetitionBase {
   labRecheckRequestedBy?: string;
   labRecheckReason?: string;
   labRecheckCount?: number;
+  /** เวลาที่คาดว่าจะได้รับผล Lab — บันทึกตอนกด "เริ่มงาน" / เปลี่ยนเครื่อง / Re-check */
+  labExpected?: {
+    startedAt: string;
+    at: string;
+    minutes: number;
+    estimated: boolean;
+    basis: Array<{ code: string; name?: string; minutes: number; source: "standard" | "default"; standardTimeId?: string; estimatedSource?: string }>;
+  } | null;
   /** มีค่าเมื่อผู้รับผิดชอบกด "แก้ไข" ผล Lab ที่บันทึกแล้วและยังไม่กดบันทึก/ยกเลิก */
   labEditSession?: { startedAt: string; startedBy?: string; reason: string } | null;
   labReturnNote?: string;

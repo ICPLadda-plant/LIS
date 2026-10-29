@@ -258,7 +258,7 @@ describe("PetitionTimelineDetailPage", () => {
   it("highlights overdue estimate status in large red text", async () => {
     renderDetail();
 
-    const overdue = await screen.findByText("เลยกำหนด");
+    const overdue = await screen.findByText("เกินกำหนด");
 
     expect(overdue).toHaveClass("text-base", "font-bold", "text-red-600");
   });
@@ -1026,7 +1026,7 @@ describe("estimateMetric", () => {
     expect(estimateMetric(header)).toEqual({
       label: "Estimate Time",
       value: formatDateTime(header.endAt),
-      hint: "เลยกำหนด",
+      hint: "เกินกำหนด",
       tone: "danger",
     });
   });
