@@ -120,11 +120,16 @@ function enteredFieldLabels(qcResults) {
 // labDone = every lab sampleId has a completed PhysicalResult (route-computed).
 function buildCurrent(petition, qc, fieldLabels, labDone) {
   const status = petition.status;
+  const labOnClose = (label, lab) => (hasLabTrack(petition)
+    ? { label, tracks: { lab: { side: 'lab', label: lab } } }
+    : { label });
 
   // --- terminal / pre-receive states: single label, no tracks ---
-  if (status === 'approved') return { label: 'หัวหน้า QC ออก Final Result — ปิดงาน' };
+  if (status === 'approved') return labOnClose('หัวหน้า QC ออก Final Result — ปิดงาน', 'ผลวิเคราะห์ออกแล้ว');
   if (status === 'rejected') return { label: 'ส่งกลับให้แก้ไข' };
-  if (status === 'success') return { label: 'เสร็จสิ้น — รอหัวหน้า QC ยืนยัน', side: 'qc' };
+  if (status === 'success') {
+    return { ...labOnClose('เสร็จสิ้น — รอหัวหน้า QC ยืนยัน', 'Lab ออกผลแล้วรอ QC ยืนยันผล'), side: 'qc' };
+  }
 
   const qcReceived = !!petition.qcReceivedAt;
   const labReceived = !!petition.labReceivedAt;
@@ -162,6 +167,10 @@ function buildCurrent(petition, qc, fieldLabels, labDone) {
   const labTrack = hasLabItem
     ? buildLabTrack({
       labReceived, isAssignee: assigneeSide === 'lab', assignee, started, labDone,
+      labCompleted: !!petition.labCompletedAt,
+      // งานเก่าก่อนมีปุ่มรับงาน: เริ่มตรวจ/บันทึกผลไปแล้วถือว่ารับงานแล้ว
+      accepted: !!assignee?.acceptedAt || !!petition.firstResultAt || !!petition.labCompletedAt
+        || (petition.reviewHistory ?? []).some((r) => r.action === 'startTesting'),
       labApproved: !!petition.labApprovedAt,
     })
     : null;
@@ -209,17 +218,14 @@ function buildQcTrack({ qcReceived, isAssignee, assignee, started, qc, fieldLabe
 
 // Lab side of `current`. Keep the track visible after Lab finishes so callers can
 // still identify Lab-owned results such as %AI while QC continues independently.
-// `isAssignee` = the single petition assignee belongs to Lab.
-function buildLabTrack({ labReceived, isAssignee, assignee, started, labDone, labApproved }) {
-  if (labApproved) return { label: 'Lab ออกผลแล้ว' };
-  if (labDone) return { label: 'Lab ตรวจครบ — รอออกผล' };
+// Flow: หัวหน้า Lab รับ → assign → เจ้าหน้าที่รับงาน (acceptedAt) → บันทึกผล → อนุมัติ → QC ยืนยัน
+function buildLabTrack({ labReceived, isAssignee, labDone, labCompleted, accepted, labApproved }) {
+  if (labApproved) return { label: 'Lab ออกผลแล้วรอ QC ยืนยันผล' };
+  if (labDone || labCompleted) return { label: 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ' };
   if (!labReceived) return { label: 'Lab รอรับ' };
-  if (isAssignee) {
-    return started
-      ? { label: `Lab ${assignee.name} รับงานแล้ว · กำลังตรวจ` }
-      : { label: 'เจ้าหน้าที่กำลังวิเคราะห์' };
-  }
-  return { label: 'Lab รับแล้ว' };
+  if (!isAssignee) return { label: 'Lab รับงานแล้ว รอ assign' };
+  if (!accepted) return { label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ' };
+  return { label: 'เจ้าหน้าที่กำลังดำเนินการวิเคราะห์' };
 }
 
 // Maps one audit-log row to a Thai milestone label, or null to skip it.
@@ -230,6 +236,8 @@ function timelineLabel(log, petition) {
       return 'ยื่นคำขอ';
     case 'received':
       return md.side === 'lab' ? 'Lab รับตัวอย่าง' : 'QC รับตัวอย่าง';
+    case 'accepted':
+      return log.note || 'เจ้าหน้าที่รับงาน';
     case 'assigned':
       return petition?.assignedTo?.name
         ? `มอบหมายให้ ${petition.assignedTo.name}`
@@ -268,7 +276,7 @@ function buildTimeline(auditLogs, petition) {
     if (!label) continue;
     const entry = { label, at: log.createdAt, actor: log.actor };
     if (log.event === 'received' && log.metadata?.side) entry.side = log.metadata.side;
-    if (log.event === 'recheck') entry.side = 'lab';
+    if (log.event === 'recheck' || log.event === 'accepted') entry.side = 'lab';
     if (log.event === 'assigned') {
       // assignment belongs to ONE side — derive from the assignee snapshot logged
       // at assign time (falls back to the petition's current assignee on old logs).

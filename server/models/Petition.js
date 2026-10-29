@@ -61,6 +61,9 @@ const PetitionAssigneeSchema = new mongoose.Schema(
     position: String,
     assignedAt: { type: Date, default: Date.now },
     assignedBy: String,
+    // เจ้าหน้าที่กดรับงานหลังหัวหน้า assign — เริ่มนับเวลาคาดว่าจะได้รับผลจากตรงนี้
+    acceptedAt: Date,
+    acceptedBy: String,
   },
   { _id: false },
 );

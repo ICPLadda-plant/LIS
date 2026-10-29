@@ -1245,13 +1245,16 @@ function labNotReceived(doc) {
 // ตั้ง assignedTo + เครื่องที่เลือก แล้วบันทึก audit — ใช้ร่วมกันทั้งหัวหน้ามอบหมายและเจ้าหน้าที่รับงานเอง
 async function applyLabAssignment(doc, assignee, machines, { actor, note, claimed = false }) {
   const prevStatus = doc.status;
+  const now = new Date();
   doc.assignedTo = {
     employeeId: String(assignee.employeeId).trim(),
     name: String(assignee.name).trim(),
     department: assignee.department ? String(assignee.department).trim() : undefined,
     position: assignee.position ? String(assignee.position).trim() : undefined,
-    assignedAt: new Date(),
+    assignedAt: now,
     assignedBy: actor ? String(actor).trim() : undefined,
+    // รับงานเอง (มอบหมายอิสระ) = รับงานทันที; หัวหน้า assign → รอเจ้าหน้าที่กดรับ
+    ...(claimed ? { acceptedAt: now, acceptedBy: String(assignee.name).trim() } : {}),
   };
 
   if (Array.isArray(machines)) {
@@ -1342,6 +1345,42 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 }));
 
 // POST /api/petitions/:id/claim { machines } → เจ้าหน้าที่ Lab รับงานเองช่วงมอบหมายอิสระ
+// POST /api/petitions/:id/accept → เจ้าหน้าที่ที่ถูก assign กดรับงาน (เริ่มนับเวลาวิเคราะห์)
+router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const assignee = doc.assignedTo;
+    if (!assignee?.employeeId) return res.status(409).json({ error: { message: 'งานนี้ยังไม่ได้มอบหมาย' } });
+    if (['success', 'approved', 'rejected'].includes(doc.status)) return badRequest(res, 'งานนี้ปิดแล้ว');
+    if (assignee.acceptedAt) return res.json(doc);
+    const name = user.name || user.email;
+    const employeeId = user.employeeId || (!user._id ? String(req.body?.employeeId || '').trim() : '');
+    const isAssignee = (employeeId && employeeId === assignee.employeeId)
+      || (name && String(name).trim() === assignee.name);
+    if (!isAssignee && !isLabAssignHead(user)) {
+      return res.status(403).json({ error: { message: `งานนี้มอบหมายให้ ${assignee.name}` } });
+    }
+    doc.assignedTo.acceptedAt = new Date();
+    doc.assignedTo.acceptedBy = name;
+    doc.markModified('assignedTo');
+    await doc.save();
+    logAudit(doc, {
+      event: 'accepted',
+      fromStatus: doc.status,
+      toStatus: doc.status,
+      actor: name,
+      note: `${assignee.name} รับงาน`,
+      metadata: { side: 'lab', assignee: doc.assignedTo },
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
   try {
     const user = await currentUser(req);

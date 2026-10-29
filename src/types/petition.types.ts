@@ -133,6 +133,8 @@ export interface PetitionAssignee {
   position?: string;
   assignedAt?: string;
   assignedBy?: string;
+  acceptedAt?: string | null;
+  acceptedBy?: string;
 }
 
 export interface PetitionAssignedMachine {
@@ -158,6 +160,7 @@ export type PetitionAuditEvent =
   | 'updated'
   | 'deleted'
   | 'received'
+  | 'accepted'
   | 'resultEntered'
   | 'resultUpdated';
 
@@ -182,6 +185,7 @@ export const PETITION_AUDIT_EVENT_LABELS: Record<PetitionAuditEvent, string> = {
   updated: 'แก้ไขข้อมูล',
   deleted: 'ลบคำร้อง',
   received: 'รับตัวอย่าง',
+  accepted: 'เจ้าหน้าที่รับงาน',
   resultEntered: 'ใส่ค่า QC',
   resultUpdated: 'แก้ค่า QC',
 };

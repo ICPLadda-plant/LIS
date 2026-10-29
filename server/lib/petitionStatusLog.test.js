@@ -196,11 +196,11 @@ test('current: only QC received, has lab item → QC รับแล้ว | Lab
   });
 });
 
-test('current: only Lab received, has lab item → QC รอรับ | Lab รับแล้ว', () => {
+test('current: only Lab received, has lab item → QC รอรับ | Lab รับงานแล้ว รอ assign', () => {
   const p = { status: 'pendingReview', items: [{ batchNo: 'B-1' }], labReceivedAt: 'T' };
   assert.deepStrictEqual(buildCurrent(p, QC0, [], false), {
-    label: 'QC รอรับ | Lab รับแล้ว',
-    tracks: { qc: { side: 'qc', label: 'QC รอรับ' }, lab: { side: 'lab', label: 'Lab รับแล้ว' } },
+    label: 'QC รอรับ | Lab รับงานแล้ว รอ assign',
+    tracks: { qc: { side: 'qc', label: 'QC รอรับ' }, lab: { side: 'lab', label: 'Lab รับงานแล้ว รอ assign' } },
   });
 });
 
@@ -208,16 +208,16 @@ test('current: only Lab received, has lab item → QC รอรับ | Lab ร�
 const LAB_ASSIGNEE = { name: 'อนล', department: 'Lab/วิเคราะห์', position: 'Lab Analyst' };
 
 // QC-side assignee → assign line on QC, Lab is just "รับแล้ว"
-test('current: both received + QC-assignee + not started → QC มอบหมาย | Lab รับแล้ว', () => {
+test('current: both received + QC-assignee + not started → QC มอบหมาย | Lab รับงานแล้ว รอ assign', () => {
   const p = {
     status: 'pendingReview', items: [{ batchNo: 'B-1' }],
     qcReceivedAt: 'T', labReceivedAt: 'T', assignedTo: ASSIGNEE, reviewHistory: [],
   };
   assert.deepStrictEqual(buildCurrent(p, QC0, [], false), {
-    label: 'QC มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน | Lab รับแล้ว',
+    label: 'QC มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน | Lab รับงานแล้ว รอ assign',
     tracks: {
       qc: { side: 'qc', label: 'QC มอบหมายงานแล้ว รอเจ้าหน้าที่รับงาน' },
-      lab: { side: 'lab', label: 'Lab รับแล้ว' },
+      lab: { side: 'lab', label: 'Lab รับงานแล้ว รอ assign' },
     },
   });
 });
@@ -229,26 +229,26 @@ test('current: both received + Lab-assignee + not started → QC รับแล
     qcReceivedAt: 'T', labReceivedAt: 'T', assignedTo: LAB_ASSIGNEE, reviewHistory: [],
   };
   assert.deepStrictEqual(buildCurrent(p, QC0, [], false), {
-    label: 'QC รับแล้ว | เจ้าหน้าที่กำลังวิเคราะห์',
+    label: 'QC รับแล้ว | Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ',
     tracks: {
       qc: { side: 'qc', label: 'QC รับแล้ว' },
-      lab: { side: 'lab', label: 'เจ้าหน้าที่กำลังวิเคราะห์' },
+      lab: { side: 'lab', label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ' },
     },
   });
 });
 
 // started (accepted via startTesting) — only the assignee side flips to รับงานแล้ว
-test('current: QC-assignee + startTesting → QC รับงานแล้ว | Lab รับแล้ว', () => {
+test('current: QC-assignee + startTesting → QC รับงานแล้ว | Lab รับงานแล้ว รอ assign', () => {
   const p = {
     status: 'inProgress', items: [{ batchNo: 'B-1' }],
     qcReceivedAt: 'T', labReceivedAt: 'T', assignedTo: ASSIGNEE,
     reviewHistory: [{ action: 'startTesting' }],
   };
   assert.deepStrictEqual(buildCurrent(p, QC0, [], false), {
-    label: 'QC สมชาย รับงานแล้ว · กำลังตรวจ | Lab รับแล้ว',
+    label: 'QC สมชาย รับงานแล้ว · กำลังตรวจ | Lab รับงานแล้ว รอ assign',
     tracks: {
       qc: { side: 'qc', label: 'QC สมชาย รับงานแล้ว · กำลังตรวจ' },
-      lab: { side: 'lab', label: 'Lab รับแล้ว' },
+      lab: { side: 'lab', label: 'Lab รับงานแล้ว รอ assign' },
     },
   });
 });
@@ -260,10 +260,10 @@ test('current: Lab-assignee + startTesting → QC รับแล้ว | Lab �
     reviewHistory: [{ action: 'startTesting' }],
   };
   assert.deepStrictEqual(buildCurrent(p, QC0, [], false), {
-    label: 'QC รับแล้ว | Lab อนล รับงานแล้ว · กำลังตรวจ',
+    label: 'QC รับแล้ว | เจ้าหน้าที่กำลังดำเนินการวิเคราะห์',
     tracks: {
       qc: { side: 'qc', label: 'QC รับแล้ว' },
-      lab: { side: 'lab', label: 'Lab อนล รับงานแล้ว · กำลังตรวจ' },
+      lab: { side: 'lab', label: 'เจ้าหน้าที่กำลังดำเนินการวิเคราะห์' },
     },
   });
 });
@@ -275,10 +275,10 @@ test('current: QC entering values (Lab-assignee) → QC % | Lab รับงา�
     qcReceivedAt: 'T', labReceivedAt: 'T', assignedTo: LAB_ASSIGNEE, reviewHistory: [],
   };
   assert.deepStrictEqual(buildCurrent(p, { filled: 1, total: 2, percent: 45 }, ['pH', 'ความชื้น'], false), {
-    label: 'QC กำลังตรวจ — pH, ความชื้น (45%) | Lab อนล รับงานแล้ว · กำลังตรวจ',
+    label: 'QC กำลังตรวจ — pH, ความชื้น (45%) | Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ',
     tracks: {
       qc: { side: 'qc', label: 'QC กำลังตรวจ — pH, ความชื้น (45%)', percent: 45 },
-      lab: { side: 'lab', label: 'Lab อนล รับงานแล้ว · กำลังตรวจ' },
+      lab: { side: 'lab', label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ' },
     },
   });
 });
@@ -291,10 +291,10 @@ test('current: QC completed + lab not done (Lab-assignee) → QC ตรวจค
     assignedTo: LAB_ASSIGNEE, reviewHistory: [],
   };
   assert.deepStrictEqual(buildCurrent(p, { filled: 2, total: 2, percent: 100 }, ['pH'], false), {
-    label: 'QC ตรวจครบ — รอยืนยัน | Lab อนล รับงานแล้ว · กำลังตรวจ',
+    label: 'QC ตรวจครบ — รอยืนยัน | Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ',
     tracks: {
       qc: { side: 'qc', label: 'QC ตรวจครบ — รอยืนยัน' },
-      lab: { side: 'lab', label: 'Lab อนล รับงานแล้ว · กำลังตรวจ' },
+      lab: { side: 'lab', label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ' },
     },
   });
 });
@@ -307,10 +307,10 @@ test('current: QC completed + lab done → both completed tracks remain visible'
     assignedTo: ASSIGNEE, reviewHistory: [],
   };
   assert.deepStrictEqual(buildCurrent(p, { filled: 2, total: 2, percent: 100 }, ['pH'], true), {
-    label: 'QC ตรวจครบ — รอยืนยัน | Lab ตรวจครบ — รอออกผล',
+    label: 'QC ตรวจครบ — รอยืนยัน | เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ',
     tracks: {
       qc: { side: 'qc', label: 'QC ตรวจครบ — รอยืนยัน' },
-      lab: { side: 'lab', label: 'Lab ตรวจครบ — รอออกผล' },
+      lab: { side: 'lab', label: 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ' },
     },
   });
 });
@@ -483,7 +483,7 @@ test('buildStatusLog: completed Lab track remains visible with its %AI result', 
   const out = buildStatusLog(petition, [], results, parameters, true);
 
   assert.strictEqual(out.current.tracks.qc.density, '1.041');
-  assert.strictEqual(out.current.tracks.lab.label, 'Lab ตรวจครบ — รอออกผล');
+  assert.strictEqual(out.current.tracks.lab.label, 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ');
   assert.strictEqual(out.current.tracks.lab['%AI'], '48.10');
 });
 

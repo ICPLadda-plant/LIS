@@ -69,27 +69,34 @@ describe('labTrackStatusBadge', () => {
   });
 
   it('sampleSent with assignee but not Lab-received shows waiting receive on the Lab track', () => {
-    const p = { status: 'sampleSent' as const, assignedTo: { userId: 'u1' } };
+    const p = { status: 'sampleSent' as const, assignedTo: { employeeId: 'u1', name: 'Analyst' } };
     expect(labTrackStatusBadge(p).label).toBe('รอรับ');
   });
 
   it('Lab received + global inProgress → Lab track in progress, not QC status', () => {
-    const p = { status: 'inProgress' as const, labReceivedAt: T1, labReceivedBy: 'Lab Tech', assignedTo: { name: 'Analyst' } };
-    expect(labTrackStatusBadge(p).label).toBe('Lab กำลังตรวจ');
+    const p = { status: 'inProgress' as const, labReceivedAt: T1, labReceivedBy: 'Lab Tech', assignedTo: { employeeId: 'a1', name: 'Analyst', acceptedAt: T1 } };
+    expect(labTrackStatusBadge(p).label).toBe('เจ้าหน้าที่กำลังดำเนินการวิเคราะห์');
   });
 
   it('Lab received but not assigned shows waiting assign', () => {
-    expect(labTrackStatusBadge({ status: 'pendingReview', labReceivedAt: T1 }).label).toBe('รอ assign');
+    expect(labTrackStatusBadge({ status: 'pendingReview', labReceivedAt: T1 }).label).toBe('Lab รับงานแล้ว รอ assign');
   });
 
   it('legacy received (receivedAt only) counts as Lab received → Lab track in progress', () => {
-    const p = { status: 'inProgress' as const, receivedAt: T1, receivedBy: 'Dev Administrator', assignedTo: { name: 'Analyst' } };
-    expect(labTrackStatusBadge(p).label).toBe('Lab กำลังตรวจ');
+    const p = { status: 'inProgress' as const, receivedAt: T1, receivedBy: 'Dev Administrator', assignedTo: { employeeId: 'a1', name: 'Analyst', acceptedAt: T1 } };
+    expect(labTrackStatusBadge(p).label).toBe('เจ้าหน้าที่กำลังดำเนินการวิเคราะห์');
   });
 
   it('Lab completed shows pending result while petition waits for other gates', () => {
-    const p = { status: 'inProgress' as const, labReceivedAt: T1, labCompletedAt: T2, assignedTo: { name: 'Analyst' } };
-    expect(labTrackStatusBadge(p).label).toBe('รอออกผล');
+    const p = { status: 'inProgress' as const, labReceivedAt: T1, labCompletedAt: T2, assignedTo: { employeeId: 'a1', name: 'Analyst', acceptedAt: T1 } };
+    expect(labTrackStatusBadge(p).label).toBe('เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ');
+  });
+});
+
+describe('labTrackStatusBadge accept step', () => {
+  it('assigned but not accepted → waiting for staff to accept', () => {
+    const p = { status: 'inProgress' as const, labReceivedAt: T1, assignedTo: { employeeId: 'a1', name: 'Analyst' } };
+    expect(labTrackStatusBadge(p).label).toBe('Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ');
   });
 });
 
@@ -100,7 +107,7 @@ describe('labAssignBoardStatusBadge', () => {
   });
 
   it('assigned card shows assigned wording on the Lab assign board', () => {
-    const p = { status: 'sampleSent' as const, assignedTo: { userId: 'u1' } };
+    const p = { status: 'sampleSent' as const, assignedTo: { employeeId: 'u1', name: 'Analyst' } };
     expect(labAssignBoardStatusBadge(p, true).label).toBe('assign แล้ว');
   });
 
@@ -189,7 +196,7 @@ describe('labTrackStatusSteps', () => {
     const p = {
       status: 'inProgress',
       labReceivedAt: T1,
-      assignedTo: { userId: 'u1' },
+      assignedTo: { employeeId: 'u1', name: 'Analyst' },
       labCompletedAt: T2,
     } as unknown as Petition;
     const steps = labTrackStatusSteps(p);
@@ -201,7 +208,7 @@ describe('labTrackStatusSteps', () => {
     const p = {
       status: 'inProgress',
       labReceivedAt: T1,
-      assignedTo: { userId: 'u1' },
+      assignedTo: { employeeId: 'u1', name: 'Analyst' },
       labCompletedAt: T2,
       labApprovedAt: T2,
     } as unknown as Petition;
@@ -233,7 +240,7 @@ describe('qcTrackStatusSteps', () => {
     const p = {
       status: 'inProgress',
       qcReceivedAt: T1,
-      assignedTo: { userId: 'u1' },
+      assignedTo: { employeeId: 'u1', name: 'Analyst' },
       qcCompletedAt: T2,
     } as unknown as Petition;
     expect(qcTrackStatusSteps(p).find((s) => s.current)?.key).toBe('qc-approval');
@@ -243,7 +250,7 @@ describe('qcTrackStatusSteps', () => {
     const p = {
       status: 'approved',
       qcReceivedAt: T1,
-      assignedTo: { userId: 'u1' },
+      assignedTo: { employeeId: 'u1', name: 'Analyst' },
       qcCompletedAt: T2,
     } as unknown as Petition;
     expect(qcTrackStatusSteps(p).every((s) => s.done)).toBe(true);

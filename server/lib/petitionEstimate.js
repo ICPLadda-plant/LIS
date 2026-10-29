@@ -86,7 +86,12 @@ function estimateTrackEnd(petition, side, { qcTaskCount = 0, now = new Date() } 
       ?? now;
     return endOfNextWorkingDay(anchor);
   }
-  if (side === 'lab') return addWorkingMinutes(receivedAt, labMinutes(petition));
+  if (side === 'lab') {
+    // นับจากตอนเจ้าหน้าที่รับงาน; ยังไม่รับ → นับจากตอนนี้ (ยังไม่เริ่ม)
+    const acceptedAt = validDate(petition.assignedTo?.acceptedAt);
+    const start = acceptedAt ?? (now > receivedAt ? now : receivedAt);
+    return addWorkingMinutes(start, labMinutes(petition));
+  }
   if (qcTaskCount > 0) return addWorkingMinutes(receivedAt, qcTaskCount * QC_MINUTES_PER_TASK);
   return endOfNextWorkingDay(receivedAt);
 }

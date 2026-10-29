@@ -412,6 +412,7 @@ function activityLabel(entry: PetitionAuditLogEntry): string {
   switch (entry.event) {
     case "created": return "สร้างคำร้อง";
     case "received": return metadataString(entry.metadata, "side") === "lab" ? "Lab รับตัวอย่าง" : "QC รับตัวอย่าง";
+    case "accepted": return entry.note?.trim() || "เจ้าหน้าที่รับงาน";
     case "assigned": {
       const assignee = metadataString(entry.metadata, "assignee") ?? metadataObjectName(entry.metadata, "assignee");
       return `มอบหมาย${assignee ? `ให้ ${assignee}` : "งาน"}`;

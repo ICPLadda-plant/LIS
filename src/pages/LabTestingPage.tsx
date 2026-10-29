@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { FlaskConical, AlertTriangle, RotateCcw } from 'lucide-react';
 import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
@@ -25,7 +26,7 @@ import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
 import { DataTable, type DataTableColumn } from '@/components/lis/DataTable';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
-import { labReceivedAt, labReceivedBy, labTrackStatusBadge } from '@/lib/receiveStatus';
+import { isLabWorkAccepted, labReceivedAt, labReceivedBy, labTrackStatusBadge } from '@/lib/receiveStatus';
 import { normalizeRoles } from '@/lib/roles';
 import { assigneeNamesForUser, isAssignedTo } from '@/lib/assignment';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
@@ -53,6 +54,7 @@ export default function LabTestingPage() {
   const [parametersLoaded, setParametersLoaded] = useState(false);
   const [parametersError, setParametersError] = useState(false);
   const groupMembership = useItemGroupMembership();
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   useEffect(() => {
     api.getParameters()
@@ -61,7 +63,7 @@ export default function LabTestingPage() {
       .finally(() => setParametersLoaded(true));
   }, []);
 
-  const { data, loading } = usePetitionList({
+  const { data, loading, refresh } = usePetitionList({
     status: 'sampleSent,pendingReview,inProgress,success',
     search,
     dept: dept || undefined,
@@ -70,6 +72,26 @@ export default function LabTestingPage() {
     labPending: true,
     limit: 50,
   });
+
+  // หัวหน้า assign แล้ว เจ้าหน้าที่ต้องกดรับงานก่อน จึงเริ่มนับเวลาวิเคราะห์
+  const needsAccept = (p: Petition) =>
+    !!labReceivedAt(p) && !!p.assignedTo && !isLabWorkAccepted(p)
+    && (isFullAccess || isAssignedTo(p.assignedTo, user));
+
+  async function acceptPetition(p: Petition) {
+    if (acceptingId) return;
+    setAcceptingId(p._id);
+    try {
+      await api.post<Petition>(`/petitions/${p._id}/accept`, { employeeId: user?.employeeId });
+      toast.success(`รับงาน ${p.petitionNo} แล้ว`);
+      refresh();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'รับงานไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setAcceptingId(null);
+    }
+  }
 
   const petitions: Petition[] = prioritizeUrgentPetitions((data?.items ?? [])
     .filter((p) => !p.labApprovedAt)
@@ -171,7 +193,18 @@ export default function LabTestingPage() {
       header: 'การดำเนินการ',
       className: 'text-right align-top',
       cell: (p) =>
-        labReceivedAt(p) ? (
+        needsAccept(p) ? (
+          <Button
+            size="sm"
+            disabled={acceptingId === p._id}
+            onClick={(e) => {
+              e.stopPropagation();
+              void acceptPetition(p);
+            }}
+          >
+            {acceptingId === p._id ? 'กำลังรับงาน...' : 'รับงาน'}
+          </Button>
+        ) : labReceivedAt(p) ? (
           <Button
             size="sm"
             onClick={(e) => {
@@ -230,7 +263,7 @@ export default function LabTestingPage() {
           isLoading={loading || !parametersLoaded}
           rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
           onRowClick={(p) => {
-            if (labReceivedAt(p)) navigate(`/lab-testing/${p._id}`);
+            if (labReceivedAt(p) && !needsAccept(p)) navigate(`/lab-testing/${p._id}`);
           }}
           emptyTitle="ไม่มีคำร้อง Lab ที่รอตรวจ"
         />

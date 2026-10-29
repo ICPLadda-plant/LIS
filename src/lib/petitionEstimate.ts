@@ -99,7 +99,9 @@ export function estimatePetitionEnd(input: { petition: Petition; qcTaskCount: nu
     candidates.push(addWorkingMinutes(qcReceivedAt, input.qcTaskCount * QC_MINUTES_PER_TASK));
   }
   if (labReceivedAt && hasLabTrack(petition)) {
-    candidates.push(addWorkingMinutes(labReceivedAt, labMinutes(petition)));
+    // นับจากตอนเจ้าหน้าที่รับงาน (mirror server/lib/petitionEstimate.js)
+    const acceptedAt = validDate(petition.assignedTo?.acceptedAt);
+    candidates.push(addWorkingMinutes(acceptedAt ?? labReceivedAt, labMinutes(petition)));
   }
 
   if (candidates.length === 0) {
