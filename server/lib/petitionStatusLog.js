@@ -1,7 +1,7 @@
 // Derives a human-readable status_log ({ current, timeline }) for a petition.
 // Pure functions — NO DB access. The route loads inputs and calls buildStatusLog.
 const { defaultSendItemToLab, isLabBatchNo, isMandatoryLabProduct, isResearchAndDevelopmentDepartment, requiresQcTrack } = require('./petitionSubmissionRules');
-const { estimateTrackEnd, formatThai } = require('./petitionEstimate');
+const { estimateTrackEnd, resolveLabExpected, formatThai } = require('./petitionEstimate');
 
 // Lab batch rule (mirrors src/types/petition.types.ts isLabBatch):
 // last char of trimmed batchNo is '1' or '6'.
@@ -432,8 +432,24 @@ function buildStatusLog(petition, auditLogs, qcResults, parameters, labDone, now
       () => estimateTrackEnd(petition, 'qc', { qcTaskCount, now }));
   }
   if (current.tracks?.lab) {
-    setExpected(current.tracks.lab, labRecheck ? null : petition.labApprovedAt,
-      () => estimateTrackEnd(petition, 'lab', { now }));
+    // Lab ผูกกับ Standard Time: เริ่มนับเมื่อกด "เริ่มงาน" (หรือเวลาที่สั่ง Re-check)
+    const lab = current.tracks.lab;
+    const doneAt = labRecheck ? null : petition.labApprovedAt;
+    const expected = doneAt ? null : resolveLabExpected(petition);
+    lab.expectedEstimated = false;
+    lab.expectedOverdue = false;
+    if (doneAt) {
+      setExpected(lab, doneAt, () => null);
+    } else if (!expected) {
+      lab.expectedAt = null;
+      lab.expectedText = 'รอเริ่มงาน';
+    } else {
+      setExpected(lab, null, () => expected.at);
+      lab.expectedEstimated = !!expected.estimated;
+      lab.expectedOverdue = expected.at.getTime() < now.getTime();
+      if (lab.expectedEstimated) lab.expectedText += ' (ประมาณ)';
+      if (lab.expectedOverdue) lab.expectedText += ' (เกินกำหนด)';
+    }
   }
   return { current, timeline, testResults };
 }

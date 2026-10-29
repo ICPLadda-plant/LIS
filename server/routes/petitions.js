@@ -22,6 +22,7 @@ const LabRequest = require('../models/LabRequest');
 const StandardTime = require('../models/StandardTime');
 const LabFreeAssign = require('../models/LabFreeAssign');
 const { buildStatusLog, hasLabTrack, shouldSendItemToLab, isPetitionComplete } = require('../lib/petitionStatusLog');
+const { refreshLabExpected } = require('../lib/petitionEstimate');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { router: additionalSamplesRouter, changeAdditionalSampleState, currentUser, canTestSide } = require('./additionalSamples');
 const { normalizeRoles } = require('../lib/roles');
@@ -717,9 +718,16 @@ router.post('/status-petition-log', serializePetitionWrite(async (req, res) => {
       return res.status(409).json({ error: { message: 'คำร้องนี้ขอตรวจสอบซ้ำฝั่ง Lab ไม่ได้' } });
     }
     const actor = user.name || user.email;
+    petition.labRecheckRequestedAt = new Date();
+    petition.labRecheckRequestedBy = actor;
+    refreshLabExpected(petition);
     await Petition.updateOne(
       { _id: petition._id },
-      { $set: { labRecheckRequestedAt: new Date(), labRecheckRequestedBy: actor } },
+      { $set: {
+        labRecheckRequestedAt: petition.labRecheckRequestedAt,
+        labRecheckRequestedBy: actor,
+        ...(petition.labExpected ? { labExpected: petition.labExpected } : {}),
+      } },
     );
     const payload = {
       event: 'recheck',
@@ -954,6 +962,7 @@ router.post('/:id/lab-recheck', serializePetitionWrite(async (req, res) => {
     doc.labRecheckRequestedBy = actor;
     doc.labRecheckReason = reason;
     doc.labRecheckCount = round;
+    refreshLabExpected(doc);
     doc.status = 'pendingReview';
     doc.reviewHistory.push({ action: 'lab-recheck', reviewedBy: actor, reviewedAt: now, note: reason });
     await doc.save();
@@ -1277,6 +1286,7 @@ async function applyLabAssignment(doc, assignee, machines, { actor, note, claime
     }
     doc.assignedMachines = cleaned;
   }
+  refreshLabExpected(doc);
 
   if (doc.status === 'pendingReview') doc.status = 'inProgress';
 
@@ -1397,6 +1407,7 @@ router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
     doc.assignedTo.acceptedAt = new Date();
     doc.assignedTo.acceptedBy = name;
     doc.markModified('assignedTo');
+    refreshLabExpected(doc);
     await doc.save();
     logAudit(doc, {
       event: 'accepted',
@@ -1451,7 +1462,7 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
 router.patch('/:id', serializePetitionWrite(async (req, res) => {
   try {
     const updates = { ...req.body };
-    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
+    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'labExpected', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
     if (Object.keys(updates).some(key => key.startsWith('$') || key.includes('.') || managedFields.includes(key))) return badRequest(res, 'ข้อมูลสถานะและรอบตัวอย่างต้องเปลี่ยนผ่านขั้นตอนที่กำหนด');
     let actor = updates.actor;
     delete updates.actor;

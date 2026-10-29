@@ -186,6 +186,9 @@ const PetitionSchema = new mongoose.Schema(
     reviewHistory: { type: [ReviewEntrySchema], default: [] },
     assignedTo: PetitionAssigneeSchema,
     assignedMachines: { type: [PetitionAssignedMachineSchema], default: [] },
+    // เวลาที่คาดว่าจะได้รับผล Lab — บันทึกตอนกด "เริ่มงาน" / เปลี่ยนเครื่อง / Re-check
+    // { startedAt, at, minutes, estimated, basis: [{ code, name, minutes, source: 'standard'|'default', ... }] }
+    labExpected: { type: mongoose.Schema.Types.Mixed, default: null },
     prodOrderNos: { type: [String], default: [], index: true },
     productionWorkflow: ProductionWorkflowSchema,
     additionalSampleRequests: {

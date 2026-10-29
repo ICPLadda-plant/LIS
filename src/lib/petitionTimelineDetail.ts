@@ -51,8 +51,9 @@ export type TimelineDetailHeader = {
   startAt: string;
   startKind: "received" | "submitted";
   endAt: string;
-  endKind: "actual" | "estimated" | "unreceived";
+  endKind: "actual" | "estimated" | "unreceived" | "waiting";
   overdue: boolean;
+  approximate?: boolean;
 };
 export type TimelineDetailItemTab = {
   seq: number;
@@ -145,6 +146,7 @@ function buildHeaderTiming(
     endAt: estimate.at,
     endKind: estimate.kind,
     overdue: estimate.kind === "estimated" && new Date(estimate.at).getTime() < now.getTime(),
+    approximate: !!estimate.approximate,
   };
 }
 
