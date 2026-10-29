@@ -70,10 +70,11 @@ export function petitionStatusSteps(petition: Petition): PetitionStatusStep[] {
   const steps: PetitionStatusStep[] = petition.status === "deliveringQC" && !received
     ? [{ key: "delivering", label: "กำลังส่งตัวอย่าง", done: false }]
     : [];
-  steps.push(
-    { key: "received", label: "รับตัวอย่าง", done: received || closed },
-    { key: "assigned", label: "Assign", done: !!petition.assignedTo || closed },
-  );
+  steps.push({ key: "received", label: "รับตัวอย่าง", done: received || closed });
+  // ขั้น Assign มีเฉพาะงาน Lab — QC ไม่มีการมอบหมาย
+  if (hasLab) {
+    steps.push({ key: "assigned", label: "Assign", done: !!petition.assignedTo || closed });
+  }
   if (hasQc) {
     steps.push({ key: "qc", label: "QC", done: qcDone });
   }

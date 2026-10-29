@@ -135,7 +135,7 @@ export function labTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
 
 /**
  * Timeline เฉพาะ track QC สำหรับหน้า /qc-testing:
- *   รับตัวอย่าง → Assign → QC → ออก Final Result
+ *   รับตัวอย่าง → QC → ออก Final Result (QC ไม่มีขั้น Assign — มีเฉพาะ Lab)
  * step ปลายทางผูกกับ status === 'approved' (ตรงกับ petitionStatusSteps)
  */
 export function qcTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
@@ -146,7 +146,6 @@ export function qcTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
     : [];
   steps.push(
     { key: 'received', label: 'รับตัวอย่าง', done: received || closed },
-    { key: 'assigned', label: 'Assign', done: !!petition.assignedTo || closed },
     { key: 'qc', label: 'QC', done: !!petition.qcCompletedAt || closed },
     { key: 'qc-approval', label: 'ออก Final Result', done: petition.status === 'approved' },
   );
