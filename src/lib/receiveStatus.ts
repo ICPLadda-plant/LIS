@@ -146,7 +146,8 @@ export function qcTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
     : [];
   steps.push(
     { key: 'received', label: 'รับตัวอย่าง', done: received || closed },
-    { key: 'qc', label: petition.qcCompletedAt || closed ? 'บันทึกผลแล้ว' : 'QC กำลังวิเคราะห์', done: !!petition.qcCompletedAt || closed },
+    { key: 'qc', label: 'QC กำลังวิเคราะห์', done: !!petition.qcCompletedAt || closed },
+    { key: 'qc-recorded', label: 'บันทึกผลแล้ว', done: !!petition.qcCompletedAt || closed },
     { key: 'qc-approval', label: 'ออก Final Result', done: petition.status === 'approved' },
   );
   return withCurrentStep(steps);

@@ -223,9 +223,9 @@ describe('labTrackStatusSteps', () => {
 });
 
 describe('qcTrackStatusSteps', () => {
-  it('3 steps in QC-only order (no Assign): รับตัวอย่าง → QC → ออก Final Result', () => {
+  it('QC-only order (no Assign): รับตัวอย่าง → QC กำลังวิเคราะห์ → บันทึกผลแล้ว → ออก Final Result', () => {
     const steps = qcTrackStatusSteps({ status: 'sampleSent' } as Petition);
-    expect(steps.map((s) => s.label)).toEqual(['รับตัวอย่าง', 'QC กำลังวิเคราะห์', 'ออก Final Result']);
+    expect(steps.map((s) => s.label)).toEqual(['รับตัวอย่าง', 'QC กำลังวิเคราะห์', 'บันทึกผลแล้ว', 'ออก Final Result']);
   });
 
   it('delivering sample is current while QC receive stays pending', () => {
