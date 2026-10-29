@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   ChevronDown, ChevronLeft, ChevronRight, Search,
 } from "lucide-react";
-import { NAV_ITEMS, type NavItem } from "@/lib/navItems";
+import { LAB_ASSIGN_PATH, NAV_ITEMS, type NavItem } from "@/lib/navItems";
 import { normalizeFavorites } from "@/lib/favorites";
 import { rankSearchResults } from "@/lib/searchRanking";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -281,13 +281,19 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
   const favoritePaths = useMemo(() => normalizeFavorites(favorites, NAV_PATHS), [favorites]);
 
   const allSections = useMemo(() => {
-    if (favoritePaths.length === 0) return sections;
+    // Assign Lab เห็นได้เฉพาะหัวหน้า Lab / admin
+    const canSeeLabAssign = roles.some((r) => r === "admin" || r === "lab-head");
+    const visible = (item: NavItem) => canSeeLabAssign || item.path !== LAB_ASSIGN_PATH;
+    const baseSections = sections
+      .map((s) => ({ ...s, items: s.items.filter(visible) }))
+      .filter((s) => s.items.length > 0);
+    if (favoritePaths.length === 0) return baseSections;
     const items = favoritePaths
       .map((path) => NAV_ITEMS.find((item) => item.path === path))
-      .filter((item): item is NavItem => !!item);
-    if (items.length === 0) return sections;
-    return [{ id: FAVORITES_SECTION_ID, label: "รายการโปรด", items }, ...sections];
-  }, [favoritePaths, sections]);
+      .filter((item): item is NavItem => !!item && visible(item));
+    if (items.length === 0) return baseSections;
+    return [{ id: FAVORITES_SECTION_ID, label: "รายการโปรด", items }, ...baseSections];
+  }, [favoritePaths, sections, roles]);
 
   // The active nav item is the one whose path is the longest prefix of the
   // current pathname — so /daily-check stays active on /daily-check/balance,
