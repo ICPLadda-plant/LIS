@@ -30,9 +30,11 @@ interface Props {
   onAccepted: () => void;
   /** โหมดกรอกเลขคำร้องอย่างเดียว (ไม่เปิดกล้อง) — ใช้กับปุ่ม "กรอกเลขรับงาน" */
   manualOnly?: boolean;
+  /** ช่วงมอบหมายอิสระ: รับตัวอย่างแล้ว assign งานให้คนที่กดรับทันที */
+  claimOnReceive?: boolean;
 }
 
-export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOnly = false }: Props) {
+export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOnly = false, claimOnReceive = false }: Props) {
   const { user } = useAuth();
   const isFullAccess = normalizeRoles(user).some((r) => FULL_ACCESS_ROLES.has(r));
 
@@ -81,7 +83,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       }
 
       // Assignment is intentionally performed after Lab receives the sample.
-      if (found.assignedTo && !isFullAccess && !isAssignedTo(found.assignedTo, user)) {
+      if (found.assignedTo && (claimOnReceive || !isFullAccess) && !isAssignedTo(found.assignedTo, user)) {
         setErrorMsg(`คุณไม่ได้ถูก assign งานนี้ (มอบหมายให้: ${found.assignedTo.name})`);
         setPhase('error');
         return;
@@ -95,7 +97,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       }
 
       // Already received by Lab
-      if (!request && found.labReceivedAt) {
+      if (!request && found.labReceivedAt && !(claimOnReceive && !found.assignedTo)) {
         onAccepted();
         return;
       }
@@ -108,7 +110,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setErrorMsg(msg);
       setPhase('error');
     }
-  }, [isFullAccess, onAccepted, user]);
+  }, [claimOnReceive, isFullAccess, onAccepted, user]);
 
   useEffect(() => {
     if (!open || phase !== 'scanning' || manualOnly) return;
@@ -171,12 +173,20 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     receiveBusy.current = true;
     setPhase('loading');
     try {
-      const received = await api.patch<Petition>(`/petitions/${id}/receive`, {
-        actor: user?.name || user?.email,
-        side: 'lab',
-        ...additionalSamplePayload(additionalRequest),
-      });
-      const updated = received.data.data;
+      let updated = petition as Petition;
+      if (additionalRequest || !petition?.labReceivedAt) {
+        const received = await api.patch<Petition>(`/petitions/${id}/receive`, {
+          actor: user?.name || user?.email,
+          side: 'lab',
+          ...additionalSamplePayload(additionalRequest),
+        });
+        updated = received.data.data;
+      }
+      if (claimOnReceive && !updated.assignedTo?.employeeId) {
+        // server ใช้ตัวตนจาก session; employeeId ใช้เฉพาะ role จำลองตอน dev
+        const claimed = await api.post<Petition>(`/petitions/${id}/claim`, { employeeId: user?.employeeId });
+        updated = claimed.data.data;
+      }
       setPetition(updated);
       setPhase('success');
       onAccepted();

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FlaskConical, AlertTriangle, RotateCcw } from 'lucide-react';
+import { FlaskConical, AlertTriangle, RotateCcw, QrCode } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
+import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
@@ -55,6 +58,16 @@ export default function LabTestingPage() {
   const [parametersError, setParametersError] = useState(false);
   const groupMembership = useItemGroupMembership();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const canClaimRole = normalizeRoles(user).some((r) => ['admin', 'lab-head', 'lab-analyze'].includes(r));
+  const { data: freeAssign = null } = useQuery({
+    queryKey: ['lab-free-assign'],
+    queryFn: async () => (await api.get<LabFreeAssignState>('/petitions/lab-free-assign')).data.data,
+    enabled: canClaimRole,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+  const canReceiveAndClaim = canClaimRole && isFreeAssignActive(freeAssign, new Date());
 
   useEffect(() => {
     api.getParameters()
@@ -231,6 +244,19 @@ export default function LabTestingPage() {
             </span>
           }
           description={`${petitions.length} รายการ`}
+          actions={canReceiveAndClaim ? (
+            <Button variant="primary" onClick={() => setScanOpen(true)}>
+              <QrCode className="h-4 w-4" />
+              รับตัวอย่าง
+            </Button>
+          ) : undefined}
+        />
+
+        <LabScanAcceptModal
+          open={scanOpen}
+          claimOnReceive
+          onClose={() => setScanOpen(false)}
+          onAccepted={() => { refresh(); }}
         />
 
         <PageToolbar
