@@ -190,6 +190,7 @@ async function resolveGroupIds(audiences) {
 async function notifyPetitionEvent(petition, payload) {
   // Web Push ไม่ขึ้นกับ LINE — require ตอนเรียกเพื่อเลี่ยง circular import กับ petitionNotifications
   require('./webPush').notifyPushForPetitionEvent(petition, payload);
+  require('./productionCallback').notifyProductionOnEvent(petition, payload);
   try {
     if (!line.isConfigured()) return;
     const desc = describeEvent(petition, payload);
