@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FlaskConical, AlertTriangle, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
+import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen } from 'lucide-react';
+import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
+import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
+import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
@@ -25,7 +29,7 @@ import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
 import { DataTable, type DataTableColumn } from '@/components/lis/DataTable';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
-import { labReceivedAt, labReceivedBy, labTrackStatusBadge } from '@/lib/receiveStatus';
+import { isLabWorkAccepted, labReceivedAt, labReceivedBy, labTrackStatusBadge } from '@/lib/receiveStatus';
 import { normalizeRoles } from '@/lib/roles';
 import { assigneeNamesForUser, isAssignedTo } from '@/lib/assignment';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
@@ -53,6 +57,36 @@ export default function LabTestingPage() {
   const [parametersLoaded, setParametersLoaded] = useState(false);
   const [parametersError, setParametersError] = useState(false);
   const groupMembership = useItemGroupMembership();
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const canClaimRole = normalizeRoles(user).some((r) => ['admin', 'lab-head', 'lab-analyze'].includes(r));
+  const [freeAssign, setFreeAssign] = useState<LabFreeAssignState | null>(null);
+  useEffect(() => {
+    if (!canClaimRole) return;
+    let alive = true;
+    const load = () => {
+      Promise.resolve()
+        .then(() => api.get<LabFreeAssignState>('/petitions/lab-free-assign'))
+        .then((res) => { if (alive) setFreeAssign(res.data.data ?? null); })
+        .catch(() => { /* ปิดปุ่มไว้ถ้าโหลดสถานะไม่ได้ */ });
+    };
+    load();
+    const timer = window.setInterval(load, 30_000);
+    window.addEventListener('focus', load);
+    return () => { alive = false; window.clearInterval(timer); window.removeEventListener('focus', load); };
+  }, [canClaimRole]);
+  const canReceiveAndClaim = canClaimRole && isFreeAssignActive(freeAssign, new Date());
+  const [scanCode, setScanCode] = useState<string | undefined>(undefined);
+  // ช่วงมอบหมายอิสระ: โชว์คำร้องที่ส่งตัวอย่างแล้วแต่ Lab ยังไม่รับ ให้ทุกคนกดรับได้
+  const { data: awaitingData, refresh: refreshAwaiting } = usePetitionList(
+    { page: 1, limit: 100, status: 'sampleSent,pendingReview', search, dept: dept || undefined },
+    { enabled: canReceiveAndClaim, refetchOnFocus: true, pollMs: 30_000 },
+  );
+  const awaitingReceive = canReceiveAndClaim
+    ? prioritizeUrgentPetitions((awaitingData?.items ?? []).filter(
+      (p) => isVisibleInAssignQueue(p) && !p.assignedTo && !labReceivedAt(p),
+    ))
+    : [];
 
   useEffect(() => {
     api.getParameters()
@@ -61,7 +95,7 @@ export default function LabTestingPage() {
       .finally(() => setParametersLoaded(true));
   }, []);
 
-  const { data, loading } = usePetitionList({
+  const { data, loading, refresh } = usePetitionList({
     status: 'sampleSent,pendingReview,inProgress,success',
     search,
     dept: dept || undefined,
@@ -71,10 +105,32 @@ export default function LabTestingPage() {
     limit: 50,
   });
 
+  // หัวหน้า assign แล้ว เจ้าหน้าที่ต้องกดรับงานก่อน จึงเริ่มนับเวลาวิเคราะห์
+  const needsAccept = (p: Petition) =>
+    !!labReceivedAt(p) && !!p.assignedTo && !isLabWorkAccepted(p)
+    && (isFullAccess || isAssignedTo(p.assignedTo, user));
+
+  async function acceptPetition(p: Petition) {
+    if (acceptingId) return;
+    setAcceptingId(p._id);
+    try {
+      await api.post<Petition>(`/petitions/${p._id}/accept`, { employeeId: user?.employeeId });
+      toast.success(`เริ่มงาน ${p.petitionNo} แล้ว`);
+      refresh();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'เริ่มงานไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setAcceptingId(null);
+    }
+  }
+
   const petitions: Petition[] = prioritizeUrgentPetitions((data?.items ?? [])
     .filter((p) => !p.labApprovedAt)
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
-    .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user)));
+    .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
+    // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
+    .filter((p) => !canReceiveAndClaim || p.assignedTo || labReceivedAt(p)));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
@@ -171,7 +227,18 @@ export default function LabTestingPage() {
       header: 'การดำเนินการ',
       className: 'text-right align-top',
       cell: (p) =>
-        labReceivedAt(p) ? (
+        needsAccept(p) ? (
+          <Button
+            size="sm"
+            disabled={acceptingId === p._id}
+            onClick={(e) => {
+              e.stopPropagation();
+              void acceptPetition(p);
+            }}
+          >
+            {acceptingId === p._id ? 'กำลังเริ่มงาน...' : 'เริ่มงาน'}
+          </Button>
+        ) : labReceivedAt(p) ? (
           <Button
             size="sm"
             onClick={(e) => {
@@ -198,6 +265,20 @@ export default function LabTestingPage() {
             </span>
           }
           description={`${petitions.length} รายการ`}
+          actions={canReceiveAndClaim ? (
+            <Button variant="primary" onClick={() => { setScanCode(undefined); setScanOpen(true); }}>
+              <QrCode className="h-4 w-4" />
+              รับตัวอย่าง
+            </Button>
+          ) : undefined}
+        />
+
+        <LabScanAcceptModal
+          open={scanOpen}
+          claimOnReceive
+          initialCode={scanCode}
+          onClose={() => setScanOpen(false)}
+          onAccepted={() => { refresh(); refreshAwaiting(); }}
         />
 
         <PageToolbar
@@ -221,6 +302,43 @@ export default function LabTestingPage() {
           }
         />
 
+        {awaitingReceive.length > 0 && (
+          <section className="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <PackageOpen className="h-4 w-4 text-muted-foreground" />
+              <h2 className="text-base font-semibold text-foreground">รอรับตัวอย่าง</h2>
+              <Badge variant="gray-soft" className="font-normal">{awaitingReceive.length}</Badge>
+              <span className="ml-auto text-xs text-muted-foreground">กดการ์ดเพื่อรับตัวอย่าง งานจะมอบหมายให้คุณทันที</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              {awaitingReceive.map((p) => (
+                <button
+                  key={p._id}
+                  type="button"
+                  onClick={() => { setScanCode(p.petitionNo); setScanOpen(true); }}
+                  className="rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate font-semibold text-primary">{p.petitionNo}</span>
+                    <UrgentBadge petition={p} />
+                    <Badge variant={labTrackStatusBadge(p).variant} className="ml-auto shrink-0">{labTrackStatusBadge(p).label}</Badge>
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {p.submittedBy?.name ?? '-'} · {petitionDepartmentLabel(p)}
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {labItemsFor(p).map((it) => (
+                      <span key={it.seq} className="max-w-full truncate rounded bg-muted px-1.5 py-0.5 text-[10px] text-foreground">
+                        {it.commonName || it.sampleName} #{it.seq}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {parametersError && <p role="alert" className="text-sm text-destructive">โหลดพารามิเตอร์ Lab ไม่สำเร็จ กรุณารีเฟรชหน้า</p>}
 
         <DataTable
@@ -230,7 +348,7 @@ export default function LabTestingPage() {
           isLoading={loading || !parametersLoaded}
           rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
           onRowClick={(p) => {
-            if (labReceivedAt(p)) navigate(`/lab-testing/${p._id}`);
+            if (labReceivedAt(p) && !needsAccept(p)) navigate(`/lab-testing/${p._id}`);
           }}
           emptyTitle="ไม่มีคำร้อง Lab ที่รอตรวจ"
         />

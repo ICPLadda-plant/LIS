@@ -13,6 +13,7 @@ import DailyCheckReminderWatcher from "@/components/lis/DailyCheckReminderWatche
 import PetitionFlowWatcher from "@/components/lis/PetitionFlowWatcher";
 import UrgentPetitionReminder from "@/components/lis/UrgentPetitionReminder";
 import PrivateRoute from "@/components/PrivateRoute";
+import LabHeadRoute from "@/components/LabHeadRoute";
 import RoutePointerLockGuard from "@/components/RoutePointerLockGuard";
 import { DevRoleSwitcher } from "@/components/DevRoleSwitcher";
 import EmployeeLinkGate from "@/components/lis/EmployeeLinkGate";
@@ -178,7 +179,7 @@ const App = () => (
               <Route path="/petitions-old" element={<PrivateRoute><PetitionListPage /></PrivateRoute>} />
               <Route path="/petition" element={<PrivateRoute><PetitionTimelinePage /></PrivateRoute>} />
               <Route path="/lab-send-conditions" element={<PrivateRoute><LabSendConditionsPage /></PrivateRoute>} />
-              <Route path="/petition/assign" element={<PrivateRoute><PetitionAssignPage /></PrivateRoute>} />
+              <Route path="/petition/assign" element={<PrivateRoute><LabHeadRoute><PetitionAssignPage /></LabHeadRoute></PrivateRoute>} />
               <Route path="/petition/:id" element={<PrivateRoute><PetitionTimelineDetailPage /></PrivateRoute>} />
               <Route path="/adutuilog" element={<PrivateRoute><PetitionAuditLogPage /></PrivateRoute>} />
               <Route path="/auditlog" element={<PrivateRoute><PetitionAuditLogPage /></PrivateRoute>} />

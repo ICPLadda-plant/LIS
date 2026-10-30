@@ -54,15 +54,21 @@ export function qcReceivedBy(p: ReceiveFields): string | undefined {
  * `inProgress` ("QC กำลังตรวจ") ทั้งที่ Lab ยังไม่ได้รับตัวอย่าง ถ้าโชว์ตรงๆ
  * ฝั่ง Lab จะเห็น "QC กำลังตรวจ" ผิด — ต้องรับตัวอย่างก่อน assign
  */
+/** เจ้าหน้าที่รับงานที่หัวหน้า assign แล้ว (งานเก่าที่เริ่มบันทึกผลไปแล้วถือว่ารับแล้ว) */
+export function isLabWorkAccepted(p: Pick<Petition, 'assignedTo' | 'firstResultAt' | 'labCompletedAt'>): boolean {
+  return !!(p.assignedTo?.acceptedAt || p.firstResultAt || p.labCompletedAt);
+}
+
+// mirror ของ buildLabTrack ใน server/lib/petitionStatusLog.js
 export function labTrackStatusBadge(p: ReceiveFields & { status: PetitionStatus }): StatusBadge {
+  if (p.status === 'approved') return toneBadge('success', 'ผลวิเคราะห์ออกแล้ว');
+  if (p.status === 'rejected') return statusBadge(p.status);
+  if (p.labApprovedAt) return toneBadge('warning', 'Lab ออกผลแล้วรอ QC ยืนยันผล');
+  if (p.labCompletedAt) return toneBadge('warning', 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ');
   if (!labReceivedAt(p)) return toneBadge('warning', 'รอรับ');
-  if (!p.assignedTo) return toneBadge('info', 'รอ assign');
-  if (['success', 'approved', 'rejected'].includes(p.status)) return statusBadge(p.status);
-  if (p.status === 'deliveringQC') return statusBadge('pendingReview');
-  if (p.labApprovedAt) return toneBadge('warning', 'ผล Lab ออกแล้ว · รอ QC');
-  if (p.labCompletedAt) return toneBadge('warning', 'รอออกผล');
-  if (p.status === 'inProgress') return toneBadge('info', 'Lab กำลังตรวจ');
-  return statusBadge(p.status);
+  if (!p.assignedTo) return toneBadge('info', 'Lab รับงานแล้ว รอ assign');
+  if (!isLabWorkAccepted(p)) return toneBadge('warning', 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ');
+  return toneBadge('info', 'เจ้าหน้าที่กำลังดำเนินการวิเคราะห์');
 }
 
 /**
@@ -129,7 +135,7 @@ export function labTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
 
 /**
  * Timeline เฉพาะ track QC สำหรับหน้า /qc-testing:
- *   รับตัวอย่าง → Assign → QC → ออก Final Result
+ *   รับตัวอย่าง → QC → ออก Final Result (QC ไม่มีขั้น Assign — มีเฉพาะ Lab)
  * step ปลายทางผูกกับ status === 'approved' (ตรงกับ petitionStatusSteps)
  */
 export function qcTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
@@ -140,8 +146,8 @@ export function qcTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
     : [];
   steps.push(
     { key: 'received', label: 'รับตัวอย่าง', done: received || closed },
-    { key: 'assigned', label: 'Assign', done: !!petition.assignedTo || closed },
-    { key: 'qc', label: 'QC', done: !!petition.qcCompletedAt || closed },
+    { key: 'qc', label: 'QC กำลังวิเคราะห์', done: !!petition.qcCompletedAt || closed },
+    { key: 'qc-recorded', label: 'บันทึกผลแล้ว', done: !!petition.qcCompletedAt || closed },
     { key: 'qc-approval', label: 'ออก Final Result', done: petition.status === 'approved' },
   );
   return withCurrentStep(steps);

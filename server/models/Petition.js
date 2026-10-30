@@ -61,6 +61,9 @@ const PetitionAssigneeSchema = new mongoose.Schema(
     position: String,
     assignedAt: { type: Date, default: Date.now },
     assignedBy: String,
+    // เจ้าหน้าที่กดรับงานหลังหัวหน้า assign — เริ่มนับเวลาคาดว่าจะได้รับผลจากตรงนี้
+    acceptedAt: Date,
+    acceptedBy: String,
   },
   { _id: false },
 );
@@ -183,6 +186,9 @@ const PetitionSchema = new mongoose.Schema(
     reviewHistory: { type: [ReviewEntrySchema], default: [] },
     assignedTo: PetitionAssigneeSchema,
     assignedMachines: { type: [PetitionAssignedMachineSchema], default: [] },
+    // เวลาที่คาดว่าจะได้รับผล Lab — บันทึกตอนกด "เริ่มงาน" / เปลี่ยนเครื่อง / Re-check
+    // { startedAt, at, minutes, estimated, basis: [{ code, name, minutes, source: 'standard'|'default', ... }] }
+    labExpected: { type: mongoose.Schema.Types.Mixed, default: null },
     prodOrderNos: { type: [String], default: [], index: true },
     productionWorkflow: ProductionWorkflowSchema,
     additionalSampleRequests: {

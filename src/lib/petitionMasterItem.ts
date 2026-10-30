@@ -105,6 +105,12 @@ export function findMatchingPetitionMasterItem(
       (!packageUnit || sameText(option.packageUnit, packageUnit))
     ));
     if (fullMatch) return fullMatch;
+    // Master Item ที่ไม่มีชื่อสามัญ/ขนาดบรรจุ ให้ผู้ใช้กรอกเองได้ จึงถือว่าช่องว่างใน master ตรงกับค่าที่กรอก
+    const blankFieldMatch = exactRows.find((option) => (
+      (!commonName || !option.commonName?.trim() || sameText(option.commonName, commonName)) &&
+      (!packageUnit || !option.packageUnit?.trim() || sameText(option.packageUnit, packageUnit))
+    ));
+    if (blankFieldMatch) return blankFieldMatch;
   }
 
   return exactRows.length === 1 ? exactRows[0] : null;

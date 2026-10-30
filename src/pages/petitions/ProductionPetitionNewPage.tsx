@@ -330,6 +330,34 @@ function dedupeImportedItems(items: ItemRowValues[]): ItemRowValues[] {
   return unique.map((item, index) => ({ ...item, seq: index + 1 }));
 }
 
+function routesToQcAndLab(searchParams: URLSearchParams): boolean {
+  const targets = (searchParams.get('routeTargets') ?? '').split(',').map((target) => target.trim());
+  return targets.includes('qc') && targets.includes('lab');
+}
+
+// ส่งทั้ง QC และ LAB: Production อาจส่ง batch เดียวกันมาเป็น 2 แถว (แถวละปริมาณ)
+// แต่ฟอร์มต้องการ 1 รายการต่อ batch ที่มีปริมาณ 2 ค่า จึงรวมแถวให้ก่อน
+export function mergeQcLabSameBatchItems(items: ItemRowValues[]): ItemRowValues[] {
+  const merged: ItemRowValues[] = [];
+  const byKey = new Map<string, ItemRowValues>();
+  for (const item of items) {
+    const batchNo = item.batchNo.trim();
+    const key = batchNo ? `${item.sampleName.trim().toLowerCase()}|${batchNo}` : '';
+    const existing = key ? byKey.get(key) : undefined;
+    if (!existing) {
+      const copy = { ...item };
+      merged.push(copy);
+      if (key) byKey.set(key, copy);
+      continue;
+    }
+    const quantities = [...(existing.labelQuantities ?? []), ...(item.labelQuantities ?? [])].filter((entry) => entry.trim());
+    existing.labelQuantities = quantities;
+    existing.labelQuantity = quantities.join(', ');
+    if (item.note && !existing.note.includes(item.note)) existing.note = [existing.note, item.note].filter(Boolean).join(' | ');
+  }
+  return merged.map((item, index) => ({ ...item, seq: index + 1 }));
+}
+
 function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
@@ -468,7 +496,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     }
   }
 
-  return dedupeImportedItems(items);
+  return routesToQcAndLab(searchParams) ? mergeQcLabSameBatchItems(items) : dedupeImportedItems(items);
 }
 
 function makeBlankLabRequest(
