@@ -1044,15 +1044,18 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       ? sample
       : { ...sample, batchNo: '', lotNo: '' };
     let legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+    const legacyHistoryMatch = authoritativeBatch
+      ? findBestLegacyLabResult(legacyLabRows, source, { ...sample, batchNo: '', lotNo: '' })
+      : legacyMatch;
     let densityBatchMatch = null;
     let densityIdentityRows = [];
-    if (!authoritativeBatch && legacyMatch?.matchKind === 'productHistory') {
-      const family = densityBatchFamily(legacyMatch.batchNo);
+    if ((!authoritativeBatch || /^FG\d/i.test(authoritativeBatch)) && legacyHistoryMatch?.matchKind === 'productHistory') {
+      const family = densityBatchFamily(legacyHistoryMatch.batchNo);
       if (family) {
         const pattern = new RegExp(`^${escapeRegex(family)}-\\d+(?:-P\\d+)?$`, 'i');
         densityIdentityRows = await ResultDensity.find({ 'Sample name': pattern })
           .sort({ _id: -1 }).limit(5000).lean();
-        densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyMatch.batchNo);
+        densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyHistoryMatch.batchNo);
         if (densityBatchMatch) {
           sample.batchNo = densityBatchMatch.batchNo;
           authoritativeBatch = densityBatchMatch.batchNo;

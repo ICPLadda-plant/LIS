@@ -1608,7 +1608,7 @@ test('ERP autofill fills the production date from MF after resolving the Batch f
   }
 });
 
-test('ERP autofill may identify the batch from Density but does not use its production date', async () => {
+test('ERP autofill resolves the production batch from Density while retaining the FG lot', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1630,6 +1630,9 @@ test('ERP autofill may identify the batch from Density but does not use its prod
   try {
     global.fetch = async (url) => {
       if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
+      if (String(url).includes('stock-all-item')) {
+        return { ok: true, json: async () => [{ item_no: 'F-OMT50-1X20', lot_no: 'FG260917-001', stock_qty: 10 }] };
+      }
       return { ok: true, json: async () => [] };
     };
     Petition.find = () => sortedLimitedLean([]);
@@ -1650,7 +1653,8 @@ test('ERP autofill may identify the batch from Density but does not use its prod
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '526');
-    assert.equal(res.body.sample.productionDate, '');
+    assert.equal(res.body.sample.lotNo, 'FG260917-001');
+    assert.equal(res.body.sample.productionDate, '2026-09-17');
     assert.equal(res.body.legacyMatch, null);
     assert.match(res.body.warnings.join(' '), /Density/);
   } finally {
