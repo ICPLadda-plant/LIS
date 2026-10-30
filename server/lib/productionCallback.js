@@ -36,8 +36,14 @@ async function sendProductionResult(petition) {
   const secret = String(process.env.PRODUCTION_RESULT_SECRET || '').trim();
   if (secret) headers['X-LIS-Signature'] = crypto.createHmac('sha256', secret).update(raw).digest('hex');
   const res = await fetch(url, { method: 'POST', headers, body: raw });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || json.ok === false) throw new Error(`production callback ${res.status}: ${json.error || ''}`);
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch { json = null; }
+  if (!res.ok || !json || json.ok !== true) {
+    const detail = json?.error || text.replace(/<[^>]+>/g, '').trim().slice(0, 300);
+    throw new Error(`production callback ${res.status}: ${detail}`);
+  }
+  if (!json.updated) console.warn('[productionCallback] ไม่พบ request_no ใน Production:', body.request_no);
   return json;
 }
 
