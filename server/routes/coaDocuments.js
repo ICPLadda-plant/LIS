@@ -219,7 +219,8 @@ function aiResultUpdatedTime(results, commonName) {
 }
 
 function aiCandidateMatchRank(candidate) {
-  if (candidate.matchKind === 'exact') return 2;
+  if (candidate.matchKind === 'exact') return 3;
+  if (candidate.matchKind === 'previous') return 2;
   if (candidate.matchKind === 'sample') return 1;
   return 0;
 }
@@ -229,7 +230,7 @@ async function latestAiLabData(petitions, sample) {
   const selection = findLatestAiLabItems(petitions, sample);
   const hasBatch = Boolean(manualText(sample?.batchNo || sample?.lotNo));
   const candidates = selection.candidates
-    .filter((candidate) => !hasBatch || candidate.matchKind === 'exact')
+    .filter((candidate) => !hasBatch || candidate.matchKind === 'exact' || candidate.matchKind === 'previous')
     .slice(0, 100);
   if (candidates.length) {
     const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
@@ -259,8 +260,10 @@ async function latestAiLabData(petitions, sample) {
       || right.candidate.approvedTime - left.candidate.approvedTime
     ));
     if (hasBatch && matches.length) {
+      const selectedBatchKey = matches[0].candidate.batchKey;
+      const selectedMatches = matches.filter((match) => match.candidate.batchKey === selectedBatchKey);
       const seen = new Set();
-      const qcResults = matches.flatMap((match) => match.qcResults).filter((result) => {
+      const qcResults = selectedMatches.flatMap((match) => match.qcResults).filter((result) => {
         const key = String(result?._id || [
           result?.petitionId, result?.itemSeq, result?.parameterId || result?.parameterName, result?.sampleRoundId,
         ].join('\u0000'));
@@ -270,10 +273,10 @@ async function latestAiLabData(petitions, sample) {
       });
       return {
         ...selection,
-        best: matches[0].candidate,
+        best: selectedMatches[0].candidate,
         qcResults,
         resultData: resultRowsFromQc(qcResults, commonName),
-        resultTime: Math.max(...matches.map((match) => match.resultTime)),
+        resultTime: Math.max(...selectedMatches.map((match) => match.resultTime)),
         source: 'petition',
       };
     }

@@ -338,6 +338,17 @@ function batchSimilarity(requested, candidate) {
   return Math.min(0.99, prefixRatio * 0.8 + numericBonus);
 }
 
+function previousBatchDistance(requested, candidate) {
+  const parse = (value) => {
+    const match = text(value).toUpperCase().match(/^(.*?)(\d+)\s*$/);
+    return match ? { prefix: normalizeBatch(match[1]), number: Number(match[2]) } : null;
+  };
+  const left = parse(requested);
+  const right = parse(candidate);
+  if (!left || !right || left.prefix !== right.prefix || right.number >= left.number) return null;
+  return left.number - right.number;
+}
+
 function translatePhysicalValue(value) {
   const source = text(value).replace(/^สี/, '');
   return PHYSICAL_ENGLISH[source] || (/^[\x20-\x7E]+$/.test(source) ? source : '');
@@ -488,23 +499,39 @@ function findLatestAiLabItems(petitions, sample) {
         ? items.filter((item) => batchSimilarity(batchNo, item.batchNo || item.lotNo) === 1)
         : [];
       const exactItem = exactItems[0] || null;
-      const matchedItems = exactItems.length ? exactItems : items;
+      const previousDistance = Math.min(...items
+        .map((item) => previousBatchDistance(batchNo, item.batchNo || item.lotNo))
+        .filter((distance) => distance !== null));
+      const previousItems = Number.isFinite(previousDistance)
+        ? items.filter((item) => previousBatchDistance(batchNo, item.batchNo || item.lotNo) === previousDistance)
+        : [];
       const sameSample = Boolean(sampleName && items.some((item) => normalizeText(item.sampleName) === sampleName));
       const referenceAt = petition?.approvedAt || petition?.labApprovedAt || petition?.updatedAt || petition?.createdAt;
-      candidates.push({
-        petition,
-        item: exactItem || matchedItems[0],
-        items: matchedItems,
-        batchScore: exactItem ? 1 : 0,
-        matchKind: exactItem ? 'exact' : sameSample ? 'sample' : 'commonName',
-        approvedTime: Date.parse(referenceAt) || 0,
-        updatedTime: Date.parse(petition.updatedAt) || 0,
-      });
+      const candidateGroups = [
+        exactItems.length && { items: exactItems, matchKind: 'exact', distance: null },
+        previousItems.length && { items: previousItems, matchKind: 'previous', distance: previousDistance },
+        !exactItems.length && !previousItems.length && { items, matchKind: sameSample ? 'sample' : 'commonName', distance: null },
+      ].filter(Boolean);
+      for (const group of candidateGroups) {
+        const item = group.items[0];
+        candidates.push({
+          petition,
+          item,
+          items: group.items,
+          batchScore: group.matchKind === 'exact' ? 1 : 0,
+          batchKey: normalizeBatch(item?.batchNo || item?.lotNo),
+          previousDistance: group.distance,
+          matchKind: group.matchKind,
+          approvedTime: Date.parse(referenceAt) || 0,
+          updatedTime: Date.parse(petition.updatedAt) || 0,
+        });
+      }
     }
   }
-  const matchRank = { exact: 2, sample: 1, commonName: 0 };
+  const matchRank = { exact: 3, previous: 2, sample: 1, commonName: 0 };
   candidates.sort((left, right) => (
     matchRank[right.matchKind] - matchRank[left.matchKind]
+    || (left.previousDistance ?? Number.POSITIVE_INFINITY) - (right.previousDistance ?? Number.POSITIVE_INFINITY)
     || right.approvedTime - left.approvedTime
     || right.updatedTime - left.updatedTime
   ));

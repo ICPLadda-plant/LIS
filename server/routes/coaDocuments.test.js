@@ -1813,7 +1813,7 @@ test('real-time Lab AI lookup averages duplicate results from the exact batch', 
   }
 });
 
-test('real-time Lab AI lookup does not fall back to a different batch', async () => {
+test('real-time Lab AI lookup falls back to the nearest previous batch', async () => {
   const originals = {
     petitionFind: Petition.find,
     legacyFind: LegacyLabResult.find,
@@ -1822,7 +1822,10 @@ test('real-time Lab AI lookup does not fall back to a different batch', async ()
   const petition = {
     _id: 'petition-ai-lookup', petitionNo: 'P-AI-LOOKUP', updatedAt: '2026-10-08T00:00:00.000Z',
     approvedAt: '2026-10-08T00:00:00.000Z', submittedBy: { department: 'QC' },
-    items: [{ seq: 1, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '080' }],
+    items: [
+      { seq: 1, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '080' },
+      { seq: 2, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '081' },
+    ],
   };
   try {
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
@@ -1839,12 +1842,13 @@ test('real-time Lab AI lookup does not fall back to a different batch', async ()
     assert.equal(found.body.analysisDate, '2026-10-08');
     assert.equal(found.body.match.batchNo, '080');
 
-    const missing = await invoke('/lab-ai-lookup', 'get', {
+    const fallback = await invoke('/lab-ai-lookup', 'get', {
       query: { batchNo: '081', commonName: 'GLYPHOSATE 48% W/V SL', sampleName: 'ช้างมาร์กี้' },
     });
-    assert.equal(missing.statusCode, 200);
-    assert.equal(missing.body.ai, null);
-    assert.equal(missing.body.match, null);
+    assert.equal(fallback.statusCode, 200);
+    assert.equal(fallback.body.ai.result, '48.15%');
+    assert.equal(fallback.body.analysisDate, '2026-10-08');
+    assert.equal(fallback.body.match.batchNo, '080');
   } finally {
     Petition.find = originals.petitionFind;
     LegacyLabResult.find = originals.legacyFind;
