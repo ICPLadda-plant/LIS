@@ -4,14 +4,14 @@ import { useParams, useNavigate, Navigate, useLocation, useSearchParams } from '
 import { FlaskConical, CheckCircle2, Loader2, AlertCircle, AlertTriangle, RotateCcw, Save, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
-import { mergeQcLabDuplicateItems } from '@/lib/petitionRouting';
+import { mergeQcLabDuplicateItems, qcSideItems } from '@/lib/petitionRouting';
 import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
 import { api, type ParameterItem, type ParameterValueField } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useArrivalFlash } from '@/hooks/useArrivalFlash';
 import { useConfirm } from '@/context/ConfirmDialog';
-import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance } from '@/lib/parameterValidation';
+import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, isLabelToleranceAbnormal } from '@/lib/parameterValidation';
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { cn } from '@/lib/utils';
@@ -50,6 +50,10 @@ import { buildPreviousValueLookup, getPreviousValue, type PreviousValueLookup } 
 import { AiOutlierBadge } from '@/components/lis/AiOutlierBadge';
 import { checkOutlier, getAiStatus, streamAnalyzeQC, type OutlierCheckResult } from '@/lib/aiApi';
 import DensitySyncButton from '@/components/lis/DensitySyncButton';
+import ParameterRemarkField from '@/components/lis/ParameterRemarkField';
+import SgConfirmPanel from '@/components/lis/SgConfirmPanel';
+import { FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
+import { itemNeedsSgConfirmation } from '@/lib/sgConfirmation';
 import { normalizeRoles } from '@/lib/roles';
 import {
   SG_VALUE_LABEL,
@@ -58,6 +62,8 @@ import {
   formatDensity3,
   formatTSetComparison,
   isSgMachineUnitKey,
+  isSgTemperatureEditable,
+  sourceSiblingKey,
 } from '@/lib/densitySync';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -760,6 +766,50 @@ export default function QCTestingDetailPage() {
     [user, advanceToInProgress, id, loadResults, petitionCategory, autosaves, additionalSampleOpen, submitting],
   );
 
+  // หมายเหตุต่อ parameter ต่อตัวอย่าง → QCTestResult.remark
+  const handleSaveRemark = useCallback(
+    async (petition: Petition, item: PetitionItem, param: ParameterItem, remark: string) => {
+      const saved = await api.saveQCResultRemark({
+        petitionId: petition._id!,
+        petitionNo: petition.petitionNo,
+        itemSeq: item.seq,
+        sampleId: item.sampleId,
+        sampleName: item.sampleName,
+        commonName: item.commonName,
+        parameterId: param._id!,
+        parameterName: param.name,
+        remark,
+        enteredBy: { name: user?.name ?? 'Unknown', email: user?.email ?? '' },
+      });
+      if (!saved) return;
+      setSavedResults((prev) => {
+        const rest = prev.filter((r) => !(r.itemSeq === saved.itemSeq && r.parameterId === saved.parameterId));
+        const current = prev.find((r) => r.itemSeq === saved.itemSeq && r.parameterId === saved.parameterId);
+        return [...rest, { ...(current ?? saved), remark: saved.remark, remarkBy: saved.remarkBy, remarkAt: saved.remarkAt }];
+      });
+    },
+    [user],
+  );
+
+  // ตัวอย่างกลุ่มน้ำ: QC ยืนยันค่า ถพ. + อุณหภูมิ แล้วจึงปล่อยงานไป Lab
+  const [sgConfirmingSeq, setSgConfirmingSeq] = useState<number | null>(null);
+  const handleConfirmSg = useCallback(
+    async (petition: Petition, item: PetitionItem) => {
+      setSgConfirmingSeq(item.seq);
+      try {
+        await autosaves.flush();
+        const updated = await api.confirmSpecificGravity(petition._id!, item.seq);
+        setRequestedPetition(updated);
+        toast.success(item.sgConfirmedAt ? 'ยืนยันค่า ถพ. ใหม่แล้ว' : 'ยืนยันค่า ถพ. แล้ว');
+      } catch (error) {
+        toast.error(error instanceof Error && error.message ? error.message : 'ยืนยันค่า ถพ. ไม่สำเร็จ');
+      } finally {
+        setSgConfirmingSeq(null);
+      }
+    },
+    [autosaves],
+  );
+
   const handleOutlierCheck = useCallback(
     async (
       commonName: string,
@@ -890,7 +940,7 @@ export default function QCTestingDetailPage() {
     );
   }
 
-  const items = mergeQcLabDuplicateItems(petition, petition.items ?? []);
+  const items = mergeQcLabDuplicateItems(petition, qcSideItems(petition));
 
   // 2-phase support
   // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1
@@ -930,6 +980,26 @@ export default function QCTestingDetailPage() {
     return Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]);
   };
 
+  // จำนวนค่าผิดปกติของ render unit เดียว (ช่องเดียว / สารเดียว) — ใช้ร่วมกันทั้งตัวนับรวม,
+  // ป้ายแจ้งเตือนที่หัวพารามิเตอร์ และกรอบแดงของช่องค่า ถพ.
+  const countUnitAbnormal = (
+    unit: RenderFieldUnit & { hiddenStandard?: boolean },
+    src: Record<string, unknown>,
+    context: ConditionContext,
+  ): number => {
+    if (unit.hiddenStandard) return 0;
+    if (unit.field.conditionalMode && unit.field.conditionalResult === 'output') {
+      return isConditionalOutputAbnormal(unit.field, context) ? 1 : 0;
+    }
+    const field = unit.field.conditionalMode ? resolveFieldStandard(unit.field, context) : unit.field;
+    const unitValues = unit.field.multiple ? readMultiple(src, unit.key) : [src[unit.key]];
+    return unitValues.filter((v) => {
+      if (v == null || v === '') return false;
+      if (unit.labelTolerance) return isLabelToleranceAbnormal(unit.labelTolerance.std, unit.labelTolerance.rawSpec, v);
+      return isFieldAbnormal(field, v);
+    }).length;
+  };
+
   const resolveReference = (itemSeq: number, field: ParameterValueField) => {
     if (!field.refParameterId || !field.refFieldLabel) {
       return { value: '' as unknown, sourceName: undefined as string | undefined };
@@ -962,20 +1032,29 @@ export default function QCTestingDetailPage() {
     let count = 0;
     fieldsToScan.forEach((field) => {
       expandFieldForItem(field, item.commonName, { includeRestrictedStandards: canSeeRestrictedStandards, category: petitionCategory }).forEach((unit) => {
-        if (unit.field.conditionalMode && unit.field.conditionalResult === 'output') {
-          if (isConditionalOutputAbnormal(unit.field, context)) count += 1;
-          return;
-        }
-        const field = unit.field.conditionalMode ? resolveFieldStandard(unit.field, context) : unit.field;
-        if (unit.field.multiple) {
-          readMultiple(src, unit.key).forEach((v) => {
-            if (isFieldAbnormal(field, v)) count += 1;
-          });
-        } else if (isFieldAbnormal(field, src[unit.key])) {
-          count += 1;
-        }
+        count += countUnitAbnormal(unit, src, context);
       });
     });
+    return count;
+  };
+
+  // จำนวนค่าผิดปกติของพารามิเตอร์หนึ่งตัวในตัวอย่างหนึ่งรายการ — ใช้แจ้งเตือนสีแดงที่หัวพารามิเตอร์
+  const countAbnormalForParam = (item: PetitionItem, param: ParameterItem): number => {
+    const k = resultKey(item.seq, param._id!);
+    const p1Fields = visibleFields(param, 1, item);
+    let count = 0;
+    // multiEntry: scan every entry; otherwise the flat phase-1 dict.
+    if (param.multiEntry) {
+      getEntryValues({ entries: entriesByKey[k] }, param).forEach((entryValues) => {
+        count += countAbnormalInValues(p1Fields, item, entryValues, param._id!);
+      });
+    } else {
+      count += countAbnormalInValues(p1Fields, item, values[k] ?? {}, param._id!);
+    }
+    if (hasAnyPhasedParam) {
+      const p2Values = valuesPhase2[k] ?? {};
+      count += countAbnormalInValues(visibleFields(param, 2, item), item, p2Values, param._id!, 2);
+    }
     return count;
   };
 
@@ -984,20 +1063,7 @@ export default function QCTestingDetailPage() {
     items.forEach((item) => {
       const matched = matchParametersForItem(item, parameters, idsFor(item), { petitionCategory });
       matched.forEach((param) => {
-        const k = resultKey(item.seq, param._id!);
-        const p1Fields = visibleFields(param, 1, item);
-        // multiEntry: scan every entry; otherwise the flat phase-1 dict.
-        if (param.multiEntry) {
-          getEntryValues({ entries: entriesByKey[k] }, param).forEach((entryValues) => {
-            count += countAbnormalInValues(p1Fields, item, entryValues, param._id!);
-          });
-        } else {
-          count += countAbnormalInValues(p1Fields, item, values[k] ?? {}, param._id!);
-        }
-        if (hasAnyPhasedParam) {
-          const p2Values = valuesPhase2[k] ?? {};
-          count += countAbnormalInValues(visibleFields(param, 2, item), item, p2Values, param._id!, 2);
-        }
+        count += countAbnormalForParam(item, param);
       });
     });
     return count;
@@ -1383,7 +1449,11 @@ export default function QCTestingDetailPage() {
                       unit.field.label.trim().startsWith(SG_VALUE_LABEL) ||
                       (param.name ?? '').includes('ถพ.')
                     ) && !unit.field.label.includes(SG_TEMP_LABEL);
-                    const unitDisabled = fieldDisabled || !!aiFieldKind || (isSgMachineField && !isSgValueUnit);
+                    const densityKeyPrefix = `${resultKey(item.seq, param._id!)}::`;
+                    const sgManualSelected = Object.entries(manualDensityKeys).some(([key, on]) => on && key.startsWith(densityKeyPrefix));
+                    // อุณหภูมิล็อกเฉพาะตอนค่า ถพ. มาจากเครื่อง — กรอกค่า ถพ. เองต้องกรอกอุณหภูมิเองได้
+                    const sgTemperatureLocked = isSgMachineField && !isSgValueUnit && !isSgTemperatureEditable(srcValues, sgManualSelected);
+                    const unitDisabled = fieldDisabled || !!aiFieldKind || sgTemperatureLocked;
                     const densityOptions = densityOptionsByKey[resultKey(item.seq, param._id!) ] ?? [];
                     // Match by label too: legacy SG parameters may not carry requestValueSource.
                     const densityValue = srcValues[unit.key] == null ? '' : String(srcValues[unit.key]);
@@ -1396,26 +1466,42 @@ export default function QCTestingDetailPage() {
 
                     if (isSgValueUnit) {
                       const densityControlDisabled = additionalSampleOpen || submitting;
+                      const sgAbnormal = countUnitAbnormal(unit, srcValues, condCtx) > 0;
                       return (
                         <div key={unit.key} className="space-y-1">
-                          <label className="text-sm font-medium text-grey-700">{unit.field.label}{unit.field.unit && <span className="text-grey-400 font-normal ml-1">({unit.field.unit})</span>}</label>
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-grey-700">{unit.field.label}{unit.field.unit && <span className="text-grey-400 font-normal ml-1">({unit.field.unit})</span>}</label>
+                            {sgAbnormal && (
+                              <span className="inline-flex items-center" title="ค่าผิดปกติ — ไม่เข้าเกณฑ์ที่กำหนด">
+                                <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                              </span>
+                            )}
+                          </div>
                           <Select value={isManualDensity ? '__manual__' : densityValue || '__none__'} onValueChange={(v) => {
                             if (v === '__manual__') {
                               setManualDensityKeys((prev) => ({ ...prev, [densityControlKey]: true }));
                               onUnitChange(unit.key, '');
+                              // ค่านี้ไม่ได้มาจากเครื่องแล้ว — ล้างที่มาเดิมให้ช่องอุณหภูมิเปิดกรอกได้หลังโหลดใหม่
+                              if (srcValues[sourceSiblingKey(unit.key)] != null) onUnitChange(sourceSiblingKey(unit.key), null);
                             } else if (v !== '__none__') {
                               setManualDensityKeys((prev) => ({ ...prev, [densityControlKey]: false }));
                               onUnitChange(unit.key, v);
                             }
                           }} disabled={densityControlDisabled}>
-                            <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="เลือกค่า ถพ. ..." /></SelectTrigger>
+                            <SelectTrigger className={cn('h-8 text-sm', sgAbnormal && !isManualDensity && 'border-red-400 ring-1 ring-red-200')}><SelectValue placeholder="เลือกค่า ถพ. ..." /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__none__">— เลือก —</SelectItem>
                               {densityChoices.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
                               <SelectItem value="__manual__">กรอกค่าเอง</SelectItem>
                             </SelectContent>
                           </Select>
-                          {isManualDensity && <Input type="number" step="0.001" value={densityValue} onChange={(e) => onUnitChange(unit.key, e.target.value)} disabled={densityControlDisabled} className="h-8 text-sm" placeholder="กรอกค่า ถพ. 3 ตำแหน่ง" />}
+                          {isManualDensity && <Input type="number" step="0.001" value={densityValue} onChange={(e) => onUnitChange(unit.key, e.target.value)} disabled={densityControlDisabled} className={cn('h-8 text-sm', sgAbnormal && 'border-red-400 ring-1 ring-red-200')} placeholder="กรอกค่า ถพ. 3 ตำแหน่ง" />}
+                          {sgAbnormal && <p className="text-[11px] text-red-600">ค่าผิดปกติ — ไม่เข้าเกณฑ์ที่กำหนด</p>}
+                          {unit.labelTolerance && densityValue && (() => {
+                            const rv = resolveLabelTolerance(unit.labelTolerance.std, unit.labelTolerance.rawSpec, densityValue);
+                            const range = formatLabelToleranceRange(rv, unit.field.unit ?? '', { showAutoPass: true, multiline: true, autoPassLabel: 'ผ่านเกณฑ์ 25%' });
+                            return range ? <p className="text-xs text-muted-foreground whitespace-pre-line">{range}</p> : null;
+                          })()}
                         </div>
                       );
                     }
@@ -1576,12 +1662,26 @@ export default function QCTestingDetailPage() {
                     </div>
                   );
 
+                  const paramAbnormalCount = countAbnormalForParam(item, param);
                   return (
-                    <div key={param._id} className="space-y-3">
+                    <div
+                      key={param._id}
+                      className={cn('space-y-3', paramAbnormalCount > 0 && 'rounded-lg border border-red-300 bg-red-50/40 p-3')}
+                      data-abnormal={paramAbnormalCount > 0 ? 'true' : undefined}
+                    >
                       <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-grey-800 border-b pb-1 flex-1">
+                        <h3 className={cn('text-sm font-semibold border-b pb-1 flex-1', paramAbnormalCount > 0 ? 'text-red-700 border-red-200' : 'text-grey-800')}>
                           {param.name}
                         </h3>
+                        {paramAbnormalCount > 0 && (
+                          <Badge
+                            role="alert"
+                            className="gap-1 bg-red-100 text-red-700 text-[11px] font-semibold hover:bg-red-100"
+                          >
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            ค่าผิดปกติ {paramAbnormalCount} รายการ
+                          </Badge>
+                        )}
                         {param.hasPhases && (
                           <Badge className="bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-100">
                             Phase {effectivePhase}
@@ -1701,6 +1801,34 @@ export default function QCTestingDetailPage() {
                           phaseSaves[k],
                         )
                       )}
+                      {itemNeedsSgConfirmation(item) && (param.valueFields ?? []).some(
+                        (f) => f.label === SG_VALUE_LABEL || f.label.startsWith(`${SG_VALUE_LABEL} —`),
+                      ) && (() => {
+                        const formIndex = Number(values[k]?.[FORM_ENTRY_INDEX_KEY] ?? 0);
+                        const row = param.multiEntry
+                          ? (entriesByKey[k] ?? [])[Number.isFinite(formIndex) ? formIndex : 0] ?? entriesByKey[k]?.[0] ?? {}
+                          : phaseValues[k] ?? {};
+                        const sgValue = readSpecificGravityEntryValue(row, SG_VALUE_LABEL);
+                        const sgTemperature = row[SG_TEMP_LABEL];
+                        return (
+                          <SgConfirmPanel
+                            value={sgValue == null ? '' : String(sgValue)}
+                            temperature={sgTemperature == null ? '' : String(sgTemperature)}
+                            confirmedAt={item.sgConfirmedAt}
+                            confirmedBy={item.sgConfirmedBy}
+                            confirmedValue={item.sgConfirmedValue}
+                            confirmedTemperature={item.sgConfirmedTemperature}
+                            disabled={['approved', 'rejected'].includes(petition.status) || submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}
+                            confirming={sgConfirmingSeq === item.seq}
+                            onConfirm={() => void handleConfirmSg(petition, item)}
+                          />
+                        );
+                      })()}
+                      <ParameterRemarkField
+                        value={savedResults.find((r) => r.itemSeq === item.seq && r.parameterId === param._id)?.remark ?? ''}
+                        disabled={isLocked || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey}
+                        onSave={(remark) => handleSaveRemark(petition, item, param, remark)}
+                      />
                     </div>
                   );
                 })

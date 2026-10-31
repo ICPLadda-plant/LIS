@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -6,6 +7,8 @@ import type { ApprovalItemGroup } from "@/lib/qcApprovalRows";
 
 interface Props {
   groups: ApprovalItemGroup[];
+  /** ปุ่ม/สถานะเพิ่มเติมที่หัวการ์ดของแต่ละรายการ (เช่น อนุมัติรายรายการ) */
+  renderGroupActions?: (group: ApprovalItemGroup) => ReactNode;
 }
 
 /**
@@ -13,17 +16,20 @@ interface Props {
  * ใช้ร่วมกันระหว่างหน้าออกผล Lab และ dialog ดูรายละเอียดผล Lab — โครงสร้าง groups มาจาก
  * buildApprovalGroups (parameters ถูก scope ก่อนส่งเข้ามา ที่นี่แค่ render).
  */
-export default function LabResultGroups({ groups }: Props) {
+export default function LabResultGroups({ groups, renderGroupActions }: Props) {
   return (
     <>
       {groups.map((g) => (
         <Card key={g.seq} className="overflow-hidden">
           <CardHeader className="pb-3 bg-muted">
-            <CardTitle className="text-base flex items-center gap-2 flex-wrap">
-              <span>รายการที่ {g.seq}: {g.sampleName}</span>
-              {g.batchNo && <Badge variant="gray-soft" className="font-normal">Batch: {g.batchNo}</Badge>}
-              {g.sampleId && <Badge variant="primary-soft" className="font-normal text-xs">{g.sampleId}</Badge>}
-            </CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="text-base flex items-center gap-2 flex-wrap">
+                <span>รายการที่ {g.seq}: {g.sampleName}</span>
+                {g.batchNo && <Badge variant="gray-soft" className="font-normal">Batch: {g.batchNo}</Badge>}
+                {g.sampleId && <Badge variant="primary-soft" className="font-normal text-xs">{g.sampleId}</Badge>}
+              </CardTitle>
+              {renderGroupActions?.(g)}
+            </div>
           </CardHeader>
           <CardContent className="pt-4 space-y-5">
             {g.unmatched ? (
@@ -32,6 +38,11 @@ export default function LabResultGroups({ groups }: Props) {
               g.params.map((param) => (
                 <div key={param.parameterId} className="space-y-2">
                   <h3 className="text-sm font-semibold text-foreground border-b border-border pb-1">{param.parameterName}</h3>
+                  {param.remark && (
+                    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                      <span className="font-medium text-foreground">หมายเหตุ:</span> {param.remark}
+                    </p>
+                  )}
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm table-fixed">
                       <colgroup>

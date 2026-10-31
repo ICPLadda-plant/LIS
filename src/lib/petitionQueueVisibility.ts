@@ -1,6 +1,7 @@
 import type { Petition } from '@/types/petition.types';
 import { isLabRecheckPending, labReceivedAt, qcReceivedAt } from './receiveStatus';
 import { hasLabTrack, requiresQcTrack } from './petitionRouting';
+import { isLabAwaitingSgConfirmation } from './sgConfirmation';
 
 const OPEN_TESTING_STATUSES: readonly Petition['status'][] = ['sampleSent', 'pendingReview', 'inProgress'];
 
@@ -18,6 +19,8 @@ export function isVisibleInQcTestingQueue(petition: Petition): boolean {
 
 export function isVisibleInAssignQueue(petition: Petition): boolean {
   if (!hasLabTrack(petition)) return false;
+  // ตัวอย่างกลุ่มน้ำ: Lab ยังไม่เห็นงานจนกว่า QC ยืนยันค่า ถพ.
+  if (isLabAwaitingSgConfirmation(petition)) return false;
   // Re-check may be redone by someone else on another day — show it again
   // (even after success) so it can be reassigned.
   if (isLabRecheckPending(petition)) return true;

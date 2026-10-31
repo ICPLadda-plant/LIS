@@ -38,7 +38,6 @@ const petition = {
   createdAt: "2026-09-10T07:25:23.316Z",
   updatedAt: "2026-09-11T10:04:10.866Z",
   qcReceivedAt: "2026-09-11T07:18:37.751Z",
-  qcCompletedAt: "2026-09-11T10:04:10.860Z",
 } as Petition;
 
 function makeQueuePetition(index: number): Petition {
@@ -154,6 +153,61 @@ describe("QueueDisplay", () => {
     render(<QueueDisplay mode="lab" />);
 
     expect(mockedUsePetitionList).toHaveBeenCalledWith({ page: 1, limit: 200, status: "sampleSent" });
+  });
+
+  describe("QC column follows the QC track", () => {
+    const columnOf = (title: string) =>
+      screen.getByRole("heading", { name: title }).closest("section") as HTMLElement;
+    const serve = (items: Petition[]) =>
+      mockedUsePetitionList.mockImplementation((params) => {
+        const statuses = params.status?.split(",") ?? [];
+        const matched = items.filter((item) => statuses.includes(item.status));
+        return {
+          data: { items: matched, total: matched.length, page: 1, limit: 100 },
+          loading: false,
+          error: null,
+          refresh: vi.fn(),
+        };
+      });
+    const fresh = (overrides: Partial<Petition>) =>
+      ({
+        ...petition,
+        _id: "petition-new",
+        petitionNo: "P-2611-0002",
+        qcReceivedAt: undefined,
+        qcCompletedAt: undefined,
+        ...overrides,
+      }) as Petition;
+
+    it("keeps a sample in ตัวอย่างใหม่ only, even after Lab receives it first", async () => {
+      serve([fresh({ status: "inProgress", labReceivedAt: "2026-09-11T07:00:00.000Z" })]);
+      mockedApi.getQCProgress.mockResolvedValue({});
+      render(<QueueDisplay mode="qc" />);
+
+      await waitFor(() => expect(within(columnOf("ตัวอย่างใหม่")).getByText("P-2611-0002")).toBeInTheDocument());
+      expect(within(columnOf("กำลังดำเนินการ")).queryByText("P-2611-0002")).not.toBeInTheDocument();
+      expect(screen.getAllByText("P-2611-0002")).toHaveLength(1);
+    });
+
+    it("moves the sample to กำลังดำเนินการ once QC receives it", async () => {
+      serve([fresh({ status: "pendingReview", qcReceivedAt: "2026-09-11T07:00:00.000Z" })]);
+      mockedApi.getQCProgress.mockResolvedValue({});
+      render(<QueueDisplay mode="qc" />);
+
+      await waitFor(() => expect(within(columnOf("กำลังดำเนินการ")).getByText("P-2611-0002")).toBeInTheDocument());
+      expect(within(columnOf("ตัวอย่างใหม่")).queryByText("P-2611-0002")).not.toBeInTheDocument();
+    });
+
+    it("moves the sample to กำลังดำเนินการ once QC starts recording results", async () => {
+      serve([fresh({ status: "sampleSent" })]);
+      mockedApi.getQCProgress.mockResolvedValue({
+        "petition-new": [{ itemSeq: 1, parameterId: "param-1", filledLabels: ["สี"] }],
+      });
+      render(<QueueDisplay mode="qc" />);
+
+      await waitFor(() => expect(within(columnOf("กำลังดำเนินการ")).getByText("P-2611-0002")).toBeInTheDocument());
+      expect(within(columnOf("ตัวอย่างใหม่")).queryByText("P-2611-0002")).not.toBeInTheDocument();
+    });
   });
 
   it("keeps empty queue groups visible while the overflowing column slides", async () => {

@@ -16,7 +16,8 @@ import {
   type PetitionProgress,
 } from "@/lib/qcProgress";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
-import { isVisibleInQcTestingQueue } from "@/lib/petitionQueueVisibility";
+import { qcQueueStatus } from "@/lib/qcQueueStatus";
+import { isLabAwaitingSgConfirmation } from "@/lib/sgConfirmation";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { calculateQueueItemsPerColumn } from "@/lib/queueDisplayRows";
 import { isNotificationSoundEnabled } from "@/lib/appPreferences";
@@ -48,8 +49,9 @@ const QUEUE_PAGE_MS = 10_000;
 const NEW_WORK_ALERT_MS = 10_000;
 const NEW_SAMPLE_SOUND_URL = `${import.meta.env.BASE_URL}sound/new.mp3`;
 
+// ตัวอย่างกลุ่มน้ำที่ QC ยังไม่ยืนยันค่า ถพ. ยังไม่ขึ้นบอร์ด Lab
 const petitionHasLabItems = (petition: Petition) =>
-  petition.items.some((item) => shouldSendItemToLab(item));
+  petition.items.some((item) => shouldSendItemToLab(item)) && !isLabAwaitingSgConfirmation(petition);
 
 // เวลาที่ฝั่งของบอร์ดนี้ "ออกผล" แล้ว: Lab = ออกผล Lab (labApprovedAt), QC = ยืนยันผล QC (qcCompletedAt)
 // ถ้า Lab ถูกขอตรวจซ้ำหลังออกผล ให้ถือว่ายังไม่ออกผล
@@ -62,11 +64,9 @@ const sideResultAt = (petition: Petition, mode: QueueMode): string | null => {
   return approvedAt;
 };
 
-const queueStatusFor = (petition: Petition, mode: QueueMode): PetitionStatus => {
+const queueStatusFor = (petition: Petition, mode: QueueMode, qcStarted = false): PetitionStatus => {
   if (sideResultAt(petition, mode)) return "success";
-  if (mode === "qc" && petition.status === "deliveringQC" && isVisibleInQcTestingQueue(petition)) {
-    return "inProgress";
-  }
+  if (mode === "qc") return qcQueueStatus(petition, qcStarted);
   return petition.status;
 };
 
@@ -447,12 +447,30 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
     return () => { cancelled = true; window.clearInterval(interval); };
   }, [visibleProgressIds]);
 
+  // ช่องที่แสดงของแต่ละคำร้อง — QC: เริ่มบันทึกผลแล้ว = มีค่าในพารามิเตอร์ QC
+  // (progress รวมผล Lab มาด้วย จึงกรองด้วยพารามิเตอร์ scope QC)
+  const displayStatusById = useMemo(() => {
+    const qcParameterIds = new Set(parameters.map((p) => String(p._id)));
+    const map = new Map<string, PetitionStatus>();
+    for (const petition of allItems) {
+      const qcStarted = (progressMap[petition._id] ?? []).some(
+        (entry) => qcParameterIds.has(String(entry.parameterId)) && entry.filledLabels.length > 0,
+      );
+      map.set(petition._id, queueStatusFor(petition, mode, qcStarted));
+    }
+    return map;
+  }, [allItems, mode, parameters, progressMap]);
+  const displayStatusOf = useCallback(
+    (petition: Petition) => displayStatusById.get(petition._id) ?? queueStatusFor(petition, mode),
+    [displayStatusById, mode],
+  );
+
   const itemsByGroup = useMemo(() => {
     return config.groups.map((group) => ({
       ...group,
-      items: allItems.filter((petition) => group.statuses.includes(queueStatusFor(petition, mode))),
+      items: allItems.filter((petition) => group.statuses.includes(displayStatusOf(petition))),
     }));
-  }, [allItems, config.groups, mode]);
+  }, [allItems, config.groups, displayStatusOf]);
 
   const queueResetKey = useMemo(
     () =>
@@ -460,11 +478,11 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
         .map((group) =>
           [
             group.id,
-            group.items.map((petition) => `${petition._id}:${queueStatusFor(petition, mode)}:${petition.updatedAt}`).join("|"),
+            group.items.map((petition) => `${petition._id}:${displayStatusOf(petition)}:${petition.updatedAt}`).join("|"),
           ].join("="),
         )
         .join(";"),
-    [itemsByGroup, mode],
+    [itemsByGroup, displayStatusOf],
   );
 
   const hasOverflowingGroup = useMemo(
@@ -592,7 +610,7 @@ export default function QueueDisplay({ mode }: { mode: QueueMode }) {
   const currentDate = formatDate(now);
 
   const renderQueueCard = (petition: Petition) => {
-    const queueStatus = queueStatusFor(petition, mode);
+    const queueStatus = displayStatusOf(petition);
     const showProgress =
       mode === "qc" &&
       (queueStatus === "sampleSent" || queueStatus === "pendingReview" || queueStatus === "inProgress");

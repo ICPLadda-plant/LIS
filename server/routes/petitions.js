@@ -22,6 +22,7 @@ const LabRequest = require('../models/LabRequest');
 const StandardTime = require('../models/StandardTime');
 const LabFreeAssign = require('../models/LabFreeAssign');
 const { buildStatusLog, hasLabTrack, shouldSendItemToLab, isPetitionComplete } = require('../lib/petitionStatusLog');
+const { isLabAwaitingSgConfirmation } = require('../lib/sgConfirmation');
 const { refreshLabExpected } = require('../lib/petitionEstimate');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { router: additionalSamplesRouter, changeAdditionalSampleState, currentUser, canTestSide } = require('./additionalSamples');
@@ -32,11 +33,15 @@ router.use(additionalSamplesRouter);
 const { normalizeAnalysisName, canonicalAnalysisName } = require('../lib/analysisName');
 const { buildProductionWorkflow } = require('../lib/productionWorkflow');
 const { resolveEmployeeActor } = require('../lib/employeeResolver');
+const { clearSideApprovals, upsertItemApproval, itemRequiresSide, findItemApproval, approvedBatchNos } = require('../lib/itemApprovals');
+const { resolveApprovalTabs } = require('../lib/qcApprovalAccess');
 const {
   isResearchAndDevelopmentDepartment,
   normalizePetitionItems,
+  normalizeSampledBy,
   requiresDeliveryAndBatch,
   requiresQcTrack,
+  routeTargetsForSubmission,
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
 
@@ -58,6 +63,25 @@ function logAudit(petition, payload) {
   });
   // Fan out to LINE groups (fire-and-forget; no-op unless configured + groups bound).
   notifyPetitionEvent(petition, payload);
+}
+
+// เลขรายการ (itemSeq) ที่ผล Lab เปลี่ยนระหว่าง snapshot ก่อน/หลังแก้ไข
+function changedLabResultSeqs(before, after) {
+  const fingerprint = (docs) => {
+    const map = new Map();
+    for (const d of docs || []) {
+      const key = `${d.itemSeq}__${d.parameterId}`;
+      map.set(key, JSON.stringify([d.values ?? null, d.valuesPhase2 ?? null, d.entries ?? null, d.remark ?? null]));
+    }
+    return map;
+  };
+  const a = fingerprint(before);
+  const b = fingerprint(after);
+  const seqs = new Set();
+  for (const key of new Set([...a.keys(), ...b.keys()])) {
+    if (a.get(key) !== b.get(key)) seqs.add(Number(key.split('__')[0]));
+  }
+  return [...seqs].filter(Number.isInteger).sort((x, y) => x - y);
 }
 
 // Generate next petition number from DocumentNumberConfig (default: P-YYMM-####).
@@ -876,14 +900,20 @@ router.post('/:id/lab-result-action', serializePetitionWrite(async (req, res) =>
     const user = await currentUser(req);
     if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
     if (!canTestSide(user, doc, 'lab')) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์แก้ไขผล Lab นี้' } });
+    // หัวหน้า Lab แก้ไขผลได้ทุกช่วง (หลังออกผล/หลัง Final Result) — ต้องมีเหตุผลและเก็บ log; ล้างค่ายังทำได้เฉพาะก่อนออกผล
+    const isLabHeadUser = normalizeRoles(user).some((role) => role === 'admin' || role === 'lab-head');
     if (['success', 'approved', 'rejected'].includes(doc.status) || doc.labApprovedAt) {
-      return res.status(409).json({ error: { message: 'ผล Lab ออกผลแล้ว ไม่สามารถแก้ไขหรือล้างค่าได้' } });
+      const headOverride = isLabHeadUser && doc.status !== 'rejected' && action !== 'clear';
+      if (!headOverride) return res.status(409).json({ error: { message: 'ผล Lab ออกผลแล้ว ไม่สามารถแก้ไขหรือล้างค่าได้' } });
     }
     if (!doc.labCompletedAt) return res.status(409).json({ error: { message: 'ยังไม่ได้บันทึกผล Lab' } });
 
     const actor = user.name || user.email;
     const now = new Date();
     const session = doc.labEditSession || null;
+    const batchesBefore = approvedBatchNos(doc);
+    const statusBeforeAction = doc.status;
+    let headApprovedSeqs = [];
     let note;
     let metadata;
 
@@ -900,6 +930,23 @@ router.post('/:id/lab-result-action', serializePetitionWrite(async (req, res) =>
       doc.labEditSession = null;
       note = action === 'edit-save' ? `บันทึกการแก้ไขผล Lab: ${session.reason}` : `ยกเลิกการแก้ไขผล Lab: ${session.reason}`;
       metadata = { side: 'lab', action, reason: session.reason, startedAt: session.startedAt, startedBy: session.startedBy, before: session.snapshot, after };
+      // หัวหน้า Lab แก้ไข = อนุมัติรายการที่แก้ทันที (ไม่ย้อนกลับไปรออนุมัติ)
+      if (action === 'edit-save' && isLabHeadUser) {
+        headApprovedSeqs = changedLabResultSeqs(session.snapshot, after)
+          .filter((seq) => itemRequiresSide(doc, (doc.items || []).find((it) => it.seq === seq), 'lab'));
+        for (const seq of headApprovedSeqs) {
+          const prev = findItemApproval(doc, seq, 'lab');
+          upsertItemApproval(doc, {
+            seq, side: 'lab', status: 'approved',
+            conclusion: prev?.status === 'approved' && prev.conclusion ? prev.conclusion : 'pass',
+            note: session.reason, by: actor, at: now, source: 'lab-head-edit',
+          });
+        }
+        if (headApprovedSeqs.length) {
+          note += ` — หัวหน้า Lab แก้ไข ถือว่าอนุมัติรายการที่ ${headApprovedSeqs.join(', ')}`;
+          metadata.headApprovedSeqs = headApprovedSeqs;
+        }
+      }
     } else {
       if (session) await restoreLabResults(doc._id, session.snapshot);
       const before = await clearLabResults(doc._id);
@@ -910,12 +957,19 @@ router.post('/:id/lab-result-action', serializePetitionWrite(async (req, res) =>
       metadata = { side: 'lab', action, reason, before, after: [], assignedTo: doc.assignedTo || null };
     }
     doc.markModified('labEditSession');
+    const approvalFlow = headApprovedSeqs.length ? require('./approvals') : null;
+    const finalPayload = approvalFlow ? await approvalFlow.finalizeIfComplete(doc, actor) : null;
     await doc.save();
     await PetitionAuditLog.create({
       petitionId: doc._id, petitionNo: doc.petitionNo,
       event: action === 'clear' ? 'labResultCleared' : 'labResultEdited',
-      fromStatus: doc.status, toStatus: doc.status, actor, note, metadata,
+      fromStatus: statusBeforeAction, toStatus: statusBeforeAction, actor, note, metadata,
     });
+    if (approvalFlow) {
+      if (finalPayload) approvalFlow.writeAudit(doc, finalPayload, true);
+      const batches = approvalFlow.newlyApprovedBatches(doc, batchesBefore);
+      if (batches.length) require('../lib/productionCallback').notifyProductionBatches(doc, batches);
+    }
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
@@ -962,6 +1016,7 @@ router.post('/:id/lab-recheck', serializePetitionWrite(async (req, res) => {
     doc.labRecheckRequestedBy = actor;
     doc.labRecheckReason = reason;
     doc.labRecheckCount = round;
+    clearSideApprovals(doc, 'lab');
     refreshLabExpected(doc);
     doc.status = 'pendingReview';
     doc.reviewHistory.push({ action: 'lab-recheck', reviewedBy: actor, reviewedAt: now, note: reason });
@@ -1003,6 +1058,7 @@ router.post('/:id/lab-reject', serializePetitionWrite(async (req, res) => {
     doc.labApprovedAt = null;
     doc.labApprovedBy = undefined;
     doc.labReturnNote = note;
+    clearSideApprovals(doc, 'lab');
     doc.reviewHistory.push({ action: 'lab-reject', reviewedBy: actor, reviewedAt: new Date(), note });
     await doc.save();
     logAudit(doc, {
@@ -1123,10 +1179,14 @@ router.post('/', async (req, res) => {
       petitionNo,
     });
     const submittedBy = await resolveEmployeeActor(body.submittedBy);
+    const sampledBy = normalizeSampledBy(body.sampledBy);
+    const routeTargets = routeTargetsForSubmission(body, items);
     const doc = await Petition.create({
       ...body,
       submittedBy,
       items,
+      sampledBy,
+      routeTargets,
       petitionNo,
       status: 'deliveringQC',
       revisionOf,
@@ -1192,6 +1252,9 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
     if (pendingAdditionalSamples(before, side).length) return res.status(409).json({ error: { message: 'กรุณาสแกน QR ใบนำส่งตัวอย่างเพิ่มของรอบนี้' } });
     if (before.additionalSampleRequests?.some(round => round.side === side)) return res.status(409).json({ error: { message: 'รับตัวอย่างเดิมแล้ว กรุณาใช้ QR รอบตัวอย่างเพิ่ม' } });
     if (side === 'qc' && !requiresQcTrack(before)) return badRequest(res, 'คำขอ R&D ไม่ต้องส่ง QC');
+    if (side === 'lab' && isLabAwaitingSgConfirmation(before)) {
+      return res.status(409).json({ error: { message: 'รอ QC ยืนยันค่า ถพ. ก่อน Lab จึงรับตัวอย่างได้' } });
+    }
     const now = new Date();
     const update = {
       [`${side}ReceivedBy`]: actor,
@@ -1462,7 +1525,7 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
 router.patch('/:id', serializePetitionWrite(async (req, res) => {
   try {
     const updates = { ...req.body };
-    const managedFields = ['additionalSampleRequests', 'assignedTo', 'assignedMachines', 'labExpected', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
+    const managedFields = ['itemApprovals', 'additionalSampleRequests', 'assignedTo', 'assignedMachines', 'labExpected', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
     if (Object.keys(updates).some(key => key.startsWith('$') || key.includes('.') || managedFields.includes(key))) return badRequest(res, 'ข้อมูลสถานะและรอบตัวอย่างต้องเปลี่ยนผ่านขั้นตอนที่กำหนด');
     let actor = updates.actor;
     delete updates.actor;
@@ -1489,6 +1552,19 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
     }
 
     const hasCompletedTrack = before.status === 'success' || Boolean(before.qcCompletedAt || before.labCompletedAt);
+
+    // Final Result / ส่งกลับทั้งใบจากหน้า /qc-approval — ตรวจสิทธิ์ระดับ tab (QC Approver เห็นแค่ tab QC)
+    if (updates.status === 'approved' || updates.status === 'rejected') {
+      const approvalUser = await currentUser(req);
+      if (!approvalUser) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+      const tabs = await resolveApprovalTabs(approvalUser);
+      const target = req.body.target;
+      const needed = updates.status === 'approved'
+        ? [requiresQcTrack(before) && 'qc', hasLabTrack(before) && 'lab'].filter(Boolean)
+        : [['qc', 'both'].includes(target) && 'qc', ['lab', 'both'].includes(target) && 'lab'].filter(Boolean);
+      const allowed = tabs.length > 0 && needed.every((side) => tabs.includes(side));
+      if (!allowed) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์ดำเนินการกับผลฝั่งนี้' } });
+    }
 
     // Approve after either QC or Lab has confirmed results.
     if (updates.status === 'approved') {
@@ -1568,11 +1644,13 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
         before.labApprovedAt = null;
         before.labApprovedBy = undefined;
         before.labReturnNote = note;
+        clearSideApprovals(before, 'lab');
       }
       if (target === 'qc' || target === 'both') {
         before.qcCompletedAt = null;
         before.qcCompletedBy = undefined;
         before.qcReturnNote = note;
+        clearSideApprovals(before, 'qc');
       }
       before.reviewHistory.push({ action: 'reject', reviewedBy: actor || 'system', reviewedAt: new Date(), note });
       const targetLabel = target === 'lab' ? 'ฝั่ง Lab' : target === 'qc' ? 'ฝั่ง QC' : 'ทั้ง Lab และ QC';

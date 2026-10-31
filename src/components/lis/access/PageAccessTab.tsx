@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Globe2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { isPublicPath, userCanAccessPath } from "@/lib/accessControl";
 import { PAGE_ITEMS, type NavItem } from "@/lib/navItems";
 import { unionPermissions } from "@/lib/roles";
 import { rankSearchResults } from "@/lib/searchRanking";
-import { tabsFor } from "@/lib/tabRegistry";
+import { configurableTabsFor, denyToken, tabsFor } from "@/lib/tabRegistry";
 import type { AccessGroup, AppUser, Role } from "./types";
 
 const BADGE_LIMIT = 5;
@@ -30,6 +30,7 @@ type PageAccessRow = PageDescriptor & {
   owner: PageOwner;
   roles: Role[];
   users: AppUser[];
+  tabs: { key: string; label: string; roles: Role[]; users: AppUser[] }[];
 };
 
 type PageAccessTabProps = {
@@ -136,6 +137,26 @@ function userCanAccessPage(user: AppUser, path: string, permissions: Record<stri
   );
 }
 
+function userRoleIds(user: AppUser) {
+  return user.roleIds.length > 0 ? user.roleIds : [user.roleId];
+}
+
+// แถวย่อยสิทธิ์ระดับ tab (deny model): เข้าหน้าได้ และไม่มี deny:/page/tab ใน permission รวม — admin เห็นทุก tab
+function tabAccessRows(path: string, pageRoles: Role[], pageUsers: AppUser[], permissions: Record<string, string[]>) {
+  return configurableTabsFor(path).map((tab) => {
+    const token = denyToken(path, tab.key);
+    return {
+      key: tab.key,
+      label: tab.label,
+      roles: pageRoles.filter((role) => role.id === "admin" || !(permissions[role.id] ?? []).includes(token)),
+      users: pageUsers.filter((user) => {
+        const ids = userRoleIds(user);
+        return ids.includes("admin") || !unionPermissions(ids, permissions).includes(token);
+      }),
+    };
+  });
+}
+
 function VisibleBadges({ values, emptyText }: { values: string[]; emptyText: string }) {
   if (values.length === 0) {
     return <span className="text-xs text-muted-foreground">{emptyText}</span>;
@@ -164,12 +185,17 @@ export default function PageAccessTab({ groups, roles, users, permissions }: Pag
   const [search, setSearch] = useState("");
 
   const rows = useMemo<PageAccessRow[]>(() => {
-    return buildPageDescriptors(groups).map((page) => ({
-      ...page,
-      owner: pageOwnerFor(page.path, groups),
-      roles: roles.filter((role) => roleCanAccessPath(role.id, page.path, permissions, groups)),
-      users: users.filter((user) => userCanAccessPage(user, page.path, permissions, groups)),
-    }));
+    return buildPageDescriptors(groups).map((page) => {
+      const pageRoles = roles.filter((role) => roleCanAccessPath(role.id, page.path, permissions, groups));
+      const pageUsers = users.filter((user) => userCanAccessPage(user, page.path, permissions, groups));
+      return {
+        ...page,
+        owner: pageOwnerFor(page.path, groups),
+        roles: pageRoles,
+        users: pageUsers,
+        tabs: tabAccessRows(page.path, pageRoles, pageUsers, permissions),
+      };
+    });
   }, [groups, permissions, roles, users]);
 
   const filteredRows = useMemo(() => {
@@ -244,7 +270,8 @@ export default function PageAccessTab({ groups, roles, users, permissions }: Pag
             {filteredRows.map((row) => {
               const Icon = row.icon ?? Globe2;
               return (
-                <TableRow key={row.path}>
+                <Fragment key={row.path}>
+                <TableRow>
                   <TableCell>
                     <div className="flex items-start gap-2">
                       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -274,6 +301,27 @@ export default function PageAccessTab({ groups, roles, users, permissions }: Pag
                     </div>
                   </TableCell>
                 </TableRow>
+                {row.tabs.map((tab) => (
+                  <TableRow key={`${row.path}#${tab.key}`} className="bg-muted/30">
+                    <TableCell className="pl-10">
+                      <p className="text-sm">แท็บ: {tab.label}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{row.path}/{tab.key}</p>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">ตามหน้าหลัก</span>
+                    </TableCell>
+                    <TableCell>
+                      <VisibleBadges values={tab.roles.map((role) => role.name)} emptyText="ไม่มี role" />
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">{tab.users.length} คน</p>
+                        <VisibleBadges values={tab.users.map((user) => user.name)} emptyText="ไม่มีผู้ใช้" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                </Fragment>
               );
             })}
           </TableBody>

@@ -19,6 +19,7 @@ import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import type { QCTestResult } from "@/types/petition.types";
 import { useAuth } from "@/hooks/useAuth";
 import { normalizeRoles } from "@/lib/roles";
+import LabHeadEditAction from "@/components/lis/approval/LabHeadEditAction";
 
 const PHYSICAL_PARAMETER_NAME = "กายภาพ";
 
@@ -120,6 +121,7 @@ export default function LabResultDetailPage() {
           }
           actions={
             <div className="flex flex-wrap justify-end gap-2">
+              <LabHeadEditAction petition={petition} />
               <Button variant="primary-outline" onClick={() => labResultPrintable && setPrintOpen(true)} disabled={!labResultPrintable} className="gap-2">
                 <Printer className="h-4 w-4" /> พิมพ์ผลวิเคราะห์ Lab
               </Button>

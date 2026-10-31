@@ -4,7 +4,7 @@ const DEV_EMAIL_SUFFIX = '.dev@icpladda.com';
 const KNOWN_ROLE_IDS = [
   'lab-data-config', 'lab-inventory', 'lab-analyze', 'lab-analyst',
   'qc-data-config', 'qc-reviewer', 'lab-config', 'lab-head',
-  'qc-staff', 'qc-head', 'viewer', 'admin', 'lab', 'qc',
+  'qc-staff', 'qc-head', 'qc-approver', 'viewer', 'admin', 'lab', 'qc',
 ].sort((a, b) => b.length - a.length);
 
 function syntheticDevRolesFromEmail(email) {

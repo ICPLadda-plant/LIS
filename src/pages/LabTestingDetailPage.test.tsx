@@ -6,6 +6,7 @@ import LabTestingDetailPage from "./LabTestingDetailPage";
 
 const mockNavigate = vi.hoisted(() => vi.fn());
 const mockSaveQCResult = vi.hoisted(() => vi.fn());
+const mockAuthRoles = vi.hoisted(() => ({ roles: ["admin"] as string[] }));
 
 const fixtures = vi.hoisted(() => {
   const petition: Petition = {
@@ -151,7 +152,7 @@ vi.mock("@/hooks/useAuth", () => ({
     user: {
       name: "พรหมพิริยะ ทองรุ่งรัตนกุล",
       email: "prompiriya.t@example.com",
-      roles: ["admin"],
+      roles: mockAuthRoles.roles,
     },
   }),
 }));
@@ -199,6 +200,7 @@ describe("LabTestingDetailPage", () => {
 
   beforeEach(() => {
     mockNavigate.mockClear();
+    mockAuthRoles.roles = ["admin"];
     mockState.activeFixtures = fixtures;
     mockState.parametersError = false;
     mockSaveQCResult.mockReset();
@@ -428,7 +430,8 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByRole("button", { name: "ยกเลิก" })).toBeEnabled();
   });
 
-  it("locks Lab results after Lab approval", async () => {
+  it("locks Lab results after Lab approval for analysts", async () => {
+    mockAuthRoles.roles = ["lab-analyze"];
     mockState.activeFixtures = {
       ...fixtures,
       petition: {
@@ -443,6 +446,24 @@ describe("LabTestingDetailPage", () => {
 
     expect((await screen.findAllByRole("spinbutton"))[0]).toBeDisabled();
     expect(screen.queryByRole("button", { name: /แก้ไข/ })).not.toBeInTheDocument();
+  });
+
+  it("lets the Lab head edit (but not clear) results after Lab approval", async () => {
+    mockAuthRoles.roles = ["lab-head"];
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        status: "approved",
+        labCompletedAt: "2026-07-13T03:00:00.000Z",
+        labApprovedAt: "2026-07-13T04:00:00.000Z",
+      },
+    };
+
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByRole("button", { name: /แก้ไข/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ล้างค่า/ })).not.toBeInTheDocument();
   });
 
   it("keeps an assigned Lab item visible and prevents completion when no parameter matches", async () => {

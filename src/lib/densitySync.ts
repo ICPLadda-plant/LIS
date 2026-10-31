@@ -29,6 +29,22 @@ export function isSgMachineUnitKey(key: string, label: string): boolean {
   return isSgValueKey(key) || label === SG_VALUE_LABEL || label.startsWith(`${SG_VALUE_LABEL} —`) || label === SG_TEMP_LABEL;
 }
 
+// ช่องอุณหภูมิของ "ค่า ถพ." ล็อกไว้เฉพาะตอนค่ามาจากเครื่อง (Result-Density)
+// QC เลือก "กรอกค่าเอง" หรือค่า ถพ./อุณหภูมิที่บันทึกไว้ไม่มีที่มาจากเครื่อง → ต้องกรอกอุณหภูมิเองได้
+export function isSgTemperatureEditable(
+  values: Record<string, unknown> | undefined,
+  manualSelected: boolean,
+): boolean {
+  if (manualSelected) return true;
+  for (const [key, value] of Object.entries(values ?? {})) {
+    if (key !== SG_TEMP_LABEL && !isSgValueKey(key)) continue;
+    if (value == null || value === '') continue;
+    const src = values?.[sourceSiblingKey(key)] as { source?: string } | undefined;
+    if (src?.source !== 'instrument') return true;
+  }
+  return false;
+}
+
 function firstDensityColumnValue(row: Record<string, unknown>, columns: string[]): unknown {
   for (const column of columns) {
     const value = row[column];

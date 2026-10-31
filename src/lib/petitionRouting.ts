@@ -1,4 +1,4 @@
-import type { Petition } from "@/types/petition.types";
+import type { Petition, PetitionRouteTarget } from "@/types/petition.types";
 
 export function isResearchAndDevelopmentDepartment(department: unknown): boolean {
   return String(department ?? "").replace(/\s+/g, "").toLowerCase() === "r&d";
@@ -23,6 +23,7 @@ export type LabRouteItem = {
   commonName?: string;
   batchNo?: unknown;
   sendToLab?: unknown;
+  sendToQc?: unknown;
   note?: unknown;
   MF_Before?: unknown;
   MF_Lasted?: unknown;
@@ -91,14 +92,53 @@ export function defaultSendItemToLab(item: Pick<LabRouteItem, "batchNo" | "sampl
   return isMandatoryLabProduct(item) || isMfFiveBatchLabHold(item) || isLabBatchNo(item.batchNo);
 }
 
+/**
+ * รายการที่มี sendToQc เป็น boolean = ฝ่ายผลิตเลือก "ส่งวิเคราะห์" QC / Lab (AI) เองแล้ว
+ * ค่า sendToLab ของรายการนั้นเป็นค่าจริง ห้ามกฎ LIS (PUBLIC HEALTH, batch 1/6 ฯลฯ) override
+ */
+export function hasProductionSendTargets(item: LabRouteItem | null | undefined): boolean {
+  return typeof item?.sendToQc === "boolean";
+}
+
 export function shouldSendItemToLab(item: LabRouteItem | null | undefined): boolean {
   if (!item) return false;
+  if (hasProductionSendTargets(item) && typeof item.sendToLab === "boolean") return item.sendToLab;
   if (isMandatoryLabProduct(item)) return true;
   return typeof item.sendToLab === "boolean" ? item.sendToLab : defaultSendItemToLab(item);
 }
 
+/** ตัวอย่างนี้ต้องให้ QC ทดสอบไหม — คำร้องเก่าที่ไม่มี sendToQc ถือว่าส่ง QC */
+export function shouldSendItemToQc(item: Pick<LabRouteItem, "sendToQc"> | null | undefined): boolean {
+  return Boolean(item) && item.sendToQc !== false;
+}
+
+/** รายการฝั่ง QC ของคำร้อง (ตัดตัวอย่างที่ฝ่ายผลิตไม่ได้ติ๊กส่ง QC ออก) */
+export function qcSideItems<T extends Pick<LabRouteItem, "sendToQc">>(
+  petition: { items?: T[] } | null | undefined,
+  items: T[] = petition?.items ?? [],
+): T[] {
+  return items.filter((item) => shouldSendItemToQc(item));
+}
+
+/** ฝ่ายผลิตต้องเลือกส่งวิเคราะห์อย่างน้อย 1 ช่องต่อ batch */
+export function sendTargetsRequiredError(items: LabRouteItem[]): string | null {
+  const missing = items.find((item) => hasProductionSendTargets(item) && item.sendToQc !== true && item.sendToLab !== true);
+  if (!missing) return null;
+  const label = missing.seq ? `ลำดับ ${missing.seq}` : missing.sampleName || String(missing.batchNo ?? "").trim() || "นี้";
+  return `ตัวอย่าง${label}: กรุณาเลือกส่งวิเคราะห์อย่างน้อย 1 ช่อง (QC หรือ Lab (AI))`;
+}
+
+/** ทุกตัวอย่างไม่ส่ง QC → คำร้องไม่มีเส้นทาง QC (คืน null = ใช้เส้นทางตามกฎเดิม) */
+export function routeTargetsFromSendTargets(items: LabRouteItem[]): PetitionRouteTarget[] | null {
+  if (!items.length || !items.every(hasProductionSendTargets)) return null;
+  if (items.some((item) => shouldSendItemToQc(item))) return null;
+  return items.some((item) => shouldSendItemToLab(item)) ? ["lab"] : null;
+}
+
 export function hasSendToLabOverride(item: LabRouteItem | null | undefined): boolean {
   if (!item || typeof item.sendToLab !== "boolean") return false;
+  // ฝ่ายผลิตติ๊กเพิ่ม/เอาออกได้อิสระ ไม่ต้องใส่เหตุผล
+  if (hasProductionSendTargets(item)) return false;
   if (isMandatoryLabProduct(item)) return false;
   return item.sendToLab !== defaultSendItemToLab(item);
 }

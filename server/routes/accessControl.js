@@ -38,6 +38,7 @@ const defaultRoles = [
   { id: LAB_BASE_ROLE, name: 'Lab Analyze', description: 'Base Lab analysis workspace', permissions: ['dashboard', 'samples', 'results', '/petition/assign', '/lab-testing', '/lab-testing/:id'], family: 'lab', dashboardProfile: 'lab-analyze' },
   { id: QC_BASE_ROLE, name: 'QC Staff', description: 'Base QC receiving and tracking workspace', permissions: ['dashboard', 'samples', 'qc', '/qc-testing', '/qc-testing/:id'], family: 'qc', dashboardProfile: 'qc-staff' },
   { id: 'qc-head', name: 'QC Head', description: 'Full Access Data and Approve', permissions: ['/petitions', '/qc-approval', '/stock'], family: 'qc' },
+  { id: 'qc-approver', name: 'QC Approver', description: 'อนุมัติหรือไม่อนุมัติผล QC (ไม่รวมผล Lab)', permissions: ['/qc-approval', 'deny:/qc-approval/lab'], family: 'qc' },
   { id: 'lab', name: 'Lab Analyst', description: 'Sample handling and result entry', permissions: ['dashboard', 'samples', 'results', 'stock'], family: 'lab' },
   { id: 'qc', name: 'QC Reviewer', description: 'Review and approve results', permissions: ['dashboard', 'results', 'qc', 'reports'], family: 'qc' },
   { id: 'viewer', name: 'Viewer', description: 'Read-only access to dashboards and reports', permissions: ['dashboard', 'reports'], family: '' },
@@ -55,6 +56,7 @@ const knownRoleFamilies = new Map([
   ['qc-reviewer', 'qc'],
   ['qc-data-config', 'qc'],
   ['qc-head', 'qc'],
+  ['qc-approver', 'qc'],
 ]);
 
 const defaultRolePermissionGrants = [
@@ -185,7 +187,8 @@ async function ensureGroups() {
 }
 
 async function ensureRoleFamilyDefaults() {
-  for (const role of defaultRoles.filter((item) => [LAB_BASE_ROLE, QC_BASE_ROLE].includes(item.id))) {
+  // qc-approver: สร้างครั้งแรกเท่านั้น (admin แก้สิทธิ์ต่อได้ใน access matrix โดยไม่ถูกทับ)
+  for (const role of defaultRoles.filter((item) => [LAB_BASE_ROLE, QC_BASE_ROLE, 'qc-approver'].includes(item.id))) {
     await Role.updateOne(
       { id: role.id },
       { $setOnInsert: role },

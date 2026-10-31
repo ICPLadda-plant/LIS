@@ -54,6 +54,7 @@ import { api, type ParameterItem } from '@/lib/api';
 import type { QCTestResult } from '@/types/petition.types';
 import { findSgParameter, type SgParameter } from '@/lib/formSpecificGravity';
 import { buildApprovalGroups } from '@/lib/qcApprovalRows';
+import ParameterRemarksCard from '@/components/lis/ParameterRemarksCard';
 import { buildLaLisAssistant, type LaLisIssue } from '@/lib/laLisAssistant';
 import { buildLabResultReportPages } from '@/lib/labResultReport';
 import { canPrintSampleLabel, canPrintPreReport, canPrintLabResult } from '@/lib/petitionPrintability';
@@ -548,6 +549,8 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                 {laLisSummary && <LaLisAssistantPanel summary={laLisSummary} />}
 
                 <PetitionView petition={data} hideMissingStandardBadge={isResultMode} />
+
+                <ParameterRemarksCard petition={data} results={qcResults} parameters={parameters} />
 
               </div>
 

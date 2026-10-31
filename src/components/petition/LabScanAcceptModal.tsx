@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { normalizeRoles } from '@/lib/roles';
 import { isAssignedTo } from '@/lib/assignment';
 import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isLabAwaitingSgConfirmation, SG_PENDING_LABEL } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { additionalSamplePayload, extractScannedCode, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
 
@@ -80,6 +81,13 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       // Must have at least one lab item
       if (labReceivableItems(found).length === 0) {
         setErrorMsg('คำร้องนี้ไม่มีรายการ Lab');
+        setPhase('error');
+        return;
+      }
+
+      // ตัวอย่างกลุ่มน้ำ: รอ QC ยืนยันค่า ถพ. ก่อน Lab จึงรับได้
+      if (!request && isLabAwaitingSgConfirmation(found)) {
+        setErrorMsg(`${SG_PENDING_LABEL} — Lab จะรับตัวอย่างได้หลัง QC ยืนยันค่า ถพ.`);
         setPhase('error');
         return;
       }

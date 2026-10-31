@@ -15,6 +15,8 @@ import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
+import { useAccessibleTabs } from "@/hooks/useAccessibleTabs";
+import { sideApprovalProgress, type ApprovalSide } from "@/lib/itemApprovals";
 
 const API_BASE = import.meta.env.BASE_URL + "api";
 
@@ -60,8 +62,17 @@ const QCApproval = () => {
       ),
     [petitions, abnormalMap, returnedMap],
   );
-  const qcPetitions = sortedPetitions.filter((petition) => !!petition.qcCompletedAt);
-  const labPetitions = sortedPetitions.filter((petition) => !!petition.labCompletedAt);
+  // แต่ละ tab แสดงเฉพาะคำร้องที่ฝั่งนั้นยืนยันผลแล้วและยังมีรายการรออนุมัติ
+  const hasPendingItems = (petition: Petition, side: ApprovalSide) => {
+    const progress = sideApprovalProgress(petition, side);
+    return progress.total > 0 && progress.pending > 0;
+  };
+  const qcPetitions = sortedPetitions.filter((petition) => !!petition.qcCompletedAt && hasPendingItems(petition, "qc"));
+  const labPetitions = sortedPetitions.filter((petition) => !!petition.labCompletedAt && hasPendingItems(petition, "lab"));
+  const { isVisible } = useAccessibleTabs("/qc-approval");
+  const showQcTab = isVisible("qc");
+  const showLabTab = isVisible("lab");
+  const visibleCount = (showQcTab ? qcPetitions.length : 0) + (showLabTab ? labPetitions.length : 0);
 
   useEffect(() => {
     getAiStatus().then((s) => setOllamaAvailable(s.available));
@@ -168,7 +179,14 @@ const QCApproval = () => {
         );
       },
     },
-    { key: "count", header: "จำนวนรายการ", cell: (p) => `${p.items?.length ?? 0} รายการ` },
+    {
+      key: "count",
+      header: "อนุมัติแล้ว",
+      cell: (p) => {
+        const progress = sideApprovalProgress(p, side);
+        return `${progress.approved}/${progress.total} รายการ`;
+      },
+    },
     {
       key: "submittedAt",
       header: "ยืนยันผลเมื่อ",
@@ -265,15 +283,15 @@ const QCApproval = () => {
               ออก Final Result
             </span>
           }
-          description={`ตรวจสอบผลที่ QC หรือ Lab ยืนยันแล้ว · ${sortedPetitions.length} คำร้อง`}
+          description={`ตรวจสอบและอนุมัติผลทีละรายการ (batch × common name) · ${visibleCount} คำร้องรออนุมัติ`}
         />
 
-        <Tabs defaultValue="qc" className="space-y-4">
+        <Tabs defaultValue={showQcTab ? "qc" : "lab"} key={showQcTab ? "qc" : "lab"} className="space-y-4">
           <TabsList>
-            <TabsTrigger value="qc">ผล QC ({qcPetitions.length})</TabsTrigger>
-            <TabsTrigger value="lab">ผล Lab ({labPetitions.length})</TabsTrigger>
+            {showQcTab && <TabsTrigger value="qc">ผล QC ({qcPetitions.length})</TabsTrigger>}
+            {showLabTab && <TabsTrigger value="lab">ผล Lab ({labPetitions.length})</TabsTrigger>}
           </TabsList>
-          <TabsContent value="qc">
+          {showQcTab && <TabsContent value="qc">
             <DataTable
               columns={columns("qc")}
               data={qcPetitions}
@@ -283,8 +301,8 @@ const QCApproval = () => {
               emptyTitle="ไม่มีผล QC ที่ยืนยันแล้ว"
               tableClassName="min-w-[800px]"
             />
-          </TabsContent>
-          <TabsContent value="lab">
+          </TabsContent>}
+          {showLabTab && <TabsContent value="lab">
             <DataTable
               columns={columns("lab")}
               data={labPetitions}
@@ -294,7 +312,7 @@ const QCApproval = () => {
               emptyTitle="ไม่มีผล Lab ที่ยืนยันแล้ว"
               tableClassName="min-w-[800px]"
             />
-          </TabsContent>
+          </TabsContent>}
         </Tabs>
       </div>
     </AppLayout>

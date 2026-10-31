@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
@@ -46,6 +47,8 @@ export interface ItemRowValues {
   testUnit: string;
   testItems: string;
   sendToLab?: boolean;
+  /** ฝ่ายผลิตเลือกส่ง QC (default true) — มีค่า boolean = sendToLab เป็นค่าที่ผลิตเลือกเอง */
+  sendToQc?: boolean;
   MF_Before?: string | null;
   MF_Lasted?: string | null;
   MF_GapDays?: number | null;
@@ -77,6 +80,8 @@ interface Props {
   masterItemsLoading?: boolean;
   /** ส่งทั้ง QC และ LAB: บังคับ 2 ตัวอย่าง ปริมาณน้อยกว่าไป QC มากกว่าไป LAB */
   splitQcLab?: boolean;
+  /** ฝ่ายผลิต: แสดง "ส่งวิเคราะห์" QC / Lab (AI) ต่อ batch ให้ติ๊กเองได้อิสระ */
+  showSendTargets?: boolean;
 }
 
 function quantityNumber(value: string | undefined): number | null {
@@ -173,6 +178,7 @@ export default function ItemsStep({
   masterItemOptions = [],
   masterItemsLoading = false,
   splitQcLab = false,
+  showSendTargets = false,
 }: Props) {
   useEffect(() => {
     if (!splitQcLab || !value.some((item) => item.sampleQuantity !== 2)) return;
@@ -192,6 +198,8 @@ export default function ItemsStep({
     const followsDefault = typeof item.sendToLab !== 'boolean' || item.sendToLab === previousDefault;
     const next = { ...item, ...patch };
     const nextDefault = defaultSendItemToLab(next);
+    // ฝ่ายผลิตเลือกเองได้: เปลี่ยนตาม default เฉพาะเมื่อยังไม่เคยติ๊กต่างจาก default (ไม่บังคับ PUBLIC HEALTH)
+    if (showSendTargets) return followsDefault ? { ...patch, sendToLab: nextDefault } : patch;
     if (isMandatoryLabProduct(next)) return { ...patch, sendToLab: true };
     if (!syncDefault && !isMandatoryLabProduct(item)) {
       return followsDefault && !previousDefault && nextDefault ? { ...patch, sendToLab: true } : patch;
@@ -265,6 +273,7 @@ export default function ItemsStep({
         submissionNo: '',
         testUnit: '',
         testItems: '',
+        ...(showSendTargets ? { sendToLab: false, sendToQc: true } : {}),
         sampleQuantity: 1,
         labelQuantity: '',
         note: '',
@@ -377,7 +386,35 @@ export default function ItemsStep({
                     />
                   </div>
                 )}
-                {requireDeliveryAndBatch && (
+                {requireDeliveryAndBatch && showSendTargets && (
+                  <div className="sm:col-span-2 rounded-lg border bg-card p-3">
+                    <div className="text-sm font-medium text-foreground">ส่งวิเคราะห์</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={it.sendToQc !== false}
+                          onCheckedChange={(checked) => setItem(idx, { sendToQc: checked === true, sendToLab: lab })}
+                          disabled={itemsReadOnly}
+                          aria-label={`ส่งวิเคราะห์ QC ตัวอย่างที่ ${it.seq}`}
+                        />
+                        QC
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={lab}
+                          onCheckedChange={(checked) => setItem(idx, { sendToLab: checked === true, sendToQc: it.sendToQc !== false })}
+                          disabled={itemsReadOnly}
+                          aria-label={`ส่งวิเคราะห์ Lab (AI) ตัวอย่างที่ ${it.seq}`}
+                        />
+                        Lab (AI)
+                      </label>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      ค่าเริ่มต้นตามเลขแบชหรือกลุ่มสินค้า: {labDefault ? 'ส่ง Lab' : 'ไม่ส่ง Lab'}{labBatchSuffix ? ` (ลงท้าย ${batchSuffix})` : ''} · เลือกอย่างน้อย 1 ช่อง
+                    </p>
+                  </div>
+                )}
+                {requireDeliveryAndBatch && !showSendTargets && (
                   <div className="sm:col-span-2 text-xs text-grey-500">
                     ระบบกำหนดการส่ง LAB จากเลขแบชหรือกลุ่ม PUBLIC HEALTH/LIVE STOCK: {labDefault ? 'ส่ง LAB' : 'ไม่ส่ง LAB'}{labBatchSuffix ? ` (ลงท้าย ${batchSuffix})` : ''}
                   </div>

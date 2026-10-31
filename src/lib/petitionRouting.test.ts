@@ -6,8 +6,12 @@ import {
   hasSendToLabOverride,
   labSendOverrideNoteError,
   isResearchAndDevelopmentPetition,
+  qcSideItems,
   requiresQcTrack,
+  routeTargetsFromSendTargets,
+  sendTargetsRequiredError,
   shouldSendItemToLab,
+  shouldSendItemToQc,
 } from "./petitionRouting";
 import type { Petition } from "@/types/petition.types";
 
@@ -136,3 +140,42 @@ describe("petitionRouting", () => {
     expect(duplicateBatchError(items)).toBe("พบ batch ซ้ำ: BATCH002");
   });
 });
+
+describe("production send targets (QC / Lab (AI))", () => {
+  const publicHealth = { seq: 1, sampleName: "S", commonName: "DELTAMETHRIN 1% W/V EC (PUBLIC HEALTH)", batchNo: "B-1" };
+
+  it("respects production's sendToLab over LIS rules and needs no reason", () => {
+    const unticked = { ...publicHealth, sendToQc: true, sendToLab: false, note: "" };
+    expect(shouldSendItemToLab(unticked)).toBe(false);
+    expect(hasSendToLabOverride(unticked)).toBe(false);
+    expect(labSendOverrideNoteError([unticked, { seq: 2, sampleName: "X", batchNo: "B-2", sendToQc: true, sendToLab: true }])).toBeNull();
+  });
+
+  it("keeps the legacy mandatory Lab rule for items without a production choice", () => {
+    expect(shouldSendItemToLab({ ...publicHealth, sendToLab: false })).toBe(true);
+  });
+
+  it("filters QC-side items by sendToQc, treating legacy items as QC", () => {
+    const items = [
+      { seq: 1, sampleName: "A", batchNo: "B-2" },
+      { seq: 2, sampleName: "B", batchNo: "B-3", sendToQc: false, sendToLab: true },
+      { seq: 3, sampleName: "C", batchNo: "B-4", sendToQc: true, sendToLab: false },
+    ];
+    expect(shouldSendItemToQc(items[0])).toBe(true);
+    expect(qcSideItems({ items }).map((item) => item.seq)).toEqual([1, 3]);
+  });
+
+  it("requires at least one target per batch", () => {
+    expect(sendTargetsRequiredError([{ seq: 4, sampleName: "S", batchNo: "B-2", sendToQc: false, sendToLab: false }]))
+      .toBe("ตัวอย่างลำดับ 4: กรุณาเลือกส่งวิเคราะห์อย่างน้อย 1 ช่อง (QC หรือ Lab (AI))");
+    expect(sendTargetsRequiredError([{ seq: 4, sampleName: "S", batchNo: "B-2", sendToQc: false, sendToLab: true }])).toBeNull();
+  });
+
+  it("drops the QC route only when no batch is sent to QC", () => {
+    const labOnly = { sampleName: "S", batchNo: "B-2", sendToQc: false, sendToLab: true };
+    expect(routeTargetsFromSendTargets([labOnly, labOnly])).toEqual(["lab"]);
+    expect(routeTargetsFromSendTargets([labOnly, { ...labOnly, sendToQc: true }])).toBeNull();
+    expect(routeTargetsFromSendTargets([{ sampleName: "S", batchNo: "B-2" }])).toBeNull();
+  });
+});
+

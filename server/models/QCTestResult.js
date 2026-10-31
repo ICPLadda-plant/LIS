@@ -18,6 +18,10 @@ const qcTestResultSchema = new mongoose.Schema(
     // For multiEntry parameters only — an array of value-objects, each holding
     // the full field set for one entry. Empty/absent for normal parameters.
     entries:       { type: [mongoose.Schema.Types.Mixed], default: undefined },
+    // หมายเหตุอิสระของผู้บันทึกผล ต่อ parameter ต่อตัวอย่าง (ใช้ทั้ง QC และ Lab) — ไม่พิมพ์ใน COA
+    remark:        { type: String, default: '' },
+    remarkBy:      { name: String, email: String },
+    remarkAt:      { type: Date },
     enteredBy:     { name: String, email: String },
     enteredAt:     { type: Date },
     updatedBy:     { name: String, email: String },

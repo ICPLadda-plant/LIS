@@ -144,22 +144,38 @@ describe('R&D integration request rules', () => {
     expect(items.map((item) => item.sendToLab)).toEqual([false, true]);
   });
 
-  it('sets PUBLIC HEALTH and LIVE STOCK query items to Lab even when batch is non-Lab', () => {
+  it('defaults PUBLIC HEALTH and LIVE STOCK query items to Lab when production sends no choice', () => {
     const items = makeInitialItemsFromQuery(
       new URLSearchParams(
-        'sampleName=Foo,Bar&commonName=DELTAMETHRIN%201%25%20W%2FV%20EC%20(PUBLIC%20HEALTH),BIFENTHRIN%2010%25%20W%2FV%20EC%20(LIVE%20STOCK)&batchNo=BATCH002,BATCH002&sendToLab=false,false',
+        'sampleName=Foo,Bar&commonName=DELTAMETHRIN%201%25%20W%2FV%20EC%20(PUBLIC%20HEALTH),BIFENTHRIN%2010%25%20W%2FV%20EC%20(LIVE%20STOCK)&batchNo=BATCH002,BATCH002',
       ),
     );
 
     expect(items.map((item) => item.sendToLab)).toEqual([true, true]);
+    expect(items.map((item) => item.sendToQc)).toEqual([true, true]);
   });
 
-  it('sets a single PUBLIC HEALTH query item to Lab even when sendToLab is false', () => {
+  it('respects production unticking Lab for a single PUBLIC HEALTH item', () => {
     const [item] = makeInitialItemsFromQuery(
       new URLSearchParams('sampleName=Foo&commonName=DELTAMETHRIN%201%25%20W%2FV%20EC%20(PUBLIC%20HEALTH)&batchNo=BATCH002&sendToLab=false'),
     );
 
-    expect(item.sendToLab).toBe(true);
+    expect(item.sendToLab).toBe(false);
+  });
+
+  it('reads per-sample QC / Lab (AI) choices sent by Production System', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samplerName: 'นายอติภัทร  จารุณ',
+      samples: [
+        { sampleName: 'DELTAMETHRIN 1% W/V EC (PUBLIC HEALTH)', batchNo: 'B-2', sendToQc: '1', sendToLab: '0' },
+        { sampleName: 'OMETHOATE', batchNo: 'B-3', sendToQc: '0', sendToLab: '1' },
+      ],
+    }));
+
+    expect(items.map(({ sendToQc, sendToLab }) => ({ sendToQc, sendToLab }))).toEqual([
+      { sendToQc: true, sendToLab: false },
+      { sendToQc: false, sendToLab: true },
+    ]);
   });
 
   it('maps posted integration payloads into the existing query parser', () => {

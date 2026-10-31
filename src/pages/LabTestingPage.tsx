@@ -34,6 +34,7 @@ import { normalizeRoles } from '@/lib/roles';
 import { assigneeNamesForUser, isAssignedTo } from '@/lib/assignment';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
 import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isLabAwaitingSgConfirmation } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
@@ -127,6 +128,8 @@ export default function LabTestingPage() {
 
   const petitions: Petition[] = prioritizeUrgentPetitions((data?.items ?? [])
     .filter((p) => !p.labApprovedAt)
+    // ตัวอย่างกลุ่มน้ำที่ QC ยังไม่ยืนยันค่า ถพ. ยังไม่ปล่อยมาให้ Lab
+    .filter((p) => !isLabAwaitingSgConfirmation(p))
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
     // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว

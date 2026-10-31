@@ -1,5 +1,6 @@
 import type { Petition, PetitionStatus } from '@/types/petition.types';
 import { statusBadge, toneBadge, type StatusBadge, type PetitionStatusStep } from './statusBadge';
+import { isLabAwaitingSgConfirmation, SG_PENDING_LABEL } from './sgConfirmation';
 
 /**
  * Per-side receive status (Lab / QC), with legacy backward-compat.
@@ -65,6 +66,8 @@ export function labTrackStatusBadge(p: ReceiveFields & { status: PetitionStatus 
   if (p.status === 'rejected') return statusBadge(p.status);
   if (p.labApprovedAt) return toneBadge('warning', 'Lab ออกผลแล้วรอ QC ยืนยันผล');
   if (p.labCompletedAt) return toneBadge('warning', 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ');
+  // caller บางจุดส่งมาเฉพาะ field รับตัวอย่าง (ไม่มี items) — helper คืน false เองเมื่อไม่มี items
+  if (isLabAwaitingSgConfirmation(p as unknown as Petition)) return toneBadge('warning', SG_PENDING_LABEL);
   if (!labReceivedAt(p)) return toneBadge('warning', 'รอรับ');
   if (!p.assignedTo) return toneBadge('info', 'Lab รับงานแล้ว รอ assign');
   if (!isLabWorkAccepted(p)) return toneBadge('warning', 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ');

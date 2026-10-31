@@ -19,13 +19,14 @@ import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
 import { api, type ParameterItem, type ParameterValueField, type InstrumentSource, type InstrumentReading, type ValueProvenance } from '@/lib/api';
 import InstrumentFetchButton from '@/components/lis/InstrumentFetchButton';
+import ParameterRemarkField from '@/components/lis/ParameterRemarkField';
 import { useAuth } from '@/hooks/useAuth';
 import { useArrivalFlash } from '@/hooks/useArrivalFlash';
 import { normalizeRoles } from '@/lib/roles';
 import { isAssignedTo } from '@/lib/assignment';
 import { labReceivedAt, labReceivedBy } from '@/lib/receiveStatus';
 import { useConfirm } from '@/context/ConfirmDialog';
-import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance } from '@/lib/parameterValidation';
+import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, isLabelToleranceAbnormal } from '@/lib/parameterValidation';
 import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
@@ -828,6 +829,25 @@ export default function LabTestingDetailPage() {
     return Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]);
   };
 
+  // จำนวนค่าผิดปกติของ render unit เดียว (ช่องเดียว / สารเดียว) — รวมเกณฑ์ label tolerance
+  const countUnitAbnormal = (
+    unit: ReturnType<typeof expandFieldForItem>[number],
+    src: Record<string, unknown>,
+    context: ConditionContext,
+  ): number => {
+    if (unit.hiddenStandard) return 0;
+    if (unit.field.conditionalMode && unit.field.conditionalResult === 'output') {
+      return isConditionalOutputAbnormal(unit.field, context) ? 1 : 0;
+    }
+    const field = unit.field.conditionalMode ? resolveFieldStandard(unit.field, context) : unit.field;
+    const unitValues = unit.field.multiple ? readMultiple(src, unit.key) : [src[unit.key]];
+    return unitValues.filter((v) => {
+      if (v == null || v === '') return false;
+      if (unit.labelTolerance) return isLabelToleranceAbnormal(unit.labelTolerance.std, unit.labelTolerance.rawSpec, v);
+      return isFieldAbnormal(field, v);
+    }).length;
+  };
+
   // Resolve a reference field's value from another parameter's saved result on the same item
   const resolveReference = (itemSeq: number, field: ParameterValueField) => {
     if (!field.refParameterId || !field.refFieldLabel) {
@@ -861,20 +881,27 @@ export default function LabTestingDetailPage() {
     let count = 0;
     fieldsToScan.forEach((field) => {
       expandFieldForItem(field, item.commonName, { category: petitionCategory }).forEach((unit) => {
-        if (unit.field.conditionalMode && unit.field.conditionalResult === 'output') {
-          if (isConditionalOutputAbnormal(unit.field, context)) count += 1;
-          return;
-        }
-        const field = unit.field.conditionalMode ? resolveFieldStandard(unit.field, context) : unit.field;
-        if (unit.field.multiple) {
-          readMultiple(src, unit.key).forEach((v) => {
-            if (isFieldAbnormal(field, v)) count += 1;
-          });
-        } else if (isFieldAbnormal(field, src[unit.key])) {
-          count += 1;
-        }
+        count += countUnitAbnormal(unit, src, context);
       });
     });
+    return count;
+  };
+
+  // จำนวนค่าผิดปกติของพารามิเตอร์หนึ่งตัวในตัวอย่างหนึ่งรายการ — ใช้แจ้งเตือนสีแดงที่หัวพารามิเตอร์
+  const countAbnormalForParam = (item: PetitionItem, param: (typeof allParameters)[number]): number => {
+    const k = resultKey(item.seq, param._id!);
+    const p1Fields = visibleFields(param, 1, item);
+    let count = 0;
+    if (param.multiEntry) {
+      getEntryValues({ entries: entriesByKey[k] }, param).forEach((entryValues) => {
+        count += countAbnormalInValues(p1Fields, item, entryValues, param._id!);
+      });
+    } else {
+      count += countAbnormalInValues(p1Fields, item, values[k] ?? {}, param._id!);
+    }
+    if (hasAnyPhasedParam) {
+      count += countAbnormalInValues(visibleFields(param, 2, item), item, valuesPhase2[k] ?? {}, param._id!, 2);
+    }
     return count;
   };
 
@@ -884,21 +911,7 @@ export default function LabTestingDetailPage() {
       const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
       matched.forEach((param) => {
         if (param.scope !== 'lab') return; // skip read-only shared QC params
-        const k = resultKey(item.seq, param._id!);
-        const p1Fields = visibleFields(param, 1, item);
-        // multiEntry: scan every entry; otherwise the flat phase-1 dict.
-        if (param.multiEntry) {
-          getEntryValues({ entries: entriesByKey[k] }, param).forEach((entryValues) => {
-            count += countAbnormalInValues(p1Fields, item, entryValues, param._id!);
-          });
-        } else {
-          count += countAbnormalInValues(p1Fields, item, values[k] ?? {}, param._id!);
-        }
-        // Check Phase 2 values for both/after fields if phased
-        if (hasAnyPhasedParam) {
-          const p2Values = valuesPhase2[k] ?? {};
-          count += countAbnormalInValues(visibleFields(param, 2, item), item, p2Values, param._id!, 2);
-        }
+        count += countAbnormalForParam(item, param);
       });
     });
     return count;
@@ -1062,11 +1075,37 @@ export default function LabTestingDetailPage() {
   const isAssigned = isFullAccess || isAssignedTo(petition.assignedTo, user);
   // ผล Lab ที่ออกแล้วแก้ไขได้จนกว่าคำร้องจะปิด Final Result; การกด
   // "แก้ไขผล Lab" จากหน้ารายการจึงต้องเปิดช่องกรอกจริงตามชื่อปุ่ม.
-  const isLocked = ['approved', 'rejected'].includes(petition.status) || !!petition.labApprovedAt || !isAssigned || !!pendingSample || pendingDensity;
+  // หัวหน้า Lab แก้ไขผลที่บันทึกแล้วได้ทุกช่วง (หลังออกผล/หลัง Final Result) ผ่าน "แก้ไข" + เหตุผล
+  const labHeadOverride = isFullAccess && !!petition.labCompletedAt && petition.status !== 'rejected';
+  const isLocked = (!labHeadOverride && (['approved', 'rejected'].includes(petition.status) || !!petition.labApprovedAt)) || !isAssigned || !!pendingSample || pendingDensity;
+  const clearLocked = ['approved', 'rejected', 'success'].includes(petition.status) || !!petition.labApprovedAt;
   const hasSubmittedLab = !!petition.labCompletedAt;
   const isEditingSubmitted = hasSubmittedLab && !!petition.labEditSession;
   // บันทึกผลแล้ว = ดูอย่างเดียว จนกว่าจะกด "แก้ไข"
   const viewOnly = hasSubmittedLab && !isEditingSubmitted;
+  // หมายเหตุต่อ parameter ต่อตัวอย่าง → QCTestResult.remark (ไม่พิมพ์ใน COA)
+  const saveRemark = async (item: PetitionItem, param: ParameterItem, remark: string) => {
+    const saved = await api.saveQCResultRemark({
+      petitionId: petition._id!,
+      petitionNo: petition.petitionNo,
+      itemSeq: item.seq,
+      sampleId: item.sampleId,
+      sampleName: item.sampleName,
+      commonName: item.commonName,
+      parameterId: param._id!,
+      parameterName: param.name,
+      remark,
+      enteredBy: { name: user?.name ?? 'Unknown', email: user?.email ?? '' },
+    });
+    if (!saved) return;
+    setSavedResults((prev) => {
+      const current = prev.find((r) => r.itemSeq === saved.itemSeq && r.parameterId === saved.parameterId);
+      const rest = prev.filter((r) => r !== current);
+      return [...rest, { ...(current ?? saved), remark: saved.remark, remarkBy: saved.remarkBy, remarkAt: saved.remarkAt }];
+    });
+  };
+  const remarkOf = (item: PetitionItem, param: ParameterItem) =>
+    savedResults.find((r) => r.itemSeq === item.seq && r.parameterId === param._id)?.remark ?? '';
   const switchablePetitions = (worklistData?.items ?? []).filter((p) =>
     !!labReceivedAt(p) && (p.items ?? []).some(
       (it) =>
@@ -1260,12 +1299,23 @@ export default function LabTestingDetailPage() {
                           return out;
                         })(),
                       };
+                      const paramAbnormalCount = countAbnormalForParam(item, param);
                       return (
-                        <div key={param._id} className="space-y-3">
+                        <div
+                          key={param._id}
+                          className={cn('space-y-3', paramAbnormalCount > 0 && 'rounded-lg border border-red-300 bg-red-50/40 p-3')}
+                          data-abnormal={paramAbnormalCount > 0 ? 'true' : undefined}
+                        >
                           <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-semibold text-foreground border-b border-border pb-1 flex-1">
+                            <h3 className={cn('text-sm font-semibold border-b pb-1 flex-1', paramAbnormalCount > 0 ? 'text-red-700 border-red-200' : 'text-foreground border-border')}>
                               {param.name}
                             </h3>
+                            {paramAbnormalCount > 0 && (
+                              <Badge role="alert" className="gap-1 bg-red-100 text-red-700 text-[11px] font-semibold hover:bg-red-100">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                ค่าผิดปกติ {paramAbnormalCount} รายการ
+                              </Badge>
+                            )}
                             <Badge className="bg-primary/10 text-primary text-[10px] font-semibold uppercase hover:bg-primary/10">
                               Lab
                             </Badge>
@@ -1565,6 +1615,11 @@ export default function LabTestingDetailPage() {
                               true,
                             );
                           })()}
+                          <ParameterRemarkField
+                            value={remarkOf(item, param)}
+                            disabled={isLocked || viewOnly || submitting}
+                            onSave={(remark) => saveRemark(item, param, remark)}
+                          />
                         </div>
                       );
                     })}
@@ -1588,12 +1643,23 @@ export default function LabTestingDetailPage() {
                           return out;
                         })(),
                       };
+                      const sharedAbnormalCount = countAbnormalForParam(item, param);
                       return (
-                        <div key={param._id} className="space-y-3 rounded-lg bg-indigo-50/40 border border-indigo-100 p-3">
+                        <div
+                          key={param._id}
+                          className={cn('space-y-3 rounded-lg border p-3', sharedAbnormalCount > 0 ? 'border-red-300 bg-red-50/40' : 'bg-indigo-50/40 border-indigo-100')}
+                          data-abnormal={sharedAbnormalCount > 0 ? 'true' : undefined}
+                        >
                           <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-semibold text-foreground flex-1">
+                            <h3 className={cn('text-sm font-semibold flex-1', sharedAbnormalCount > 0 ? 'text-red-700' : 'text-foreground')}>
                               {param.name}
                             </h3>
+                            {sharedAbnormalCount > 0 && (
+                              <Badge role="alert" className="gap-1 bg-red-100 text-red-700 text-[11px] font-semibold hover:bg-red-100">
+                                <AlertTriangle className="h-3.5 w-3.5" />
+                                ค่าผิดปกติ {sharedAbnormalCount} รายการ
+                              </Badge>
+                            )}
                             <Badge className="bg-indigo-100 text-indigo-800 text-[10px] font-semibold uppercase hover:bg-indigo-100">
                               QC กรอกแล้ว
                             </Badge>
@@ -1844,10 +1910,10 @@ export default function LabTestingDetailPage() {
             )}
             {viewOnly ? (
               <>
-                <Button variant="outline" onClick={() => setReasonDialog('clear')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
+                {!clearLocked && <Button variant="outline" onClick={() => setReasonDialog('clear')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
                   <RotateCcw className="h-4 w-4" />
                   ล้างค่า
-                </Button>
+                </Button>}
                 <Button variant="primary" onClick={() => setReasonDialog('edit')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
                   <Pencil className="h-4 w-4" />
                   แก้ไข
