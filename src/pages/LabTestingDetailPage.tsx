@@ -19,6 +19,7 @@ import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
 import { api, type ParameterItem, type ParameterValueField, type InstrumentSource, type InstrumentReading, type ValueProvenance } from '@/lib/api';
 import InstrumentFetchButton from '@/components/lis/InstrumentFetchButton';
+import ParameterRemarkField from '@/components/lis/ParameterRemarkField';
 import { useAuth } from '@/hooks/useAuth';
 import { useArrivalFlash } from '@/hooks/useArrivalFlash';
 import { normalizeRoles } from '@/lib/roles';
@@ -1062,11 +1063,37 @@ export default function LabTestingDetailPage() {
   const isAssigned = isFullAccess || isAssignedTo(petition.assignedTo, user);
   // ผล Lab ที่ออกแล้วแก้ไขได้จนกว่าคำร้องจะปิด Final Result; การกด
   // "แก้ไขผล Lab" จากหน้ารายการจึงต้องเปิดช่องกรอกจริงตามชื่อปุ่ม.
-  const isLocked = ['approved', 'rejected'].includes(petition.status) || !!petition.labApprovedAt || !isAssigned || !!pendingSample || pendingDensity;
+  // หัวหน้า Lab แก้ไขผลที่บันทึกแล้วได้ทุกช่วง (หลังออกผล/หลัง Final Result) ผ่าน "แก้ไข" + เหตุผล
+  const labHeadOverride = isFullAccess && !!petition.labCompletedAt && petition.status !== 'rejected';
+  const isLocked = (!labHeadOverride && (['approved', 'rejected'].includes(petition.status) || !!petition.labApprovedAt)) || !isAssigned || !!pendingSample || pendingDensity;
+  const clearLocked = ['approved', 'rejected', 'success'].includes(petition.status) || !!petition.labApprovedAt;
   const hasSubmittedLab = !!petition.labCompletedAt;
   const isEditingSubmitted = hasSubmittedLab && !!petition.labEditSession;
   // บันทึกผลแล้ว = ดูอย่างเดียว จนกว่าจะกด "แก้ไข"
   const viewOnly = hasSubmittedLab && !isEditingSubmitted;
+  // หมายเหตุต่อ parameter ต่อตัวอย่าง → QCTestResult.remark (ไม่พิมพ์ใน COA)
+  const saveRemark = async (item: PetitionItem, param: ParameterItem, remark: string) => {
+    const saved = await api.saveQCResultRemark({
+      petitionId: petition._id!,
+      petitionNo: petition.petitionNo,
+      itemSeq: item.seq,
+      sampleId: item.sampleId,
+      sampleName: item.sampleName,
+      commonName: item.commonName,
+      parameterId: param._id!,
+      parameterName: param.name,
+      remark,
+      enteredBy: { name: user?.name ?? 'Unknown', email: user?.email ?? '' },
+    });
+    if (!saved) return;
+    setSavedResults((prev) => {
+      const current = prev.find((r) => r.itemSeq === saved.itemSeq && r.parameterId === saved.parameterId);
+      const rest = prev.filter((r) => r !== current);
+      return [...rest, { ...(current ?? saved), remark: saved.remark, remarkBy: saved.remarkBy, remarkAt: saved.remarkAt }];
+    });
+  };
+  const remarkOf = (item: PetitionItem, param: ParameterItem) =>
+    savedResults.find((r) => r.itemSeq === item.seq && r.parameterId === param._id)?.remark ?? '';
   const switchablePetitions = (worklistData?.items ?? []).filter((p) =>
     !!labReceivedAt(p) && (p.items ?? []).some(
       (it) =>
@@ -1565,6 +1592,11 @@ export default function LabTestingDetailPage() {
                               true,
                             );
                           })()}
+                          <ParameterRemarkField
+                            value={remarkOf(item, param)}
+                            disabled={isLocked || viewOnly || submitting}
+                            onSave={(remark) => saveRemark(item, param, remark)}
+                          />
                         </div>
                       );
                     })}
@@ -1844,10 +1876,10 @@ export default function LabTestingDetailPage() {
             )}
             {viewOnly ? (
               <>
-                <Button variant="outline" onClick={() => setReasonDialog('clear')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
+                {!clearLocked && <Button variant="outline" onClick={() => setReasonDialog('clear')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
                   <RotateCcw className="h-4 w-4" />
                   ล้างค่า
-                </Button>
+                </Button>}
                 <Button variant="primary" onClick={() => setReasonDialog('edit')} disabled={submitting || loadedResultsKey !== resultsKey} className="gap-2">
                   <Pencil className="h-4 w-4" />
                   แก้ไข

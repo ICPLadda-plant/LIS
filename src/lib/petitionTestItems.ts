@@ -1,6 +1,6 @@
 import type { ParameterApplyRule, ParameterItem, ParameterValueField } from '@/lib/api';
 import type { PetitionItem, Petition } from '@/types/petition.types';
-import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isResearchAndDevelopmentPetition, shouldSendItemToLab, shouldSendItemToQc } from '@/lib/petitionRouting';
 import { getClassification, getCommonName } from '@/lib/productClassification';
 
 function extractItemNoPrefix(itemNo: string | undefined | null): string {
@@ -290,10 +290,12 @@ export function matchParametersForItem(
   // param's "ใช้กับ" classification — applyAll must not leak a lab param
   // onto non-lab items. QC params are unaffected.
   const itemIsLab = options.forceLabTrack || shouldSendItemToLab(item);
+  // ตัวอย่างที่ฝ่ายผลิตไม่ได้ติ๊กส่ง QC (sendToQc=false) ไม่ต้องมี parameter ฝั่ง QC
+  const itemIsQc = shouldSendItemToQc(item);
   const active = params.filter(
     (p) =>
       p.status !== 'inactive' &&
-      ((p.scope ?? 'qc') !== 'lab' || itemIsLab),
+      ((p.scope ?? 'qc') === 'lab' ? itemIsLab : itemIsQc),
   );
 
   if (!item.testItems) {

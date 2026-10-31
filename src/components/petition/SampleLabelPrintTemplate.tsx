@@ -2,6 +2,7 @@ import QRCode from 'qrcode';
 import FitToBox from '@/components/petition/FitToBox';
 import { expandItemsBySampleQuantity } from '@/lib/petitionPrintItems';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
+import { labelSampledByName, sampleLabelDocumentNumber } from '@/lib/petitionSampler';
 import type { AdditionalSampleRequest, Petition } from '@/types/petition.types';
 
 // sampleName กับ commonName ของงานผลิตมักเป็นค่าเดียวกัน — ถ้าต่อกันดื้อๆ ชื่อจะซ้ำสองรอบ
@@ -60,6 +61,7 @@ const LABEL_HEADER_LINE_1 = 'ป้ายนำส่งตัวอย่าง
 const LABEL_HEADER_LINE_2 = 'ลัดดา จำกัด';
 const LABEL_HEADER_TEXT = `${LABEL_HEADER_LINE_1} ${LABEL_HEADER_LINE_2}`;
 const DOCUMENT_NUMBER_LABEL = 'เลขที่';
+const LABEL_FOOTER_TEXT = 'F-LAB-01-12 Rev : 00 02/11/69';
 const SAMPLE_QR_SIZE_CLASS = 'h-[18mm] w-[18mm]';
 const SAMPLE_QR_TEXT_WIDTH_CLASS = 'w-[18mm]';
 
@@ -152,7 +154,9 @@ function LabelCard({
   copyIndex: number;
   additionalSampleRequest?: AdditionalSampleRequest;
 }) {
-  const sampledByName = petition.submittedBy?.name || item.labelSampledBy || '';
+  const sampledByName = labelSampledByName(petition, item);
+  // เลขที่ __/__ มาจากเลขคำร้อง (P-2611-0002 → 2/69); รูปแบบอื่นคงแบบเดิม
+  const documentNumber = sampleLabelDocumentNumber(petition.petitionNo);
   const qrValue = additionalSampleRequest?.qrCode || getQrValue(petition, item);
   const labelQuantity = labelQuantityForCopy(item, copyIndex);
   return (
@@ -203,11 +207,11 @@ function LabelCard({
             >
               <span>{DOCUMENT_NUMBER_LABEL}</span>
               <span className="inline-block min-w-[1.45rem] border-b border-black px-0.5 text-center">
-                {item.sampleId || '\u00a0'}
+                {documentNumber?.seq || item.sampleId || '\u00a0'}
               </span>
               <span>/</span>
               <span className="inline-block min-w-[1.1rem] border-b border-black px-0.5 text-center">
-                {yearShort}
+                {documentNumber?.year || yearShort}
               </span>
             </div>
           </div>
@@ -242,7 +246,7 @@ function LabelCard({
         <Field label="หมายเหตุ" value={additionalSampleRequest?.reason || item.labelRemark} />
       </div>
 
-      <div className="mt-1 text-[7.5px] font-semibold">F-LAB-01-10 Rev : 01 01/04/67</div>
+      <div className="mt-1 text-[7.5px] font-semibold">{LABEL_FOOTER_TEXT}</div>
 
       <div className="sr-only">{petition.petitionNo}</div>
       </FitToBox>

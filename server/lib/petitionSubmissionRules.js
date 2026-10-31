@@ -41,8 +41,19 @@ function defaultSendItemToLab(item) {
   return isMandatoryLabProduct(item) || isLabBatchNo(item?.batchNo);
 }
 
+// รายการที่มี sendToQc เป็น boolean = ฝ่ายผลิตเลือก "ส่งวิเคราะห์" QC / Lab (AI) เอง
+// ค่า sendToLab ของรายการนั้นเป็นค่าจริง กฎ LIS ห้าม override (mirror src/lib/petitionRouting.ts)
+function hasProductionSendTargets(item) {
+  return typeof item?.sendToQc === 'boolean';
+}
+
+function shouldSendItemToQc(item) {
+  return Boolean(item) && item.sendToQc !== false;
+}
+
 function hasSendToLabOverride(item) {
   if (!item || typeof item.sendToLab !== 'boolean') return false;
+  if (hasProductionSendTargets(item)) return false;
   if (isMandatoryLabProduct(item)) return false;
   return item.sendToLab !== defaultSendItemToLab(item);
 }
@@ -96,6 +107,29 @@ function labSendOverrideNoteError(items) {
   return `ตัวอย่าง${label}: โปรดระบุเหตุผล`;
 }
 
+function sendTargetsRequiredError(items) {
+  const missing = (items || []).find((item) => hasProductionSendTargets(item) && item.sendToQc !== true && item.sendToLab !== true);
+  if (!missing) return null;
+  const label = missing.seq ? `ลำดับ ${missing.seq}` : missing.sampleName || String(missing.batchNo ?? '').trim() || 'นี้';
+  return `ตัวอย่าง${label}: กรุณาเลือกส่งวิเคราะห์อย่างน้อย 1 ช่อง (QC หรือ Lab (AI))`;
+}
+
+// ทุกตัวอย่างไม่ส่ง QC → คำร้องไม่มีเส้นทาง QC; คืน undefined = ใช้ routeTargets เดิม/กฎเดิม
+function routeTargetsForSubmission(body, items) {
+  if (Array.isArray(body?.routeTargets) && body.routeTargets.length) return body.routeTargets;
+  if (isResearchAndDevelopmentDepartment(body?.submittedBy?.department)) return body?.routeTargets;
+  const list = items || [];
+  if (!list.length || !list.every(hasProductionSendTargets) || list.some(shouldSendItemToQc)) return body?.routeTargets;
+  return list.some((item) => item.sendToLab === true) ? ['lab'] : body?.routeTargets;
+}
+
+function normalizeSampledBy(value) {
+  const name = String(value?.name ?? '').trim();
+  if (!name) return undefined;
+  const employeeId = String(value?.employeeId ?? '').trim();
+  return employeeId ? { employeeId, name } : { name };
+}
+
 function normalizeSampleQuantity(value) {
   if (value == null || value === '') return 1;
   const parsed = Number(value);
@@ -117,9 +151,13 @@ function normalizePetitionItems(items, { department, petitionNo } = {}) {
     };
     return {
       ...normalizedItem,
-      sendToLab: isResearchRequest || isMandatoryLabProduct(normalizedItem)
+      sendToLab: isResearchRequest
         ? true
-        : (typeof item.sendToLab === 'boolean' ? item.sendToLab : defaultSendItemToLab(normalizedItem)),
+        : hasProductionSendTargets(item) && typeof item.sendToLab === 'boolean'
+          ? item.sendToLab
+          : isMandatoryLabProduct(normalizedItem)
+            ? true
+            : (typeof item.sendToLab === 'boolean' ? item.sendToLab : defaultSendItemToLab(normalizedItem)),
     };
   });
 }
@@ -153,13 +191,17 @@ function validatePetitionSubmission(body) {
       return `ตัวอย่าง "${item.sampleName || item.seq}": กรุณากรอกจำนวนตัวอย่างเป็นเลขจำนวนเต็มตั้งแต่ 1 ขึ้นไป`;
     }
   }
-  const overrideNoteError = labSendOverrideNoteError(body.items);
+  const sendTargetsError = sendTargetsRequiredError(body.items);
+  if (sendTargetsError) return sendTargetsError;
+  // ฝ่ายผลิต (รวมคำขอจาก Production System) ติ๊กส่ง Lab เพิ่ม/เอาออกได้โดยไม่ต้องใส่เหตุผล
+  const overrideNoteError = body.dept === 'production' ? null : labSendOverrideNoteError(body.items);
   if (overrideNoteError) return overrideNoteError;
   return null;
 }
 
 module.exports = {
   defaultSendItemToLab,
+  hasProductionSendTargets,
   hasSendToLabOverride,
   isMandatoryLabProduct,
   isResearchAndDevelopmentDepartment,
@@ -167,7 +209,11 @@ module.exports = {
   labSendOverrideNoteError,
   normalizeProductionCommonName,
   normalizePetitionItems,
+  normalizeSampledBy,
   requiresDeliveryAndBatch,
   requiresQcTrack,
+  routeTargetsForSubmission,
+  sendTargetsRequiredError,
+  shouldSendItemToQc,
   validatePetitionSubmission,
 };

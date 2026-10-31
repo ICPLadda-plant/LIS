@@ -29,6 +29,13 @@ const { normalizeRoles } = require('../lib/roles');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { serializePetitionWrite } = require('../lib/petitionWriteQueue');
 const {
+  SG_TEMP_LABEL,
+  isLabAwaitingSgConfirmation,
+  isSgParameter,
+  itemNeedsSgConfirmation,
+  readSgReading,
+} = require('../lib/sgConfirmation');
+const {
   computeAbnormalFlags,
   ensureRequestedIdsPresent,
   getEntryValuesJS,
@@ -46,8 +53,9 @@ async function resultRoundContext(req, res, parameter) {
     return null;
   }
   const sampleRoundId = requiredSampleRoundId(petition, side, req.body.itemSeq);
-  // ผล Lab ที่บันทึกแล้วเป็นโหมดดูอย่างเดียว — แก้ได้เฉพาะหลังกด "แก้ไข" (มี labEditSession) และก่อนออกผล
-  if (side === 'lab' && (petition.labApprovedAt || (petition.labCompletedAt && !petition.labEditSession))) {
+  // ผล Lab ที่บันทึกแล้วเป็นโหมดดูอย่างเดียว — แก้ได้เฉพาะหลังกด "แก้ไข" (มี labEditSession);
+  // หลังออกผลแล้วมีแต่หัวหน้า Lab ที่เปิด labEditSession ได้ (ดู lab-result-action)
+  if (side === 'lab' && !petition.labEditSession && (petition.labApprovedAt || petition.labCompletedAt)) {
     res.status(409).json({ error: 'ผล Lab บันทึกแล้ว กรุณากด "แก้ไข" และระบุเหตุผลก่อนแก้ค่า' });
     return null;
   }
@@ -85,6 +93,26 @@ async function resultRoundContext(req, res, parameter) {
   }
   const allowedRoundIds = new Set(['', ...(petition.additionalSampleRequests || []).filter(round => round.side === side && round.status === 'received' && round.items.some(item => item.itemSeq === Number(req.body.itemSeq))).map(round => String(round._id))]);
   return { sampleRoundId, allowedRoundIds };
+}
+
+// ค่า ถพ. ถูกแก้หลัง QC กดยืนยันแล้ว → บันทึก audit (ค่าใหม่ไหลไป Lab เองเพราะ Lab อ่านจากผล QC)
+function logSgEditAfterConfirm({ petition, parameter, itemSeq, fieldLabel, before, after, actor, sampleName }) {
+  if (!petition || !isSgParameter(parameter)) return;
+  const label = String(fieldLabel || '');
+  const isSgField = label === SG_TEMP_LABEL || (parameter.valueFields || []).some((field) => label === field.label || label.startsWith(`${field.label}::`));
+  if (!isSgField || label.endsWith('__source')) return;
+  const item = (petition.items || []).find((it) => it.seq === Number(itemSeq));
+  if (!item?.sgConfirmedAt) return;
+  if (String(before ?? '') === String(after ?? '')) return;
+  if (!mongoose.Types.ObjectId.isValid(String(petition._id))) return;
+  PetitionAuditLog.create({
+    petitionId: petition._id,
+    petitionNo: petition.petitionNo,
+    event: 'updated',
+    actor: actor || 'system',
+    note: `แก้ไขค่า ถพ. หลังยืนยัน${sampleName ? ` (${sampleName})` : ''}: ${label} ${before ?? '-'} → ${after ?? '-'}`,
+    metadata: { kind: 'sgEditedAfterConfirm', itemSeq: Number(itemSeq), batchNo: item.batchNo, fieldLabel: label, before, after },
+  }).catch((err) => console.error('[audit-log] sg edit write failed:', err.message));
 }
 
 // GET /api/qc-results/testers?petitionIds=id1,id2,...
@@ -227,6 +255,24 @@ router.get("/last-values", async (req, res) => {
   }
 });
 
+// GET /api/qc-results/by-petitions?petitionIds=a,b&parameterIds=x,y
+// ผลแบบย่อของหลายคำร้อง (เฉพาะ parameter ที่ขอ) — หน้า /petition ใช้อ่านค่า ถพ. ต่อ batch
+router.get("/by-petitions", async (req, res) => {
+  try {
+    const split = (v) => String(v || "").split(",").map((s) => s.trim()).filter(Boolean).slice(0, 500);
+    const petitionIds = split(req.query.petitionIds);
+    const parameterIds = split(req.query.parameterIds);
+    if (!petitionIds.length || !parameterIds.length) return res.json([]);
+    const docs = await QCTestResult.find(
+      { petitionId: { $in: petitionIds }, parameterId: { $in: parameterIds } },
+      { petitionId: 1, itemSeq: 1, parameterId: 1, values: 1, entries: 1 },
+    ).lean();
+    res.json(docs.map((doc) => ({ ...doc, values: flattenLegacyDottedValues(doc.values) })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/qc-results/:petitionId
 router.get("/:petitionId", async (req, res) => {
   try {
@@ -267,8 +313,10 @@ router.put("/", serializePetitionWrite(async (req, res) => {
     const paramForCheck = await Parameter.findById(parameterId).lean();
     const petitionForEdit = await Petition.findById(petitionId).lean();
     const existingUser = await currentUser(req);
-    const isClosed = ['approved', 'rejected'].includes(petitionForEdit?.status);
     const roles = normalizeRoles(existingUser);
+    // หัวหน้า Lab ที่เปิดแก้ไขผล Lab (labEditSession) แก้ได้แม้คำร้องปิดแล้ว — เหตุผล/log อยู่ที่ lab-result-action
+    const labHeadEditing = paramForCheck?.scope === 'lab' && Boolean(petitionForEdit?.labEditSession) && (roles.includes('lab-head') || roles.includes('admin'));
+    const isClosed = ['approved', 'rejected'].includes(petitionForEdit?.status) && !labHeadEditing;
     if (isClosed) {
       if (!roles.includes('qc-head') && !roles.includes('admin')) {
         return res.status(403).json({ error: 'แก้ไขผลที่ปิดงานแล้วได้เฉพาะ QC Head' });
@@ -302,7 +350,7 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       updatedAt: now,
       sampleRoundId: roundContext.sampleRoundId,
     };
-    if (newRound) Object.assign(baseSet, { values: {}, valuesPhase2: {}, entries: [] });
+    if (newRound) Object.assign(baseSet, { values: {}, valuesPhase2: {}, entries: [], remark: '' });
     if (isNew || newRound || !existing?.enteredBy) {
       baseSet.enteredBy = enteredBy;
       baseSet.enteredAt = now;
@@ -361,6 +409,17 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       });
     }
 
+    logSgEditAfterConfirm({
+      petition: petitionForEdit,
+      parameter: paramForCheck,
+      itemSeq,
+      fieldLabel,
+      before: existingFieldValue,
+      after: value,
+      actor: enteredBy?.name || enteredBy?.email,
+      sampleName,
+    });
+
     // If this field has triggersPhase2 and was filled in Phase 1, schedule advance
     if (phaseNum === 1 && fieldDef?.triggersPhase2 && paramForCheck) {
       try {
@@ -401,8 +460,9 @@ router.put("/entries", serializePetitionWrite(async (req, res) => {
     const parameter = await Parameter.findById(parameterId).lean();
     const petitionForEdit = await Petition.findById(petitionId).lean();
     const entryUser = await currentUser(req);
-    const isClosed = ['approved', 'rejected'].includes(petitionForEdit?.status);
     const entryRoles = normalizeRoles(entryUser);
+    const labHeadEditing = parameter?.scope === 'lab' && Boolean(petitionForEdit?.labEditSession) && (entryRoles.includes('lab-head') || entryRoles.includes('admin'));
+    const isClosed = ['approved', 'rejected'].includes(petitionForEdit?.status) && !labHeadEditing;
     if (isClosed && (!entryRoles.includes('qc-head') && !entryRoles.includes('admin'))) return res.status(403).json({ error: 'แก้ไขผลที่ปิดงานแล้วได้เฉพาะ QC Head' });
     if (isClosed && !String(overrideReason || '').trim()) return res.status(400).json({ error: 'กรุณาระบุเหตุผลการแก้ไขผล' });
     const roundContext = await resultRoundContext(req, res, parameter);
@@ -420,7 +480,7 @@ router.put("/entries", serializePetitionWrite(async (req, res) => {
         sampleRoundId: roundContext.sampleRoundId,
       },
     };
-    if (newRound) Object.assign(update.$set, { values: {}, valuesPhase2: {} });
+    if (newRound) Object.assign(update.$set, { values: {}, valuesPhase2: {}, remark: '' });
     if (!existing || newRound || !existing.enteredBy) {
       update.$set.enteredBy = enteredBy;
       update.$set.enteredAt = now;
@@ -448,7 +508,152 @@ router.put("/entries", serializePetitionWrite(async (req, res) => {
     }
     if (isClosed) notifyPetitionEvent(petitionForEdit, { event: 'updated', actor: enteredBy?.name || enteredBy?.email || 'QC Head', note: `QC Head แก้ไขผล ${parameterName || parameterId} · เหตุผล: ${String(overrideReason).trim()}`, metadata: { audience: 'qc' } });
 
+    if (isSgParameter(parameter)) {
+      const before = readSgReading(existing ? { values: existing.values, entries: existing.entries } : null);
+      const after = readSgReading({ values: doc.values, entries: doc.entries });
+      const actor = enteredBy?.name || enteredBy?.email;
+      logSgEditAfterConfirm({ petition: petitionForEdit, parameter, itemSeq, fieldLabel: 'ค่าถพ.', before: before.value, after: after.value, actor, sampleName });
+      logSgEditAfterConfirm({ petition: petitionForEdit, parameter, itemSeq, fieldLabel: SG_TEMP_LABEL, before: before.temperature, after: after.temperature, actor, sampleName });
+    }
+
     res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// PUT /api/qc-results/remark — หมายเหตุอิสระต่อ parameter ต่อตัวอย่าง (ผู้บันทึกผล QC และ Lab)
+// เก็บที่ QCTestResult.remark (+ remarkBy/remarkAt) ของผลรายพารามิเตอร์นั้น
+router.put("/remark", serializePetitionWrite(async (req, res) => {
+  try {
+    const {
+      petitionId, petitionNo, sampleId, sampleName, commonName,
+      parameterId, parameterName, remark, enteredBy,
+    } = req.body;
+    const itemSeq = Number(req.body.itemSeq);
+    if (!petitionId || !Number.isInteger(itemSeq) || !parameterId) {
+      return res.status(400).json({ error: "petitionId, itemSeq, parameterId are required" });
+    }
+    const text = String(remark ?? '').trim().slice(0, 1000);
+    const [parameter, petition] = await Promise.all([
+      mongoose.Types.ObjectId.isValid(String(parameterId)) ? Parameter.findById(parameterId).lean() : null,
+      mongoose.Types.ObjectId.isValid(String(petitionId)) ? Petition.findById(petitionId).lean() : null,
+    ]);
+    if (!petition || !parameter) return res.status(404).json({ error: 'ไม่พบคำขอหรือหัวข้อทดสอบ' });
+    if (!petition.items?.some((item) => item.seq === itemSeq)) return res.status(400).json({ error: 'ไม่พบรายการตัวอย่างในคำขอนี้' });
+    const side = parameter.scope === 'lab' ? 'lab' : 'qc';
+    // กฎเดียวกับการแก้ค่าผล Lab: บันทึกแล้วต้องเปิด "แก้ไข" (labEditSession) ก่อน
+    if (side === 'lab' && !petition.labEditSession && (petition.labApprovedAt || petition.labCompletedAt)) {
+      return res.status(409).json({ error: 'ผล Lab บันทึกแล้ว กรุณากด "แก้ไข" และระบุเหตุผลก่อนแก้หมายเหตุ' });
+    }
+    if (['approved', 'rejected'].includes(petition.status)) {
+      const roles = normalizeRoles(await currentUser(req));
+      if (!roles.includes('admin') && !roles.includes(`${side}-head`)) {
+        return res.status(403).json({ error: 'แก้ไขหมายเหตุของงานที่ปิดแล้วได้เฉพาะหัวหน้า' });
+      }
+    }
+
+    const filter = { petitionId: String(petitionId), itemSeq, parameterId: String(parameterId) };
+    const existing = await QCTestResult.findOne(filter).lean();
+    const before = String(existing?.remark || '');
+    if (before === text) return res.json(existing || null);
+
+    const now = new Date();
+    const set = { remark: text, remarkBy: enteredBy, remarkAt: now };
+    if (!existing) {
+      Object.assign(set, {
+        petitionNo, sampleId, sampleName, commonName, parameterName,
+        sampleRoundId: requiredSampleRoundId(petition, side, itemSeq),
+        enteredBy, enteredAt: now, updatedBy: enteredBy, updatedAt: now,
+      });
+    }
+    const doc = await QCTestResult.findOneAndUpdate(filter, { $set: set }, { upsert: !existing, new: true });
+    if (!doc) return res.status(409).json({ error: 'ผลตรวจเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' });
+
+    PetitionAuditLog.create({
+      petitionId: petition._id,
+      petitionNo: petition.petitionNo,
+      event: 'resultUpdated',
+      actor: enteredBy?.name || enteredBy?.email || 'system',
+      note: `${side === 'lab' ? 'Lab' : 'QC'} ${text ? 'บันทึก' : 'ลบ'}หมายเหตุ ${parameterName || parameter.name || parameterId}${sampleName ? ` (${sampleName})` : ''}${text ? `: ${text}` : ''}`,
+      metadata: { kind: 'remark', side, itemSeq, sampleName, parameterId: String(parameterId), parameterName: parameterName || parameter.name, before, after: text },
+    }).catch((err) => console.error('[audit-log] remark write failed:', err.message));
+
+    res.json(doc);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+}));
+
+// POST /api/qc-results/sg-confirm — QC ยืนยันค่า ถพ. + อุณหภูมิ ของตัวอย่างกลุ่มน้ำ
+// เมื่อยืนยันครบทุกตัวอย่างที่ส่ง Lab งานจะปล่อยไป Lab (ดู lib/sgConfirmation.js)
+// กดซ้ำได้หลังแก้ค่า เพื่อบันทึกค่าที่ยืนยันล่าสุด
+router.post("/sg-confirm", serializePetitionWrite(async (req, res) => {
+  try {
+    const petitionId = String(req.body?.petitionId || '');
+    const itemSeq = Number(req.body?.itemSeq);
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
+    const roles = normalizeRoles(user);
+    if (!roles.some((role) => role === 'admin' || String(role).startsWith('qc'))) {
+      return res.status(403).json({ error: 'เฉพาะเจ้าหน้าที่ QC ยืนยันค่า ถพ. ได้' });
+    }
+    if (!mongoose.Types.ObjectId.isValid(petitionId) || !Number.isInteger(itemSeq)) {
+      return res.status(400).json({ error: 'petitionId, itemSeq are required' });
+    }
+    const petition = await Petition.findById(petitionId);
+    if (!petition) return res.status(404).json({ error: 'ไม่พบคำขอ' });
+    if (['approved', 'rejected'].includes(petition.status)) return res.status(409).json({ error: 'คำขอนี้ปิดแล้ว' });
+    const item = petition.items.find((it) => it.seq === itemSeq);
+    if (!item) return res.status(404).json({ error: 'ไม่พบรายการตัวอย่างในคำขอนี้' });
+    if (!itemNeedsSgConfirmation(item)) return res.status(400).json({ error: 'ตัวอย่างนี้ไม่ต้องยืนยันค่า ถพ.' });
+
+    const results = await QCTestResult.find({ petitionId, itemSeq }).lean();
+    const parameterIds = results.map((r) => r.parameterId).filter((id) => mongoose.Types.ObjectId.isValid(String(id)));
+    const parameters = parameterIds.length ? await Parameter.find({ _id: { $in: parameterIds } }).lean() : [];
+    const sgParamIds = new Set(parameters.filter((p) => (p.scope ?? 'qc') === 'qc' && isSgParameter(p)).map((p) => String(p._id)));
+    const reading = readSgReading(results.find((r) => sgParamIds.has(String(r.parameterId))));
+    if (!reading.value || !reading.temperature) {
+      return res.status(400).json({ error: 'กรุณากรอกค่า ถพ. และอุณหภูมิก่อนยืนยัน' });
+    }
+
+    const actor = user.name || user.email;
+    const previous = item.sgConfirmedAt
+      ? { at: item.sgConfirmedAt, by: item.sgConfirmedBy, value: item.sgConfirmedValue, temperature: item.sgConfirmedTemperature }
+      : null;
+    const wasAwaiting = isLabAwaitingSgConfirmation(petition.toObject());
+    item.sgConfirmedAt = new Date();
+    item.sgConfirmedBy = actor;
+    item.sgConfirmedValue = reading.value;
+    item.sgConfirmedTemperature = reading.temperature;
+    petition.increment();
+    await petition.save();
+    const releasedToLab = wasAwaiting && !isLabAwaitingSgConfirmation(petition.toObject());
+
+    const label = item.batchNo ? `batch ${item.batchNo}` : `รายการที่ ${itemSeq}`;
+    const reading$ = `${reading.value} ที่ ${reading.temperature} °C`;
+    const payload = {
+      event: 'updated',
+      fromStatus: petition.status,
+      toStatus: petition.status,
+      actor,
+      note: previous
+        ? `QC ยืนยันค่า ถพ. ใหม่ ${label}: ${reading$} (เดิม ${previous.value ?? '-'} ที่ ${previous.temperature ?? '-'} °C)`
+        : `QC ยืนยันค่า ถพ. ${label}: ${reading$}${releasedToLab ? ' · ส่งงานให้ Lab แล้ว' : ''}`,
+      metadata: {
+        kind: 'sgConfirmed',
+        itemSeq,
+        batchNo: item.batchNo,
+        value: reading.value,
+        temperature: reading.temperature,
+        previous,
+        releasedToLab,
+        audience: releasedToLab ? 'lab' : 'qc',
+      },
+    };
+    await PetitionAuditLog.create({ petitionId: petition._id, petitionNo: petition.petitionNo, ...payload });
+    if (releasedToLab) notifyPetitionEvent(petition, payload);
+    res.json(petition.toObject());
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

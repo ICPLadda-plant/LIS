@@ -49,7 +49,11 @@ describe("tabRegistry", () => {
 
   it("PAGES_WITH_TABS lists the registered pages", () => {
     expect(PAGES_WITH_TABS).toEqual(
-      expect.arrayContaining(["/stock", "/settings", "/report", "/admin-data"]),
+      expect.arrayContaining(["/stock", "/settings", "/report", "/admin-data", "/qc-approval"]),
     );
+  });
+
+  it("qc-approval exposes QC and Lab tabs as configurable rows", () => {
+    expect(configurableTabsFor("/qc-approval").map((t) => t.key)).toEqual(["qc", "lab"]);
   });
 });

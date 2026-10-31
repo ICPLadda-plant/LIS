@@ -46,6 +46,11 @@ export const TAB_REGISTRY: Record<string, TabDef[]> = {
     { key: "activelog", label: "Active Log", icon: Activity },
     { key: "auditlog", label: "Audit Log", icon: History },
   ],
+  // server ตรวจ deny token เดียวกันที่ server/lib/qcApprovalAccess.js (อนุมัติรายรายการ / Final Result)
+  "/qc-approval": [
+    { key: "qc", label: "ผล QC" },
+    { key: "lab", label: "ผล Lab" },
+  ],
 };
 
 export const tabPath = (parent: string, key: string) => `${parent}/${key}`;

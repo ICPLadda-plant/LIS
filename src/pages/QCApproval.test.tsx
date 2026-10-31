@@ -3,8 +3,9 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import QCApproval from "./QCApproval";
 
-const { navigateMock } = vi.hoisted(() => ({
+const { navigateMock, deniedTabs } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
+  deniedTabs: new Set<string>(),
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -63,9 +64,14 @@ vi.mock("@/lib/aiApi", () => ({
   streamDraftNote: vi.fn(),
 }));
 
+vi.mock("@/hooks/useAccessibleTabs", () => ({
+  useAccessibleTabs: () => ({ isVisible: (key: string) => !deniedTabs.has(key) }),
+}));
+
 describe("QCApproval", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    deniedTabs.clear();
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => ({ p1: ["Tester A"] }),
@@ -104,5 +110,17 @@ describe("QCApproval", () => {
     expect(await screen.findByRole("tab", { name: "ผล QC (1)" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "ผล Lab (0)" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ยืนยันผลเมื่อ" })).toBeInTheDocument();
+  });
+
+  it("hides the Lab tab when the role denies it (QC Approver)", async () => {
+    deniedTabs.add("lab");
+    render(
+      <MemoryRouter>
+        <QCApproval />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("tab", { name: "ผล QC (1)" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /ผล Lab/ })).not.toBeInTheDocument();
   });
 });

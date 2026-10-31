@@ -24,7 +24,8 @@ import {
 import {
   defaultSendItemToLab,
   duplicateBatchError,
-  labSendOverrideNoteError,
+  routeTargetsFromSendTargets,
+  sendTargetsRequiredError,
   shouldSendItemToLab,
 } from '@/lib/petitionRouting';
 import {
@@ -64,6 +65,7 @@ function makeBlankItem(seq: number): ItemRowValues {
     testUnit: '',
     testItems: '',
     sendToLab: false,
+    sendToQc: true,
     sampleQuantity: 1,
     labelQuantity: '',
     labelQuantities: [],
@@ -88,9 +90,14 @@ async function fetchOptionalJson(url: string): Promise<unknown> {
   }
 }
 
+// ค่าที่ฝ่ายผลิตส่งมา (samples[i][sendToLab]) คือค่าจริง ไม่ให้กฎ LIS override; ไม่ส่งมา = ใช้ default ตามกฎเดิม
 function sendToLabFromDefault(item: Pick<ItemRowValues, 'sampleName' | 'commonName' | 'batchNo'>, value?: string): boolean {
-  const parsed = parseSendToLabValue(value);
-  return parsed == null ? defaultSendItemToLab(item) : shouldSendItemToLab({ ...item, sendToLab: parsed });
+  return parseSendToLabValue(value) ?? defaultSendItemToLab(item);
+}
+
+// QC ติ๊กเป็น default ทุก batch
+function sendToQcFromQuery(value?: string): boolean {
+  return parseSendToLabValue(value) ?? true;
 }
 
 function sendToLabForSubmit(
@@ -238,6 +245,7 @@ function makeInitialItemFromQuery(searchParams: URLSearchParams): ItemRowValues 
   const mfNo = getQueryValue(searchParams, ['mfNo']);
   const priority = getQueryValue(searchParams, ['priority']);
   const sendToLab = getQueryValue(searchParams, ['sendToLab']);
+  const sendToQc = getQueryValue(searchParams, ['sendToQc']);
   const note = [
     getQueryValue(searchParams, ['note']),
     itemNo ? `Item: ${itemNo}` : '',
@@ -263,6 +271,7 @@ function makeInitialItemFromQuery(searchParams: URLSearchParams): ItemRowValues 
     // submissionNo เว้นว่าง — backend จะเซ็ต = เลขคำขออัตโนมัติตอนบันทึก
     testItems,
     sendToLab: sendToLabFromDefault({ sampleName, commonName, batchNo }, sendToLab),
+    sendToQc: sendToQcFromQuery(sendToQc),
     note,
   };
 }
@@ -409,6 +418,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
   const mfNos = getSampleOrQueryValues(searchParams, ['mfNo'], { splitComma: true });
   const priorities = getSampleOrQueryValues(searchParams, ['priority'], { splitComma: true });
   const sendToLabs = getSampleOrQueryValues(searchParams, ['sendToLab'], { splitComma: true });
+  const sendToQcs = getSampleOrQueryValues(searchParams, ['sendToQc'], { splitComma: true });
 
   const itemCount = Math.max(
     sampleNames.length,
@@ -425,6 +435,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     mfNos.length,
     priorities.length,
     sendToLabs.length,
+    sendToQcs.length,
   );
 
   if (itemCount <= 1) {
@@ -435,6 +446,8 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     const labelQuantity = makeQuantityLabel(submittedQuantity, submittedUnit);
     return [{
       ...singleItem,
+      sendToLab: sendToLabFromDefault(singleItem, sendToLabs[0]),
+      sendToQc: sendToQcFromQuery(sendToQcs[0]),
       productionDate: productionDate || null,
       packageUnit: packageUnits[0] || singleItem.packageUnit,
       labelQuantity,
@@ -472,6 +485,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
         commonName: valueAt(commonNames, i),
         batchNo: valueAt(batchNos, i, false),
       }, valueAt(sendToLabs, i, false)),
+      sendToQc: sendToQcFromQuery(valueAt(sendToQcs, i, false)),
       note,
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
@@ -579,6 +593,13 @@ export default function ProductionPetitionNewPage({
   const prodOrderNos = prodOrderNosFromState?.length ? prodOrderNosFromState : prodOrderNosFromQuery;
   const productionRequestNo = getQueryValue(effectiveSearchParams, ['requestNo', 'request_no', 'submissionNo']);
   const productionRequesterEmail = getQueryValue(effectiveSearchParams, ['requesterEmail', 'requester_email', 'email']);
+  // QC รายวันที่ฝ่ายผลิตเลือก → "สุ่มโดย" บนป้าย และผู้นำส่งที่ /scanner
+  const sampledBy = useMemo(() => {
+    const name = getQueryValue(effectiveSearchParams, ['samplerName']);
+    if (!name) return null;
+    const employeeId = getQueryValue(effectiveSearchParams, ['samplerId']);
+    return employeeId ? { employeeId, name } : { name };
+  }, [effectiveSearchParams]);
   const initialQueryItems = useMemo(() => makeInitialItemsFromQuery(effectiveSearchParams), [effectiveSearchParams]);
   const integrationActor = useMemo(() => {
     const department = getQueryValue(effectiveSearchParams, ['department']);
@@ -698,6 +719,7 @@ export default function ProductionPetitionNewPage({
             testUnit: it.testUnit ?? '',
             testItems: it.testItems ?? '',
             sendToLab: sendToLabForSubmit({ ...it, commonName: it.commonName ?? '' }, source.submittedBy?.department ?? ''),
+            sendToQc: it.sendToQc ?? true,
             sampleQuantity: it.sampleQuantity ?? 1,
             labelQuantity: it.labelQuantity ?? '',
             labelQuantities: it.labelQuantities ?? [],
@@ -816,9 +838,10 @@ export default function ProductionPetitionNewPage({
           return false;
         }
       }
-      const overrideNoteError = deliveryAndBatchRequired ? labSendOverrideNoteError(items) : null;
-      if (overrideNoteError) {
-        setStepError(overrideNoteError);
+      // ฝ่ายผลิตติ๊ก QC / Lab (AI) ได้อิสระ ไม่ต้องใส่เหตุผล แต่ต้องเลือกอย่างน้อย 1 ช่องต่อ batch
+      const sendTargetsError = deliveryAndBatchRequired && !splitQcLab ? sendTargetsRequiredError(items) : null;
+      if (sendTargetsError) {
+        setStepError(sendTargetsError);
         return false;
       }
       const duplicateError = duplicateBatchError(items, { allowDuplicates: !splitQcLab });
@@ -874,6 +897,15 @@ export default function ProductionPetitionNewPage({
     setSubmitting(true);
     setError(null);
     try {
+      const researchRequest = isResearchAndDevelopmentDepartment(submitterDepartment);
+      const payloadItems = items.map((it, idx) => ({
+        ...it,
+        ...(splitQcLab ? { sampleQuantity: 2 } : {}),
+        seq: idx + 1,
+        sendToLab: selectedTargets ? selectedTargets.includes('lab') : sendToLabForSubmit(it, submitterDepartment),
+        sendToQc: researchRequest ? undefined : selectedTargets ? selectedTargets.includes('qc') : (it.sendToQc ?? true),
+      }));
+      const payloadRouteTargets = selectedTargets ?? (researchRequest ? null : routeTargetsFromSendTargets(payloadItems));
       const payload = {
         dept: 'production' as const,
         submittedBy: {
@@ -882,13 +914,9 @@ export default function ProductionPetitionNewPage({
           email: submitter.email || undefined,
           department: submitterDepartment || undefined,
         },
-        items: items.map((it, idx) => ({
-          ...it,
-          ...(splitQcLab ? { sampleQuantity: 2 } : {}),
-          seq: idx + 1,
-          sendToLab: selectedTargets ? selectedTargets.includes('lab') : sendToLabForSubmit(it, submitterDepartment),
-        })),
-        routeTargets: selectedTargets ?? undefined,
+        sampledBy: sampledBy ?? undefined,
+        items: payloadItems,
+        routeTargets: payloadRouteTargets ?? undefined,
         labRequests: [],
         prodOrderNos,
         productionWorkflow: productionRequestNo ? {
@@ -989,6 +1017,11 @@ export default function ProductionPetitionNewPage({
                   </p>
                 )}
                 <p className="text-blue-800">Please review the imported sample data before saving.</p>
+                {sampledBy && (
+                  <p>
+                    สุ่มโดย (QC รายวัน): <span className="font-semibold">{sampledBy.name}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1061,6 +1094,7 @@ export default function ProductionPetitionNewPage({
                 allowManualItemFields={!masterItemSelectionRequired}
                 masterItemOptions={masterItemOptions}
                 splitQcLab={splitQcLab}
+                showSendTargets={deliveryAndBatchRequired && !splitQcLab}
                 masterItemsLoading={masterItemsLoading}
               />
             )}

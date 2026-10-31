@@ -1,7 +1,8 @@
 // Derives a human-readable status_log ({ current, timeline }) for a petition.
 // Pure functions — NO DB access. The route loads inputs and calls buildStatusLog.
-const { defaultSendItemToLab, isLabBatchNo, isMandatoryLabProduct, isResearchAndDevelopmentDepartment, requiresQcTrack } = require('./petitionSubmissionRules');
+const { defaultSendItemToLab, hasProductionSendTargets, isLabBatchNo, isMandatoryLabProduct, isResearchAndDevelopmentDepartment, requiresQcTrack, shouldSendItemToQc } = require('./petitionSubmissionRules');
 const { estimateTrackEnd, resolveLabExpected, formatThai } = require('./petitionEstimate');
+const { SG_PENDING_LABEL, isLabAwaitingSgConfirmation } = require('./sgConfirmation');
 
 // Lab batch rule (mirrors src/types/petition.types.ts isLabBatch):
 // last char of trimmed batchNo is '1' or '6'.
@@ -11,6 +12,7 @@ function isLabBatch(batchNo) {
 
 function shouldSendItemToLab(item) {
   if (!item) return false;
+  if (hasProductionSendTargets(item) && typeof item.sendToLab === 'boolean') return item.sendToLab;
   if (isMandatoryLabProduct(item)) return true;
   return typeof item.sendToLab === 'boolean' ? item.sendToLab : defaultSendItemToLab(item);
 }
@@ -172,6 +174,7 @@ function buildCurrent(petition, qc, fieldLabels, labDone) {
       accepted: !!assignee?.acceptedAt || !!petition.firstResultAt || !!petition.labCompletedAt
         || (petition.reviewHistory ?? []).some((r) => r.action === 'startTesting'),
       labApproved: !!petition.labApprovedAt,
+      sgPending: isLabAwaitingSgConfirmation(petition),
     })
     : null;
 
@@ -219,9 +222,10 @@ function buildQcTrack({ qcReceived, isAssignee, assignee, started, qc, fieldLabe
 // Lab side of `current`. Keep the track visible after Lab finishes so callers can
 // still identify Lab-owned results such as %AI while QC continues independently.
 // Flow: หัวหน้า Lab รับ → assign → เจ้าหน้าที่รับงาน (acceptedAt) → บันทึกผล → อนุมัติ → QC ยืนยัน
-function buildLabTrack({ labReceived, isAssignee, labDone, labCompleted, accepted, labApproved }) {
+function buildLabTrack({ labReceived, isAssignee, labDone, labCompleted, accepted, labApproved, sgPending }) {
   if (labApproved) return { label: 'Lab ออกผลแล้วรอ QC ยืนยันผล' };
   if (labDone || labCompleted) return { label: 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ' };
+  if (sgPending) return { label: SG_PENDING_LABEL };
   if (!labReceived) return { label: 'Lab รอรับ' };
   if (!isAssignee) return { label: 'Lab รับงานแล้ว รอ assign' };
   if (!accepted) return { label: 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ' };
@@ -348,6 +352,7 @@ function hasApplicableTrackField(petition, parameters, side, fieldPattern) {
     if (!labels.some((label) => fieldPattern.test(String(label ?? '').trim()))) return false;
     return (petition.items ?? []).some((item) => {
       if (side === 'lab' && !shouldSendItemToLab(item)) return false;
+      if (side === 'qc' && !shouldSendItemToQc(item)) return false;
       const selected = String(item.testItems ?? '').split(',').map((name) => name.trim().toLowerCase()).filter(Boolean);
       if (selected.length > 0 && !selected.includes(String(param.name ?? '').trim().toLowerCase())) return false;
       return qcParamAppliesToItem(param, item);

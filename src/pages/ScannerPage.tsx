@@ -14,6 +14,7 @@ import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { useAuth } from '@/hooks/useAuth';
 import SubmitterPicker, { type SubmitterValues } from '@/components/petition/wizard/SubmitterPicker';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
+import { presetDelivererFor } from '@/lib/petitionSampler';
 import { additionalSamplePayload, extractScannedCode, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
 
@@ -69,6 +70,11 @@ export default function ScannerPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const hardwareScanBufferRef = useRef('');
   const hardwareScanTimerRef = useRef<number | null>(null);
+  // ผู้นำส่ง = "สุ่มโดย" ที่ฝ่ายผลิตเลือกไว้ (อ่านอย่างเดียว); คำร้องเก่าที่ไม่มีชื่อนี้ต้องเลือกเองแบบเดิม
+  const presetDeliverers = deliveryItems.map((item) => presetDelivererFor(item.petition));
+  const needsManualDeliverer = presetDeliverers.some((preset) => !preset);
+  const presetDelivererNames = Array.from(new Set(presetDeliverers.filter(Boolean).map((preset) => preset.name)));
+  const delivererReady = !needsManualDeliverer || Boolean(deliverer.name.trim());
 
   useEffect(() => {
     if (phase !== 'scanning') return;
@@ -178,13 +184,14 @@ export default function ScannerPage() {
   }, [deliveryItems]);
 
   async function confirmDeliver() {
-    if (!deliveryItems.length || !deliverer.name.trim() || deliveryBusy.current || phase !== 'confirming') return;
+    if (!deliveryItems.length || !delivererReady || deliveryBusy.current || phase !== 'confirming') return;
     deliveryBusy.current = true;
     setPhase('loading');
     try {
       let lastDelivered: Petition | null = null;
       for (const item of deliveryItems) {
-        lastDelivered = await deliverPetition(item.petition._id, user?.name || user?.email, item.additionalRequest, deliverer);
+        const itemDeliverer = presetDelivererFor(item.petition) ?? deliverer;
+        lastDelivered = await deliverPetition(item.petition._id, user?.name || user?.email, item.additionalRequest, itemDeliverer);
         if (item.additionalRequest) deliveredRounds.current.add(item.additionalRequest._id);
       }
       setPetition(lastDelivered);
@@ -451,7 +458,13 @@ export default function ScannerPage() {
                 </div>
               )}
 
-              <SubmitterPicker value={deliverer} onChange={setDeliverer} />
+              {presetDelivererNames.length > 0 && (
+                <div className="rounded-lg border bg-card p-3 text-sm">
+                  <p className="text-xs text-muted-foreground">ผู้นำส่ง (สุ่มโดย จากฝ่ายผลิต)</p>
+                  <p data-testid="scanner-preset-deliverer" className="font-semibold text-foreground">{presetDelivererNames.join(', ')}</p>
+                </div>
+              )}
+              {needsManualDeliverer && <SubmitterPicker value={deliverer} onChange={setDeliverer} />}
 
               <div className="flex gap-2 text-sm">
                 <Building2 className="w-4 h-4 text-grey-400 mt-0.5 shrink-0" />
@@ -490,7 +503,7 @@ export default function ScannerPage() {
                   variant="success"
                   className="flex-1 flex items-center gap-1.5 justify-center"
                   onClick={confirmDeliver}
-                  disabled={!deliverer.name.trim()}
+                  disabled={!delivererReady}
                 >
                   {deliveryItems.length === 1 ? 'ยืนยัน' : `ยืนยันส่ง ${deliveryItems.length} รายการ`}
                 </Button>
@@ -593,7 +606,7 @@ export default function ScannerPage() {
               <span className="font-semibold text-black-500">{petition.petitionNo}</span>
             </p>
             <p className="text-xs text-grey-400">
-              {deliverer.name || petition.deliveredBy?.name || '-'} · {petitionDepartmentLabel(petition)}
+              {petition.deliveredBy?.name || deliverer.name || '-'} · {petitionDepartmentLabel(petition)}
             </p>
             <Button variant="primary" className="mt-2 w-full" onClick={reset}>
               สแกนคำร้องถัดไป

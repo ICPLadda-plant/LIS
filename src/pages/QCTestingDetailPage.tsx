@@ -4,7 +4,7 @@ import { useParams, useNavigate, Navigate, useLocation, useSearchParams } from '
 import { FlaskConical, CheckCircle2, Loader2, AlertCircle, AlertTriangle, RotateCcw, Save, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
-import { mergeQcLabDuplicateItems } from '@/lib/petitionRouting';
+import { mergeQcLabDuplicateItems, qcSideItems } from '@/lib/petitionRouting';
 import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
 import { api, type ParameterItem, type ParameterValueField } from '@/lib/api';
@@ -50,6 +50,10 @@ import { buildPreviousValueLookup, getPreviousValue, type PreviousValueLookup } 
 import { AiOutlierBadge } from '@/components/lis/AiOutlierBadge';
 import { checkOutlier, getAiStatus, streamAnalyzeQC, type OutlierCheckResult } from '@/lib/aiApi';
 import DensitySyncButton from '@/components/lis/DensitySyncButton';
+import ParameterRemarkField from '@/components/lis/ParameterRemarkField';
+import SgConfirmPanel from '@/components/lis/SgConfirmPanel';
+import { FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
+import { itemNeedsSgConfirmation } from '@/lib/sgConfirmation';
 import { normalizeRoles } from '@/lib/roles';
 import {
   SG_VALUE_LABEL,
@@ -58,6 +62,8 @@ import {
   formatDensity3,
   formatTSetComparison,
   isSgMachineUnitKey,
+  isSgTemperatureEditable,
+  sourceSiblingKey,
 } from '@/lib/densitySync';
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -760,6 +766,50 @@ export default function QCTestingDetailPage() {
     [user, advanceToInProgress, id, loadResults, petitionCategory, autosaves, additionalSampleOpen, submitting],
   );
 
+  // หมายเหตุต่อ parameter ต่อตัวอย่าง → QCTestResult.remark
+  const handleSaveRemark = useCallback(
+    async (petition: Petition, item: PetitionItem, param: ParameterItem, remark: string) => {
+      const saved = await api.saveQCResultRemark({
+        petitionId: petition._id!,
+        petitionNo: petition.petitionNo,
+        itemSeq: item.seq,
+        sampleId: item.sampleId,
+        sampleName: item.sampleName,
+        commonName: item.commonName,
+        parameterId: param._id!,
+        parameterName: param.name,
+        remark,
+        enteredBy: { name: user?.name ?? 'Unknown', email: user?.email ?? '' },
+      });
+      if (!saved) return;
+      setSavedResults((prev) => {
+        const rest = prev.filter((r) => !(r.itemSeq === saved.itemSeq && r.parameterId === saved.parameterId));
+        const current = prev.find((r) => r.itemSeq === saved.itemSeq && r.parameterId === saved.parameterId);
+        return [...rest, { ...(current ?? saved), remark: saved.remark, remarkBy: saved.remarkBy, remarkAt: saved.remarkAt }];
+      });
+    },
+    [user],
+  );
+
+  // ตัวอย่างกลุ่มน้ำ: QC ยืนยันค่า ถพ. + อุณหภูมิ แล้วจึงปล่อยงานไป Lab
+  const [sgConfirmingSeq, setSgConfirmingSeq] = useState<number | null>(null);
+  const handleConfirmSg = useCallback(
+    async (petition: Petition, item: PetitionItem) => {
+      setSgConfirmingSeq(item.seq);
+      try {
+        await autosaves.flush();
+        const updated = await api.confirmSpecificGravity(petition._id!, item.seq);
+        setRequestedPetition(updated);
+        toast.success(item.sgConfirmedAt ? 'ยืนยันค่า ถพ. ใหม่แล้ว' : 'ยืนยันค่า ถพ. แล้ว');
+      } catch (error) {
+        toast.error(error instanceof Error && error.message ? error.message : 'ยืนยันค่า ถพ. ไม่สำเร็จ');
+      } finally {
+        setSgConfirmingSeq(null);
+      }
+    },
+    [autosaves],
+  );
+
   const handleOutlierCheck = useCallback(
     async (
       commonName: string,
@@ -890,7 +940,7 @@ export default function QCTestingDetailPage() {
     );
   }
 
-  const items = mergeQcLabDuplicateItems(petition, petition.items ?? []);
+  const items = mergeQcLabDuplicateItems(petition, qcSideItems(petition));
 
   // 2-phase support
   // รอบตรวจซ้ำ (Phase 2) เป็นของรายการที่มี parameter trigger เช่น อบ 14 วัน เท่านั้น — รายการอื่นในใบเดียวกันจบที่ Phase 1
@@ -1383,7 +1433,11 @@ export default function QCTestingDetailPage() {
                       unit.field.label.trim().startsWith(SG_VALUE_LABEL) ||
                       (param.name ?? '').includes('ถพ.')
                     ) && !unit.field.label.includes(SG_TEMP_LABEL);
-                    const unitDisabled = fieldDisabled || !!aiFieldKind || (isSgMachineField && !isSgValueUnit);
+                    const densityKeyPrefix = `${resultKey(item.seq, param._id!)}::`;
+                    const sgManualSelected = Object.entries(manualDensityKeys).some(([key, on]) => on && key.startsWith(densityKeyPrefix));
+                    // อุณหภูมิล็อกเฉพาะตอนค่า ถพ. มาจากเครื่อง — กรอกค่า ถพ. เองต้องกรอกอุณหภูมิเองได้
+                    const sgTemperatureLocked = isSgMachineField && !isSgValueUnit && !isSgTemperatureEditable(srcValues, sgManualSelected);
+                    const unitDisabled = fieldDisabled || !!aiFieldKind || sgTemperatureLocked;
                     const densityOptions = densityOptionsByKey[resultKey(item.seq, param._id!) ] ?? [];
                     // Match by label too: legacy SG parameters may not carry requestValueSource.
                     const densityValue = srcValues[unit.key] == null ? '' : String(srcValues[unit.key]);
@@ -1403,6 +1457,8 @@ export default function QCTestingDetailPage() {
                             if (v === '__manual__') {
                               setManualDensityKeys((prev) => ({ ...prev, [densityControlKey]: true }));
                               onUnitChange(unit.key, '');
+                              // ค่านี้ไม่ได้มาจากเครื่องแล้ว — ล้างที่มาเดิมให้ช่องอุณหภูมิเปิดกรอกได้หลังโหลดใหม่
+                              if (srcValues[sourceSiblingKey(unit.key)] != null) onUnitChange(sourceSiblingKey(unit.key), null);
                             } else if (v !== '__none__') {
                               setManualDensityKeys((prev) => ({ ...prev, [densityControlKey]: false }));
                               onUnitChange(unit.key, v);
@@ -1701,6 +1757,34 @@ export default function QCTestingDetailPage() {
                           phaseSaves[k],
                         )
                       )}
+                      {itemNeedsSgConfirmation(item) && (param.valueFields ?? []).some(
+                        (f) => f.label === SG_VALUE_LABEL || f.label.startsWith(`${SG_VALUE_LABEL} —`),
+                      ) && (() => {
+                        const formIndex = Number(values[k]?.[FORM_ENTRY_INDEX_KEY] ?? 0);
+                        const row = param.multiEntry
+                          ? (entriesByKey[k] ?? [])[Number.isFinite(formIndex) ? formIndex : 0] ?? entriesByKey[k]?.[0] ?? {}
+                          : phaseValues[k] ?? {};
+                        const sgValue = readSpecificGravityEntryValue(row, SG_VALUE_LABEL);
+                        const sgTemperature = row[SG_TEMP_LABEL];
+                        return (
+                          <SgConfirmPanel
+                            value={sgValue == null ? '' : String(sgValue)}
+                            temperature={sgTemperature == null ? '' : String(sgTemperature)}
+                            confirmedAt={item.sgConfirmedAt}
+                            confirmedBy={item.sgConfirmedBy}
+                            confirmedValue={item.sgConfirmedValue}
+                            confirmedTemperature={item.sgConfirmedTemperature}
+                            disabled={['approved', 'rejected'].includes(petition.status) || submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}
+                            confirming={sgConfirmingSeq === item.seq}
+                            onConfirm={() => void handleConfirmSg(petition, item)}
+                          />
+                        );
+                      })()}
+                      <ParameterRemarkField
+                        value={savedResults.find((r) => r.itemSeq === item.seq && r.parameterId === param._id)?.remark ?? ''}
+                        disabled={isLocked || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey}
+                        onSave={(remark) => handleSaveRemark(petition, item, param, remark)}
+                      />
                     </div>
                   );
                 })

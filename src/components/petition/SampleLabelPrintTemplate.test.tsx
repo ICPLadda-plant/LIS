@@ -67,4 +67,21 @@ describe("SampleLabelPrintTemplate", () => {
     expect(screen.getByText("6 g")).toBeInTheDocument();
     expect(screen.getAllByText("Batch No.")).toHaveLength(2);
   });
+
+  it("พิมพ์ footer ฟอร์มใหม่ เลขที่จากเลขคำร้อง และสุ่มโดยจาก QC รายวัน", () => {
+    const petition = {
+      ...petitionWith({ sampleName: "OMETHOATE", batchNo: "B-001", sampleId: "S-9" }),
+      petitionNo: "P-2611-0002",
+      sampledBy: { name: "นายสรรสกุล เหล็กอิ่ม" },
+    } as Petition;
+
+    const { container } = render(<SampleLabelPrintTemplate petition={petition} />);
+
+    expect(container).toHaveTextContent("F-LAB-01-12 Rev : 00 02/11/69");
+    expect(container).not.toHaveTextContent("F-LAB-01-10");
+    expect(screen.getByTestId("sample-label-document-number")).toHaveTextContent("เลขที่2/69");
+    expect(screen.getByText("นายสรรสกุล เหล็กอิ่ม")).toBeInTheDocument();
+    expect(screen.queryByText("ทดสอบระบบ")).not.toBeInTheDocument();
+  });
+
 });

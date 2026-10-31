@@ -37,6 +37,8 @@ export interface ApprovalParamGroup {
   scope: "lab" | "qc";
   hasPhases: boolean;
   rows: ApprovalFieldRow[];
+  /** หมายเหตุต่อ parameter ต่อตัวอย่าง ที่ผู้บันทึกผลกรอก (QCTestResult.remark) */
+  remark?: string;
 }
 
 export interface ApprovalItemGroup {
@@ -245,6 +247,7 @@ export function buildApprovalGroups(
         scope: side,
         hasPhases: !!param.hasPhases,
         rows,
+        remark: asStr(resultByKey[k]?.remark).trim() || undefined,
       };
     });
 

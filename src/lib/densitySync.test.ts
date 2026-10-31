@@ -10,6 +10,7 @@ import {
   formatDensity3,
   isSgMachineUnitKey,
   isSgValueKey,
+  isSgTemperatureEditable,
 } from './densitySync';
 
 const ROW = {
@@ -181,3 +182,23 @@ describe('formatTSetComparison', () => {
     expect(formatTSetComparison(undefined, 30)).toBeNull();
   });
 });
+
+describe('isSgTemperatureEditable', () => {
+  const fromMachine = densityRowToEntry(ROW, '2026-10-31T00:00:00.000Z');
+
+  it('locks the temperature while the ถพ. value comes from the instrument', () => {
+    expect(isSgTemperatureEditable(fromMachine, false)).toBe(false);
+    expect(isSgTemperatureEditable({}, false)).toBe(false);
+  });
+
+  it('opens the temperature as soon as QC picks "กรอกค่าเอง"', () => {
+    expect(isSgTemperatureEditable(fromMachine, true)).toBe(true);
+    expect(isSgTemperatureEditable({}, true)).toBe(true);
+  });
+
+  it('keeps the temperature open after reload when the saved ถพ. value was typed by hand', () => {
+    expect(isSgTemperatureEditable({ [SG_VALUE_LABEL]: '1.050', [SG_TEMP_LABEL]: '' }, false)).toBe(true);
+    expect(isSgTemperatureEditable({ ...fromMachine, [SG_VALUE_LABEL]: '1.050', [sourceSiblingKey(SG_VALUE_LABEL)]: null }, false)).toBe(true);
+  });
+});
+

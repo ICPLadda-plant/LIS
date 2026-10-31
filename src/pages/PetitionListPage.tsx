@@ -58,6 +58,8 @@ import {
 import type { SixMonthMedicineStockItem } from '@/types/stock';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
+import PetitionBatchStatus from '@/components/lis/PetitionBatchStatus';
+import { findSgParameter, resolveSpecificGravity } from '@/lib/formSpecificGravity';
 
 const PAGE_SIZE = 20;
 const NEW_PETITION_PATH = '/petitions/new';
@@ -901,6 +903,21 @@ export default function PetitionListPage({
     return [...visibleHighlighted, ...visibleItems.filter((petition) => !pinnedIds.has(petition._id))];
   }, [visibleHighlighted, visibleItems]);
 
+  // ค่า ถพ. ต่อรายการ (บรรทัดล่างของสถานะราย batch) — ดึงเฉพาะ parameter ถพ. ของคำร้องที่แสดงอยู่
+  const sgParameter = useMemo(() => findSgParameter(parameters), [parameters]);
+  const listPetitionIds = useMemo(() => listItems.map((petition) => petition._id).join(','), [listItems]);
+  const { data: sgResults = [] } = useQuery({
+    queryKey: ['petition-list-sg', listPetitionIds, sgParameter?.parameterId],
+    enabled: Boolean(sgParameter && listPetitionIds),
+    queryFn: () => api.getQCResultsByPetitions(listPetitionIds.split(','), sgParameter ? [sgParameter.parameterId] : []),
+    staleTime: 60 * 1000,
+  });
+  const specificGravityFor = useCallback(
+    (petitionId: string) => (seq: number) =>
+      resolveSpecificGravity(sgResults.filter((result) => result.petitionId === petitionId), seq, sgParameter),
+    [sgParameter, sgResults],
+  );
+
   const [glowing, setGlowing] = useState(true);
   useEffect(() => {
     if (!highlightKey) return;
@@ -1013,6 +1030,7 @@ export default function PetitionListPage({
 
             <PetitionStatusTimeline petition={petition} compact />
           </div>
+          <PetitionBatchStatus petition={petition} specificGravityFor={specificGravityFor(petition._id)} />
         </div>
       </Card>
     );

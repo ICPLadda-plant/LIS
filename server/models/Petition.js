@@ -14,6 +14,8 @@ const PetitionItemSchema = new mongoose.Schema(
     testUnit: String,
     testItems: String,
     sendToLab: Boolean,
+    // ฝ่ายผลิตเลือก "ส่งวิเคราะห์ QC" ต่อ batch — undefined (คำร้องเก่า) = ส่ง QC
+    sendToQc: Boolean,
     note: String,
     sampleQuantity: { type: Number, default: 1 },
     labelManufacturer: String,
@@ -29,6 +31,11 @@ const PetitionItemSchema = new mongoose.Schema(
     // ตอนจับคู่ parameter (ดู src/lib/petitionTestItems.ts)
     itemNo: String,
     condition: { type: String, enum: ['normal', 'defective'] },
+    // ตัวอย่างกลุ่มน้ำที่ส่ง Lab: QC ยืนยันค่า ถพ. + อุณหภูมิแล้วจึงปล่อยงานไป Lab (ดู lib/sgConfirmation.js)
+    sgConfirmedAt: Date,
+    sgConfirmedBy: String,
+    sgConfirmedValue: String,
+    sgConfirmedTemperature: String,
   },
   { _id: false },
 );
@@ -181,6 +188,11 @@ const PetitionSchema = new mongoose.Schema(
     conclusionNote: String,
     submittedBy: { type: SubmittedBySchema, required: true },
     deliveredBy: { type: DeliveredBySchema },
+    // QC รายวันที่ฝ่ายผลิตเลือกตอนสร้างคำขอ — ใช้เป็น "สุ่มโดย" บนป้าย และผู้นำส่งที่ /scanner
+    sampledBy: {
+      type: new mongoose.Schema({ employeeId: String, name: { type: String, required: true } }, { _id: false }),
+      default: undefined,
+    },
     items: { type: [PetitionItemSchema], default: [] },
     cause: String,
     reviewHistory: { type: [ReviewEntrySchema], default: [] },
@@ -250,6 +262,21 @@ const PetitionSchema = new mongoose.Schema(
     },
     approvedAt: { type: Date, default: null },
     rejectedAt: { type: Date, default: null },
+    // อนุมัติ/ไม่อนุมัติรายรายการ (ต่อ item.seq ต่อฝั่ง) จากหน้า /qc-approval และการแก้ผลโดยหัวหน้า Lab
+    // คำร้องออก Final Result (status approved) อัตโนมัติเมื่อทุกรายการอนุมัติครบทุกฝั่ง — ดู server/lib/itemApprovals.js
+    itemApprovals: {
+      type: [new mongoose.Schema({
+        seq: { type: Number, required: true },
+        side: { type: String, enum: ['qc', 'lab'], required: true },
+        status: { type: String, enum: ['approved', 'rejected'], required: true },
+        conclusion: { type: String, enum: ['pass', 'accepted-oos'], default: undefined },
+        note: String,
+        by: String,
+        at: Date,
+        source: { type: String, enum: ['qc-approval', 'lab-head-edit'], default: 'qc-approval' },
+      }, { _id: false })],
+      default: [],
+    },
   },
   { timestamps: true, optimisticConcurrency: true },
 );

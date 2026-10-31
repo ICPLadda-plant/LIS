@@ -15,7 +15,7 @@ import {
   updateLabRequest,
   createLabRequest,
 } from '@/hooks/usePetition';
-import { duplicateBatchError, isQcAndLabPetition, labSendOverrideNoteError, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { duplicateBatchError, isQcAndLabPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
 import type { LabRequest } from '@/types/labRequest.types';
 
 type StepKey = 'items' | 'lab';
@@ -115,6 +115,8 @@ export default function PetitionEditPage() {
       testUnit: it.testUnit ?? '',
       testItems: it.testItems ?? '',
       sendToLab: it.sendToLab,
+      // ค่าที่ฝ่ายผลิตเลือก (ส่ง QC) — ต้องหอบไปด้วย ไม่งั้นบันทึกแล้ว sendToLab จะถูกกฎ LIS override
+      sendToQc: it.sendToQc,
       sampleQuantity: it.sampleQuantity ?? 1,
       labelQuantity: it.labelQuantity ?? '',
       labelQuantities: it.labelQuantities ?? [],
@@ -264,11 +266,7 @@ export default function PetitionEditPage() {
           return false;
         }
       }
-      const overrideNoteError = data?.dept === 'production' ? labSendOverrideNoteError(items) : null;
-      if (overrideNoteError) {
-        setStepError(overrideNoteError);
-        return false;
-      }
+      // ฝ่ายผลิตติ๊กส่ง Lab เพิ่ม/เอาออกได้โดยไม่ต้องใส่เหตุผล (server ข้ามเช่นกัน)
       const duplicateError = duplicateBatchError(items, {
         allowDuplicates: data?.dept === 'production' && !isQcAndLabPetition(data),
       });

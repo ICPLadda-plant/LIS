@@ -839,6 +839,14 @@ export const api = {
   // QC Test Results
   getQCResults: (petitionId: string) =>
     request<import("@/types/petition.types").QCTestResult[]>(`/qc-results/${petitionId}`),
+  // ผลแบบย่อของหลายคำร้อง เฉพาะ parameter ที่ระบุ (หน้า /petition อ่านค่า ถพ.)
+  getQCResultsByPetitions: (petitionIds: string[], parameterIds: string[]) => {
+    if (petitionIds.length === 0 || parameterIds.length === 0) {
+      return Promise.resolve([] as import("@/types/petition.types").QCTestResult[]);
+    }
+    const qs = new URLSearchParams({ petitionIds: petitionIds.join(","), parameterIds: parameterIds.join(",") }).toString();
+    return request<import("@/types/petition.types").QCTestResult[]>(`/qc-results/by-petitions?${qs}`);
+  },
   saveQCResult: (data: import("@/types/petition.types").SaveQCResultPayload) =>
     request<import("@/types/petition.types").QCTestResult>("/qc-results", {
       method: "PUT",
@@ -854,6 +862,22 @@ export const api = {
     request<import("@/types/petition.types").QCTestResult>("/qc-results/entries", {
       method: "PUT",
       body: JSON.stringify(data),
+    }),
+  // หมายเหตุต่อ parameter ต่อตัวอย่าง (QC และ Lab) — เก็บที่ QCTestResult.remark
+  saveQCResultRemark: (data: {
+    petitionId: string; petitionNo?: string; itemSeq: number; sampleId?: string;
+    sampleName?: string; commonName?: string; parameterId: string; parameterName?: string;
+    remark: string; enteredBy: { name: string; email: string };
+  }) =>
+    request<import("@/types/petition.types").QCTestResult | null>("/qc-results/remark", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }),
+  // QC ยืนยันค่า ถพ. + อุณหภูมิ ของตัวอย่างกลุ่มน้ำ → ปล่อยงานไป Lab
+  confirmSpecificGravity: (petitionId: string, itemSeq: number) =>
+    request<import("@/types/petition.types").Petition>("/qc-results/sg-confirm", {
+      method: "POST",
+      body: JSON.stringify({ petitionId, itemSeq }),
     }),
   getQCProgress: (petitionIds: string[]) => {
     if (petitionIds.length === 0) return Promise.resolve({} as QCProgressMap);
@@ -923,6 +947,21 @@ export const api = {
     request<import("@/types/petition.types").Petition>(`/petitions/${petitionId}`, {
       method: "PATCH",
       body: JSON.stringify({ status: "rejected", actor, revisionNote, target }),
+    }),
+  // อนุมัติ/ไม่อนุมัติรายรายการ (ต่อ batch × common name) จากหน้า /qc-approval
+  // ครบทุกรายการทุกฝั่ง → server ออก Final Result ให้เอง; batch ที่อนุมัติครบแจ้ง Production ทันที
+  decideApprovalItems: (
+    petitionId: string,
+    body: {
+      side: "qc" | "lab";
+      decision: "approve" | "reject";
+      items: { seq: number; abnormal?: boolean }[];
+      note?: string;
+    },
+  ) =>
+    request<import("@/types/petition.types").Petition>(`/approvals/petitions/${petitionId}/items`, {
+      method: "POST",
+      body: JSON.stringify(body),
     }),
   // Dev-only: raw-set petition.status via the gated backend dev endpoint
   // (bypasses business guards; companion fields are NOT touched).

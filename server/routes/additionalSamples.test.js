@@ -4,6 +4,8 @@ const Petition = require('../models/Petition');
 const QCTestResult = require('../models/QCTestResult');
 const Parameter = require('../models/Parameter');
 const User = require('../models/User');
+const Role = require('../models/Role');
+const AccessGroup = require('../models/AccessGroup');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
 const lineNotify = require('../lib/lineNotify');
 const notifications = [];
@@ -276,6 +278,9 @@ test('additional completion and approval require authenticated side or head perm
   state.status = 'inProgress';
   assert.equal((await invoke(petitions, '/:id/lab-approve', 'post')).statusCode, 401);
   context.mock.method(User, 'findOne', () => ({ lean: async () => ({ roles: ['qc-staff'], name: 'Staff' }) }));
+  // qc-staff ไม่มีสิทธิ์หน้า /qc-approval → ไม่มี tab ให้อนุมัติ
+  context.mock.method(Role, 'find', () => ({ lean: async () => [{ id: 'qc-staff', permissions: ['/qc-testing'] }] }));
+  context.mock.method(AccessGroup, 'find', () => ({ lean: async () => [] }));
   assert.equal((await invoke(petitions, '/:id/lab-approve', 'post')).statusCode, 403);
   state.status = 'success';
   assert.equal((await invoke(petitions, '/:id', 'patch', { status: 'approved', actor: 'Fake head' })).statusCode, 403);

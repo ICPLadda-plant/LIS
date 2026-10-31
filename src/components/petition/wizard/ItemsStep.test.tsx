@@ -370,3 +370,25 @@ describe('ItemsStep master item selection', () => {
     expect(screen.getByText('Product A 1.8 EC')).toBeInTheDocument();
   });
 });
+
+describe('ItemsStep production send targets', () => {
+  const productionItem: ItemRowValues = { ...baseItem, batchNo: 'BATCH002', commonName: 'DELTAMETHRIN 1% W/V EC (PUBLIC HEALTH)', sendToQc: true, sendToLab: true };
+
+  it('lets production untick Lab (AI) on a PUBLIC HEALTH batch without forcing it back', () => {
+    const { onChange } = renderStep({ showSendTargets: true, value: [productionItem] });
+
+    expect(screen.getByText('ส่งวิเคราะห์')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ส่งวิเคราะห์ Lab (AI) ตัวอย่างที่ 1' }));
+
+    expect(onChange).toHaveBeenCalledWith([{ ...productionItem, sendToLab: false, sendToQc: true }]);
+  });
+
+  it('lets production untick QC while keeping the Lab choice explicit', () => {
+    const { onChange } = renderStep({ showSendTargets: true, value: [productionItem] });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ส่งวิเคราะห์ QC ตัวอย่างที่ 1' }));
+
+    expect(onChange).toHaveBeenCalledWith([{ ...productionItem, sendToQc: false, sendToLab: true }]);
+  });
+});
+

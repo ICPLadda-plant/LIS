@@ -4,8 +4,10 @@ const {
   defaultSendItemToLab,
   isResearchAndDevelopmentDepartment,
   normalizePetitionItems,
+  normalizeSampledBy,
   requiresDeliveryAndBatch,
   requiresQcTrack,
+  routeTargetsForSubmission,
   validatePetitionSubmission,
 } = require('./petitionSubmissionRules');
 
@@ -55,28 +57,72 @@ test('validatePetitionSubmission no longer requires a deliverer, but still requi
   }), /แบช/);
 });
 
-test('validatePetitionSubmission requires item note when sendToLab overrides batch suffix default', () => {
+test('validatePetitionSubmission requires item note when sendToLab overrides batch suffix default outside production', () => {
   assert.match(validatePetitionSubmission({
-    dept: 'production',
-    submittedBy: { name: 'Production User', department: 'Production' },
+    dept: 'rm',
+    submittedBy: { name: 'RM User', department: 'RM' },
     deliveredBy: { name: 'Runner' },
     items: [{ seq: 2, sampleName: 'Sample B', batchNo: 'B-002', sendToLab: true, note: '' }],
   }), /โปรดระบุเหตุผล/);
 
   assert.match(validatePetitionSubmission({
-    dept: 'production',
-    submittedBy: { name: 'Production User', department: 'Production' },
+    dept: 'fg',
+    submittedBy: { name: 'FG User', department: 'FG' },
     deliveredBy: { name: 'Runner' },
     items: [{ seq: 3, sampleName: 'Sample C', batchNo: 'B-001', sendToLab: false, note: '' }],
   }), /โปรดระบุเหตุผล/);
 
   assert.strictEqual(validatePetitionSubmission({
-    dept: 'production',
-    submittedBy: { name: 'Production User', department: 'Production' },
+    dept: 'rm',
+    submittedBy: { name: 'RM User', department: 'RM' },
     deliveredBy: { name: 'Runner' },
     items: [{ seq: 4, sampleName: 'Sample D', batchNo: 'B-002', sendToLab: true, note: 'ส่งตรวจเพิ่ม' }],
   }), null);
 });
+
+test('validatePetitionSubmission lets production change Lab routing without a reason', () => {
+  assert.strictEqual(validatePetitionSubmission({
+    dept: 'production',
+    submittedBy: { name: 'Production User', department: 'Production' },
+    items: [
+      { seq: 1, sampleName: 'Sample B', batchNo: 'B-002', sendToLab: true, note: '' },
+      { seq: 2, sampleName: 'Sample C', batchNo: 'B-001', sendToQc: true, sendToLab: false, note: '' },
+    ],
+  }), null);
+});
++
+test('normalizePetitionItems keeps production QC / Lab (AI) choices without LIS override', () => {
+  const [publicHealth, labOnly] = normalizePetitionItems([
+    { seq: 1, sampleName: 'S', commonName: 'CYPERMETHRIN 10% W/V EC (PUBLIC HEALTH)', batchNo: 'B-001', sendToQc: true, sendToLab: false },
+    { seq: 2, sampleName: 'T', batchNo: 'B-002', sendToQc: false, sendToLab: true },
+  ], { department: 'Production', petitionNo: 'P-2611-0002' });
+  assert.strictEqual(publicHealth.sendToLab, false);
+  assert.strictEqual(publicHealth.sendToQc, true);
+  assert.strictEqual(labOnly.sendToLab, true);
+  assert.strictEqual(labOnly.sendToQc, false);
+});
+
+test('validatePetitionSubmission requires at least one send target per production batch', () => {
+  assert.match(validatePetitionSubmission({
+    dept: 'production',
+    submittedBy: { name: 'Production User', department: 'Production' },
+    items: [{ seq: 1, sampleName: 'S', batchNo: 'B-002', sendToQc: false, sendToLab: false }],
+  }), /กรุณาเลือกส่งวิเคราะห์อย่างน้อย 1 ช่อง/);
+});
+
+test('routeTargetsForSubmission drops QC only when every batch skips QC', () => {
+  const body = { dept: 'production', submittedBy: { name: 'P', department: 'Production' } };
+  const labOnly = { sampleName: 'S', batchNo: 'B-2', sendToQc: false, sendToLab: true };
+  assert.deepStrictEqual(routeTargetsForSubmission(body, [labOnly, labOnly]), ['lab']);
+  assert.strictEqual(routeTargetsForSubmission(body, [labOnly, { ...labOnly, sendToQc: true }]), undefined);
+  assert.deepStrictEqual(routeTargetsForSubmission({ ...body, routeTargets: ['qc', 'lab'] }, [labOnly]), ['qc', 'lab']);
+});
+
+test('normalizeSampledBy keeps the QC sampler name and id', () => {
+  assert.deepStrictEqual(normalizeSampledBy({ employeeId: ' 7 ', name: ' นายอติภัทร  จารุณ ' }), { employeeId: '7', name: 'นายอติภัทร  จารุณ' });
+  assert.strictEqual(normalizeSampledBy({ name: ' ' }), undefined);
+});
+
 
 test('validatePetitionSubmission does not require override note for mandatory Lab product groups', () => {
   assert.strictEqual(validatePetitionSubmission({

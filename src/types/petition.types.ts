@@ -71,6 +71,8 @@ export interface PetitionItem {
   testUnit?: string;
   testItems?: string;
   sendToLab?: boolean;
+  /** ฝ่ายผลิตเลือกส่ง QC ต่อ batch — undefined (คำร้องเก่า) = ส่ง QC */
+  sendToQc?: boolean;
   MF_Before?: string | null;
   MF_Lasted?: string | null;
   MF_GapDays?: number | null;
@@ -91,6 +93,12 @@ export interface PetitionItem {
   // "หมวดหมู่ย่อย (prefix code)" + "กลุ่ม Item" ของ parameter — ดู getItemSubCategory.
   itemNo?: string;
   condition?: ItemCondition;
+  /** ตัวอย่างกลุ่มน้ำที่ส่ง Lab: เวลาที่ QC ยืนยันค่า ถพ. (ยังไม่ยืนยัน = Lab ยังรับงานไม่ได้) */
+  sgConfirmedAt?: string | null;
+  sgConfirmedBy?: string;
+  /** ค่า ถพ. / อุณหภูมิ ณ ตอนกดยืนยันครั้งล่าสุด */
+  sgConfirmedValue?: string;
+  sgConfirmedTemperature?: string;
 }
 
 // ===== Submitter (ผู้ยื่นคำขอ) =====
@@ -238,6 +246,8 @@ interface PetitionBase {
   status: PetitionStatus;
   submittedBy: PetitionSubmitter;
   deliveredBy?: PetitionDeliverer;
+  /** QC รายวันที่ฝ่ายผลิตเลือก ("สุ่มโดย" บนป้าย / ผู้นำส่งที่ /scanner) */
+  sampledBy?: { employeeId?: string; name: string };
   items: PetitionItem[];
   routeTargets?: PetitionRouteTarget[];
   additionalSampleRequests?: AdditionalSampleRequest[];
@@ -294,8 +304,21 @@ interface PetitionBase {
   revisionOf?: string | null;
   approvedAt?: string | null;
   rejectedAt?: string | null;
+  /** อนุมัติ/ไม่อนุมัติรายรายการ (ต่อ item.seq ต่อฝั่ง) — ดู src/lib/itemApprovals.ts */
+  itemApprovals?: PetitionItemApproval[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PetitionItemApproval {
+  seq: number;
+  side: "qc" | "lab";
+  status: "approved" | "rejected";
+  conclusion?: "pass" | "accepted-oos";
+  note?: string;
+  by?: string;
+  at?: string;
+  source?: "qc-approval" | "lab-head-edit";
 }
 
 export interface ProductionPetition extends PetitionBase {
@@ -329,6 +352,10 @@ export interface QCTestResult {
   valuesPhase2?: Record<string, unknown>;
   // For multiEntry parameters — array of per-entry value-objects.
   entries?: Record<string, unknown>[];
+  /** หมายเหตุของผู้บันทึกผล ต่อ parameter ต่อตัวอย่าง (QC และ Lab) — ไม่พิมพ์ใน COA */
+  remark?: string;
+  remarkBy?: { name: string; email?: string };
+  remarkAt?: string;
   enteredBy?: { name: string; email: string };
   enteredAt?: string;
   updatedBy?: { name: string; email: string };

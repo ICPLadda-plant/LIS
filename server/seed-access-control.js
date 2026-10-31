@@ -29,6 +29,8 @@ const ROLES = [
   { id: 'lab-analyze', name: 'Lab Analyze', description: 'Base Lab analysis workspace', locked: false, permissions: ['/dashboard/lab', '/record-results', '/daily-check', '/petition/assign', '/lab-testing', '/lab-testing/:id'], family: 'lab', dashboardProfile: 'lab-analyze' },
   { id: 'qc-staff', name: 'QC Staff', description: 'Base QC receiving and tracking workspace', locked: false, permissions: ['/dashboard/qc', '/physical-inspection', '/qc-testing', '/qc-testing/:id'], family: 'qc', dashboardProfile: 'qc-staff' },
   { id: 'qc-head', name: 'QC Head', description: 'Full Access Data and Approve', locked: false, permissions: ['/petitions', '/qc-approval', '/stock', '/mf-gap-medicines'], family: 'qc' },
+  // อนุมัติ/ปฏิเสธผล QC ได้ แต่ไม่เห็น tab ผล Lab (tab Lab เฉพาะ QC Head และ admin)
+  { id: 'qc-approver', name: 'QC Approver', description: 'อนุมัติหรือไม่อนุมัติผล QC (ไม่รวมผล Lab)', locked: false, permissions: ['/qc-approval', 'deny:/qc-approval/lab'], family: 'qc' },
   { id: 'lab', name: 'Lab Analyst', description: 'Sample handling and result entry', locked: false, permissions: ['/record-results', '/daily-check', '/stock-deduction', '/petition/assign', '/master-items', '/simple-method', '/machines', '/stock'], family: 'lab' },
   { id: 'qc', name: 'QC Reviewer', description: 'Review and approve results', locked: false, permissions: ['inventory', '/physical-inspection'], family: 'qc' },
   { id: 'viewer', name: 'Viewer', description: 'Read-only access to dashboards and reports', locked: false, permissions: ['/home', '/', '/petition'], family: '' },

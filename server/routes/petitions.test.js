@@ -221,7 +221,7 @@ test('PATCH /:id cannot bypass Lab receipt through a general update', async () =
   assert.equal(res.statusCode, 400);
 });
 
-test('POST / rejects sendToLab override without item note before creating petition', async () => {
+test('POST / rejects non-production sendToLab override without item note before creating petition', async () => {
   const originals = {
     configFindOne: DocumentNumberConfig.findOne,
     petitionFindOne: Petition.findOne,
@@ -238,8 +238,8 @@ test('POST / rejects sendToLab override without item note before creating petiti
 
     const res = await invoke('/', 'post', {
       body: {
-        dept: 'production',
-        submittedBy: { name: 'Production User', department: 'Production' },
+        dept: 'fg',
+        submittedBy: { name: 'FG User', department: 'FG' },
         deliveredBy: { name: 'Runner' },
         items: [{ seq: 2, sampleName: 'Sample B', batchNo: 'B-002', sendToLab: true, note: '' }],
       },
@@ -255,7 +255,7 @@ test('POST / rejects sendToLab override without item note before creating petiti
   }
 });
 
-test('PATCH /:id rejects sendToLab override without item note before updating petition', async () => {
+test('PATCH /:id rejects non-production sendToLab override without item note before updating petition', async () => {
   const originals = {
     petitionFindById: Petition.findById,
     petitionFindByIdAndUpdate: Petition.findByIdAndUpdate,
@@ -265,9 +265,9 @@ test('PATCH /:id rejects sendToLab override without item note before updating pe
     Petition.findById = async () => ({
       _id: 'petition-1',
       petitionNo: 'P-2609-0001',
-      dept: 'production',
+      dept: 'fg',
       status: 'deliveringQC',
-      submittedBy: { name: 'Production User', department: 'Production' },
+      submittedBy: { name: 'FG User', department: 'FG' },
       deliveredBy: { name: 'Runner' },
       items: [{ seq: 1, sampleName: 'Sample A', batchNo: 'B-001' }],
       toObject() {
@@ -282,8 +282,8 @@ test('PATCH /:id rejects sendToLab override without item note before updating pe
     const res = await invoke('/:id', 'patch', {
       params: { id: 'petition-1' },
       body: {
-        dept: 'production',
-        submittedBy: { name: 'Production User', department: 'Production' },
+        dept: 'fg',
+        submittedBy: { name: 'FG User', department: 'FG' },
         deliveredBy: { name: 'Runner' },
         items: [{ seq: 1, sampleName: 'Sample A', batchNo: 'B-001', sendToLab: false, note: '' }],
       },
