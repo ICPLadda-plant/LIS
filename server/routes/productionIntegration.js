@@ -3,7 +3,14 @@ const express = require('express');
 const ProductionIntegrationRequest = require('../models/ProductionIntegrationRequest');
 const Petition = require('../models/Petition');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
+const LabRequest = require('../models/LabRequest');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
+const {
+  buildEditedItems,
+  canEditWholePetition,
+  replaceProductionNote,
+  routeTargetsForItems,
+} = require('../lib/productionPetitionEdit');
 
 const router = express.Router();
 
@@ -103,6 +110,79 @@ router.post('/petitions/:petitionNo/additional-samples/:roundId/send', async (re
     await PetitionAuditLog.create({ petitionId: updated._id, petitionNo: updated.petitionNo, ...payload });
     notifyPetitionEvent(updated, payload);
     res.json({ ok: true, petitionNo: updated.petitionNo, roundId: String(round._id), status: 'sent' });
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+});
+
+// Production แก้ไขคำขอ: ยังไม่รับตัวอย่าง = แทนที่รายการทั้งใบ (mode=full), รับแล้ว = แก้หมายเหตุอย่างเดียว (mode=note)
+// body: { requestNo, mode, note, priority?, sampledBy?, updatedBy?, items?: [{ sampleName, commonName, itemNo, mfNo, packsize,
+//         batchNo, lotNo, productionDate, qty, labQty, unit, sendToQc, sendToLab }] }
+router.put('/petitions/:petitionNo', async (req, res) => {
+  try {
+    if (!authorized(req)) return res.status(401).json({ error: { message: 'Unauthorized' } });
+    const requestNo = String(req.body?.requestNo || '').trim();
+    // Production ที่ไม่ได้เลขคำร้องกลับมาจะเก็บ requestNo แทน petitionNo → หาจาก productionWorkflow.requestNo ต่อ
+    const petition = await Petition.findOne({ petitionNo: String(req.params.petitionNo) })
+      || (requestNo ? await Petition.findOne({ 'productionWorkflow.requestNo': requestNo, deletedAt: null }).sort({ createdAt: -1 }) : null);
+    if (!petition) return res.status(404).json({ error: { message: 'ไม่พบคำขอ' } });
+    if (!requestNo || petition.productionWorkflow?.requestNo !== requestNo) {
+      return res.status(403).json({ error: { message: 'requestNo ไม่ตรงกับคำขอ' } });
+    }
+    const mode = req.body?.mode === 'full' ? 'full' : 'note';
+    const note = String(req.body?.note ?? '').trim();
+    const actor = String(req.body?.updatedBy?.name || 'Production System').trim();
+    const before = { status: petition.status, __v: petition.__v };
+    let update;
+    let auditNote;
+    if (mode === 'full') {
+      if (!canEditWholePetition(petition)) {
+        return res.status(409).json({ error: { message: 'รับตัวอย่างแล้ว แก้ไขได้เฉพาะหมายเหตุ' } });
+      }
+      const rows = Array.isArray(req.body?.items) ? req.body.items : [];
+      if (!rows.length) return res.status(400).json({ error: { message: 'ต้องมีตัวอย่างอย่างน้อย 1 รายการ' } });
+      const items = buildEditedItems(petition.toObject().items, rows, {
+        note,
+        priority: req.body?.priority,
+        department: petition.submittedBy?.department,
+        petitionNo: petition.petitionNo,
+      });
+      if (items.some((item) => !item.sampleName || !item.batchNo)) {
+        return res.status(400).json({ error: { message: 'กรุณาระบุชื่อตัวอย่างและ Batch ให้ครบ' } });
+      }
+      if (items.some((item) => item.sendToQc === false && item.sendToLab !== true)) {
+        return res.status(400).json({ error: { message: 'ต้องเลือกส่งวิเคราะห์อย่างน้อย 1 ช่อง (QC หรือ Lab)' } });
+      }
+      update = { items, routeTargets: routeTargetsForItems(items) };
+      const sampledName = String(req.body?.sampledBy?.name || '').trim();
+      if (sampledName) {
+        const employeeId = String(req.body?.sampledBy?.employeeId || '').trim();
+        update.sampledBy = employeeId ? { employeeId, name: sampledName } : { name: sampledName };
+      }
+      auditNote = 'Production แก้ไขคำขอก่อนรับตัวอย่าง: ' + items.map((it) => `#${it.seq} ${it.batchNo} ${it.labelQuantity || ''}`.trim()).join(', ');
+    } else {
+      update = { items: petition.toObject().items.map((item) => ({ ...item, note: replaceProductionNote(item.note, note) })) };
+      auditNote = 'Production แก้ไขหมายเหตุ: ' + (note || '-');
+    }
+    const saved = await Petition.findOneAndUpdate(
+      { _id: petition._id, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v },
+      { $set: update, $inc: { __v: 1 } },
+      { new: true, runValidators: true },
+    );
+    if (!saved) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
+    if (mode === 'full') {
+      // ใบคำขอรับบริการ Lab ผูกกับรายการ Lab ตัวแรก — ย้ายตามรายการที่แก้
+      const firstLab = saved.items.find((item) => item.sendToLab === true);
+      if (firstLab) {
+        await LabRequest.updateMany(
+          { petitionId: saved._id, deletedAt: null },
+          { $set: { batchNo: firstLab.batchNo, sampleSeq: firstLab.seq } },
+        );
+      }
+    }
+    const payload = { event: 'updated', toStatus: saved.status, actor, note: auditNote, metadata: { type: 'productionEdit', mode } };
+    await PetitionAuditLog.create({ petitionId: saved._id, petitionNo: saved.petitionNo, ...payload });
+    res.json({ ok: true, petitionNo: saved.petitionNo, mode });
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
   }

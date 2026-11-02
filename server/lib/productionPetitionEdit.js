@@ -1,0 +1,100 @@
+const { normalizePetitionItems } = require('./petitionSubmissionRules');
+
+// แก้ไขคำขอจาก Production System หลังส่งเข้า LIS แล้ว
+// สร้างรายการให้รูปแบบเดียวกับตอนสร้างใบคำร้อง (ProductionPetitionNewPage → makeInitialItemsFromQuery)
+
+const SUFFIX_PREFIXES = ['Item: ', 'MF: ', 'Priority: '];
+
+function petitionReceived(petition) {
+  return Boolean(petition?.qcReceivedAt || petition?.labReceivedAt || petition?.receivedAt);
+}
+
+// ยังไม่มีใครรับตัวอย่าง = ฝ่ายผลิตแก้ได้ทั้งใบ
+function canEditWholePetition(petition) {
+  return !petitionReceived(petition) && ['deliveringQC', 'sampleSent'].includes(petition?.status);
+}
+
+function text(value) {
+  return String(value ?? '').trim();
+}
+
+function quantityLabel(qty, unit) {
+  return [text(qty), text(unit)].filter(Boolean).join(' ');
+}
+
+function flag(value, fallback) {
+  if (typeof value === 'boolean') return value;
+  const v = text(value).toLowerCase();
+  if (['1', 'true'].includes(v)) return true;
+  if (['0', 'false'].includes(v)) return false;
+  return fallback;
+}
+
+// หมายเหตุรายการ = "<หมายเหตุจากผลิต> | Item: .. | MF: .. | Priority: .."
+function itemNoteWith(note, suffix) {
+  return [text(note), ...suffix].filter(Boolean).join(' | ');
+}
+
+function replaceProductionNote(itemNote, note) {
+  // อ่านท้ายข้อความย้อนกลับตามลำดับ Priority → MF → Item (หมายเหตุผลิตเองก็อาจขึ้นต้นด้วย "MF: ")
+  const parts = String(itemNote ?? '').split(' | ').map((part) => part.trim()).filter(Boolean);
+  let start = parts.length;
+  for (let p = SUFFIX_PREFIXES.length - 1; p >= 0 && start > 0; p -= 1) {
+    if (parts[start - 1].startsWith(SUFFIX_PREFIXES[p])) start -= 1;
+  }
+  return itemNoteWith(note, parts.slice(start));
+}
+
+function buildEditedItems(existingItems, rows, { note, priority, department, petitionNo } = {}) {
+  const previous = Array.isArray(existingItems) ? existingItems : [];
+  const items = (rows || []).map((row, index) => {
+    const old = previous[index] || {};
+    const unit = text(row.unit);
+    const qcLabel = quantityLabel(row.qty, unit);
+    const sendToQc = flag(row.sendToQc, true);
+    const sendToLab = flag(row.sendToLab, false);
+    const labQty = Number(row.labQty);
+    const split = sendToQc && sendToLab && labQty > 0 && qcLabel;
+    const labelQuantities = split ? [qcLabel, quantityLabel(row.labQty, unit)] : (qcLabel ? [qcLabel] : []);
+    const productionDate = text(row.productionDate) || null;
+    return {
+      ...old,
+      seq: index + 1,
+      sampleName: text(row.sampleName),
+      commonName: text(row.commonName),
+      itemNo: text(row.itemNo) || undefined,
+      batchNo: text(row.batchNo),
+      lotNo: text(row.lotNo),
+      productionDate,
+      packageUnit: text(row.packsize),
+      sendToQc,
+      sendToLab,
+      sampleQuantity: split ? 2 : 1,
+      labelQuantity: labelQuantities.join(', '),
+      labelQuantities,
+      labelSampledDate: productionDate || '',
+      note: itemNoteWith(note, [
+        text(row.itemNo) ? `Item: ${text(row.itemNo)}` : '',
+        text(row.mfNo) ? `MF: ${text(row.mfNo)}` : '',
+        text(priority) ? `Priority: ${text(priority)}` : '',
+      ]),
+      sampleId: old.sampleId && old.seq === index + 1 ? old.sampleId : undefined,
+    };
+  });
+  return normalizePetitionItems(items, { department, petitionNo });
+}
+
+// mirror src/lib/petitionRouting.ts routeTargetsFromSendTargets
+function routeTargetsForItems(items) {
+  if (!items.length || items.some((item) => item.sendToQc !== false)) return [];
+  return items.some((item) => item.sendToLab === true) ? ['lab'] : [];
+}
+
+module.exports = {
+  buildEditedItems,
+  canEditWholePetition,
+  petitionReceived,
+  replaceProductionNote,
+  routeTargetsForItems,
+};
+

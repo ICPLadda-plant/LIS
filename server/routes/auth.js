@@ -6,6 +6,8 @@ const Role = require('../models/Role');
 const { primaryRole, normalizeRoles, unionPermissions } = require('../lib/roles');
 const { clearLisSessionCookie, getLisSessionUserId, setLisSessionCookie } = require('../lib/lisSessionCookie');
 const { requireAdminUser } = require('../lib/adminGate');
+const { fetchMonthlyEmployees } = require('../lib/employeeDirectory');
+const { findEmployeeByEmail } = require('../lib/employeeLink');
 
 const loginAttempts = new Map();
 const LOGIN_WINDOW_MS = 60 * 1000;
@@ -60,6 +62,23 @@ async function getPermissions(rolesInput) {
   const roleDocs = await Role.find(roles.includes('admin') ? {} : { id: { $in: roles } }).lean();
   const permsByRole = Object.fromEntries(roleDocs.map((r) => [r.id, r.permissions || []]));
   return unionPermissions(roles, permsByRole);
+}
+
+// role ที่ production ส่งมาใช้ได้เฉพาะ role ทั่วไปที่มีใน LIS — ห้ามยกระดับเป็น admin ผ่าน SSO
+async function resolveClaimedRole(rawRole) {
+  const claimed = String(rawRole || '').trim().toLowerCase();
+  if (!claimed || claimed === 'admin') return null;
+  return Role.findOne({ id: claimed });
+}
+
+// จับคู่พนักงาน HR ด้วยอีเมล (best-effort เหมือน Microsoft login) — HR ล่ม/ไม่พบ = ข้าม
+async function findHrEmployee(email) {
+  try {
+    return findEmployeeByEmail(await fetchMonthlyEmployees(), email) || null;
+  } catch (err) {
+    console.error('[production-sso] employee lookup failed:', err.message);
+    return null;
+  }
 }
 
 function formatSsoUser(user, permissions = []) {
@@ -127,8 +146,7 @@ router.post('/sso', async (req, res) => {
     const normalizedEmail = String(payload.email || '').trim().toLowerCase();
     if (!normalizedEmail) return res.status(400).json({ error: 'SSO token ไม่มีอีเมลผู้ใช้' });
 
-    const claimedRole = String(payload.role || '').trim().toLowerCase();
-    const role = claimedRole ? await Role.findOne({ id: claimedRole }) : null;
+    const role = await resolveClaimedRole(payload.role);
     const now = new Date().toISOString();
     let user = await User.findOne({ email: normalizedEmail });
 
@@ -136,28 +154,41 @@ router.post('/sso', async (req, res) => {
       user.name = String(payload.name || '').trim() || user.name || normalizedEmail;
       user.department = String(payload.dept || '').trim() || user.department || 'Unassigned';
       user.position = user.position || 'Unassigned';
-      user.authProvider = 'production';
+      if (!user.authProvider || user.authProvider === 'local') user.authProvider = 'production';
       user.lastActive = now;
       const currentRoles = normalizeRoles(user);
       const onlyViewer = currentRoles.length === 0 || (currentRoles.length === 1 && currentRoles[0] === 'viewer');
       if (role && onlyViewer) user.roles = [role.id];
+      if (currentRoles.length === 0 && !role) user.roles = ['viewer'];
       await user.save();
       setLisSessionCookie(res, user._id, req);
       return res.json(formatSsoUser(user, await getPermissions(normalizeRoles(user))));
     }
 
-    user = await User.create({
+    const employee = await findHrEmployee(normalizedEmail);
+    const newUserDoc = {
       email: normalizedEmail,
-      name: String(payload.name || '').trim() || normalizedEmail,
+      name: (employee && employee.name) || String(payload.name || '').trim() || normalizedEmail,
       roles: [role?.id || 'viewer'],
-      department: String(payload.dept || '').trim() || 'Unassigned',
-      position: 'Unassigned',
+      department: (employee && employee.department) || String(payload.dept || '').trim() || 'Unassigned',
+      position: (employee && employee.position) || 'Unassigned',
+      employeeId: (employee && employee.employeeId) || '',
       status: 'active',
       lastActive: now,
       authProvider: 'production',
       microsoftId: payload.sub ? `production:${payload.sub}` : undefined,
       tenantId: 'production',
-    });
+    };
+    try {
+      user = await User.create(newUserDoc);
+    } catch (e) {
+      // employeeId ชนกับ user อื่น → สร้างโดยไม่ลิงก์ ไม่ให้การเข้าครั้งแรกล้ม
+      if (e.code === 11000 && (e.keyPattern?.employeeId || /employeeId/.test(e.message || ''))) {
+        user = await User.create({ ...newUserDoc, employeeId: '' });
+      } else {
+        throw e;
+      }
+    }
 
     setLisSessionCookie(res, user._id, req);
     res.status(201).json(formatSsoUser(user, await getPermissions(normalizeRoles(user))));
