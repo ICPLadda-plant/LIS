@@ -84,4 +84,13 @@ describe("SampleLabelPrintTemplate", () => {
     expect(screen.queryByText("ทดสอบระบบ")).not.toBeInTheDocument();
   });
 
+  it("พิมพ์หมายเหตุจากฟอร์มคำร้องลงป้ายนำส่ง", () => {
+    render(<SampleLabelPrintTemplate petition={petitionWith({
+      sampleName: "OMETHOATE",
+      note: "ถังผสม 3,000 ลิตร , ถังเก่า 10 , ใช้ TECH ANF. LOT ใหม่",
+    })} />);
+
+    expect(screen.getByTestId("sample-label-remark-value")).toHaveTextContent("ถังผสม 3,000 ลิตร , ถังเก่า 10 , ใช้ TECH ANF. LOT ใหม่");
+  });
+
 });

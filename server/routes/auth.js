@@ -8,6 +8,9 @@ const { clearLisSessionCookie, getLisSessionUserId, setLisSessionCookie } = requ
 const { requireAdminUser } = require('../lib/adminGate');
 const { fetchMonthlyEmployees } = require('../lib/employeeDirectory');
 const { findEmployeeByEmail } = require('../lib/employeeLink');
+const { autoLinkEmployeeByEmail, saveWithEmployeeLinkFallback } = require('../lib/employeeAutoLink');
+
+const findOtherLinkedUser = (employeeId, userId) => User.findOne({ employeeId, _id: { $ne: userId } }).lean();
 
 const loginAttempts = new Map();
 const LOGIN_WINDOW_MS = 60 * 1000;
@@ -93,6 +96,7 @@ function formatSsoUser(user, permissions = []) {
     permissions,
     department: user.department,
     position: user.position,
+    employeeId: user.employeeId || '',
     signatureUrl: user.signatureUrl || '',
     status: user.status,
   };
@@ -160,7 +164,9 @@ router.post('/sso', async (req, res) => {
       const onlyViewer = currentRoles.length === 0 || (currentRoles.length === 1 && currentRoles[0] === 'viewer');
       if (role && onlyViewer) user.roles = [role.id];
       if (currentRoles.length === 0 && !role) user.roles = ['viewer'];
-      await user.save();
+      // ผู้ใช้เดิมที่ยังไม่ผูกรหัสพนักงาน → ผูกจากอีเมลที่ตรงกับข้อมูล HR
+      await autoLinkEmployeeByEmail(user, { findLinkedUser: findOtherLinkedUser });
+      await saveWithEmployeeLinkFallback(user);
       setLisSessionCookie(res, user._id, req);
       return res.json(formatSsoUser(user, await getPermissions(normalizeRoles(user))));
     }
@@ -207,6 +213,11 @@ router.get('/session', async (req, res) => {
     if (!user || user.status === 'inactive') {
       clearLisSessionCookie(res, req);
       return res.status(401).json({ error: 'session ของ LIS ไม่ถูกต้อง' });
+    }
+
+    if (!user.employeeId) {
+      const link = await autoLinkEmployeeByEmail(user, { findLinkedUser: findOtherLinkedUser });
+      if (link.status === 'linked') await saveWithEmployeeLinkFallback(user);
     }
 
     res.json(formatSsoUser(user, await getPermissions(normalizeRoles(user))));

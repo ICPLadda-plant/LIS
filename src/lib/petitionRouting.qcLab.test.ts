@@ -19,4 +19,14 @@ describe("pickQcLabSideItems", () => {
       { ...items[0], sampleQuantity: 1, labelQuantity: "500 G", labelQuantities: ["500 G"] },
     ]);
   });
+
+  it("picks every portion of the requested side when Production marked the sides", () => {
+    const items = [{
+      seq: 1, sampleName: "A", batchNo: "B1", sampleQuantity: 5,
+      labelQuantities: ["10 CC", "10 CC", "50 CC", "50 CC", "50 CC"],
+      labelQuantitySides: ["qc", "qc", "lab", "lab", "lab"],
+    }];
+    expect(pickQcLabSideItems(petition as never, items, "lab")[0]).toMatchObject({ sampleQuantity: 3, labelQuantities: ["50 CC", "50 CC", "50 CC"] });
+    expect(pickQcLabSideItems(petition as never, items, "qc")[0]).toMatchObject({ sampleQuantity: 2, labelQuantities: ["10 CC", "10 CC"] });
+  });
 });

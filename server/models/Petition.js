@@ -22,6 +22,8 @@ const PetitionItemSchema = new mongoose.Schema(
     labelSeller: String,
     labelQuantity: String,
     labelQuantities: [String],
+    // ฝั่งของแต่ละตัวอย่างใน labelQuantities ('qc' | 'lab') — Production ส่งได้หลายชิ้นต่อฝั่ง
+    labelQuantitySides: [String],
     labelSampledBy: String,
     labelSampledDate: String,
     labelRemark: String,

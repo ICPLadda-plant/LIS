@@ -334,6 +334,37 @@ export function withProductionLabSample(item: ItemRowValues, labQty: string, uni
   return { ...item, sampleQuantity: 2, labelQuantities: quantities, labelQuantity: quantities.join(', ') };
 }
 
+// Production ส่งน้ำหนักรายชิ้นของแต่ละฝั่ง (qcQtys / labQtys) → 1 รายการ หลายตัวอย่าง พร้อมระบุฝั่งของแต่ละชิ้น
+export function withProductionPortions(item: ItemRowValues, qcQtys: string[], labQtys: string[], unit: string): ItemRowValues | null {
+  const qc = item.sendToQc === false ? [] : qcQtys;
+  const lab = item.sendToLab ? labQtys : [];
+  if (!qc.length && !lab.length) return null;
+  const quantities = [...qc, ...lab].map((qty) => makeQuantityLabel(qty, unit));
+  return {
+    ...item,
+    sampleQuantity: quantities.length,
+    labelQuantities: quantities,
+    labelQuantity: quantities.join(', '),
+    labelQuantitySides: [...qc.map(() => 'qc' as const), ...lab.map(() => 'lab' as const)],
+  };
+}
+
+function productionPortionList(searchParams: URLSearchParams, index: number, key: 'qcQtys' | 'labQtys'): string[] {
+  return (searchParams.get(`samples[${index}][${key}]`) ?? '')
+    .split(',')
+    .map((qty) => qty.trim())
+    .filter((qty) => Number(qty) > 0);
+}
+
+function withProductionSamples(item: ItemRowValues, searchParams: URLSearchParams, index: number, labQty: string, unit: string): ItemRowValues {
+  return withProductionPortions(
+    item,
+    productionPortionList(searchParams, index, 'qcQtys'),
+    productionPortionList(searchParams, index, 'labQtys'),
+    unit,
+  ) ?? withProductionLabSample(item, labQty, unit);
+}
+
 function dedupeImportedItems(items: ItemRowValues[]): ItemRowValues[] {
   const seen = new Set<string>();
   const unique: ItemRowValues[] = [];
@@ -370,6 +401,9 @@ export function mergeQcLabSameBatchItems(items: ItemRowValues[]): ItemRowValues[
     const quantities = [...(existing.labelQuantities ?? []), ...(item.labelQuantities ?? [])].filter((entry) => entry.trim());
     existing.labelQuantities = quantities;
     existing.labelQuantity = quantities.join(', ');
+    existing.labelQuantitySides = existing.labelQuantitySides && item.labelQuantitySides
+      ? [...existing.labelQuantitySides, ...item.labelQuantitySides]
+      : undefined;
     if (item.note && !existing.note.includes(item.note)) existing.note = [existing.note, item.note].filter(Boolean).join(' | ');
   }
   return merged.map((item, index) => ({ ...item, seq: index + 1 }));
@@ -453,7 +487,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     const submittedQuantity = quantities[0] ?? '';
     const submittedUnit = quantityUnits[0] ?? '';
     const labelQuantity = makeQuantityLabel(submittedQuantity, submittedUnit);
-    return [withProductionLabSample({
+    return [withProductionSamples({
       ...singleItem,
       sendToLab: sendToLabFromDefault(singleItem, sendToLabs[0]),
       sendToQc: sendToQcFromQuery(sendToQcs[0]),
@@ -464,7 +498,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       labelSampledDate: productionDate,
       submittedQuantity,
       submittedUnit,
-    }, labQtys[0] ?? '', submittedUnit)];
+    }, searchParams, 0, labQtys[0] ?? '', submittedUnit)];
   }
 
   const items: ItemRowValues[] = [];
@@ -515,7 +549,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       item.testItems,
       item.note,
     ].some(Boolean)) {
-      items.push(withProductionLabSample(item, valueAt(labQtys, i, false), item.submittedUnit));
+      items.push(withProductionSamples(item, searchParams, i, valueAt(labQtys, i, false), item.submittedUnit));
     }
   }
 

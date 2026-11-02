@@ -58,6 +58,8 @@ export interface ItemRowValues {
   sampleQuantity?: number;
   labelQuantity?: string;
   labelQuantities?: string[];
+  /** ฝั่งของแต่ละตัวอย่าง ('qc' | 'lab') ตามลำดับ labelQuantities — มาจาก Production ที่ส่งหลายชิ้นต่อฝั่ง */
+  labelQuantitySides?: Array<'qc' | 'lab'>;
   labelSampledDate?: string;
   submittedQuantity?: string;
   submittedUnit?: string;
@@ -333,7 +335,11 @@ export default function ItemsStep({
           const packageUnitLocked = !allowManualItemFields && (!pickedMaster || Boolean(pickedMaster.packageUnit?.trim()));
           const labelQuantityId = `label-quantity-${idx}`;
           const sentQuantityInputs = labelQuantityInputs(splitQcLab ? { ...it, sampleQuantity: 2 } : it);
-          const sampleTargets = splitQcLab ? qcLabSampleTargets(sentQuantityInputs) : null;
+          const sampleTargets = splitQcLab
+            ? qcLabSampleTargets(sentQuantityInputs)
+            : it.labelQuantitySides?.length === sentQuantityInputs.length
+              ? it.labelQuantitySides.map((side) => (side === 'lab' ? 'LAB' : 'QC') as 'QC' | 'LAB')
+              : null;
           return (
             <div key={idx} className="rounded-[10px] border border-grey-200 p-4">
               <div className="mb-3 flex items-center justify-between">

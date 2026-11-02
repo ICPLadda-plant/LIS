@@ -1,37 +1,34 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import EmployeeLinkGate from "./EmployeeLinkGate";
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: vi.fn() }));
-vi.mock("@/lib/api", () => ({ api: { get: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-describe("EmployeeLinkGate search ranking", () => {
-  it("ranks before the 50-row limit while preserving totals and employee linking", async () => {
+const mockUser = (linkSelfEmployee: ReturnType<typeof vi.fn>) =>
+  vi.mocked(useAuth).mockReturnValue({
+    user: { id: "unlinked", employeeId: "", email: "achara.b@icpladda.com", roles: ["viewer"] },
+    linkSelfEmployee,
+  } as unknown as ReturnType<typeof useAuth>);
+
+describe("EmployeeLinkGate", () => {
+  it("links by email automatically without asking the user to pick", async () => {
     const linkSelfEmployee = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useAuth).mockReturnValue({
-      user: { id: "unlinked", employeeId: "", email: "employee@example.com", roles: ["viewer"] },
-      linkSelfEmployee,
-    } as unknown as ReturnType<typeof useAuth>);
-    vi.mocked(api.get).mockResolvedValue({ data: { data: [
-      ...Array.from({ length: 50 }, (_, index) => ({
-        employeeId: "X-" + index, name: "E1 Employee " + index, department: "QC", position: "Analyst",
-      })),
-      { employeeId: "E1", name: "Exact", department: "QC", position: "Analyst" },
-    ] } });
+    mockUser(linkSelfEmployee);
     render(<EmployeeLinkGate />);
-    await screen.findByRole("button", { name: /E1 Employee 0/ });
-    expect(screen.queryByText("Exact")).not.toBeInTheDocument();
-    const input = screen.getByPlaceholderText("ค้นหาชื่อ, รหัสพนักงาน, แผนก...");
-    fireEvent.change(input, { target: { value: " e1 " } });
-    expect(screen.getAllByRole("button")).toHaveLength(50);
-    expect(screen.getAllByRole("button")[0]).toHaveTextContent("Exact");
-    expect(screen.getByText(/แสดง 50 จาก 51 รายการ/)).toBeInTheDocument();
-    fireEvent.change(input, { target: { value: "" } });
-    expect(screen.getAllByRole("button")[0]).toHaveTextContent("E1 Employee 0");
-    fireEvent.change(input, { target: { value: "e1" } });
-    fireEvent.click(screen.getAllByRole("button")[0]);
-    await waitFor(() => expect(linkSelfEmployee).toHaveBeenCalledWith("E1"));
+    await waitFor(() => expect(linkSelfEmployee).toHaveBeenCalledTimes(1));
+    expect(linkSelfEmployee).toHaveBeenCalledWith();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("explains when HR has no matching email and lets the user retry", async () => {
+    const notFound = Object.assign(new Error("ไม่พบอีเมลนี้ในข้อมูลพนักงาน"), { status: 404 });
+    const linkSelfEmployee = vi.fn().mockRejectedValueOnce(notFound).mockResolvedValueOnce(undefined);
+    mockUser(linkSelfEmployee);
+    render(<EmployeeLinkGate />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("ไม่พบอีเมลนี้ในข้อมูลพนักงาน");
+    fireEvent.click(screen.getByRole("button", { name: "ลองใหม่" }));
+    await waitFor(() => expect(linkSelfEmployee).toHaveBeenCalledTimes(2));
   });
 });

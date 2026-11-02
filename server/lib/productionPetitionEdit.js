@@ -22,6 +22,10 @@ function quantityLabel(qty, unit) {
   return [text(qty), text(unit)].filter(Boolean).join(' ');
 }
 
+function qtyList(value) {
+  return (Array.isArray(value) ? value : []).map(text).filter((qty) => Number(qty) > 0);
+}
+
 function flag(value, fallback) {
   if (typeof value === 'boolean') return value;
   const v = text(value).toLowerCase();
@@ -53,9 +57,16 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
     const qcLabel = quantityLabel(row.qty, unit);
     const sendToQc = flag(row.sendToQc, true);
     const sendToLab = flag(row.sendToLab, false);
+    // Production ส่งน้ำหนักรายชิ้นของแต่ละฝั่งมา (qcQtys / labQtys) → ระบุฝั่งของแต่ละตัวอย่าง
+    const qcQtys = sendToQc ? qtyList(row.qcQtys) : [];
+    const labQtys = sendToLab ? qtyList(row.labQtys) : [];
+    const portions = [...qcQtys.map((qty) => [qty, 'qc']), ...labQtys.map((qty) => [qty, 'lab'])];
     const labQty = Number(row.labQty);
     const split = sendToQc && sendToLab && labQty > 0 && qcLabel;
-    const labelQuantities = split ? [qcLabel, quantityLabel(row.labQty, unit)] : (qcLabel ? [qcLabel] : []);
+    const labelQuantities = portions.length
+      ? portions.map(([qty]) => quantityLabel(qty, unit))
+      : split ? [qcLabel, quantityLabel(row.labQty, unit)] : (qcLabel ? [qcLabel] : []);
+    const labelQuantitySides = portions.length ? portions.map(([, side]) => side) : [];
     const productionDate = text(row.productionDate) || null;
     return {
       ...old,
@@ -69,9 +80,10 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
       packageUnit: text(row.packsize),
       sendToQc,
       sendToLab,
-      sampleQuantity: split ? 2 : 1,
+      sampleQuantity: portions.length || (split ? 2 : 1),
       labelQuantity: labelQuantities.join(', '),
       labelQuantities,
+      labelQuantitySides,
       labelSampledDate: productionDate || '',
       note: itemNoteWith(note, [
         text(row.itemNo) ? `Item: ${text(row.itemNo)}` : '',

@@ -32,6 +32,17 @@ describe('productionPetitionEdit', () => {
     expect(routeTargetsForItems([items[1]])).toEqual(['lab']);
   });
 
+  test('keeps several QC and Lab portions with their sides', () => {
+    const [item] = buildEditedItems([], [
+      { sampleName: 'PROPANIL', batchNo: 'B1', qty: '10', unit: 'CC', sendToQc: '1', sendToLab: '1', labQty: '50', qcQtys: ['10', '10'], labQtys: ['50', '50', '50'] },
+    ], { petitionNo: 'P1' });
+    expect(item).toMatchObject({
+      sampleQuantity: 5,
+      labelQuantities: ['10 CC', '10 CC', '50 CC', '50 CC', '50 CC'],
+      labelQuantitySides: ['qc', 'qc', 'lab', 'lab', 'lab'],
+    });
+  });
+
   test('replaces only the production note and keeps Item/MF/Priority', () => {
     expect(replaceProductionNote('MF: X | Item: A | MF: X | Priority: urgent', 'ใหม่'))
       .toBe('ใหม่ | Item: A | MF: X | Priority: urgent');

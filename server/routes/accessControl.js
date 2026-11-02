@@ -3,7 +3,11 @@ const mongoose = require('mongoose');
 const router = express.Router();
 const { requireAdminUser, requireAuthenticatedUser } = require('../lib/adminGate');
 router.use((req, res, next) => {
-  if ((req.method === 'GET' && req.path === '/') || (req.method === 'POST' && req.path === '/users/microsoft')) {
+  if (
+    (req.method === 'GET' && req.path === '/') ||
+    (req.method === 'POST' && req.path === '/users/microsoft') ||
+    (req.method === 'POST' && req.path === '/users/me/link-employee')
+  ) {
     return requireAuthenticatedUser(req, res, next);
   }
   return requireAdminUser(req, res, next);
@@ -21,6 +25,7 @@ const { resolveHrField } = require('../lib/userProfile');
 const { primaryRole, normalizeRoles, unionPermissions } = require('../lib/roles');
 const { fetchMonthlyEmployees } = require('../lib/employeeDirectory');
 const { findEmployeeByEmail, findEmployeeById, planEmployeeSync } = require('../lib/employeeLink');
+const { autoLinkEmployeeByEmail, saveWithEmployeeLinkFallback } = require('../lib/employeeAutoLink');
 const { isStorablePermission } = require('../lib/permissionFilter');
 const { isValidProfileId } = require('../lib/dashboardProfiles');
 const { roleInUse } = require('../lib/roleUsage');
@@ -488,6 +493,37 @@ router.post('/users/microsoft', async (req, res) => {
     res.status(201).json(formatUser(user, await getRolePermissions(normalizeRoles(user))));
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'Email already exists' });
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ผู้ใช้ที่ล็อกอินอยู่ผูกตัวเองกับพนักงาน HR จากอีเมลบัญชี (ไม่รับรหัสจาก client
+// จึงผูกกับคนอื่นไม่ได้) — ใช้แทนการให้ผู้ใช้เลือกชื่อเอง
+router.post('/users/me/link-employee', async (req, res) => {
+  try {
+    const sessionUserId = req.authenticatedUser?._id;
+    if (!sessionUserId) return res.status(401).json({ error: 'ต้องระบุผู้ใช้' });
+    const user = await User.findById(sessionUserId);
+    if (!user) return res.status(404).json({ error: 'ไม่พบบัญชีผู้ใช้' });
+
+    const link = await autoLinkEmployeeByEmail(user, {
+      findLinkedUser: (employeeId, userId) => User.findOne({ employeeId, _id: { $ne: userId } }).lean(),
+    });
+    if (link.status === 'not-found') {
+      return res.status(404).json({ error: 'ไม่พบอีเมลนี้ในข้อมูลพนักงาน', code: 'EMPLOYEE_EMAIL_NOT_FOUND' });
+    }
+    if (link.status === 'taken') {
+      return res.status(409).json({ error: 'รหัสพนักงานนี้ถูกผูกกับผู้ใช้อื่นแล้ว', code: 'EMPLOYEE_ALREADY_LINKED' });
+    }
+    if (link.status === 'unavailable') {
+      return res.status(503).json({ error: 'โหลดข้อมูลพนักงานไม่สำเร็จ', code: 'EMPLOYEE_DIRECTORY_UNAVAILABLE' });
+    }
+    if (link.status === 'linked') await saveWithEmployeeLinkFallback(user);
+    if (!user.employeeId) {
+      return res.status(409).json({ error: 'รหัสพนักงานนี้ถูกผูกกับผู้ใช้อื่นแล้ว', code: 'EMPLOYEE_ALREADY_LINKED' });
+    }
+    res.json(formatUser(user, await getRolePermissions(normalizeRoles(user))));
+  } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
