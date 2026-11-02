@@ -73,6 +73,36 @@ function stubActorLookup({
   };
 }
 
+test('DELETE /:id allows QC Head and removes the COA with its audit log', async () => {
+  const originals = {
+    findById: CoaDocument.findById,
+    deleteOne: CoaDocument.deleteOne,
+    auditDeleteMany: CoaAuditLog.deleteMany,
+  };
+  const restoreActor = stubActorLookup();
+  const deleted = [];
+  try {
+    CoaDocument.findById = async () => ({ _id: '507f1f77bcf86cd799439011' });
+    CoaAuditLog.deleteMany = async (filter) => { deleted.push(['audit', filter.coaId.toString()]); };
+    CoaDocument.deleteOne = async (filter) => { deleted.push(['document', filter._id.toString()]); };
+    const res = await invoke('/:id', 'delete', {
+      params: { id: '507f1f77bcf86cd799439011' },
+      body: { _user: { email: 'qc@example.com' } },
+    });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body, { ok: true });
+    assert.deepEqual(deleted, [
+      ['audit', '507f1f77bcf86cd799439011'],
+      ['document', '507f1f77bcf86cd799439011'],
+    ]);
+  } finally {
+    CoaDocument.findById = originals.findById;
+    CoaDocument.deleteOne = originals.deleteOne;
+    CoaAuditLog.deleteMany = originals.auditDeleteMany;
+    restoreActor();
+  }
+});
+
 test('ERP manual creation, editing, submit, approval and revision preserve entered results without Lab lookup', async () => {
   const originals = { fetch: global.fetch, create: CoaDocument.create, findById: CoaDocument.findById,
     auditCreate: CoaAuditLog.create, petitionFindById: Petition.findById };
@@ -166,6 +196,8 @@ test('buildCoaSnapshots freezes selected sample and lab result data', () => {
           commonName: 'Selected Common',
           batchNo: 'B-2',
           lotNo: 'L-2',
+          productionDate: '2026-03-27',
+          labelSampledDate: '2026-04-11',
           labelManufacturer: 'Manufacturer',
         },
       ],
@@ -202,7 +234,7 @@ test('buildCoaSnapshots freezes selected sample and lab result data', () => {
     commonName: 'Selected Common',
     batchNo: 'B-2',
     lotNo: 'L-2',
-    productionDate: '',
+    productionDate: '2026-04-11',
     sampleId: '',
     condition: 'ของเหลวใส สีส้ม',
     manufacturer: 'Manufacturer',
@@ -267,7 +299,7 @@ test('buildCoaSnapshots includes multi-entry and phase-two lab values without in
 
 test('actorFromRequest uses stored active user roles instead of caller supplied privileges', async () => {
   const restore = stubActorLookup({
-    user: { name: 'Stored Staff', email: 'staff@example.com', role: 'qc-staff', roles: ['qc-staff'], status: 'active', position: 'QC Staff' },
+    user: { name: 'Stored Staff', email: 'staff@example.com', role: 'qc-staff', roles: ['qc-staff'], status: 'active', position: 'QC Staff', signatureUrl: '/LIS/uploads/signatures/staff.png' },
   });
   try {
     const actor = await router.actorFromRequest({
@@ -275,6 +307,7 @@ test('actorFromRequest uses stored active user roles instead of caller supplied 
     });
     assert.equal(actor.name, 'Stored Staff');
     assert.equal(actor.role, 'qc-staff');
+    assert.equal(actor.signatureUrl, '/LIS/uploads/signatures/staff.png');
     assert.deepEqual(actor.permissions, []);
     assert.equal(isQcHead(actor), false);
   } finally {
@@ -340,7 +373,7 @@ test('GET / includes requested COA rows for Lab-approved petitions without COA d
       petitionNo: 'P-2609-0002',
       labApprovedAt: new Date('2026-09-05T09:46:39.203Z'),
       submittedBy: { name: 'Requester Name', email: 'requester@example.com' },
-      items: [{ seq: 1, sampleName: 'Trade A', commonName: 'Common A', batchNo: 'B-001', lotNo: 'L-001', productionDate: '2026-09-01' }],
+      items: [{ seq: 1, sampleName: 'Trade A', commonName: 'Common A', batchNo: 'B-001', lotNo: 'L-001', productionDate: '2026-03-27', labelSampledDate: '2026-04-11' }],
     }]);
     LabRequest.find = () => ({ lean: async () => [{
       petitionId: 'petition-1',
@@ -369,13 +402,46 @@ test('GET / includes requested COA rows for Lab-approved petitions without COA d
         email: 'requester@example.com',
         phone: '1234',
       },
-      sampleSnapshots: [{ itemSeq: 1, sampleName: 'Trade A', commonName: 'Common A', batchNo: 'B-001', lotNo: 'L-001', productionDate: '2026-09-01', sampleId: '', condition: '', manufacturer: '' }],
+      sampleSnapshots: [{ itemSeq: 1, sampleName: 'Trade A', commonName: 'Common A', batchNo: 'B-001', lotNo: 'L-001', productionDate: '2026-04-11', sampleId: '', condition: '', manufacturer: '' }],
       resultSnapshots: [],
       trendSnapshots: [],
       print: { printCount: 0 },
       createdAt: new Date('2026-09-05T09:46:39.203Z'),
       updatedAt: new Date('2026-09-05T09:46:39.203Z'),
     });
+  } finally {
+    CoaDocument.find = originals.coaFind;
+    Petition.find = originals.petitionFind;
+    LabRequest.find = originals.labRequestFind;
+    global.fetch = originals.fetch;
+  }
+});
+
+test('GET / does not truncate COA documents after 200 rows', async () => {
+  const originals = {
+    coaFind: CoaDocument.find,
+    petitionFind: Petition.find,
+    labRequestFind: LabRequest.find,
+    fetch: global.fetch,
+  };
+  try {
+    const documents = Array.from({ length: 205 }, (_, index) => ({
+      _id: `coa-${index}`,
+      status: 'approved',
+      selectedItemSeqs: [1],
+      sampleSnapshots: [],
+      resultSnapshots: [],
+      createdAt: new Date(2026, 9, 29, 12, 0, index).toISOString(),
+    }));
+    CoaDocument.find = () => sortedLimitedLean(documents);
+    Petition.find = () => sortedLimitedLean([]);
+    LabRequest.find = () => ({ lean: async () => [] });
+    global.fetch = async () => ({ ok: true, status: 200, text: async () => '[]', json: async () => [] });
+
+    const res = await invoke('/', 'get');
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.items.length, 205);
   } finally {
     CoaDocument.find = originals.coaFind;
     Petition.find = originals.petitionFind;
@@ -434,6 +500,61 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   });
   assert.equal(docs[0].externalCoaRequest.pendingStatus, 'pending shipment');
   assert.equal(docs[0].externalCoaRequest.appearance, 'เม็ดยาสีแดง');
+});
+
+test('externalCoaRowsToDocuments keeps the latest ERP update before checking the COA mark', () => {
+  const base = { SaleOrderNo: 'SO-LATEST', Line: 10000, ItemNo: 'F-1' };
+  const removed = router.externalCoaRowsToDocuments([
+    { ...base, UpdateDate: '2026-10-01T08:00:00.000Z', remark: 'ส่งพร้อม COA' },
+    { ...base, UpdateDate: '2026-10-02T08:00:00.000Z', remark: 'ไม่ขอเอกสาร' },
+  ]);
+  assert.deepEqual(removed, []);
+
+  const [latest] = router.externalCoaRowsToDocuments([
+    { ...base, UpdateDate: '2026-10-01T08:00:00.000Z', TradeName: 'Old name', remark: 'COA' },
+    { ...base, UpdateDate: '2026-10-03T08:00:00.000Z', TradeName: 'Updated name', remark: 'COA' },
+  ]);
+  assert.equal(latest.sampleSnapshots[0].sampleName, 'Updated name');
+  assert.equal(latest.updatedAt, '2026-10-03T08:00:00.000Z');
+});
+
+test('attachDensityToExternalCoaDocuments adds averaged valid Density for the resolved Batch', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-DENSITY', Line: 10000, BatchNo: '26S-ABC-001', remark: 'COA',
+  }]);
+  const [enriched] = router.attachDensityToExternalCoaDocuments([source], [
+    { 'Sample name': '26S-ABC-001', 'Measurement status': 'valid', 'Density [g/cm³]': '1.1000', 'Date & time': '10/29/2026 9:00 AM' },
+    { 'Sample name': '26S-ABC-001-P1', 'Measurement status': 'valid', 'Density [g/cm³]': '1.2000', 'Date & time': '10/29/2026 9:05 AM' },
+    { 'Sample name': '26S-ABC-001', 'Measurement status': 'Error', 'Density [g/cm³]': '9.9999', 'Date & time': '10/29/2026 9:10 AM' },
+  ]);
+
+  assert.deepEqual(enriched.resultSnapshots, [{
+    itemSeq: 10000,
+    testItem: 'Density at 30°C (g/cm³)',
+    criteria: '-',
+    result: '1.150',
+    unit: 'g/cm³',
+    method: 'DMA 501',
+  }]);
+});
+
+test('enrichExternalCoaDocumentsWithHistory resolves the current Batch before Density lookup', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-HISTORY', Line: 10000, ItemNo: 'F-1', TradeName: 'Trade A', CommonName: 'COMMON A', remark: 'COA',
+  }]);
+  const withErpLot = {
+    ...source,
+    sampleSnapshots: [{ ...source.sampleSnapshots[0], batchNo: 'FG261029-021', lotNo: 'FG261029-021' }],
+  };
+  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withErpLot], [source], [{
+    _id: 'coa-history',
+    status: 'approved',
+    updatedAt: '2026-10-29T08:00:00.000Z',
+    sampleSnapshots: [{ sampleId: 'F-1', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: '013' }],
+  }]);
+
+  assert.equal(enriched.sampleSnapshots[0].batchNo, '013');
+  assert.equal(enriched.sampleSnapshots[0].lotNo, 'FG261029-021');
 });
 
 test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', () => {
@@ -1370,7 +1491,7 @@ test('ERP autofill averages duplicate legacy Lab results and excludes the named 
   }
 });
 
-test('ERP autofill keeps the matching LIS identifiers but uses the ERP production date', async () => {
+test('ERP autofill keeps the production date paired with the matching LIS Lot', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1413,7 +1534,7 @@ test('ERP autofill keeps the matching LIS identifiers but uses the ERP productio
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'FG260912-001');
-    assert.equal(res.body.sample.productionDate, '2026-09-15');
+    assert.equal(res.body.sample.productionDate, '2026-09-12');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
@@ -1487,7 +1608,7 @@ test('ERP autofill fills the production date from MF after resolving the Batch f
   }
 });
 
-test('ERP autofill may identify the batch from Density but does not use its production date', async () => {
+test('ERP autofill resolves the production batch from Density while retaining the FG lot', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1509,6 +1630,9 @@ test('ERP autofill may identify the batch from Density but does not use its prod
   try {
     global.fetch = async (url) => {
       if (String(url).includes('/API/COA')) return { ok: true, text: async () => JSON.stringify([externalRow]) };
+      if (String(url).includes('stock-all-item')) {
+        return { ok: true, json: async () => [{ item_no: 'F-OMT50-1X20', lot_no: 'FG260917-001', stock_qty: 10 }] };
+      }
       return { ok: true, json: async () => [] };
     };
     Petition.find = () => sortedLimitedLean([]);
@@ -1529,7 +1653,8 @@ test('ERP autofill may identify the batch from Density but does not use its prod
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '526');
-    assert.equal(res.body.sample.productionDate, '');
+    assert.equal(res.body.sample.lotNo, 'FG260917-001');
+    assert.equal(res.body.sample.productionDate, '2026-09-17');
     assert.equal(res.body.legacyMatch, null);
     assert.match(res.body.warnings.join(' '), /Density/);
   } finally {
@@ -1692,7 +1817,7 @@ test('real-time Lab AI lookup averages duplicate results from the exact batch', 
   }
 });
 
-test('real-time Lab AI lookup does not fall back to a different batch', async () => {
+test('real-time Lab AI lookup falls back to the nearest previous batch', async () => {
   const originals = {
     petitionFind: Petition.find,
     legacyFind: LegacyLabResult.find,
@@ -1701,7 +1826,10 @@ test('real-time Lab AI lookup does not fall back to a different batch', async ()
   const petition = {
     _id: 'petition-ai-lookup', petitionNo: 'P-AI-LOOKUP', updatedAt: '2026-10-08T00:00:00.000Z',
     approvedAt: '2026-10-08T00:00:00.000Z', submittedBy: { department: 'QC' },
-    items: [{ seq: 1, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '080' }],
+    items: [
+      { seq: 1, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '080' },
+      { seq: 2, sampleName: 'ช้างมาร์กี้', commonName: 'GLYPHOSATE 48% W/V SL', batchNo: '081' },
+    ],
   };
   try {
     Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
@@ -1718,12 +1846,13 @@ test('real-time Lab AI lookup does not fall back to a different batch', async ()
     assert.equal(found.body.analysisDate, '2026-10-08');
     assert.equal(found.body.match.batchNo, '080');
 
-    const missing = await invoke('/lab-ai-lookup', 'get', {
+    const fallback = await invoke('/lab-ai-lookup', 'get', {
       query: { batchNo: '081', commonName: 'GLYPHOSATE 48% W/V SL', sampleName: 'ช้างมาร์กี้' },
     });
-    assert.equal(missing.statusCode, 200);
-    assert.equal(missing.body.ai, null);
-    assert.equal(missing.body.match, null);
+    assert.equal(fallback.statusCode, 200);
+    assert.equal(fallback.body.ai.result, '48.15%');
+    assert.equal(fallback.body.analysisDate, '2026-10-08');
+    assert.equal(fallback.body.match.batchNo, '080');
   } finally {
     Petition.find = originals.petitionFind;
     LegacyLabResult.find = originals.legacyFind;

@@ -11,7 +11,9 @@ function manualCoaSnapshots(input, itemSeq) {
   for (const key of ['sampleName', 'commonName', 'batchNo', 'lotNo', 'productionDate', 'sampleId', 'condition', 'manufacturer']) {
     sampleSnapshot[key] = clean(sample[key]);
   }
-  sampleSnapshot.productionDate = lotSnapshot(sampleSnapshot.lotNo).productionDate || sampleSnapshot.productionDate;
+  sampleSnapshot.productionDate = lotSnapshot(sampleSnapshot.batchNo).productionDate
+    || lotSnapshot(sampleSnapshot.lotNo).productionDate
+    || sampleSnapshot.productionDate;
   if (!sampleSnapshot.sampleName || !sampleSnapshot.commonName || !sampleSnapshot.batchNo
     || !/^\d{4}-\d{2}-\d{2}$/.test(sampleSnapshot.productionDate)
     || Number.isNaN(Date.parse(sampleSnapshot.productionDate))

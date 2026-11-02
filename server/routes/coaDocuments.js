@@ -219,7 +219,8 @@ function aiResultUpdatedTime(results, commonName) {
 }
 
 function aiCandidateMatchRank(candidate) {
-  if (candidate.matchKind === 'exact') return 2;
+  if (candidate.matchKind === 'exact') return 3;
+  if (candidate.matchKind === 'previous') return 2;
   if (candidate.matchKind === 'sample') return 1;
   return 0;
 }
@@ -229,7 +230,7 @@ async function latestAiLabData(petitions, sample) {
   const selection = findLatestAiLabItems(petitions, sample);
   const hasBatch = Boolean(manualText(sample?.batchNo || sample?.lotNo));
   const candidates = selection.candidates
-    .filter((candidate) => !hasBatch || candidate.matchKind === 'exact')
+    .filter((candidate) => !hasBatch || candidate.matchKind === 'exact' || candidate.matchKind === 'previous')
     .slice(0, 100);
   if (candidates.length) {
     const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
@@ -259,8 +260,10 @@ async function latestAiLabData(petitions, sample) {
       || right.candidate.approvedTime - left.candidate.approvedTime
     ));
     if (hasBatch && matches.length) {
+      const selectedBatchKey = matches[0].candidate.batchKey;
+      const selectedMatches = matches.filter((match) => match.candidate.batchKey === selectedBatchKey);
       const seen = new Set();
-      const qcResults = matches.flatMap((match) => match.qcResults).filter((result) => {
+      const qcResults = selectedMatches.flatMap((match) => match.qcResults).filter((result) => {
         const key = String(result?._id || [
           result?.petitionId, result?.itemSeq, result?.parameterId || result?.parameterName, result?.sampleRoundId,
         ].join('\u0000'));
@@ -270,10 +273,10 @@ async function latestAiLabData(petitions, sample) {
       });
       return {
         ...selection,
-        best: matches[0].candidate,
+        best: selectedMatches[0].candidate,
         qcResults,
         resultData: resultRowsFromQc(qcResults, commonName),
-        resultTime: Math.max(...matches.map((match) => match.resultTime)),
+        resultTime: Math.max(...selectedMatches.map((match) => match.resultTime)),
         source: 'petition',
       };
     }
@@ -490,16 +493,19 @@ function externalCoaRowToDocument(row) {
 }
 
 function externalCoaRowsToDocuments(payload) {
-  const seen = new Set();
-  const documents = [];
-  for (const row of normalizeExternalPayload(payload)) {
-    if (!isExternalCoaRequest(row)) continue;
-    const doc = externalCoaRowToDocument(row);
-    if (seen.has(doc._id)) continue;
-    seen.add(doc._id);
-    documents.push(doc);
-  }
-  return documents;
+  const latestById = new Map();
+  normalizeExternalPayload(payload).forEach((row, index) => {
+    const id = externalCoaRequestId(row);
+    const timestamp = Date.parse(externalCoaDate(row) || '');
+    const current = latestById.get(id);
+    if (!current || (Number.isFinite(timestamp) ? timestamp : index) >= current.sortValue) {
+      latestById.set(id, { row, sortValue: Number.isFinite(timestamp) ? timestamp : index });
+    }
+  });
+  return [...latestById.values()]
+    .map(({ row }) => row)
+    .filter(isExternalCoaRequest)
+    .map(externalCoaRowToDocument);
 }
 
 function enrichExternalCoaDocumentsWithErpLots(documents, references = {}) {
@@ -521,6 +527,58 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}) {
       } : sample),
     };
   });
+}
+
+function attachDensityToExternalCoaDocuments(documents, densityRows = []) {
+  return documents.map((doc) => {
+    const sample = doc.sampleSnapshots?.[0];
+    const density = densityForBatch(densityRows, sample?.batchNo);
+    if (!sample || !density) return doc;
+    return {
+      ...doc,
+      resultSnapshots: [
+        ...(doc.resultSnapshots || []).filter((row) => !/density/i.test(row.testItem || '')),
+        {
+          itemSeq: sample.itemSeq,
+          testItem: 'Density at 30°C (g/cm³)',
+          criteria: '-',
+          result: density,
+          unit: 'g/cm³',
+          method: 'DMA 501',
+        },
+      ],
+    };
+  });
+}
+
+function enrichExternalCoaDocumentsWithHistory(documents, sourceDocuments, historyDocuments) {
+  const sourceById = new Map(sourceDocuments.map((doc) => [doc._id, doc]));
+  return documents.map((doc) => {
+    const sourceSample = sourceById.get(doc._id)?.sampleSnapshots?.[0] || {};
+    if (sourceSample.batchNo || sourceSample.lotNo) return doc;
+    const history = findBestCoaHistorySample(historyDocuments, doc);
+    const historyBatch = manualText(history?.sample?.batchNo || history?.sample?.lotNo);
+    if (!historyBatch || !doc.sampleSnapshots?.length) return doc;
+    return {
+      ...doc,
+      sampleSnapshots: doc.sampleSnapshots.map((sample, index) => (
+        index === 0 ? { ...sample, batchNo: historyBatch } : sample
+      )),
+    };
+  });
+}
+
+async function enrichExternalCoaDocumentsWithDensity(documents) {
+  if (mongoose.connection.readyState !== 1) return documents;
+  const batches = [...new Set(documents.flatMap((doc) => (
+    (doc.sampleSnapshots || []).map((sample) => String(sample.batchNo || '').trim()).filter(Boolean)
+  )))];
+  if (!batches.length) return documents;
+  const batchPattern = batches.map(escapeRegex).join('|');
+  const densityRows = await ResultDensity.find({
+    'Sample name': new RegExp(`(?:^|\\s)(?:B\\.)?(?:${batchPattern})(?:-P\\d+)?$`, 'i'),
+  }).sort({ _id: -1 }).limit(Math.min(5000, batches.length * 100)).lean();
+  return attachDensityToExternalCoaDocuments(documents, densityRows);
 }
 
 async function fetchExternalCoaDocuments() {
@@ -620,6 +678,7 @@ async function actorFromRequest(body = {}) {
     name: String(user.name || requestedActor.name || email).trim(),
     email,
     role: activeRole,
+    ...(user.signatureUrl ? { signatureUrl: String(user.signatureUrl).trim() } : {}),
     activeRole,
     roles,
     permissions,
@@ -676,7 +735,7 @@ function sampleSnapshotFromPetitionItem(item = {}) {
     commonName: item.commonName,
     batchNo: item.batchNo,
     lotNo: item.lotNo,
-    productionDate: item.productionDate,
+    productionDate: item.labelSampledDate || item.productionDate,
     sampleId: item.sampleId || '',
     condition: item.condition || '',
     manufacturer: item.labelManufacturer || '',
@@ -725,7 +784,6 @@ async function requestedCoaRows({ petitionNo } = {}) {
   if (petitionNo) petitionFilter.petitionNo = new RegExp(escapeRegex(String(petitionNo).trim()), 'i');
   const petitions = await Petition.find(petitionFilter)
     .sort({ labApprovedAt: -1 })
-    .limit(100)
     .lean();
   const petitionIds = petitions.map((petition) => petition._id);
   if (!petitionIds.length) return [];
@@ -845,14 +903,31 @@ router.get('/', async (req, res) => {
         })
       : Promise.resolve({ stockRows: [], mfRows: [] });
     const [documents, requestedRows, externalRows, erpReferences] = await Promise.all([
-      CoaDocument.find(filter).sort({ updatedAt: -1 }).limit(200).lean(),
+      CoaDocument.find(filter).sort({ updatedAt: -1 }).lean(),
       shouldIncludeRequestedRows(req.query)
         ? requestedCoaRows({ petitionNo: req.query.petitionNo })
         : Promise.resolve([]),
       externalPromise,
       erpReferencesPromise,
     ]);
-    const enrichedExternalRows = enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences);
+    const externalItemNos = [...new Set(externalRows
+      .map((row) => row.externalCoaRequest?.itemNo)
+      .filter(Boolean))];
+    const externalCoaHistory = externalItemNos.length
+      ? await CoaDocument.find({
+        'sampleSnapshots.sampleId': { $in: externalItemNos },
+        status: { $nin: ['cancelled', 'superseded', 'rejected'] },
+      }).sort({ updatedAt: -1 }).limit(500).lean()
+      : [];
+    const externalRowsWithCurrentBatch = enrichExternalCoaDocumentsWithHistory(
+      enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences),
+      externalRows,
+      externalCoaHistory,
+    );
+    const enrichedExternalRows = await enrichExternalCoaDocumentsWithDensity(externalRowsWithCurrentBatch).catch((error) => {
+      console.warn('[coa-documents] Density sync failed:', error.message);
+      return externalRowsWithCurrentBatch;
+    });
     const linkedExternalKeys = new Set(externalRows.length
       ? (await CoaDocument.find({
           'externalCoaRequest.saleOrderNo': { $in: externalRows.map((row) => row.externalCoaRequest.saleOrderNo) },
@@ -865,7 +940,7 @@ router.get('/', async (req, res) => {
         ...requestedRows,
         ...filterExternalCoaDocuments(enrichedExternalRows, req.query)
           .filter((row) => !linkedExternalKeys.has(externalCoaKey(row.externalCoaRequest))),
-      ]).slice(0, 200),
+      ]),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -969,15 +1044,18 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       ? sample
       : { ...sample, batchNo: '', lotNo: '' };
     let legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+    const legacyHistoryMatch = authoritativeBatch
+      ? findBestLegacyLabResult(legacyLabRows, source, { ...sample, batchNo: '', lotNo: '' })
+      : legacyMatch;
     let densityBatchMatch = null;
     let densityIdentityRows = [];
-    if (!authoritativeBatch && legacyMatch?.matchKind === 'productHistory') {
-      const family = densityBatchFamily(legacyMatch.batchNo);
+    if ((!authoritativeBatch || /^FG\d/i.test(authoritativeBatch)) && legacyHistoryMatch?.matchKind === 'productHistory') {
+      const family = densityBatchFamily(legacyHistoryMatch.batchNo);
       if (family) {
         const pattern = new RegExp(`^${escapeRegex(family)}-\\d+(?:-P\\d+)?$`, 'i');
         densityIdentityRows = await ResultDensity.find({ 'Sample name': pattern })
           .sort({ _id: -1 }).limit(5000).lean();
-        densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyMatch.batchNo);
+        densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyHistoryMatch.batchNo);
         if (densityBatchMatch) {
           sample.batchNo = densityBatchMatch.batchNo;
           authoritativeBatch = densityBatchMatch.batchNo;
@@ -1242,7 +1320,7 @@ router.get('/eligible-petitions', async (_req, res) => {
               commonName: item.commonName,
               batchNo: item.batchNo,
               lotNo: item.lotNo,
-              productionDate: item.productionDate,
+              productionDate: item.labelSampledDate || item.productionDate,
               activeCoa: activeByPetitionSeq.get(`${petition._id}:${item.seq}`)
                 || activeByHistoryKey.get(coaHistoryKey(item.commonName, item.batchNo))
                 || null,
@@ -1579,9 +1657,28 @@ router.post('/:id/print-event', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const actor = await actorFromRequest(req.body);
+    if (!isQcHead(actor)) return res.status(403).json({ error: 'ลบ COA ได้เฉพาะ QC Head' });
+    const coaId = objectId(req.params.id);
+    const doc = await CoaDocument.findById(coaId);
+    if (!doc) return res.status(404).json({ error: 'ไม่พบ COA' });
+    await withCoaTransaction(async (session) => {
+      await CoaAuditLog.deleteMany({ coaId }, session ? { session } : undefined);
+      await CoaDocument.deleteOne({ _id: coaId }, session ? { session } : undefined);
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(errorStatus(error)).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 module.exports.freezeSnapshots = freezeSnapshots;
 module.exports.actorFromRequest = actorFromRequest;
 module.exports.withCoaTransaction = withCoaTransaction;
 module.exports.externalCoaRowsToDocuments = externalCoaRowsToDocuments;
 module.exports.enrichExternalCoaDocumentsWithErpLots = enrichExternalCoaDocumentsWithErpLots;
+module.exports.attachDensityToExternalCoaDocuments = attachDensityToExternalCoaDocuments;
+module.exports.enrichExternalCoaDocumentsWithHistory = enrichExternalCoaDocumentsWithHistory;

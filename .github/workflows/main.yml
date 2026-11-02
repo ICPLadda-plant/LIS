@@ -1,5 +1,4 @@
-name: CI/CD
-
+name: Deploy
 on:
   push:
     branches: [main]
@@ -9,6 +8,14 @@ jobs:
     runs-on: [self-hosted, windows]
     defaults:
       run:
+        shell: powershell
         working-directory: C:\laragon\www\LIS
     steps:
-      - run: git pull
+      - name: Pull latest code
+        run: git pull origin main
+
+      - name: Install packages
+        run: npm install
+
+      - name: Build
+        run: npm run build

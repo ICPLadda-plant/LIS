@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const PersonSchema = new mongoose.Schema(
-  { name: String, email: String, role: String },
+  { name: String, email: String, role: String, signatureUrl: String },
   { _id: false },
 );
 

@@ -23,12 +23,41 @@ describe("CoaReportTemplate", () => {
     },
   );
 
+  it("shows a selected Appearance result before the batch number", () => {
+    const pages = buildCoaReportPages({
+      coaNo: "00012026",
+      sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade A", commonName: "GLYPHOSATE 48% SL", batchNo: "20260430" }],
+      resultSnapshots: [{ itemSeq: 1, testItem: "Appearance", criteria: "Clear liquid", result: "Conform" }],
+      formSelections: [{ itemSeq: 1, resultKeys: ["appearance"] }],
+    } as Parameters<typeof buildCoaReportPages>[0]);
+
+    render(<CoaReportTemplate pages={pages} />);
+
+    const rows = screen.getAllByRole("row");
+    expect(rows.findIndex((row) => row.textContent?.includes("Conform")))
+      .toBeLessThan(rows.findIndex((row) => row.textContent?.includes("BATCH NO.")));
+  });
+
+  it("does not append a duplicate percent unit after W/W", () => {
+    const pages = buildCoaReportPages({
+      coaNo: "00012026",
+      sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade A", commonName: "PRODUCT 10% SP", batchNo: "B1" }],
+      resultSnapshots: [{ itemSeq: 1, testItem: "%AI content (W/W)", result: "10.1 %W/W", unit: "%" }],
+      formSelections: [{ itemSeq: 1, resultKeys: ["ai"] }],
+    } as Parameters<typeof buildCoaReportPages>[0]);
+
+    render(<CoaReportTemplate pages={pages} />);
+
+    expect(screen.getByText("10.1 %W/W")).toBeInTheDocument();
+    expect(screen.queryByText("10.1 %W/W %")).not.toBeInTheDocument();
+  });
+
   it("renders the special GR/WP/SP COA form", () => {
     const page: CoaReportPage = {
       template: "grWpSp",
       coaNo: "00052026",
       revision: 0,
-      issueDate: "20/08/2569",
+      issueDate: "August 20, 2026",
       petitionNo: "P-2608-0005",
       customer: {},
       samples: [{
@@ -52,18 +81,30 @@ describe("CoaReportTemplate", () => {
       remark: "",
       approvedBy: "QC Head",
       approvedAt: "20/08/2569",
+      approvedSignatureUrl: "/LIS/uploads/signatures/qc-head.png",
     };
 
-    render(<CoaReportTemplate pages={[page]} />);
+    const { rerender } = render(<CoaReportTemplate pages={[page]} />);
 
     expect(screen.getByText("CERTIFICATE OF ANALYSIS")).toBeInTheDocument();
+    expect(screen.getByText("August 20, 2026")).toBeInTheDocument();
+    expect(screen.queryByText("Month Date, ค.ศ.")).not.toBeInTheDocument();
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Trade Herbicide (Glyphosate 48% SL GR)");
     expect(screen.getByText(/MANUFACTURING DATE/).closest("div")).toHaveTextContent("MANUFACTURING DATE : 15/08/2026");
     expect(screen.getByText(/EXPIRED DATE/).closest("div")).toHaveTextContent("EXPIRED DATE : 15/08/2028");
     expect(screen.getByText("BATCH NO.")).toBeInTheDocument();
     expect(screen.getByText("48% ± 2.40")).toBeInTheDocument();
     expect(screen.getByText("48.2%")).toBeInTheDocument();
+    expect(screen.getByText("Date of analysis")).toHaveAttribute("colspan", "2");
     expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("05/09/2026");
+    expect(screen.getByText("(สิริพิชญ์ สงสมพันธ์)")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "ลายเซ็นผู้อนุมัติ" })).toHaveAttribute("src", "/LIS/uploads/signatures/qc-head.png");
+
+    rerender(<CoaReportTemplate pages={[{ ...page, approvedSignatureUrl: undefined }]} />);
+    expect(screen.getByRole("img", { name: "ลายเซ็นผู้อนุมัติ" }).getAttribute("src")).toContain("siripich-signature.png");
+
+    rerender(<CoaReportTemplate pages={[{ ...page, approvedAt: "-" }]} />);
+    expect(screen.queryByRole("img", { name: "ลายเซ็นผู้อนุมัติ" })).not.toBeInTheDocument();
   });
 
   it("uses the attached sand layout when Bromadiolone ends with SG", () => {
@@ -120,7 +161,8 @@ describe("CoaReportTemplate", () => {
 
     expect(screen.getByText("Appearance")).toBeInTheDocument();
     expect(screen.getByText("%AI content (W/W)")).toBeInTheDocument();
-    expect(screen.getByText("Date of analysis")).toBeInTheDocument();
+    expect(screen.getByText("Date of analysis")).toHaveAttribute("colspan", "2");
+    expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("19-10-2026");
     expect(screen.queryByText(/Density at 30/)).not.toBeInTheDocument();
     expect(screen.queryByText("1.120")).not.toBeInTheDocument();
   });
@@ -190,7 +232,8 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("Density at 30°C (g/cm³)")).toBeInTheDocument();
     expect(screen.getByText("LOT-888 / B-888")).toBeInTheDocument();
     expect(screen.getByText("1.120")).toBeInTheDocument();
-    expect(screen.getByText("20/08/2026")).toBeInTheDocument();
+    expect(screen.getByText("Date of analysis")).toHaveAttribute("colspan", "2");
+    expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("20/08/2026");
     expect(screen.getByText("(สิริพิชญ์ สงสมพันธ์)")).toBeInTheDocument();
     expect(screen.getByText("Asst. Quality Control Manager")).toBeInTheDocument();
 
@@ -217,7 +260,7 @@ describe("CoaReportTemplate", () => {
       template: "bromadiolone0005",
       coaNo: "00082026",
       revision: 0,
-      issueDate: "20/08/2569",
+      issueDate: "August 20, 2026",
       petitionNo: "P-2608-0008",
       customer: {},
       samples: [{
@@ -246,6 +289,8 @@ describe("CoaReportTemplate", () => {
     render(<CoaReportTemplate pages={[page]} />);
 
     expect(screen.getByText("CERTIFICATE OF ANALYSIS")).toBeInTheDocument();
+    expect(screen.getByText("August 20, 2026")).toBeInTheDocument();
+    expect(screen.queryByText("Month DATE, ค.ศ.")).not.toBeInTheDocument();
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Red Wax Block (BROMADIOLONE 0.005%)");
     expect(screen.getByText("Red wax block")).toBeInTheDocument();
     expect(screen.getByText("0.005% ± 0.00125")).toBeInTheDocument();
