@@ -39,6 +39,8 @@ import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
 import AdditionalSampleRequests from '@/components/petition/AdditionalSampleRequests';
 import LabResultReportTemplate, { LAB_REPORT_CSS } from '@/components/petition/LabResultReportTemplate';
+import ChemAnalysisReportTemplate, { CHEM_ANALYSIS_REPORT_CSS } from '@/components/petition/ChemAnalysisReportTemplate';
+import { buildChemAnalysisSheets, canPrintChemAnalysisReport } from '@/lib/chemAnalysisReport';
 import {
   usePetition,
   deletePetition,
@@ -177,6 +179,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
   const [preReportOpen, setPreReportOpen] = useState(false);
   const [finalReportOpen, setFinalReportOpen] = useState(false);
   const [labResultOpen, setLabResultOpen] = useState(false);
+  const [chemReportOpen, setChemReportOpen] = useState(false);
   // ค่า ถ.พ. บนใบคำขอรับบริการ ดึงจากผล QC + พารามิเตอร์ ถพ. — โหลดแบบ lazy ตอนเปิดพิมพ์
   const [parameters, setParameters] = useState<ParameterItem[]>([]);
   const [qcResults, setQcResults] = useState<QCTestResult[]>([]);
@@ -227,6 +230,8 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
     () => data ? buildLabResultReportPages({ petition: data, labRequests: labRequests ?? [], parameters, qcResults, groupMembership }) : [],
     [data, labRequests, parameters, qcResults, groupMembership],
   );
+  const chemSheets = useMemo(() => (data ? buildChemAnalysisSheets(data, labReportPages) : []), [data, labReportPages]);
+  const chemReportPrintable = data ? canPrintChemAnalysisReport(data) && chemSheets.length > 0 : false;
 
   useEffect(() => {
     const state = location.state as { autoPrint?: boolean } | null;
@@ -351,6 +356,12 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                         <Button variant="primary-outline" size="sm" onClick={() => setLabResultOpen(true)}>
                           <FlaskConical className="h-4 w-4" />
                           พิมพ์ผลวิเคราะห์ Lab
+                        </Button>
+                      )}
+                      {chemReportPrintable && (
+                        <Button variant="primary-outline" size="sm" onClick={() => setChemReportOpen(true)}>
+                          <FileCheck2 className="h-4 w-4" />
+                          ใบรายงานผลการวิเคราะห์
                         </Button>
                       )}
                       {data.status === 'approved' && (
@@ -573,6 +584,11 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
               <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" css={LAB_REPORT_CSS}>
                 <LabResultReportTemplate pages={labReportPages} />
               </PrintPreviewDialog>
+              {chemReportPrintable && (
+                <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}>
+                  <ChemAnalysisReportTemplate sheets={chemSheets} />
+                </PrintPreviewDialog>
+              )}
             </div>
           );
         })()
