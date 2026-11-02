@@ -121,6 +121,9 @@ const ProductionWorkflowSchema = new mongoose.Schema(
     lisStatus: String,
     lisSent: Boolean,
     sentAt: Date,
+    // สถานะล่าสุดที่แจ้งกลับ Production แล้ว (lib/productionCallback.js)
+    lastSyncKey: String,
+    lastSyncAt: Date,
   },
   { _id: false },
 );
@@ -211,6 +214,9 @@ const PetitionSchema = new mongoose.Schema(
         items: { type: [new mongoose.Schema({
           itemSeq: { type: Number, required: true },
           quantity: { type: Number, required: true, min: 1, max: 1000, validate: Number.isInteger },
+          // ปริมาณที่ Production กรอกตอนกด "ส่งตัวอย่างเพิ่ม"
+          sentAmount: { type: Number, min: 0 },
+          sentUnit: String,
           weights: {
             type: [{ type: Number, min: 1, validate: Number.isSafeInteger }],
             default: undefined,
