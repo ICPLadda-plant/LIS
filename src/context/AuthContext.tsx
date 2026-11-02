@@ -99,10 +99,10 @@ interface AuthContextType {
   activeAccountId?: string;
   switchAccount: (accountId: string) => void;
   addAccount: () => Promise<void>;
-  // Self-service link of the current user to an HR employee record. Used by the
-  // EmployeeLinkGate when auto-link by email found no match. Updates local auth
-  // state on success so the gate closes without a re-login.
-  linkSelfEmployee: (employeeId: string) => Promise<void>;
+  // Links the current user to the HR employee whose email matches the account.
+  // Used by EmployeeLinkGate for accounts that are still unlinked. Updates local
+  // auth state on success so the gate closes without a re-login.
+  linkSelfEmployee: () => Promise<void>;
   devRoleIds?: string[];
   devRoles?: DevRoleOption[];
   toggleDevRole?: (role: string) => void;
@@ -538,10 +538,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const linkSelfEmployee = useCallback(
-    async (employeeId: string) => {
-      const id = productionUser?.id ?? syncedUserForAccount?.id;
-      if (!id) throw new Error("ไม่พบบัญชีผู้ใช้");
-      const res = await api.patch<AuthUser>(`/access-control/users/${id}`, { employeeId });
+    async () => {
+      // Server matches the signed-in account's email against the HR directory —
+      // the client never chooses which employee to link.
+      const res = await api.post<AuthUser>("/access-control/users/me/link-employee", {});
       const updated = res.data.data;
       // HR is the source of truth for ชื่อ/แผนก/ตำแหน่ง once linked — mirror what
       // the backend persisted (it pulls name + dept/position from the employee
@@ -570,7 +570,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
       }
     },
-    [productionUser, syncedUserForAccount?.id],
+    [productionUser],
   );
 
   const logout = useCallback(async () => {
