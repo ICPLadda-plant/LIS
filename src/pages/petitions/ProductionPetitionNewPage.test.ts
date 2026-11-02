@@ -178,6 +178,20 @@ describe('R&D integration request rules', () => {
     ]);
   });
 
+  it('keeps a QC + Lab sample as one item with two portions when Production sends labQty', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samples: [
+        { sampleName: 'OMETHOATE', batchNo: 'B-1', qty: 100, unit: 'G', sendToQc: '1', sendToLab: '1', labQty: 250 },
+        { sampleName: 'OMETHOATE', batchNo: 'B-2', qty: 80, unit: 'G', sendToQc: '1', sendToLab: '0', labQty: 0 },
+      ],
+    }));
+
+    expect(items.map(({ batchNo, sampleQuantity, labelQuantities, sendToQc, sendToLab }) => ({ batchNo, sampleQuantity, labelQuantities, sendToQc, sendToLab }))).toEqual([
+      { batchNo: 'B-1', sampleQuantity: 2, labelQuantities: ['100 G', '250 G'], sendToQc: true, sendToLab: true },
+      { batchNo: 'B-2', sampleQuantity: 1, labelQuantities: ['80 G'], sendToQc: true, sendToLab: false },
+    ]);
+  });
+
   it('maps posted integration payloads into the existing query parser', () => {
     const params = objectToSearchParams({
       requestNo: 'SA260805025408',
