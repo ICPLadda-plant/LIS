@@ -84,6 +84,8 @@ export interface PetitionItem {
   labelSeller?: string;
   labelQuantity?: string;
   labelQuantities?: string[];
+  /** ฝั่งของแต่ละตัวอย่างใน labelQuantities (ลำดับเดียวกัน) — ไม่มีค่า = ใช้กฎปริมาณน้อย QC / มาก LAB */
+  labelQuantitySides?: Array<'qc' | 'lab'>;
   labelSampledBy?: string;
   labelSampledDate?: string;
   labelRemark?: string;

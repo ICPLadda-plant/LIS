@@ -200,6 +200,7 @@ type QcLabSampleItem = {
   sampleQuantity?: number;
   labelQuantity?: string;
   labelQuantities?: string[];
+  labelQuantitySides?: string[];
 };
 
 /**
@@ -231,6 +232,14 @@ export function pickQcLabSideItems<T extends QcLabSampleItem>(
         better(sampleAmount(item.labelQuantities?.[0] ?? item.labelQuantity), sampleAmount(chosen.labelQuantities?.[0] ?? chosen.labelQuantity)) ? item : chosen);
     }
     const item = group[0];
+    // Production ระบุฝั่งของแต่ละตัวอย่างมาแล้ว (ส่งได้หลายชิ้นต่อฝั่ง) → เลือกเฉพาะชิ้นของฝั่งนั้น
+    const all = item.labelQuantities ?? [];
+    const sides = item.labelQuantitySides ?? [];
+    if (sides.length && sides.length === all.length) {
+      const picked = all.filter((_, index) => sides[index] === side);
+      if (!picked.length || picked.length === all.length) return item;
+      return { ...item, sampleQuantity: picked.length, labelQuantity: picked.join(", "), labelQuantities: picked, labelQuantitySides: picked.map(() => side) };
+    }
     const quantities = (item.labelQuantities ?? []).filter((q) => String(q ?? "").trim());
     if (item.sampleQuantity !== 2 || quantities.length !== 2) return item;
     const [a, b] = quantities.map(sampleAmount);

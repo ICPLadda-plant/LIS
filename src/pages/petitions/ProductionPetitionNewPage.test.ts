@@ -192,6 +192,20 @@ describe('R&D integration request rules', () => {
     ]);
   });
 
+  it('keeps every QC and Lab portion with its side when Production sends qcQtys / labQtys', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samples: [
+        { sampleName: 'PROPANIL', batchNo: 'B-1', qty: 10, unit: 'CC', sendToQc: '1', sendToLab: '1', labQty: 50, qcQtys: '10,10', labQtys: '50,50,50' },
+        { sampleName: 'PROPANIL', batchNo: 'B-2', qty: 20, unit: 'CC', sendToQc: '0', sendToLab: '1', labQty: 0, qcQtys: '', labQtys: '20,30' },
+      ],
+    }));
+
+    expect(items.map(({ batchNo, sampleQuantity, labelQuantities, labelQuantitySides }) => ({ batchNo, sampleQuantity, labelQuantities, labelQuantitySides }))).toEqual([
+      { batchNo: 'B-1', sampleQuantity: 5, labelQuantities: ['10 CC', '10 CC', '50 CC', '50 CC', '50 CC'], labelQuantitySides: ['qc', 'qc', 'lab', 'lab', 'lab'] },
+      { batchNo: 'B-2', sampleQuantity: 2, labelQuantities: ['20 CC', '30 CC'], labelQuantitySides: ['lab', 'lab'] },
+    ]);
+  });
+
   it('maps posted integration payloads into the existing query parser', () => {
     const params = objectToSearchParams({
       requestNo: 'SA260805025408',

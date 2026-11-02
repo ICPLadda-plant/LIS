@@ -67,6 +67,16 @@ function labelQuantityForCopy(item: Petition['items'][number], copyIndex: number
   return item.labelQuantity ?? '';
 }
 
+// หมายเหตุที่ผู้ส่งกรอกในฟอร์มคำร้องเก็บไว้ที่ item.note ส่วน labelRemark เป็นหมายเหตุเฉพาะป้าย
+// ป้ายต้องแสดงทั้งสองค่า (ไม่ซ้ำกัน); งานขอตัวอย่างเพิ่มใช้เหตุผลของรอบนั้นแทน
+function labelRemarkText(item: Petition['items'][number], additionalSampleRequest?: AdditionalSampleRequest): string {
+  if (additionalSampleRequest?.reason) return additionalSampleRequest.reason;
+  const remarks = [item.labelRemark, item.note]
+    .map((value) => value?.trim())
+    .filter((value): value is string => !!value);
+  return remarks.filter((value, index) => remarks.indexOf(value) === index).join(' , ');
+}
+
 const LABEL_HEADER_LINE_1 = 'ป้ายนำส่งตัวอย่าง บริษัท ไอ ซี พี';
 const LABEL_HEADER_LINE_2 = 'ลัดดา จำกัด';
 const LABEL_HEADER_TEXT = `${LABEL_HEADER_LINE_1} ${LABEL_HEADER_LINE_2}`;
@@ -286,7 +296,13 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
             <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
           </div>
           <Field label="วันที่หมดอายุ" value="" />
-          <Field label="หมายเหตุ" value={additionalSampleRequest?.reason || item.labelRemark} />
+          <Field
+            label="หมายเหตุ"
+            value={labelRemarkText(item, additionalSampleRequest)}
+            valueClassName="leading-tight"
+            valueTestId="sample-label-remark-value"
+            multiline
+          />
           <div className="text-[7.5px] font-semibold">{HAZARD_LABEL_FOOTER_TEXT}</div>
         </div>
       </div>
@@ -352,7 +368,13 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
       </div>
 
       <div className="space-y-1">
-        <Field label="หมายเหตุ" value={additionalSampleRequest?.reason || item.labelRemark} />
+        <Field
+          label="หมายเหตุ"
+          value={labelRemarkText(item, additionalSampleRequest)}
+          valueClassName="leading-tight"
+          valueTestId="sample-label-remark-value"
+          multiline
+        />
       </div>
 
       <div className="mt-1 text-[7.5px] font-semibold">{LABEL_FOOTER_TEXT}</div>

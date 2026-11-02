@@ -120,6 +120,7 @@ export default function PetitionEditPage() {
       sampleQuantity: it.sampleQuantity ?? 1,
       labelQuantity: it.labelQuantity ?? '',
       labelQuantities: it.labelQuantities ?? [],
+      labelQuantitySides: it.labelQuantitySides,
       note: it.note ?? '',
     }));
     setItems(mappedItems);
