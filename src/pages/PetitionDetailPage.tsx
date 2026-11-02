@@ -571,7 +571,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                 </PrintPreviewDialog>
               )}
               {data && (
-                <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label">
+                <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label" department={data.submittedBy?.department}>
                   <SampleLabelPrintTemplate petition={data} />
                 </PrintPreviewDialog>
               )}

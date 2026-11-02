@@ -30,6 +30,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   docType: PrintDocType;
+  /** แผนกเจ้าของเอกสาร (เช่น ผลิต 2) ใช้เลือกเครื่องพิมพ์แทนแผนกของผู้ใช้ที่ล็อกอิน */
+  department?: string | null;
   css?: string;
   children: React.ReactNode;
   onPrinted?: (meta: { copies: number; outputMode: PrintOutputMode }) => void;
@@ -219,6 +221,7 @@ export default function PrintPreviewDialog({
   open,
   onOpenChange,
   docType,
+  department,
   css,
   children,
   onPrinted,
@@ -243,11 +246,16 @@ export default function PrintPreviewDialog({
     queryFn: api.getPrinterConfigs,
     enabled: open,
   });
-  const userDepartment = user?.department?.trim() ?? "";
+  const userDepartment = department?.trim() || user?.department?.trim() || "";
   const serverPrinters = useMemo(
     () => eligiblePrintersForDocument(configs, docType, userDepartment, { includeAnyDepartment: isAdmin })
       .filter((printer) => printer.cupsPrinterUrl?.trim()),
     [configs, docType, isAdmin, userDepartment],
+  );
+  const departmentPrinters = useMemo(
+    () => eligiblePrintersForDocument(configs, docType, userDepartment)
+      .filter((printer) => printer.cupsPrinterUrl?.trim()),
+    [configs, docType, userDepartment],
   );
   const assignmentRoute = useMemo(() => pickPrinterAssignment(configs, docType, userDepartment), [configs, docType, userDepartment]);
   const cfg = selectedPrinterId ? serverPrinters.find((printer) => printer.id === selectedPrinterId) : undefined;
@@ -274,8 +282,11 @@ export default function PrintPreviewDialog({
   useEffect(() => {
     if (!open || outputMode !== "server") return;
     if (selectedPrinterId && serverPrinters.some((printer) => printer.id === selectedPrinterId)) return;
-    setSelectedPrinterId(serverPrinters.length === 1 ? serverPrinters[0].id : "");
-  }, [open, outputMode, selectedPrinterId, serverPrinters]);
+    const preferred = departmentPrinters.length === 1 && serverPrinters.some((printer) => printer.id === departmentPrinters[0].id)
+      ? departmentPrinters[0]
+      : serverPrinters.length === 1 ? serverPrinters[0] : undefined;
+    setSelectedPrinterId(preferred?.id ?? "");
+  }, [departmentPrinters, open, outputMode, selectedPrinterId, serverPrinters]);
 
   const handlePrint = useCallback(async (mode: PrintOutputMode | "" = outputMode) => {
     if (!mode) {

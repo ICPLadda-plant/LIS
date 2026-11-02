@@ -1033,7 +1033,7 @@ export default function ProductionPetitionNewPage({
         </Card>
       </div>
       {labelPrintOpen && (
-        <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label">
+        <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label" department={createdPetition?.submittedBy?.department || submitterDepartment}>
           <SampleLabelPrintTemplate petition={createdPetition} />
         </PrintPreviewDialog>
       )}

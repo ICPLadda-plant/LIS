@@ -83,7 +83,8 @@ function pickDefault(configs, kind) {
 }
 
 function normalizeDepartment(value) {
-  const raw = String(value || '').trim();
+  // "ผลิต 03" and "ผลิต 3" are the same department: HR data zero-pads, printer assignments do not.
+  const raw = String(value || '').trim().replace(/\s+/g, ' ').replace(/\d+/g, (digits) => digits.replace(/^0+(?=\d)/, ''));
   if (!raw || raw === 'all' || raw === 'ทุกแผนก') return '';
   return raw;
 }

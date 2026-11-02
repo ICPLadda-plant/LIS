@@ -637,7 +637,7 @@ export default function PetitionTimelineDetailPage() {
       </div>
     </div>
 
-    {labelPrintOpen && <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label"><SampleLabelPrintTemplate petition={petition} /></PrintPreviewDialog>}
+    {labelPrintOpen && <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label" department={petition.submittedBy?.department}><SampleLabelPrintTemplate petition={petition} /></PrintPreviewDialog>}
     {servicePrintOpen && serviceLabRequest && <PrintPreviewDialog open={servicePrintOpen} onOpenChange={setServicePrintOpen} docType="service-request"><PetitionPrintTemplate labRequest={serviceLabRequest} petition={petition} qcResults={qcResults} sgParam={sgParameter} requestValues={requestValues} labReportPages={labReportPages} /></PrintPreviewDialog>}
     {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}

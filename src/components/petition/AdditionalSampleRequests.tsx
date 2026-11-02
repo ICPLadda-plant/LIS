@@ -84,7 +84,7 @@ export default function AdditionalSampleRequests({ petition }: { petition: Petit
           </section>
         ))}
       </CardContent>
-      {canPrint && selected && <PrintPreviewDialog open onOpenChange={(open) => { if (!open) setPrintTarget(null); }} docType="sample-label">
+      {canPrint && selected && <PrintPreviewDialog open onOpenChange={(open) => { if (!open) setPrintTarget(null); }} docType="sample-label" department={petition.submittedBy?.department}>
         <SampleLabelPrintTemplate petition={petition} additionalSampleRequest={selected} />
       </PrintPreviewDialog>}
     </Card>

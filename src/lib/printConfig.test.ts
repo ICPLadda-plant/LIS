@@ -11,6 +11,7 @@ import {
   getPrintHeadingFontWeightForDocType,
   docTypeToKind,
   defaultPrinterFor,
+  eligiblePrintersForDocument,
   getPrintOutputMode,
   getPrintOutputModeForDocType,
   pickPrinterAssignment,
@@ -135,6 +136,22 @@ describe("pickPrinterAssignment", () => {
 
   it("returns undefined when no assignment matches the document", () => {
     expect(pickPrinterAssignment(list, "daily-check-report", "QC")).toBeUndefined();
+  });
+});
+
+describe("eligiblePrintersForDocument by production line", () => {
+  const sticker = (id: string, departments: string[]): PrinterConfig => ({
+    id, kind: "sticker", label: id, cupsPrinterUrl: id, isDefault: false,
+    assignments: departments.map((department) => ({ department, docTypes: ["sample-label"], paperSize: "label-100x50" })),
+  });
+  const printers = [sticker("p2", ["ผลิต 2"]), sticker("p3", ["ผลิต 3"]), sticker("p5", ["ผลิต 5", "ผลิต 2"])];
+
+  it("matches zero-padded HR departments like ผลิต 03 to printers assigned to ผลิต 3", () => {
+    expect(eligiblePrintersForDocument(printers, "sample-label", "ผลิต 03").map((p) => p.id)).toEqual(["p3"]);
+  });
+
+  it("offers every printer assigned to the sending production line", () => {
+    expect(eligiblePrintersForDocument(printers, "sample-label", "ผลิต 02").map((p) => p.id)).toEqual(["p2", "p5"]);
   });
 });
 
