@@ -33,3 +33,9 @@ export function getMasterItemRegulatoryTypes(item: Record<string, unknown>): Reg
 export function getMasterItemRegulatoryType(item: Record<string, unknown>): string {
   return getMasterItemRegulatoryTypes(item).join(", ");
 }
+
+/** สินค้า อย. (GMP) หรือปศุสัตว์ (LS) ต้องใช้ป้ายนำส่งตัวอย่างแบบมีสัญลักษณ์อันตราย F-LAB-01-10 */
+export function requiresHazardSampleLabel(item: { sampleName?: string | null; commonName?: string | null }): boolean {
+  const types = getMasterItemRegulatoryTypes({ item_name1: item.sampleName, commonName: item.commonName });
+  return types.includes("GMP") || types.includes("LS");
+}

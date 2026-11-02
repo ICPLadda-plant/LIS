@@ -30,6 +30,7 @@ export type CoaReportPage = {
   remark: string;
   approvedBy: string;
   approvedAt: string;
+  approvedSignatureUrl?: string;
 };
 
 function formatDate(iso?: string): string {
@@ -155,13 +156,14 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       template,
       coaNo: doc.coaNo || "-",
       revision: doc.revision || 0,
-      issueDate: template === "liquid" ? formatEnglishDate(doc.approval?.approvedAt) : formatDate(doc.approval?.approvedAt),
+      issueDate: template === "standard" ? formatDate(doc.approval?.approvedAt) : formatEnglishDate(doc.approval?.approvedAt),
       petitionNo: doc.petitionNoSnapshot || "-",
       customer: doc.customerSnapshot || {},
       samples: group,
       remark: doc.remark || "",
       approvedBy: doc.approval?.approvedBy?.name || "-",
       approvedAt: formatDate(doc.approval?.approvedAt),
+      approvedSignatureUrl: doc.approval?.approvedAt ? doc.approval.approvedBy?.signatureUrl || "" : "",
     };
   });
 }

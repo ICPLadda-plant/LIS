@@ -3,7 +3,17 @@ import FitToBox from '@/components/petition/FitToBox';
 import { expandItemsBySampleQuantity } from '@/lib/petitionPrintItems';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
 import { labelSampledByName, sampleLabelDocumentNumber } from '@/lib/petitionSampler';
+import { requiresHazardSampleLabel } from '@/lib/masterItemRegulatoryType';
 import type { AdditionalSampleRequest, Petition } from '@/types/petition.types';
+import ghsEnvironment from '@/assets/ghs/environment.png?inline';
+import ghsHealthHazard from '@/assets/ghs/health-hazard.png?inline';
+import ghsCorrosive from '@/assets/ghs/corrosive.png?inline';
+import ghsGasCylinder from '@/assets/ghs/gas-cylinder.png?inline';
+import ghsExplosive from '@/assets/ghs/explosive.png?inline';
+import ghsFlammable from '@/assets/ghs/flammable.png?inline';
+import ghsOxidizer from '@/assets/ghs/oxidizer.png?inline';
+import ghsToxic from '@/assets/ghs/toxic.png?inline';
+import ghsExclamation from '@/assets/ghs/exclamation.png?inline';
 
 // sampleName กับ commonName ของงานผลิตมักเป็นค่าเดียวกัน — ถ้าต่อกันดื้อๆ ชื่อจะซ้ำสองรอบ
 // แล้วดันบรรทัดล้นกรอบฉลาก 50mm จนบรรทัดท้าย (F-LAB) ถูกตัดทิ้ง
@@ -62,6 +72,19 @@ const LABEL_HEADER_LINE_2 = 'ลัดดา จำกัด';
 const LABEL_HEADER_TEXT = `${LABEL_HEADER_LINE_1} ${LABEL_HEADER_LINE_2}`;
 const DOCUMENT_NUMBER_LABEL = 'เลขที่';
 const LABEL_FOOTER_TEXT = 'F-LAB-01-12 Rev : 00 02/11/69';
+// สินค้า อย. / ปศุสัตว์ ต้องใช้ป้ายแบบมีสัญลักษณ์อันตราย (ให้ผู้ส่งวงกลมสัญลักษณ์ที่ตรงกับสาร)
+const HAZARD_LABEL_FOOTER_TEXT = 'F-LAB-01-10 Rev : 02 11/07/69';
+const HAZARD_PICTOGRAMS = [
+  { src: ghsEnvironment, label: 'อันตรายต่อสิ่งแวดล้อม' },
+  { src: ghsHealthHazard, label: 'อันตรายต่อสุขภาพ' },
+  { src: ghsCorrosive, label: 'สารกัดกร่อน' },
+  { src: ghsGasCylinder, label: 'ก๊าซบรรจุภายใต้ความดัน' },
+  { src: ghsExplosive, label: 'วัตถุระเบิด' },
+  { src: ghsFlammable, label: 'สารไวไฟ' },
+  { src: ghsOxidizer, label: 'สารออกซิไดซ์' },
+  { src: ghsToxic, label: 'พิษเฉียบพลัน' },
+  { src: ghsExclamation, label: 'ระวัง' },
+];
 const SAMPLE_QR_SIZE_CLASS = 'h-[18mm] w-[18mm]';
 const SAMPLE_QR_TEXT_WIDTH_CLASS = 'w-[18mm]';
 
@@ -141,57 +164,155 @@ function StackedField({
   );
 }
 
-function LabelCard({
-  petition,
-  item,
-  yearShort,
-  copyIndex,
-  additionalSampleRequest,
-}: {
+function LabelQrColumn({ petition, item, qrValue }: { petition: Petition; item: Petition['items'][number]; qrValue: string }) {
+  return (
+    <div className="flex shrink-0 flex-col items-center pt-0.5">
+      <QrCodeSvg value={qrValue} />
+      <div className={`mt-0.5 ${SAMPLE_QR_TEXT_WIDTH_CLASS} break-all text-center text-[7px] font-bold leading-tight`}>
+        {petition.petitionNo}
+      </div>
+      {item.batchNo ? (
+        <>
+          <QrCodeSvg value={item.batchNo} sizeClass={`mt-0.5 ${SAMPLE_QR_SIZE_CLASS}`} />
+          <div
+            data-testid="sample-label-batch-qr-text"
+            className={`mt-0.5 ${SAMPLE_QR_TEXT_WIDTH_CLASS} break-all text-center text-[5.5px] font-bold leading-none`}
+          >
+            {item.batchNo}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function DocumentNumber({ petition, item, yearShort }: { petition: Petition; item: Petition['items'][number]; yearShort: string }) {
+  // เลขที่ __/__ มาจากเลขคำร้อง (P-2611-0002 → 2/69); รูปแบบอื่นคงแบบเดิม
+  const documentNumber = sampleLabelDocumentNumber(petition.petitionNo);
+  return (
+    <div
+      data-testid="sample-label-document-number"
+      className="flex items-end gap-0.5 whitespace-nowrap text-[7px]"
+    >
+      <span>{DOCUMENT_NUMBER_LABEL}</span>
+      <span className="inline-block min-w-[1.45rem] border-b border-black px-0.5 text-center">
+        {documentNumber?.seq || item.sampleId || '\u00a0'}
+      </span>
+      <span>/</span>
+      <span className="inline-block min-w-[1.1rem] border-b border-black px-0.5 text-center">
+        {documentNumber?.year || yearShort}
+      </span>
+    </div>
+  );
+}
+
+const LABEL_CARD_STYLE = {
+  width: '100mm',
+  height: '50mm',
+  padding: '2mm 3mm',
+  boxSizing: 'border-box',
+  fontFamily: 'Tahoma, Arial, sans-serif',
+  textRendering: 'geometricPrecision',
+} as const;
+
+function additionalSampleTitle(petition: Petition, request: AdditionalSampleRequest, item: Petition['items'][number], copyIndex: number) {
+  const round = (petition.additionalSampleRequests ?? []).findIndex((entry) => entry._id === request._id) + 1;
+  return `ตัวอย่างเพิ่ม · ${request.side.toUpperCase()} · รอบ ${round} · ตัวอย่างที่ ${copyIndex + 1}/${item.sampleQuantity}`;
+}
+
+type LabelCardProps = {
   petition: Petition;
   item: Petition['items'][number];
   yearShort: string;
   copyIndex: number;
   additionalSampleRequest?: AdditionalSampleRequest;
-}) {
+};
+
+function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampleRequest }: LabelCardProps) {
+  const qrValue = additionalSampleRequest?.qrCode || getQrValue(petition, item);
+  return (
+    <div
+      data-testid="sample-label-hazard-form"
+      className="label-card overflow-hidden border border-black text-[9.5px] font-semibold leading-[1.15]"
+      style={LABEL_CARD_STYLE}
+    >
+      <FitToBox className="h-full">
+      <div className="flex items-start gap-1.5">
+        <LabelQrColumn petition={petition} item={item} qrValue={qrValue} />
+        <div className="min-w-0 flex-1 space-y-1">
+          {additionalSampleRequest && <p className="font-bold">{additionalSampleTitle(petition, additionalSampleRequest, item, copyIndex)}</p>}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-1">
+            <div
+              data-testid="sample-label-header-title"
+              className="min-w-0 px-0.5 text-center text-[8.5px] font-bold leading-tight"
+            >
+              <span data-testid="sample-label-title-line" className="block whitespace-nowrap">
+                {LABEL_HEADER_TEXT}
+              </span>
+            </div>
+            <DocumentNumber petition={petition} item={item} yearShort={yearShort} />
+          </div>
+          <div className="border-y border-black py-0.5">
+            <div className="grid grid-cols-9 gap-0.5">
+              {HAZARD_PICTOGRAMS.map((pictogram) => (
+                <div key={pictogram.label} className="flex min-w-0 flex-col items-center">
+                  <img src={pictogram.src} alt={pictogram.label} className="h-[6.5mm] w-[6.5mm]" />
+                  <span className="mt-px text-center text-[4px] leading-none">{pictogram.label}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-0.5 text-center text-[5.5px] font-bold leading-none">
+              ให้วงกลมล้อมรอบสัญลักษณ์ที่แสดงความเป็นอันตรายของสาร
+            </p>
+          </div>
+          <StackedField label="ชื่อผลิตภัณฑ์ และสารสำคัญ" value={productLine(item)} />
+          <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-1.5">
+            <Field label="วัน เดือน ปี ที่ผลิต/นำเข้า" value={toBuddhistShort(item.productionDate)} />
+            <Field
+              label="แบชนัมเบอร์"
+              value={item.batchNo}
+              valueClassName="text-[8px] leading-tight"
+              valueTestId="sample-label-batch-number-value"
+              multiline
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <Field label="ผู้ผลิต" value={item.labelManufacturer} />
+            <Field label="ผู้ขาย" value={item.labelSeller} />
+          </div>
+          <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-1.5">
+            <Field label="ปริมาณ" value={labelQuantityForCopy(item, copyIndex)} />
+            <Field label="สุ่มโดย" value={labelSampledByName(petition, item)} />
+            <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
+          </div>
+          <Field label="วันที่หมดอายุ" value="" />
+          <Field label="หมายเหตุ" value={additionalSampleRequest?.reason || item.labelRemark} />
+          <div className="text-[7.5px] font-semibold">{HAZARD_LABEL_FOOTER_TEXT}</div>
+        </div>
+      </div>
+      <div className="sr-only">{petition.petitionNo}</div>
+      </FitToBox>
+    </div>
+  );
+}
+
+function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleRequest }: LabelCardProps) {
+  if (requiresHazardSampleLabel(item)) {
+    return <HazardLabelCard petition={petition} item={item} yearShort={yearShort} copyIndex={copyIndex} additionalSampleRequest={additionalSampleRequest} />;
+  }
   const sampledByName = labelSampledByName(petition, item);
-  // เลขที่ __/__ มาจากเลขคำร้อง (P-2611-0002 → 2/69); รูปแบบอื่นคงแบบเดิม
-  const documentNumber = sampleLabelDocumentNumber(petition.petitionNo);
   const qrValue = additionalSampleRequest?.qrCode || getQrValue(petition, item);
   const labelQuantity = labelQuantityForCopy(item, copyIndex);
   return (
     <div
       className="label-card overflow-hidden border border-black text-[9.5px] font-semibold leading-[1.15]"
-      style={{
-        width: '100mm',
-        height: '50mm',
-        padding: '2mm 3mm',
-        boxSizing: 'border-box',
-        fontFamily: 'Tahoma, Arial, sans-serif',
-        textRendering: 'geometricPrecision',
-      }}
+      style={LABEL_CARD_STYLE}
     >
       <FitToBox className="h-full">
       <div className="mb-1 flex items-start gap-1.5">
-        <div className="flex shrink-0 flex-col items-center pt-0.5">
-          <QrCodeSvg value={qrValue} />
-          <div className={`mt-0.5 ${SAMPLE_QR_TEXT_WIDTH_CLASS} break-all text-center text-[7px] font-bold leading-tight`}>
-            {petition.petitionNo}
-          </div>
-          {item.batchNo ? (
-            <>
-              <QrCodeSvg value={item.batchNo} sizeClass={`mt-0.5 ${SAMPLE_QR_SIZE_CLASS}`} />
-              <div
-                data-testid="sample-label-batch-qr-text"
-                className={`mt-0.5 ${SAMPLE_QR_TEXT_WIDTH_CLASS} break-all text-center text-[5.5px] font-bold leading-none`}
-              >
-                {item.batchNo}
-              </div>
-            </>
-          ) : null}
-        </div>
+        <LabelQrColumn petition={petition} item={item} qrValue={qrValue} />
         <div className="min-w-0 flex-1 space-y-1">
-          {additionalSampleRequest && <p className="font-bold">ตัวอย่างเพิ่ม · {additionalSampleRequest.side.toUpperCase()} · รอบ {(petition.additionalSampleRequests ?? []).findIndex((request) => request._id === additionalSampleRequest._id) + 1} · ตัวอย่างที่ {copyIndex + 1}/{item.sampleQuantity}</p>}
+          {additionalSampleRequest && <p className="font-bold">{additionalSampleTitle(petition, additionalSampleRequest, item, copyIndex)}</p>}
           <div className="grid min-h-[7mm] grid-cols-[minmax(0,1fr)_auto] items-start gap-1">
             <div
               data-testid="sample-label-header-title"
@@ -201,19 +322,7 @@ function LabelCard({
                 {LABEL_HEADER_TEXT}
               </span>
             </div>
-            <div
-              data-testid="sample-label-document-number"
-              className="flex items-end gap-0.5 whitespace-nowrap text-[7px]"
-            >
-              <span>{DOCUMENT_NUMBER_LABEL}</span>
-              <span className="inline-block min-w-[1.45rem] border-b border-black px-0.5 text-center">
-                {documentNumber?.seq || item.sampleId || '\u00a0'}
-              </span>
-              <span>/</span>
-              <span className="inline-block min-w-[1.1rem] border-b border-black px-0.5 text-center">
-                {documentNumber?.year || yearShort}
-              </span>
-            </div>
+            <DocumentNumber petition={petition} item={item} yearShort={yearShort} />
           </div>
           <StackedField label="ชื่อผลิตภัณฑ์ และสารสำคัญ" value={productLine(item)} />
           <div>

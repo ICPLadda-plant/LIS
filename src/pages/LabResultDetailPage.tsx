@@ -14,6 +14,8 @@ import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import LabResultGroups from "@/components/petition/LabResultGroups";
 import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/LabResultReportTemplate";
+import ChemAnalysisReportTemplate, { CHEM_ANALYSIS_REPORT_CSS } from "@/components/petition/ChemAnalysisReportTemplate";
+import { buildChemAnalysisSheets, canPrintChemAnalysisReport } from "@/lib/chemAnalysisReport";
 import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationData } from "@/components/petition/LabCalculationForm";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import type { QCTestResult } from "@/types/petition.types";
@@ -41,6 +43,7 @@ export default function LabResultDetailPage() {
   const [paramsLoaded, setParamsLoaded] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [bromPrintOpen, setBromPrintOpen] = useState(false);
+  const [chemReportOpen, setChemReportOpen] = useState(false);
 
   // รายงานต้องใช้ Lab parameters + กายภาพ เพื่อเติมสภาพตัวอย่างใน header
   useEffect(() => {
@@ -72,6 +75,8 @@ export default function LabResultDetailPage() {
 
   const report = <LabResultReportTemplate pages={pages} />;
   const labResultPrintable = petition ? canPrintLabResult(petition) && pages.length > 0 : false;
+  const chemSheets = useMemo(() => (petition ? buildChemAnalysisSheets(petition, pages) : []), [petition, pages]);
+  const chemReportPrintable = petition ? canPrintChemAnalysisReport(petition) && chemSheets.length > 0 : false;
   // ใบคำนวณใช้ได้ทุกสาร: หัวกระดาษจากหน้ารายงาน แต่ค่าดิบ (Area Inj / % Sample) มาจาก groups
   // ของหน้านี้ ซึ่งเปิด includeResultOnlyFields — รายงาน Lab ปกติไม่มีแถวเหล่านี้
   const calcPages = pages
@@ -128,6 +133,9 @@ export default function LabResultDetailPage() {
               {calcPages.length > 0 && <Button variant="primary-outline" onClick={() => calcPrintable && setBromPrintOpen(true)} disabled={!calcPrintable} className="gap-2">
                 <Printer className="h-4 w-4" /> พิมพ์ใบคำนวณ
               </Button>}
+              {chemReportPrintable && <Button variant="primary-outline" onClick={() => setChemReportOpen(true)} className="gap-2">
+                <Printer className="h-4 w-4" /> ใบรายงานผลการวิเคราะห์
+              </Button>}
             </div>
           }
         />
@@ -153,6 +161,9 @@ export default function LabResultDetailPage() {
       <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="coa" css={LAB_REPORT_CSS}>
         {report}
       </PrintPreviewDialog>
+      {chemReportPrintable && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}>
+        <ChemAnalysisReportTemplate sheets={chemSheets} />
+      </PrintPreviewDialog>}
       {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" css={LAB_CALCULATION_CSS}>
         {calcPages.map((page, i) => (
           <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} />

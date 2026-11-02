@@ -1,4 +1,5 @@
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
+import SIRIPICH_SIGNATURE_URL from "@/assets/siripich-signature.png";
 import type { CoaReportPage, CoaReportSample } from "@/lib/coaReport";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
@@ -15,6 +16,7 @@ export const COA_REPORT_CSS = `
 .coa-muted { color: #555; }
 .coa-sign { margin-top: 14mm; text-align: center; }
 .coa-line { display: inline-block; min-width: 62mm; border-bottom: 0.8pt dotted #000; }
+.coa-signature-image { display: block; max-width: 62mm; height: 18mm; margin: 0 auto -2mm; object-fit: contain; }
 .coa-special-page { padding: 24mm 22mm 18mm; }
 .coa-special-title { margin-top: 0; text-align: center; font-size: 14pt; font-weight: 700; letter-spacing: 0; }
 .coa-special-meta { margin-top: 7mm; text-align: right; line-height: 1.7; }
@@ -42,21 +44,43 @@ export const COA_REPORT_CSS = `
 .coa-root h1, .coa-root th, .coa-title, .print-heading { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT} !important; }
 `;
 
+function dayMonthYear(value: string) {
+  return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");
+}
+
+function ApprovalSignature({ page, fallbackUrl }: { page: CoaReportPage; fallbackUrl?: string }) {
+  const signatureUrl = page.approvedSignatureUrl || fallbackUrl;
+  return page.approvedAt !== "-" && signatureUrl
+    ? <img className="coa-signature-image" src={signatureUrl} alt="ลายเซ็นผู้อนุมัติ" />
+    : null;
+}
+
 function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSample; hideDensity?: boolean }) {
   const rows = hideDensity
     ? sample.rows.filter((row) => !/\bdensity\b/i.test(row.testItem || ""))
     : sample.rows;
+  const appearanceRows = rows.filter((row) => /^appearance$/i.test(row.testItem?.trim() ?? ""));
+  const remainingRows = rows.filter((row) => !/^appearance$/i.test(row.testItem?.trim() ?? ""));
+
+  const renderRows = (selectedRows: typeof rows) => selectedRows.map((row, index) => {
+    const hasUnit = row.unit === "%" ? row.result?.includes("%") : row.result?.endsWith(row.unit || "");
+    const result = `${row.result}${row.unit && !hasUnit ? ` ${row.unit}` : ""}`;
+    return /date\s*of\s*analysis/i.test(row.testItem || "") ? (
+      <tr key={`${row.testItem}-${index}`}><td colSpan={2}>{row.testItem}</td><td>{dayMonthYear(result)}</td></tr>
+    ) : (
+      <tr key={`${row.testItem}-${index}`}>
+        <td>{row.testItem}</td>
+        <td>{row.criteria === "-" ? "" : row.criteria}</td>
+        <td>{result}</td>
+      </tr>
+    );
+  });
 
   return (
     <>
+      {renderRows(appearanceRows)}
       <tr><td colSpan={2}>BATCH NO.</td><td>{sample.batchLabel === "-" ? "" : sample.batchLabel}</td></tr>
-      {rows.map((row, index) => (
-        <tr key={index}>
-          <td>{row.testItem}</td>
-          <td>{row.criteria === "-" ? "" : row.criteria}</td>
-          <td>{row.result}{row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</td>
-        </tr>
-      ))}
+      {renderRows(remainingRows)}
     </>
   );
 }
@@ -70,7 +94,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
       <h1 className="coa-special-title">CERTIFICATE OF ANALYSIS</h1>
       <div className="coa-special-meta">
         <div>NO. {page.coaNo === "-" ? "" : page.coaNo}</div>
-        <div>Month Date, ค.ศ.</div>
+        <div>{page.issueDate === "-" ? "" : page.issueDate}</div>
       </div>
 
       <div className="coa-special-fields">
@@ -113,8 +137,9 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
       </table>
 
       <div className="coa-special-sign">
+        <ApprovalSignature page={page} fallbackUrl={SIRIPICH_SIGNATURE_URL} />
         <span className="coa-line" />
-        <div>(สิริพรญ์ สงสมพันธ์)</div>
+        <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
       </div>
     </section>
@@ -177,6 +202,7 @@ function LiquidCoaPage({ page, index }: { page: CoaReportPage; index: number }) 
       </table>
 
       <div className="coa-special-sign">
+        <ApprovalSignature page={page} fallbackUrl={SIRIPICH_SIGNATURE_URL} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
@@ -194,7 +220,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
       <h1 className="coa-brom-title">CERTIFICATE OF ANALYSIS</h1>
       <div className="coa-brom-meta">
         <div>NO. {page.coaNo === "-" ? "" : page.coaNo}</div>
-        <div>Month DATE, ค.ศ.</div>
+        <div>{page.issueDate === "-" ? "" : page.issueDate}</div>
       </div>
 
       <div className="coa-brom-fields">
@@ -242,6 +268,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
       </table>
 
       <div className="coa-brom-sign">
+        <ApprovalSignature page={page} fallbackUrl={SIRIPICH_SIGNATURE_URL} />
         <span className="coa-line" />
         <div>(สิริพิชญ์ สงสมพันธ์)</div>
         <div>Asst. Quality Control Manager</div>
@@ -300,6 +327,7 @@ function StandardCoaPage({ page, index }: { page: CoaReportPage; index: number }
       ))}
       <div style={{ marginTop: "6mm" }}>Remark: {page.remark || "-"}</div>
       <div className="coa-sign">
+        <ApprovalSignature page={page} />
         <span className="coa-line" />
         <div>QC Head</div>
         <div>{page.approvedBy} - {page.approvedAt}</div>

@@ -26,6 +26,16 @@ test('manual snapshots replace a stale production date with the six-digit Lot No
   assert.equal(snapshots.sampleSnapshots[0].productionDate, '2026-10-09');
 });
 
+test('manual snapshots prefer the date encoded in Batch No.', () => {
+  const data = input();
+  data.sample.batchNo = 'FG260505-002';
+  data.sample.productionDate = '2026-04-01';
+
+  const snapshots = manualCoaSnapshots(data, 10000);
+
+  assert.equal(snapshots.sampleSnapshots[0].productionDate, '2026-05-05');
+});
+
 test('manual snapshots save AI criteria as center plus-minus values', () => {
   const data = input();
   data.sample.commonName = 'Acetamiprid SP';

@@ -140,6 +140,7 @@ vi.mock("@/lib/api", () => ({
     submitCoaDocument: vi.fn().mockResolvedValue({}),
     approveCoaDocument: vi.fn().mockResolvedValue({}),
     rejectCoaDocument: vi.fn().mockResolvedValue({}),
+    deleteCoaDocument: vi.fn().mockResolvedValue({ ok: true }),
     getPrinterConfigs: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -261,13 +262,14 @@ describe("CoaCenterPage", () => {
     expect(screen.getByRole("columnheader", { name: "ชื่อลูกค้า" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ชื่อการค้า" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ชื่อสามัญ" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "LOT No. (แบช+วันที่ผลิต)" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "BATCH No. (แบช + วันที่ผลิตตามฉลาก)" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "สถานะ" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "พิมพ์" })).not.toBeInTheDocument();
     expect(screen.getByText("Customer A")).toBeInTheDocument();
     expect(screen.getByText("Trade A")).toBeInTheDocument();
     expect(screen.getAllByText("Common A").length).toBeGreaterThan(0);
-    expect(screen.getByText("L-001 / B-001 / 01/08/2026")).toBeInTheDocument();
+    expect(screen.getAllByText("B-001 / 01/08/2026").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/L-001 \/ B-001/)).not.toBeInTheDocument();
     expect(screen.getAllByText("ดำเนินการแล้ว").length).toBeGreaterThan(0);
   });
 
@@ -727,7 +729,7 @@ describe("CoaCenterPage", () => {
     expect(screen.queryByRole("columnheader", { name: "ชื่อลูกค้า" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ชื่อการค้า" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "ชื่อสามัญ" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "LOT No. (แบช+วันที่ผลิต)" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "BATCH No. (แบช + วันที่ผลิตตามฉลาก)" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "สถานะ" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "คำสั่ง" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "เปิดดูไฟล์ COA 00012026" })).toBeInTheDocument();
@@ -790,12 +792,24 @@ describe("CoaCenterPage", () => {
     expect(screen.getByRole("columnheader", { name: "ชื่อลูกค้า" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "ชื่อบริษัท" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "ชื่อสามัญ" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "LOT No. (แบช+วันที่ผลิต)" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "BATCH No. (แบช + วันที่ผลิตตามฉลาก)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "สถานะ" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "พิมพ์" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "คำสั่ง" })).toBeInTheDocument();
     expect(screen.getByText("Customer D")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "พิมพ์ COA 00032026" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "บันทึกไฟล์ PDF COA 00032026" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "ลบ COA 00032026" })).toBeEnabled();
+  });
+
+  it("confirms before deleting an approved COA", async () => {
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    renderPage();
+    await screen.findByText("00012026");
+    fireEvent.click(screen.getByRole("button", { name: "สถานะ อนุมัติแล้ว" }));
+    fireEvent.click(await screen.findByRole("button", { name: "ลบ COA 00032026" }));
+    await waitFor(() => expect(api.deleteCoaDocument).toHaveBeenCalledWith("c4", {
+      _user: expect.objectContaining({ email: "qc-head@example.com" }),
+    }));
   });
 });

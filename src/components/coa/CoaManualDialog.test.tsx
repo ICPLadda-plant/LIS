@@ -137,4 +137,36 @@ describe("CoaManualDialog", () => {
     await waitFor(() => expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-10-09"));
     expect(api.getErpCoaAutofill).not.toHaveBeenCalled();
   });
+
+  it("uses the date encoded in Batch No. instead of a stale production date", async () => {
+    const request = {
+      _id: "manual-coa-fg-batch",
+      sourceType: "erpManual",
+      externalRequestId: "external-coa-request-SO-FG-10000",
+      revision: 0,
+      status: "draft",
+      petitionId: "",
+      petitionNoSnapshot: "SO-FG",
+      selectedItemSeqs: [10000],
+      sampleSnapshots: [{
+        itemSeq: 10000,
+        sampleName: "Trade FG",
+        commonName: "PRODUCT 10% SP",
+        batchNo: "FG260505-002",
+        productionDate: "2026-04-01",
+      }],
+      resultSnapshots: [],
+    } as CoaDocument;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <CoaManualDialog open onOpenChange={vi.fn()} request={request} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-05-05"));
+    fireEvent.change(screen.getByLabelText("Batch No. *"), { target: { value: "FG260601-003" } });
+    expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-06-01");
+  });
 });

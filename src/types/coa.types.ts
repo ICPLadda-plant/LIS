@@ -11,7 +11,7 @@ export type CoaStatus =
   | "superseded"
   | "rejected";
 
-export type CoaPerson = { name?: string; email?: string; role?: string };
+export type CoaPerson = { name?: string; email?: string; role?: string; signatureUrl?: string };
 
 export type CoaFormSelection = {
   itemSeq: number;

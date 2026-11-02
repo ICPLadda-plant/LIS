@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, Trash2, TrendingUp, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,7 +14,6 @@ import { Textarea } from "@/components/ui/textarea";
 import CoaCreateDialog from "@/components/coa/CoaCreateDialog";
 import CoaManualDialog from "@/components/coa/CoaManualDialog";
 import CoaManualRequestDialog from "@/components/coa/CoaManualRequestDialog";
-import CoaSamplePreview from "@/components/coa/CoaSamplePreview";
 import CoaReportTemplate, { COA_REPORT_CSS } from "@/components/coa/CoaReportTemplate";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import { DEV_MODE } from "@/config/dev";
@@ -68,11 +67,10 @@ function formatProductionDate(value?: string | null) {
   return date.toLocaleDateString("en-GB");
 }
 
-function lotLabel(sample: CoaSampleSnapshot) {
-  const lot = sample.lotNo?.trim();
+function batchProductionLabel(sample: CoaSampleSnapshot) {
   const batch = sample.batchNo?.trim();
   const productionDate = formatProductionDate(sample.productionDate);
-  return [lot, batch, productionDate].filter(Boolean).join(" / ");
+  return [batch, productionDate].filter(Boolean).join(" / ");
 }
 
 function customerName(doc: CoaDocument) {
@@ -591,11 +589,14 @@ export default function CoaCenterPage() {
     name: user?.name,
     email: user?.email,
     role: activeRole,
+    signatureUrl: user?.signatureUrl,
     activeRole,
     roles,
     permissions: user?.permissions ?? [],
     position: user?.position,
   };
+  const canDeleteCoa = roles.some((role) => role.replace(/[\s-]+/g, "_").toLowerCase() === "qc_head")
+    || user?.permissions?.includes("coa.approve");
   const invalidateCoaDocuments = () => queryClient.invalidateQueries({ queryKey: ["coa", "documents"] });
   const syncCoaDocument = (doc: CoaDocument) => {
     queryClient.setQueryData<{ items: CoaDocument[] }>(["coa", "documents"], (current) => {
@@ -623,6 +624,10 @@ export default function CoaCenterPage() {
       setRejectDoc(null);
       setRejectReason("");
     },
+  });
+  const deleteCoa = useMutation({
+    mutationFn: (id: string) => api.deleteCoaDocument(id, { _user: actor }),
+    onSuccess: invalidateCoaDocuments,
   });
 
   function handleReject(doc: CoaDocument) {
@@ -728,6 +733,15 @@ export default function CoaCenterPage() {
     approve.mutate(doc._id);
   }
 
+  function handleDelete(doc: CoaDocument) {
+    if (!window.confirm(`ยืนยันลบ COA ${coaDisplayNo(doc)}? การลบนี้ย้อนกลับไม่ได้`)) return;
+    if (isDemoCoaDocument(doc)) {
+      setDemoCoa(null);
+      return;
+    }
+    deleteCoa.mutate(doc._id);
+  }
+
   function handleSaveDemoEdit() {
     if (!demoEditDoc) return;
     setDemoCoa((currentDoc) => {
@@ -818,7 +832,7 @@ export default function CoaCenterPage() {
       customerName(doc),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.sampleName)),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName)),
-      joinValues(doc.sampleSnapshots?.map(lotLabel)),
+      joinValues(doc.sampleSnapshots?.map(batchProductionLabel)),
     ].join(" ").toLowerCase().includes(query)), query, (doc) => {
       const samples = doc.sampleSnapshots ?? [];
       const codes = [doc.coaNo, doc.petitionNoSnapshot, ...samples.flatMap((sample) => [sample.lotNo, sample.batchNo])];
@@ -827,7 +841,7 @@ export default function CoaCenterPage() {
         secondary: [
           workflowStageLabels[workflowStageFor(doc)],
           customerName(doc),
-          ...samples.flatMap((sample) => [sample.sampleName, sample.commonName, lotLabel(sample)]),
+          ...samples.flatMap((sample) => [sample.sampleName, sample.commonName, batchProductionLabel(sample)]),
         ],
       };
     });
@@ -1137,14 +1151,6 @@ export default function CoaCenterPage() {
             />
           </div>
 
-          {showCreateActions && (
-            <CoaSamplePreview
-              className="bg-card"
-              title="ตัวอย่างการสร้างฟอร์ม COA 1 ใบ"
-              description="ตัวอย่างเอกสารที่แสดงเมื่ออยู่ในแท็บขอ COA"
-            />
-          )}
-
           {showAllYearFolders && (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {allFolderYears.map((year) => {
@@ -1190,7 +1196,7 @@ export default function CoaCenterPage() {
                   <th className="px-4 py-3">ชื่อการค้า</th>
                   {showCompanyColumn && <th className="px-4 py-3">ชื่อลูกค้า</th>}
                   {showCommonNameColumn && <th className="px-4 py-3">ชื่อสามัญ</th>}
-                  {showLotColumn && <th className="px-4 py-3">LOT No. (แบช+วันที่ผลิต)</th>}
+                  {showLotColumn && <th className="px-4 py-3">BATCH No. (แบช + วันที่ผลิตตามฉลาก)</th>}
                   {showStatusColumn && <th className="px-4 py-3">สถานะ</th>}
                   {showCommandColumn && <th className="px-4 py-3">คำสั่ง</th>}
                 </tr>
@@ -1243,7 +1249,7 @@ export default function CoaCenterPage() {
                     <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map((sample) => sample.sampleName))}</td>
                     {showCompanyColumn && <td className="px-4 py-3">{customerName(doc)}</td>}
                     {showCommonNameColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName))}</td>}
-                    {showLotColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map(lotLabel))}</td>}
+                    {showLotColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map(batchProductionLabel))}</td>}
                     {showStatusColumn && (
                       <td className="px-4 py-3">
                         <Badge variant={workflowStageBadgeVariantFor(workflowStageFor(doc))}>
@@ -1327,6 +1333,23 @@ export default function CoaCenterPage() {
                           <FileDown className="h-4 w-4" />
                           บันทึกไฟล์ PDF
                         </Button>
+                        {canDeleteCoa && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="mt-2 gap-2"
+                            disabled={deleteCoa.isPending}
+                            aria-label={`ลบ COA ${coaDisplayNo(doc)}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDelete(doc);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            ลบ
+                          </Button>
+                        )}
                       </td>
                     )}
                     {showApprovalActions && (

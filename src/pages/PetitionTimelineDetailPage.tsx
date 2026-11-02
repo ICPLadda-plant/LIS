@@ -5,6 +5,8 @@ import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/LabResultReportTemplate";
+import ChemAnalysisReportTemplate, { CHEM_ANALYSIS_REPORT_CSS } from "@/components/petition/ChemAnalysisReportTemplate";
+import { buildChemAnalysisSheets, canPrintChemAnalysisReport } from "@/lib/chemAnalysisReport";
 import PetitionPrintTemplate from "@/components/petition/PetitionPrintTemplate";
 import ResultReportPrintTemplate from "@/components/petition/ResultReportPrintTemplate";
 import SampleLabelPrintTemplate from "@/components/petition/SampleLabelPrintTemplate";
@@ -173,6 +175,7 @@ const documentButtonColors = {
   preReport: "border-green-500 text-green-500 hover:bg-green-50",
   finalReport: "border-red-500 text-red-500 hover:bg-red-50",
   labResult: "border-sky-500 text-sky-500 hover:bg-sky-50",
+  chemReport: "border-primary-500 text-primary-500 hover:bg-primary-50",
 } as const;
 
 export default function PetitionTimelineDetailPage() {
@@ -200,6 +203,7 @@ export default function PetitionTimelineDetailPage() {
   const [preReportOpen, setPreReportOpen] = useState(false);
   const [finalReportOpen, setFinalReportOpen] = useState(false);
   const [labResultOpen, setLabResultOpen] = useState(false);
+  const [chemReportOpen, setChemReportOpen] = useState(false);
   const [grPrintOpen, setGrPrintOpen] = useState(false);
   const [activeTimelineDayKey, setActiveTimelineDayKey] = useState<string | null>(null);
   const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
@@ -287,6 +291,7 @@ export default function PetitionTimelineDetailPage() {
     setPreReportOpen(false);
     setFinalReportOpen(false);
     setLabResultOpen(false);
+    setChemReportOpen(false);
     setActiveTimelineDayKey(null);
     setActiveItemSeq(null);
     setActivityDialogOpen(false);
@@ -326,6 +331,7 @@ export default function PetitionTimelineDetailPage() {
     () => (petition ? buildLabResultReportPages({ petition, labRequests: labRequests ?? [], parameters, qcResults, groupMembership }) : []),
     [petition, labRequests, parameters, qcResults, groupMembership],
   );
+  const chemSheets = useMemo(() => (petition ? buildChemAnalysisSheets(petition, labReportPages) : []), [petition, labReportPages]);
 
   const loadDocumentData = useCallback(async (): Promise<boolean> => {
     if (!petitionId) return false;
@@ -624,6 +630,7 @@ export default function PetitionTimelineDetailPage() {
         {canShowPreReport && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.preReport)} disabled={documentLoading} onClick={() => { void openDocument(setPreReportOpen); }}><FileText className="h-4 w-4" />Pre Report</Button>}
         {canPrintLabResult(petition) && labReportPages.length > 0 && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.labResult)} disabled={documentLoading} onClick={() => { void openDocument(setLabResultOpen); }}><FlaskConical className="h-4 w-4" />พิมพ์ผลวิเคราะห์ Lab</Button>}
         {petition.status === "approved" && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.finalReport)} disabled={documentLoading} onClick={() => { void openDocument(setFinalReportOpen); }}><FileCheck2 className="h-4 w-4" />Final Report</Button>}
+        {canPrintChemAnalysisReport(petition) && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.chemReport)} disabled={documentLoading} onClick={() => { void openDocument(setChemReportOpen); }}><FileCheck2 className="h-4 w-4" />ใบรายงานผลการวิเคราะห์</Button>}
         {documentLoading && <p className="text-xs text-grey-500">กำลังโหลดข้อมูลเอกสาร...</p>}
         {documentError && <p className="text-xs text-red-600">โหลดข้อมูลเอกสารไม่สำเร็จ: {documentError}</p>}
       </CardContent></Card>
@@ -635,6 +642,7 @@ export default function PetitionTimelineDetailPage() {
     {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {labResultOpen && <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" css={LAB_REPORT_CSS}><LabResultReportTemplate pages={labReportPages} /></PrintPreviewDialog>}
+    {chemReportOpen && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}><ChemAnalysisReportTemplate sheets={chemSheets} /></PrintPreviewDialog>}
     {grPrintOpen && goodsReceipt && (
       <PrintPreviewDialog open={grPrintOpen} onOpenChange={setGrPrintOpen} docType="goods-receipt" css={GOODS_RECEIPT_CSS}>
         <GoodsReceiptPrintTemplate doc={goodsReceipt} />
