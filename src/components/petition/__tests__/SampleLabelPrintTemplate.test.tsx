@@ -72,4 +72,25 @@ describe('SampleLabelPrintTemplate', () => {
     expect(batchNumber).not.toHaveClass('text-ellipsis');
     expect(batchNumber).not.toHaveClass('overflow-hidden');
   });
+
+  it('keeps the plain F-LAB-01-12 label for products that are not อย. or ปศุสัตว์', () => {
+    render(<SampleLabelPrintTemplate petition={petition} />);
+
+    expect(screen.queryByTestId('sample-label-hazard-form')).not.toBeInTheDocument();
+    expect(screen.getByText('F-LAB-01-12 Rev : 00 02/11/69')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['อย.', 'โบรมาดิโอการ์ด - อ.ย.'],
+    ['ปศุสัตว์', 'ไซเปอร์เมทริน ปศุสัตว์'],
+  ])('uses the F-LAB-01-10 hazard label for %s products', (_type, sampleName) => {
+    const hazardPetition = { ...petition, items: [{ ...petition.items[0], sampleName }] };
+    render(<SampleLabelPrintTemplate petition={hazardPetition} />);
+
+    expect(screen.getByTestId('sample-label-hazard-form')).toBeInTheDocument();
+    expect(screen.getByText('F-LAB-01-10 Rev : 02 11/07/69')).toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: /^(?!QR )/ })).toHaveLength(9);
+    expect(screen.getByText('วันที่หมดอายุ')).toBeInTheDocument();
+    expect(screen.getByTestId('sample-label-batch-qr-text')).toHaveTextContent('26S-PCB25SC-HI-026');
+  });
 });
