@@ -326,6 +326,14 @@ function makeQuantityLabel(qty: string, unit: string): string {
   return [qty, unit].filter(Boolean).join(' ');
 }
 
+// Production ส่ง QC + Lab เป็น 2 ชิ้นตัวอย่างใน batch เดียว: qty = ชิ้น QC, labQty = ชิ้น Lab (มากกว่า)
+// เก็บเป็นรายการเดียว 2 ตัวอย่าง เพื่อให้กฎ ถพ./อนุมัติรายรายการยังเห็นว่าเป็นตัวอย่างเดียวที่ส่งทั้งสองฝั่ง
+export function withProductionLabSample(item: ItemRowValues, labQty: string, unit: string): ItemRowValues {
+  if (item.sendToQc === false || !item.sendToLab || !(Number(labQty) > 0) || !item.labelQuantity) return item;
+  const quantities = [item.labelQuantity, makeQuantityLabel(labQty, unit)];
+  return { ...item, sampleQuantity: 2, labelQuantities: quantities, labelQuantity: quantities.join(', ') };
+}
+
 function dedupeImportedItems(items: ItemRowValues[]): ItemRowValues[] {
   const seen = new Set<string>();
   const unique: ItemRowValues[] = [];
@@ -419,6 +427,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
   const priorities = getSampleOrQueryValues(searchParams, ['priority'], { splitComma: true });
   const sendToLabs = getSampleOrQueryValues(searchParams, ['sendToLab'], { splitComma: true });
   const sendToQcs = getSampleOrQueryValues(searchParams, ['sendToQc'], { splitComma: true });
+  const labQtys = getSampleOrQueryValues(searchParams, ['labQty'], { splitComma: true });
 
   const itemCount = Math.max(
     sampleNames.length,
@@ -444,7 +453,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     const submittedQuantity = quantities[0] ?? '';
     const submittedUnit = quantityUnits[0] ?? '';
     const labelQuantity = makeQuantityLabel(submittedQuantity, submittedUnit);
-    return [{
+    return [withProductionLabSample({
       ...singleItem,
       sendToLab: sendToLabFromDefault(singleItem, sendToLabs[0]),
       sendToQc: sendToQcFromQuery(sendToQcs[0]),
@@ -455,7 +464,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       labelSampledDate: productionDate,
       submittedQuantity,
       submittedUnit,
-    }];
+    }, labQtys[0] ?? '', submittedUnit)];
   }
 
   const items: ItemRowValues[] = [];
@@ -506,7 +515,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       item.testItems,
       item.note,
     ].some(Boolean)) {
-      items.push(item);
+      items.push(withProductionLabSample(item, valueAt(labQtys, i, false), item.submittedUnit));
     }
   }
 
@@ -827,10 +836,6 @@ export default function ProductionPetitionNewPage({
         }
         if (!it.productionDate) {
           setStepError(`ตัวอย่างลำดับ ${it.seq}: กรุณาเลือกวันผลิต/วันที่รับเข้า`);
-          return false;
-        }
-        if (!it.packageUnit.trim()) {
-          setStepError(`ตัวอย่างลำดับ ${it.seq}: กรุณากรอกขนาดบรรจุ`);
           return false;
         }
         if (!Number.isInteger(it.sampleQuantity ?? 1) || (it.sampleQuantity ?? 1) < 1) {
