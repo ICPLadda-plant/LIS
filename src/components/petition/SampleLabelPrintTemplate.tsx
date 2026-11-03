@@ -227,7 +227,10 @@ function DocumentNumber({ petition, item, yearShort, copyIndex, additionalSample
 const LABEL_CARD_STYLE = {
   width: '100mm',
   height: '50mm',
-  padding: '2mm 3mm',
+  // เครื่องพิมพ์ฉลากเริ่มพิมพ์สูงกว่าขอบบนของดวงฉลากราว 2-3 มม. (ท้ายดวงเหลือที่ว่าง ~2 มม.)
+  // ถ้าเว้นขอบบนแค่ 2 มม. หัวป้าย/เลขที่จะตกไปอยู่ในช่องว่างระหว่างดวงแล้วถูกตัดครึ่ง
+  // จึงเว้นขอบบนมากกว่าขอบล่าง ให้เนื้อหาทั้งหมดขยับลงมาอยู่บนตัวฉลาก
+  padding: '4.5mm 3mm 1mm',
   boxSizing: 'border-box',
   fontFamily: 'Tahoma, Arial, sans-serif',
   textRendering: 'geometricPrecision',
