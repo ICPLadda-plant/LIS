@@ -45,6 +45,7 @@ const {
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
 const { canEditWholePetition } = require('../lib/productionPetitionEdit');
+const { assignMissingSampleLabelNumbers } = require('../lib/sampleLabelNumber');
 const { sendProductionCancel } = require('../lib/productionCallback');
 
 function sampleIdsFromPetition(petition) {
@@ -113,6 +114,8 @@ async function replaceProductionPetition(body, res) {
     });
   const update = { items, routeTargets: routeTargetsForSubmission(body, items) ?? [] };
   if (Array.isArray(body.prodOrderNos)) update.prodOrderNos = body.prodOrderNos;
+  const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ ...petition.toObject(), ...update });
+  if (sampleLabelNumbers) update.sampleLabelNumbers = sampleLabelNumbers;
   const sampledBy = normalizeSampledBy(body.sampledBy);
   if (sampledBy) update.sampledBy = sampledBy;
   const submittedBy = body.submittedBy ? await resolveEmployeeActor(body.submittedBy) : null;
@@ -1231,6 +1234,7 @@ router.post('/', async (req, res) => {
     const deliveredBy = body.deliveredBy?.name ? await resolveEmployeeActor(body.deliveredBy) : body.deliveredBy;
     const sampledBy = normalizeSampledBy(body.sampledBy);
     const routeTargets = routeTargetsForSubmission(body, items);
+    const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ submittedBy, items, routeTargets });
     const doc = await Petition.create({
       ...body,
       submittedBy,
@@ -1238,6 +1242,7 @@ router.post('/', async (req, res) => {
       items,
       sampledBy,
       routeTargets,
+      sampleLabelNumbers: sampleLabelNumbers ?? undefined,
       petitionNo,
       status: 'deliveringQC',
       revisionOf,
@@ -1586,6 +1591,7 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
     delete updates.target;          // routing hint for reject only
     delete updates.approvedAt;     // server-managed
     delete updates.rejectedAt;     // server-managed
+    delete updates.sampleLabelNumbers; // server-managed (ออกเลขตอนสร้าง/แก้รายการ)
 
     const before = await Petition.findById(req.params.id);
     if (!before) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
@@ -1727,6 +1733,10 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
       const nextBody = { ...(before.toObject ? before.toObject() : before), ...updates };
       const submissionError = validatePetitionSubmission(nextBody);
       if (submissionError) return badRequest(res, submissionError);
+    }
+    if (Array.isArray(updates.items) || Array.isArray(updates.routeTargets)) {
+      const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ ...(before.toObject ? before.toObject() : before), ...updates });
+      if (sampleLabelNumbers) updates.sampleLabelNumbers = sampleLabelNumbers;
     }
     const doc = await Petition.findOneAndUpdate({ _id: before._id, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v }, { $set: updates, $inc: { __v: 1 } }, { new: true });
     if (!doc) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });

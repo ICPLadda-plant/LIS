@@ -2,7 +2,13 @@ import QRCode from 'qrcode';
 import FitToBox from '@/components/petition/FitToBox';
 import { expandItemsBySampleQuantity } from '@/lib/petitionPrintItems';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
-import { labelManufacturerName, labelSampledByName, sampleLabelDocumentNumber } from '@/lib/petitionSampler';
+import {
+  labelManufacturerName,
+  labelSampledByName,
+  sampleLabelCopySide,
+  sampleLabelDocumentNumber,
+  sampleLabelSideNumber,
+} from '@/lib/petitionSampler';
 import { requiresHazardSampleLabel } from '@/lib/masterItemRegulatoryType';
 import type { AdditionalSampleRequest, Petition } from '@/types/petition.types';
 import ghsEnvironment from '@/assets/ghs/environment.png?inline';
@@ -196,9 +202,11 @@ function LabelQrColumn({ petition, item, qrValue }: { petition: Petition; item: 
   );
 }
 
-function DocumentNumber({ petition, item, yearShort }: { petition: Petition; item: Petition['items'][number]; yearShort: string }) {
-  // เลขที่ __/__ มาจากเลขคำร้อง (P-2611-0002 → 2/69); รูปแบบอื่นคงแบบเดิม
-  const documentNumber = sampleLabelDocumentNumber(petition.petitionNo);
+function DocumentNumber({ petition, item, yearShort, copyIndex, additionalSampleRequest }: LabelCardProps) {
+  // เลขที่ __/__ : ป้ายที่ส่ง QC ใช้เลข P (P04/69) ป้ายที่ส่ง LAB ใช้เลข L (L02/69)
+  // คำขอเก่าที่ยังไม่มีเลข P/L ใช้เลขจากเลขคำร้องแบบเดิม (P-2611-0002 → 2/69)
+  const side = additionalSampleRequest?.side ?? sampleLabelCopySide(petition, item, copyIndex);
+  const documentNumber = sampleLabelSideNumber(petition, side) ?? sampleLabelDocumentNumber(petition.petitionNo);
   return (
     <div
       data-testid="sample-label-document-number"
@@ -260,7 +268,7 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
                 {LABEL_HEADER_TEXT}
               </span>
             </div>
-            <DocumentNumber petition={petition} item={item} yearShort={yearShort} />
+            <DocumentNumber petition={petition} item={item} yearShort={yearShort} copyIndex={copyIndex} additionalSampleRequest={additionalSampleRequest} />
           </div>
           <div className="border-y border-black py-0.5">
             <div className="grid grid-cols-9 gap-0.5">
@@ -338,7 +346,7 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
                 {LABEL_HEADER_TEXT}
               </span>
             </div>
-            <DocumentNumber petition={petition} item={item} yearShort={yearShort} />
+            <DocumentNumber petition={petition} item={item} yearShort={yearShort} copyIndex={copyIndex} additionalSampleRequest={additionalSampleRequest} />
           </div>
           <StackedField label="ชื่อผลิตภัณฑ์ และสารสำคัญ" value={productLine(item)} />
           <div>

@@ -1,4 +1,50 @@
 import type { Petition, PetitionDeliverer } from "@/types/petition.types";
+import { hasLabTrack, requiresQcTrack, shouldSendItemToLab, shouldSendItemToQc } from "@/lib/petitionRouting";
+
+export type SampleLabelSide = "qc" | "lab";
+
+function labelAmount(value: unknown): number | null {
+  const match = String(value ?? "").replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+/**
+ * ป้ายแผ่นนี้ (ตัวอย่างชิ้นที่ copyIndex ของรายการ) ส่งฝั่งไหน
+ * ใช้ฝั่งที่ฝ่ายผลิตระบุมาก่อน ถ้าไม่มีให้ดูจากปลายทางของคำขอและรายการ
+ * รายการที่ส่งทั้งสองฝั่งแบบ 2 ตัวอย่าง: ปริมาณน้อยกว่า = QC, มากกว่า = LAB (ตรงกับ pickQcLabSideItems)
+ */
+export function sampleLabelCopySide(
+  petition: Petition,
+  item: Petition["items"][number],
+  copyIndex: number,
+): SampleLabelSide {
+  const declared = item.labelQuantitySides?.[copyIndex];
+  if (declared === "qc" || declared === "lab") return declared;
+  const hasQc = requiresQcTrack(petition);
+  const hasLab = hasLabTrack(petition);
+  if (!hasLab) return "qc";
+  if (!hasQc) return "lab";
+  if (!shouldSendItemToQc(item)) return "lab";
+  if (!shouldSendItemToLab(item)) return "qc";
+  const quantities = (item.labelQuantities ?? []).filter((quantity) => String(quantity ?? "").trim());
+  if (quantities.length === 2) {
+    const [first, second] = quantities.map(labelAmount);
+    const qcIndex = first !== null && second !== null && second < first ? 1 : 0;
+    return copyIndex === qcIndex ? "qc" : "lab";
+  }
+  return copyIndex === 0 ? "qc" : "lab";
+}
+
+/** เลขที่ป้ายของฝั่งนั้น เช่น { seq: "P04", year: "69" } — คำขอเก่าที่ยังไม่มีเลข P/L คืน null */
+export function sampleLabelSideNumber(
+  petition: Pick<Petition, "sampleLabelNumbers">,
+  side: SampleLabelSide,
+): { seq: string; year: string } | null {
+  const numbers = petition.sampleLabelNumbers;
+  const seq = numbers?.[side];
+  if (!seq || !numbers?.year) return null;
+  return { seq, year: String(numbers.year % 100).padStart(2, "0") };
+}
 
 /**
  * เลขที่มุมขวาบนของป้ายนำส่งตัวอย่าง จากเลขคำร้อง P-YYMM-NNNN

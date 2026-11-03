@@ -252,6 +252,8 @@ interface PetitionBase {
   sampledBy?: { employeeId?: string; name: string };
   items: PetitionItem[];
   routeTargets?: PetitionRouteTarget[];
+  /** เลขที่ป้ายนำส่งตัวอย่าง: qc = "P01", lab = "L01", year = ปี พ.ศ. เต็ม (server ออกเลขให้) */
+  sampleLabelNumbers?: { qc?: string; lab?: string; year?: number };
   additionalSampleRequests?: AdditionalSampleRequest[];
   scannedAdditionalSampleId?: string;
   scannedAdditionalSampleCode?: string;

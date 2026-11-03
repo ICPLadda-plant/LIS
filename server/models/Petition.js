@@ -140,6 +140,11 @@ const PetitionSchema = new mongoose.Schema(
       index: true,
     },
     routeTargets: [{ type: String, enum: ['qc', 'lab'] }],
+    // เลขที่บนป้ายนำส่งตัวอย่าง (server/lib/sampleLabelNumber.js): qc = P01, lab = L01, year = ปี พ.ศ. เต็ม
+    sampleLabelNumbers: {
+      type: new mongoose.Schema({ qc: String, lab: String, year: Number }, { _id: false }),
+      default: undefined,
+    },
     status: {
       type: String,
       enum: ['deliveringQC', 'sampleSent', 'pendingReview', 'inProgress', 'success', 'approved', 'rejected'],

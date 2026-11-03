@@ -84,6 +84,39 @@ describe("SampleLabelPrintTemplate", () => {
     expect(screen.queryByText("ทดสอบระบบ")).not.toBeInTheDocument();
   });
 
+  it("คำขอส่งทั้ง QC และ LAB พิมพ์เลข P บนป้าย QC และเลข L บนป้าย LAB", () => {
+    const petition = {
+      ...petitionWith({
+        sampleName: "OMETHOATE",
+        batchNo: "B-001",
+        sendToQc: true,
+        sendToLab: true,
+        sampleQuantity: 2,
+        labelQuantities: ["250 G", "30 G"],
+      }),
+      routeTargets: ["qc", "lab"],
+      sampleLabelNumbers: { qc: "P04", lab: "L02", year: 2569 },
+    } as Petition;
+
+    render(<SampleLabelPrintTemplate petition={petition} />);
+
+    const numbers = screen.getAllByTestId("sample-label-document-number").map((node) => node.textContent);
+    expect(numbers).toEqual(["เลขที่L02/69", "เลขที่P04/69"]);
+  });
+
+  it("คำขอส่ง QC อย่างเดียวพิมพ์เลข P ทุกป้าย", () => {
+    const petition = {
+      ...petitionWith({ sampleName: "OMETHOATE", batchNo: "B-002", sampleQuantity: 2, labelQuantities: ["5 g", "6 g"] }),
+      routeTargets: ["qc"],
+      sampleLabelNumbers: { qc: "P03", year: 2569 },
+    } as Petition;
+
+    render(<SampleLabelPrintTemplate petition={petition} />);
+
+    const numbers = screen.getAllByTestId("sample-label-document-number").map((node) => node.textContent);
+    expect(numbers).toEqual(["เลขที่P03/69", "เลขที่P03/69"]);
+  });
+
   it("พิมพ์หมายเหตุจากฟอร์มคำร้องลงป้ายนำส่ง", () => {
     render(<SampleLabelPrintTemplate petition={petitionWith({
       sampleName: "OMETHOATE",
