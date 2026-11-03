@@ -244,3 +244,36 @@ describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
     expect(items.map((item) => item.batchNo)).toEqual(['B1', 'B2']);
   });
 });
+
+describe('makeInitialItemsFromQuery — nested samples with commas in the name', () => {
+  // ชื่อสาร "2,4-D-BUTYL" มีจุลภาคในชื่อ เคยถูกตัดเป็น 2 ตัวอย่าง ("2" กับ "4-D-BUTYL ...")
+  it('keeps one sample per samples[i] entry', () => {
+    const params = new URLSearchParams();
+    params.set('sampleName', '2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+    params.set('samples[0][sampleName]', '2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+    params.set('samples[0][commonName]', '2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+    params.set('samples[0][batchNo]', '102');
+    params.set('samples[0][mfNo]', 'MF26110047');
+    params.set('samples[0][qty]', '210');
+    params.set('samples[0][unit]', 'G');
+
+    const items = makeInitialItemsFromQuery(params);
+    expect(items).toHaveLength(1);
+    expect(items[0].sampleName).toBe('2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+  });
+
+  it('keeps blank fields aligned to their own sample', () => {
+    const params = new URLSearchParams();
+    params.set('samples[0][sampleName]', '2,4-D AMINE');
+    params.set('samples[0][lotNo]', '');
+    params.set('samples[1][sampleName]', 'GLYPHOSATE');
+    params.set('samples[1][lotNo]', 'L2');
+
+    const items = makeInitialItemsFromQuery(params);
+    expect(items.map((item) => [item.sampleName, item.lotNo])).toEqual([
+      ['2,4-D AMINE', ''],
+      ['GLYPHOSATE', 'L2'],
+    ]);
+  });
+});
+

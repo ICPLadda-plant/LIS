@@ -413,26 +413,21 @@ function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-function getNestedSampleValues(
-  searchParams: URLSearchParams,
-  keys: string[],
-  options: { splitComma?: boolean } = {},
-): string[] {
-  const values: Array<{ index: number; value: string }> = [];
+// samples[i][key] คือ 1 ค่าต่อ 1 ตัวอย่างเสมอ ห้ามตัดด้วย , | ; เพราะชื่อสารอย่าง "2,4-D" มีจุลภาคอยู่ในชื่อ
+// และคืนค่าตามตำแหน่ง i (ช่องที่ว่างเป็น '') เพื่อให้ค่าของแต่ละตัวอย่างไม่เลื่อนไปปนกับตัวอย่างอื่น
+function getNestedSampleValues(searchParams: URLSearchParams, keys: string[]): string[] {
+  const values: string[] = [];
   const lowerKeys = keys.map((key) => key.toLowerCase());
 
   for (const [rawKey, rawValue] of searchParams.entries()) {
     const match = rawKey.toLowerCase().match(/^samples\[(\d+)\]\[([^\]]+)\]$/);
     if (!match || !lowerKeys.includes(match[2])) continue;
     const index = Number(match[1]);
-    for (const item of splitQueryList(rawValue, options.splitComma)) {
-      values.push({ index, value: item });
-    }
+    if (values[index]) continue;
+    values[index] = rawValue.trim();
   }
 
-  return values
-    .sort((a, b) => a.index - b.index)
-    .map((item) => item.value);
+  return Array.from(values, (value) => value ?? '');
 }
 
 function getSampleOrQueryValues(
@@ -440,7 +435,7 @@ function getSampleOrQueryValues(
   keys: string[],
   options: { splitComma?: boolean } = {},
 ): string[] {
-  const nested = getNestedSampleValues(searchParams, keys, options);
+  const nested = getNestedSampleValues(searchParams, keys);
   return nested.length ? nested : getQueryValues(searchParams, keys, options);
 }
 
