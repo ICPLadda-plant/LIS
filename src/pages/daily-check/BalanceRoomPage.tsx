@@ -23,11 +23,11 @@ interface ScaleDraft {
 }
 
 const SCALES = [
-  { id: "scale-1", name: "เครื่องชั่ง 1", model: "Balance A" },
-  { id: "scale-2", name: "เครื่องชั่ง 2", model: "Balance B" },
-  { id: "scale-3", name: "เครื่องชั่ง 3", model: "Balance C" },
-  { id: "scale-4", name: "เครื่องชั่ง 4", model: "Balance D" },
-  { id: "scale-5", name: "เครื่องชั่ง 5", model: "Balance E" },
+  { id: "scale-1", name: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง", model: "Balance A" },
+  { id: "scale-2", name: "LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง", model: "Balance B" },
+  { id: "scale-3", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C" },
+  { id: "scale-4", name: "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance D" },
+  { id: "scale-5", name: "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance E" },
 ];
 
 const TOLERANCE = 0.05;
