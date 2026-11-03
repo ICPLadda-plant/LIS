@@ -735,7 +735,7 @@ function sampleSnapshotFromPetitionItem(item = {}) {
     commonName: item.commonName,
     batchNo: item.batchNo,
     lotNo: item.lotNo,
-    productionDate: item.labelSampledDate || item.productionDate,
+    productionDate: item.productionDate || item.labelSampledDate,
     sampleId: item.sampleId || '',
     condition: item.condition || '',
     manufacturer: item.labelManufacturer || '',
@@ -1320,7 +1320,7 @@ router.get('/eligible-petitions', async (_req, res) => {
               commonName: item.commonName,
               batchNo: item.batchNo,
               lotNo: item.lotNo,
-              productionDate: item.labelSampledDate || item.productionDate,
+              productionDate: item.productionDate || item.labelSampledDate,
               activeCoa: activeByPetitionSeq.get(`${petition._id}:${item.seq}`)
                 || activeByHistoryKey.get(coaHistoryKey(item.commonName, item.batchNo))
                 || null,

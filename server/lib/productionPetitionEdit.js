@@ -84,7 +84,8 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
       labelQuantity: labelQuantities.join(', '),
       labelQuantities,
       labelQuantitySides,
-      labelSampledDate: productionDate || '',
+      // ว/ด/ป บนป้าย = วันที่ส่งของ Production; ไม่มีค่า (เวอร์ชันเดิม) ใช้วันที่ผลิต
+      labelSampledDate: text(row.requestDate) || productionDate || '',
       note: itemNoteWith(note, [
         text(row.itemNo) ? `Item: ${text(row.itemNo)}` : '',
         text(row.mfNo) ? `MF: ${text(row.mfNo)}` : '',

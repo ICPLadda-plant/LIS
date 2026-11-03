@@ -446,7 +446,16 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
   const batchNos = getSampleOrQueryValues(searchParams, ['batchNo', 'batch'], { splitComma: true });
   const lotNos = getSampleOrQueryValues(searchParams, ['lotNo', 'lot'], { splitComma: true });
   const commonNames = getSampleOrQueryValues(searchParams, ['commonName', 'activeIngredient']).map(normalizeProductionCommonName);
-  const productionDates = getSampleOrQueryValues(searchParams, ['productionDate', 'requestDate', 'mfgDate'], { splitComma: true });
+  // samples[i][requestDate] คือวันที่ส่งของ Production จึงไม่ใช้แทนวันที่ผลิตรายตัวอย่าง
+  const nestedProductionDates = getNestedSampleValues(searchParams, ['productionDate', 'mfgDate']);
+  const productionDates = nestedProductionDates.length
+    ? nestedProductionDates
+    : getQueryValues(searchParams, ['productionDate', 'requestDate', 'mfgDate'], { splitComma: true });
+  // ว/ด/ป บนป้ายนำส่ง = วันที่ส่งของ Production (รายตัวอย่าง → ระดับคำขอ → วันที่ผลิตสำหรับลิงก์รูปแบบเดิม)
+  const sendDates = getNestedSampleValues(searchParams, ['requestDate', 'sendDate', 'sentDate']);
+  const requestSendDate = getQueryValue(searchParams, ['requestDate', 'sendDate', 'sentDate']);
+  const labelSendDate = (index: number, productionDate: string) =>
+    valueAt(sendDates, index, false) || requestSendDate || productionDate;
   const packageUnits = getSampleOrQueryValues(searchParams, ['quantity', 'packageUnit', 'packSize', 'packsize']);
   const quantities = getSampleOrQueryValues(searchParams, ['qty', 'quantityValue', 'amount'], { splitComma: true });
   const quantityUnits = getSampleOrQueryValues(searchParams, ['unit', 'qtyUnit', 'quantityUnit'], { splitComma: true });
@@ -491,7 +500,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       packageUnit: packageUnits[0] || singleItem.packageUnit,
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
-      labelSampledDate: productionDate,
+      labelSampledDate: labelSendDate(0, productionDate),
       submittedQuantity,
       submittedUnit,
     }, searchParams, 0, labQtys[0] ?? '', submittedUnit)];
@@ -528,7 +537,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       note,
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
-      labelSampledDate: valueAt(productionDates, i),
+      labelSampledDate: labelSendDate(i, valueAt(productionDates, i)),
       submittedQuantity: valueAt(quantities, i, false),
       submittedUnit: valueAt(quantityUnits, i),
     };

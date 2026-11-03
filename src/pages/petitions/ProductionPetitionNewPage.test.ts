@@ -226,6 +226,21 @@ describe('R&D integration request rules', () => {
       submittedUnit: 'Kg/L',
     });
   });
+
+  it('uses the production send date for the label date and keeps the production date separate', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      requestDate: '2026-11-03',
+      samples: [
+        { sampleName: 'A', batchNo: 'B-1', productionDate: '2026-11-01', requestDate: '2026-11-03' },
+        { sampleName: 'A', batchNo: 'B-2', productionDate: '2026-11-02', requestDate: '' },
+      ],
+    }));
+
+    expect(items.map(({ productionDate, labelSampledDate }) => ({ productionDate, labelSampledDate }))).toEqual([
+      { productionDate: '2026-11-01', labelSampledDate: '2026-11-03' },
+      { productionDate: '2026-11-02', labelSampledDate: '2026-11-03' },
+    ]);
+  });
 });
 
 describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
