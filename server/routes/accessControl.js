@@ -2,10 +2,27 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 const { requireAdminUser, requireAuthenticatedUser } = require('../lib/adminGate');
+const { approvalStatusOf, isApproved, isOrgEmail, DEFAULT_APPROVED_ROLE } = require('../lib/userApproval');
+
+// ผู้ใช้ Microsoft ที่ล็อกอินครั้งแรกยังไม่มีในฐานข้อมูล จึงผ่าน requireAuthenticatedUser
+// ไม่ได้ (เดิมได้ 401 แล้วหน้าเว็บค้างเป็นหน้าขาว) — route sync จึงตรวจแค่ว่า header
+// X-LIS-User ตรงกับอีเมลที่ส่งมา ระดับความเชื่อถือเท่ากับ gate เดิม (ดูหมายเหตุใน adminGate.js)
+function requireMicrosoftSyncIdentity(req, res, next) {
+  const headerEmail = String(req.get('x-lis-user') || '').trim().toLowerCase();
+  const bodyEmail = String(req.body?.email || '').trim().toLowerCase();
+  if (!bodyEmail) return res.status(400).json({ error: 'email is required' });
+  if (!headerEmail || headerEmail !== bodyEmail) {
+    return res.status(401).json({ error: { message: 'ต้องระบุผู้ใช้' } });
+  }
+  return next();
+}
+
 router.use((req, res, next) => {
+  if (req.method === 'POST' && req.path === '/users/microsoft') {
+    return requireMicrosoftSyncIdentity(req, res, next);
+  }
   if (
     (req.method === 'GET' && req.path === '/') ||
-    (req.method === 'POST' && req.path === '/users/microsoft') ||
     (req.method === 'POST' && req.path === '/users/me/link-employee')
   ) {
     return requireAuthenticatedUser(req, res, next);
@@ -293,9 +310,18 @@ function formatUser(user, permissions) {
     employeeId: user.employeeId || '',
     signatureUrl: user.signatureUrl || '',
     status: user.status || 'active',
+    approvalStatus: approvalStatusOf(user),
+    approvedAt: user.approvedAt ? new Date(user.approvedAt).toISOString() : null,
+    approvedBy: user.approvedBy || '',
+    createdAt: user.createdAt ? new Date(user.createdAt).toISOString() : null,
     lastActive: user.lastActive || 'Never',
     authProvider: user.authProvider || 'local',
   };
+}
+
+// ผู้ใช้ที่ยังไม่ได้รับอนุมัติไม่มีสิทธิ์หน้าใดเลย จนกว่า admin จะยืนยัน
+async function permissionsForUser(user) {
+  return isApproved(user) ? getRolePermissions(normalizeRoles(user)) : [];
 }
 
 function formatRole(role) {
@@ -419,6 +445,12 @@ router.post('/users/microsoft', async (req, res) => {
     let user = await User.findOne({ email: normalizedEmail });
 
     if (user) {
+      if (approvalStatusOf(user) === 'rejected') {
+        return res.status(403).json({ error: { message: 'บัญชีไม่ได้รับอนุญาตให้เข้าระบบ' }, code: 'ACCOUNT_REJECTED' });
+      }
+      if (user.status === 'inactive') {
+        return res.status(403).json({ error: { message: 'ผู้ใช้ถูกระงับ' }, code: 'USER_INACTIVE' });
+      }
       user.authProvider = 'microsoft';
       user.microsoftId = microsoftId || user.microsoftId;
       user.tenantId = tenantId || user.tenantId;
@@ -453,11 +485,16 @@ router.post('/users/microsoft', async (req, res) => {
           throw e;
         }
       }
-      return res.json(formatUser(user, await getRolePermissions(normalizeRoles(user))));
+      return res.json(formatUser(user, await permissionsForUser(user)));
     }
 
     const existingUsers = await User.countDocuments();
-    const role = existingUsers === 0 ? 'admin' : 'viewer';
+    const isFirstUser = existingUsers === 0;
+    // ผู้ใช้ใหม่ต้องเป็นอีเมลองค์กร และต้องรอ admin ยืนยันก่อน (ยกเว้นผู้ใช้คนแรกของระบบ)
+    if (!isFirstUser && !isOrgEmail(normalizedEmail)) {
+      return res.status(403).json({ error: { message: 'บัญชีนี้ไม่ใช่อีเมลขององค์กร' }, code: 'DOMAIN_NOT_ALLOWED' });
+    }
+    const role = isFirstUser ? 'admin' : DEFAULT_APPROVED_ROLE;
     // HR is the source of truth for แผนก/ตำแหน่ง when matched; otherwise keep the
     // resolveHrField/Graph value. Resolved before create so there's a single write.
     const link = await resolveEmployeeLink(normalizedEmail);
@@ -474,6 +511,8 @@ router.post('/users/microsoft', async (req, res) => {
       position: resolvedPosition,
       employeeId: (link && link.employeeId) || '',
       status: 'active',
+      approvalStatus: isFirstUser ? 'approved' : 'pending',
+      ...(isFirstUser ? { approvedAt: new Date(), approvedBy: 'system' } : {}),
       lastActive: now,
       authProvider: 'microsoft',
       microsoftId,
@@ -490,9 +529,49 @@ router.post('/users/microsoft', async (req, res) => {
       }
     }
 
-    res.status(201).json(formatUser(user, await getRolePermissions(normalizeRoles(user))));
+    res.status(201).json(formatUser(user, await permissionsForUser(user)));
   } catch (err) {
     if (err.code === 11000) return res.status(409).json({ error: 'Email already exists' });
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin ยืนยันผู้ใช้ที่รอเข้าระบบ พร้อมกำหนด role (ค่าเริ่มต้น = viewer/ผู้ใช้งาน)
+router.post('/users/:id/approve', async (req, res) => {
+  try {
+    await ensureDefaults();
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'user not found' });
+    const roleIds = Array.isArray(req.body?.roleIds) && req.body.roleIds.length > 0
+      ? req.body.roleIds
+      : [req.body?.roleId || DEFAULT_APPROVED_ROLE];
+    user.roles = await normalizeRequestedRoles(roleIds, DEFAULT_APPROVED_ROLE);
+    user.approvalStatus = 'approved';
+    user.status = 'active';
+    user.approvedAt = new Date();
+    user.approvedBy = req.adminUser?.email || 'admin';
+    await applyStoredBaseRoles(user);
+    await user.save();
+    res.json(formatUser(user, await permissionsForUser(user)));
+  } catch (err) {
+    res.status(err.status || 400).json({ error: err.message });
+  }
+});
+
+router.post('/users/:id/reject', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: 'user not found' });
+    if (normalizeRoles(user).includes('admin') && isApproved(user)) {
+      return res.status(400).json({ error: 'admin users cannot be rejected' });
+    }
+    user.approvalStatus = 'rejected';
+    user.status = 'inactive';
+    user.approvedAt = undefined;
+    user.approvedBy = req.adminUser?.email || 'admin';
+    await user.save();
+    res.json(formatUser(user, []));
+  } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
@@ -576,6 +655,12 @@ router.patch('/users/:id', async (req, res) => {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: 'user not found' });
     Object.assign(user, patch);
+    // เปิดใช้งานผู้ใช้ที่เคยถูกปฏิเสธจากแท็บผู้ใช้ = อนุมัติให้เข้าระบบ
+    if (patch.status === 'active' && approvalStatusOf(user) === 'rejected') {
+      user.approvalStatus = 'approved';
+      user.approvedAt = new Date();
+      user.approvedBy = req.adminUser?.email || 'admin';
+    }
     await applyStoredBaseRoles(user);
     await user.save();
     res.json(formatUser(user));

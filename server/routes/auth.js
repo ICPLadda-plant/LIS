@@ -9,6 +9,7 @@ const { requireAdminUser } = require('../lib/adminGate');
 const { fetchMonthlyEmployees } = require('../lib/employeeDirectory');
 const { findEmployeeByEmail } = require('../lib/employeeLink');
 const { autoLinkEmployeeByEmail, saveWithEmployeeLinkFallback } = require('../lib/employeeAutoLink');
+const { approvalStatusOf } = require('../lib/userApproval');
 
 const findOtherLinkedUser = (employeeId, userId) => User.findOne({ employeeId, _id: { $ne: userId } }).lean();
 
@@ -99,6 +100,7 @@ function formatSsoUser(user, permissions = []) {
     employeeId: user.employeeId || '',
     signatureUrl: user.signatureUrl || '',
     status: user.status,
+    approvalStatus: approvalStatusOf(user),
   };
 }
 
@@ -160,6 +162,12 @@ router.post('/sso', async (req, res) => {
       user.position = user.position || 'Unassigned';
       if (!user.authProvider || user.authProvider === 'local') user.authProvider = 'production';
       user.lastActive = now;
+      // เข้าผ่าน production = ระบบต้นทางยืนยันตัวตนแล้ว ไม่ต้องรอ admin อนุมัติ
+      if (approvalStatusOf(user) === 'pending') {
+        user.approvalStatus = 'approved';
+        user.approvedAt = new Date();
+        user.approvedBy = 'production-sso';
+      }
       const currentRoles = normalizeRoles(user);
       const onlyViewer = currentRoles.length === 0 || (currentRoles.length === 1 && currentRoles[0] === 'viewer');
       if (role && onlyViewer) user.roles = [role.id];
@@ -180,6 +188,9 @@ router.post('/sso', async (req, res) => {
       position: (employee && employee.position) || 'Unassigned',
       employeeId: (employee && employee.employeeId) || '',
       status: 'active',
+      approvalStatus: 'approved',
+      approvedAt: new Date(),
+      approvedBy: 'production-sso',
       lastActive: now,
       authProvider: 'production',
       microsoftId: payload.sub ? `production:${payload.sub}` : undefined,
