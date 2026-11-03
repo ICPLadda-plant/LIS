@@ -571,6 +571,21 @@ test('Lab result selection excludes the named submitter before using LIS density
   assert.equal(selection.best.petition._id, 'eligible');
 });
 
+test('Lab result selection falls back to the nearest previous Batch and never a future Batch', () => {
+  const commonName = 'GLYPHOSATE 48% W/V SL';
+  const selection = findBestLabItem([{
+    _id: 'history', updatedAt: '2026-10-20T00:00:00.000Z',
+    items: [
+      { seq: 1, sampleName: 'Product A', commonName, batchNo: '079' },
+      { seq: 2, sampleName: 'Product A', commonName, batchNo: '080' },
+      { seq: 3, sampleName: 'Product A', commonName, batchNo: '082' },
+    ],
+  }], { sampleName: 'Product A', commonName, batchNo: '081' });
+
+  assert.equal(selection.best.item.batchNo, '080');
+  assert.equal(selection.best.matchKind, 'previous');
+});
+
 test('common names with multiple AI percentages receive every plus-minus criterion', () => {
   const rows = resultRowsFromQc([
     { parameterName: '%AI', values: { '%AI::2,4-d': '45.1' } },

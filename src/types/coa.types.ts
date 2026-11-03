@@ -154,7 +154,7 @@ export type CoaErpAutofill = {
     petitionNo?: string;
     itemSeq: number;
     batchNo?: string;
-    matchKind: "exact" | "close" | "none";
+    matchKind: "exact" | "previous" | "close" | "none";
     batchScore: number;
   } | null;
   legacyMatch?: {
@@ -174,7 +174,7 @@ export type CoaErpAutofill = {
     commonName?: string;
     batchNo?: string;
     batchScore: number;
-    matchKind: "exact" | "close" | "none";
+    matchKind: "exact" | "previous" | "close" | "none";
     labApprovedAt?: string | null;
   }>;
   stockCandidates: Array<{ lotNo: string; batchNo: string; productionDate: string; quantity: number; itemNo: string }>;

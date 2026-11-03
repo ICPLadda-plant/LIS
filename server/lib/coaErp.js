@@ -453,21 +453,25 @@ function findBestLabItem(petitions, sample) {
       if (!commonName || itemCommonName !== commonName) continue;
       const candidateBatch = item.batchNo || item.lotNo;
       const batchScore = batchSimilarity(batchNo, candidateBatch);
+      const previousDistance = previousBatchDistance(batchNo, candidateBatch);
       const tradeScore = tradeName && normalizeText(item.sampleName) === tradeName ? 0.15 : 0;
       const approvedScore = petition.labApprovedAt ? 0.1 : 0;
       candidates.push({
         petition,
         item,
         batchScore,
+        previousDistance,
         score: batchScore * 0.75 + tradeScore + approvedScore,
-        matchKind: batchScore === 1 ? 'exact' : batchScore >= 0.45 ? 'close' : 'none',
+        matchKind: batchScore === 1 ? 'exact' : previousDistance !== null ? 'previous' : batchScore >= 0.45 ? 'close' : 'none',
       });
     }
   }
-  candidates.sort((left, right) => right.score - left.score || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
-  // A Lab result is safe to autofill only when both common name and batch match.
-  // Keep near candidates for diagnostics, but never use them as the selected result.
-  return { best: candidates.find((candidate) => candidate.matchKind === 'exact') || null, candidates };
+  const matchRank = { exact: 3, previous: 2, close: 1, none: 0 };
+  candidates.sort((left, right) => matchRank[right.matchKind] - matchRank[left.matchKind]
+    || (left.previousDistance ?? Number.POSITIVE_INFINITY) - (right.previousDistance ?? Number.POSITIVE_INFINITY)
+    || right.score - left.score
+    || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
+  return { best: candidates.find((candidate) => ['exact', 'previous'].includes(candidate.matchKind)) || null, candidates };
 }
 
 function isAfterDryingLabItem(item) {
