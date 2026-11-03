@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Activity, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, FileCheck2, FileText, FlaskConical, ImageIcon, ListTodo, Printer, RefreshCw, UserRound } from "lucide-react";
+import { Activity, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileCheck2, FileText, FlaskConical, ImageIcon, ListTodo, Printer, RefreshCw, UserRound } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
@@ -169,6 +169,7 @@ function ActivityEntries({ activities }: { activities: TimelineDetailActivity[] 
 const documentButtonClass = "w-full justify-start";
 const activityPreviewLimit = 5;
 const activityPageSize = 6;
+const documentPreviewLimit = 3;
 const documentButtonColors = {
   sampleLabel: "border-primary-500 text-primary-500 hover:bg-primary-50",
   serviceRequest: "border-yellow-500 text-yellow-500 hover:bg-yellow-50",
@@ -225,6 +226,7 @@ export default function PetitionTimelineDetailPage() {
   const [finalReportOpen, setFinalReportOpen] = useState(false);
   const [labResultOpen, setLabResultOpen] = useState(false);
   const [chemReportOpen, setChemReportOpen] = useState(false);
+  const [documentsExpanded, setDocumentsExpanded] = useState(false);
   const [grPrintOpen, setGrPrintOpen] = useState(false);
   const [activeTimelineDayKey, setActiveTimelineDayKey] = useState<string | null>(null);
   const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
@@ -658,7 +660,8 @@ export default function PetitionTimelineDetailPage() {
       </Dialog>
 
       <Card aria-label="Documents" className="border-black-50 shadow-none"><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4 text-primary-500" />Documents</CardTitle></CardHeader><CardContent className="space-y-2">
-        {documentActions.map(({ key, label, icon: Icon, open }) => <Button key={key} variant="primary-outline" className={cn(documentButtonClass, documentButtonColors[key])} disabled={documentLoading} onClick={() => { void openDocument(open); }}><Icon className="h-4 w-4" />{label}</Button>)}
+        {(documentsExpanded ? documentActions : documentActions.slice(0, documentPreviewLimit)).map(({ key, label, icon: Icon, open }) => <Button key={key} variant="primary-outline" className={cn(documentButtonClass, documentButtonColors[key])} disabled={documentLoading} onClick={() => { void openDocument(open); }}><Icon className="h-4 w-4" />{label}</Button>)}
+        {documentActions.length > documentPreviewLimit && <Button variant="ghost" size="sm" className="w-full" aria-expanded={documentsExpanded} onClick={() => setDocumentsExpanded((expanded) => !expanded)}>{documentsExpanded ? <><ChevronUp className="h-4 w-4" />ย่อ</> : <><ChevronDown className="h-4 w-4" />ดูทั้งหมด ({documentActions.length})</>}</Button>}
         {documentLoading && <p className="text-xs text-grey-500">กำลังโหลดข้อมูลเอกสาร...</p>}
         {documentError && <p className="text-xs text-red-600">โหลดข้อมูลเอกสารไม่สำเร็จ: {documentError}</p>}
       </CardContent></Card>

@@ -600,7 +600,7 @@ describe("PetitionTimelineDetailPage", () => {
     expect(documentButtons[2]).toHaveClass("border-primary-500");
   });
 
-  it("keeps earlier documents after Final Result and lists the newest document first", async () => {
+  it("shows the 3 newest documents first and reveals earlier documents with ดูทั้งหมด", async () => {
     Object.assign(mocks.petition, {
       status: "approved",
       qcReceivedBy: "QC Staff",
@@ -613,9 +613,15 @@ describe("PetitionTimelineDetailPage", () => {
     renderDetail();
 
     await screen.findByRole("button", { name: "Final Report" });
-    const labels = Array.from(screen.getByLabelText("Documents").querySelectorAll("button")).map((button) => button.textContent);
-    const expectedOrder = ["Final Report", "Pre Report", "ใบคำขอรับบริการ", "ป้ายนำส่งตัวอย่าง"];
-    expect(labels.filter((label) => expectedOrder.includes(label ?? ""))).toEqual(expectedOrder);
+    const documentsCard = screen.getByLabelText("Documents");
+    const documentLabels = () => Array.from(documentsCard.querySelectorAll("button")).map((button) => button.textContent ?? "").filter((label) => !/ดูทั้งหมด|ย่อ/.test(label));
+    expect(documentLabels()).toEqual(["Final Report", "พิมพ์ผลวิเคราะห์ Lab", "Pre Report"]);
+
+    fireEvent.click(within(documentsCard).getByRole("button", { name: /ดูทั้งหมด \(5\)/ }));
+    expect(documentLabels()).toEqual(["Final Report", "พิมพ์ผลวิเคราะห์ Lab", "Pre Report", "ใบคำขอรับบริการ", "ป้ายนำส่งตัวอย่าง"]);
+
+    fireEvent.click(within(documentsCard).getByRole("button", { name: "ย่อ" }));
+    expect(documentLabels()).toHaveLength(3);
   });
 
   it("shows the lab-result print button once Lab approves results, before QC Final Result", async () => {
