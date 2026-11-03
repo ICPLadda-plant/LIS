@@ -18,12 +18,33 @@ export function formatSampleLabelDocumentNumber(petitionNo: string | null | unde
   return number ? `${number.seq}/${number.year}` : "";
 }
 
-/** "สุ่มโดย" บนป้าย: QC รายวันที่ฝ่ายผลิตเลือกก่อน แล้ว fallback ของเดิม */
+/** ตัดวงเล็บท้ายชื่อ เช่น "นายสมชาย ใจดี (ชาย)" → "นายสมชาย ใจดี" */
+function withoutTrailingParenthesis(name: string): string {
+  return name.replace(/\s*\([^()]*\)\s*$/u, "").trim();
+}
+
+/** "สุ่มโดย" บนป้าย: QC รายวันที่ฝ่ายผลิตเลือกก่อน แล้ว fallback ของเดิม (ไม่แสดงชื่อเล่นในวงเล็บ) */
 export function labelSampledByName(
   petition: Pick<Petition, "sampledBy" | "submittedBy">,
   item?: Pick<Petition["items"][number], "labelSampledBy">,
 ): string {
-  return petition.sampledBy?.name?.trim() || petition.submittedBy?.name || item?.labelSampledBy || "";
+  const name = petition.sampledBy?.name?.trim() || petition.submittedBy?.name || item?.labelSampledBy || "";
+  return withoutTrailingParenthesis(name);
+}
+
+/**
+ * "ผู้ผลิต" บนป้าย: ผู้ยื่นจากสายผลิต 1–5 / LDI ใช้ชื่อแผนกตัวเอง ("ผลิต 4", "LDI"),
+ * แผนกอื่นใช้ผู้ผลิตของรายการตามเดิม
+ */
+export function labelManufacturerName(
+  petition: Pick<Petition, "submittedBy">,
+  item?: Pick<Petition["items"][number], "labelManufacturer">,
+): string {
+  const dept = String(petition.submittedBy?.department ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  const line = dept.match(/(?:ผลิต|prod(?:uction)?)\s*0?([1-5])(?!\d)/);
+  if (line) return `ผลิต ${line[1]}`;
+  if (/\bldi\b/.test(dept)) return "LDI";
+  return item?.labelManufacturer ?? "";
 }
 
 /** ผู้นำส่งที่ /scanner: คำร้องที่มี "สุ่มโดย" จากผลิตใช้ชื่อนั้นอัตโนมัติ, คำร้องเก่าคืน null (ให้เลือกเอง) */

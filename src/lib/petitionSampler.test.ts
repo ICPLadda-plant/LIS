@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSampleLabelDocumentNumber, labelSampledByName, presetDelivererFor } from "./petitionSampler";
+import { formatSampleLabelDocumentNumber, labelManufacturerName, labelSampledByName, presetDelivererFor } from "./petitionSampler";
 
 describe("formatSampleLabelDocumentNumber", () => {
   it("ตัด 0 นำหน้าของลำดับ และแปลงปี ค.ศ. 2 หลักเป็น พ.ศ. 2 หลัก", () => {
@@ -25,5 +25,30 @@ describe("labelSampledByName / presetDelivererFor", () => {
     const petition = { sampledBy: undefined, submittedBy: { name: "ผู้ขอ", submittedAt: "" } };
     expect(labelSampledByName(petition)).toBe("ผู้ขอ");
     expect(presetDelivererFor(petition)).toBeNull();
+  });
+
+  it("ไม่แสดงชื่อเล่นในวงเล็บบนเอกสาร", () => {
+    const petition = { sampledBy: { employeeId: "7", name: "นายสรรสกุล เหล็กอิ่ม (กุล)" }, submittedBy: { name: "ผู้ขอ", submittedAt: "" } };
+    expect(labelSampledByName(petition)).toBe("นายสรรสกุล เหล็กอิ่ม");
+  });
+});
+
+describe("labelManufacturerName", () => {
+  const by = (department: string) => ({ submittedBy: { name: "Achara Boontha", department, submittedAt: "" } });
+  const item = { labelManufacturer: "บริษัท ก" };
+
+  it("ผู้ยื่นจากสายผลิต 1–5 ใช้ชื่อสายผลิต", () => {
+    expect(labelManufacturerName(by("ผลิต 4"), item)).toBe("ผลิต 4");
+    expect(labelManufacturerName(by("ผลิต 01"), item)).toBe("ผลิต 1");
+    expect(labelManufacturerName(by("Production 5"), item)).toBe("ผลิต 5");
+  });
+
+  it("ผู้ยื่นจาก LDI ใช้ LDI", () => {
+    expect(labelManufacturerName(by("LDI"), item)).toBe("LDI");
+  });
+
+  it("แผนกอื่นใช้ผู้ผลิตของรายการตามเดิม", () => {
+    expect(labelManufacturerName(by("IT"), item)).toBe("บริษัท ก");
+    expect(labelManufacturerName(by("คลังสินค้า RM"), item)).toBe("บริษัท ก");
   });
 });

@@ -34,8 +34,19 @@ export function getMasterItemRegulatoryType(item: Record<string, unknown>): stri
   return getMasterItemRegulatoryTypes(item).join(", ");
 }
 
-/** สินค้า อย. (GMP) หรือปศุสัตว์ (LS) ต้องใช้ป้ายนำส่งตัวอย่างแบบมีสัญลักษณ์อันตราย F-LAB-01-10 */
-export function requiresHazardSampleLabel(item: { sampleName?: string | null; commonName?: string | null }): boolean {
+/**
+ * สินค้า อย. (GMP) หรือปศุสัตว์ (LS) ต้องใช้ป้ายนำส่งตัวอย่างแบบมีสัญลักษณ์อันตราย F-LAB-01-10
+ * ชื่อสินค้าอย่าง "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)" ไม่มีคำว่า อย. แต่กลุ่ม PUBLIC HEALTH
+ * เป็นสินค้า อย. และเลข batch ของสินค้า อย. มี "-GMP" เช่น 26S-BRM0.005-GMP(R)-237
+ */
+export function requiresHazardSampleLabel(item: {
+  sampleName?: string | null;
+  commonName?: string | null;
+  batchNo?: string | null;
+}): boolean {
   const types = getMasterItemRegulatoryTypes({ item_name1: item.sampleName, commonName: item.commonName });
-  return types.includes("GMP") || types.includes("LS");
+  if (types.includes("GMP") || types.includes("LS")) return true;
+  const names = `${item.sampleName ?? ""} ${item.commonName ?? ""}`.replace(/\s+/g, " ");
+  if (/public health|live ?stock/i.test(names)) return true;
+  return /(^|[^A-Z])GMP([^A-Z]|$)/i.test(item.batchNo ?? "");
 }

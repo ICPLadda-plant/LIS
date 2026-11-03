@@ -2,7 +2,7 @@ import QRCode from 'qrcode';
 import FitToBox from '@/components/petition/FitToBox';
 import { expandItemsBySampleQuantity } from '@/lib/petitionPrintItems';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
-import { labelSampledByName, sampleLabelDocumentNumber } from '@/lib/petitionSampler';
+import { labelManufacturerName, labelSampledByName, sampleLabelDocumentNumber } from '@/lib/petitionSampler';
 import { requiresHazardSampleLabel } from '@/lib/masterItemRegulatoryType';
 import type { AdditionalSampleRequest, Petition } from '@/types/petition.types';
 import ghsEnvironment from '@/assets/ghs/environment.png?inline';
@@ -287,12 +287,12 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
             />
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            <Field label="ผู้ผลิต" value={item.labelManufacturer} />
+            <Field label="ผู้ผลิต" value={labelManufacturerName(petition, item)} />
             <Field label="ผู้ขาย" value={item.labelSeller} />
           </div>
           <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-1.5">
             <Field label="ปริมาณ" value={labelQuantityForCopy(item, copyIndex)} />
-            <Field label="สุ่มโดย" value={labelSampledByName(petition, item)} />
+            <Field label="สุ่มโดย" value={labelSampledByName(petition, item)} valueClassName="leading-tight" multiline />
             <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
           </div>
           <Field label="วันที่หมดอายุ" value="" />
@@ -354,14 +354,14 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
             />
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            <Field label="ผู้ผลิต" value={item.labelManufacturer} />
+            <Field label="ผู้ผลิต" value={labelManufacturerName(petition, item)} />
             <Field label="ผู้ขาย" value={item.labelSeller} />
           </div>
           <div>
             <Field label="ปริมาณ" value={labelQuantity} />
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-1.5">
-            <Field label="สุ่มโดย" value={sampledByName} />
+            <Field label="สุ่มโดย" value={sampledByName} valueClassName="leading-tight" multiline />
             <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
           </div>
         </div>

@@ -37,6 +37,16 @@ describe('SampleLabelPrintTemplate', () => {
     expect(screen.getByTestId('sample-label-batch-qr-text')).toHaveTextContent('26S-PCB25SC-HI-026');
   });
 
+  it.each([
+    ['PUBLIC HEALTH name', { sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)', commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)' }],
+    ['GMP batch', { sampleName: 'BROMADIOLONE 0.005% W/W', batchNo: '26S-BRM0.005-GMP(R)-237' }],
+  ])('uses the F-LAB-01-10 hazard label for อย. products identified by %s', (_case, override) => {
+    const hazardPetition = { ...petition, items: [{ ...petition.items[0], ...override }] };
+    render(<SampleLabelPrintTemplate petition={hazardPetition} />);
+
+    expect(screen.getByTestId('sample-label-hazard-form')).toBeInTheDocument();
+  });
+
   it('prints both QR codes at the same scannable size', () => {
     const { container } = render(<SampleLabelPrintTemplate petition={petition} />);
     const qrs = container.querySelectorAll('svg[aria-label^="QR "]');
