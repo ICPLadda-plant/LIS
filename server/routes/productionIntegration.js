@@ -5,6 +5,7 @@ const Petition = require('../models/Petition');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
 const LabRequest = require('../models/LabRequest');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
+const { resolveEmployeeActor } = require('../lib/employeeResolver');
 const {
   buildEditedItems,
   canEditWholePetition,
@@ -131,7 +132,9 @@ router.put('/petitions/:petitionNo', async (req, res) => {
     }
     const mode = req.body?.mode === 'full' ? 'full' : 'note';
     const note = String(req.body?.note ?? '').trim();
-    const actor = String(req.body?.updatedBy?.name || 'Production System').trim();
+    // production ส่งชื่อจากบัญชีของตัวเอง (มักเป็นภาษาอังกฤษ) → จับคู่อีเมลกับ HR ให้ได้ชื่อไทย
+    const updatedBy = req.body?.updatedBy ? await resolveEmployeeActor(req.body.updatedBy) : null;
+    const actor = String(updatedBy?.name || 'Production System').trim();
     const before = { status: petition.status, __v: petition.__v };
     let update;
     let auditNote;

@@ -114,6 +114,7 @@ async function replaceProductionPetition(body, res) {
   if (Array.isArray(body.prodOrderNos)) update.prodOrderNos = body.prodOrderNos;
   const sampledBy = normalizeSampledBy(body.sampledBy);
   if (sampledBy) update.sampledBy = sampledBy;
+  const submittedBy = body.submittedBy ? await resolveEmployeeActor(body.submittedBy) : null;
   const saved = await Petition.findOneAndUpdate(
     { _id: petition._id, status: petition.status, __v: petition.__v == null ? { $exists: false } : petition.__v },
     { $set: update, $inc: { __v: 1 } },
@@ -129,7 +130,7 @@ async function replaceProductionPetition(body, res) {
   logAudit(saved, {
     event: 'updated',
     toStatus: saved.status,
-    actor: body.actor || body.submittedBy?.name || 'Production System',
+    actor: body.actor || submittedBy?.name || 'Production System',
     note: 'Production แก้ไขรายการและตรวจใบคำขออีกครั้ง: ' + saved.items.map((it) => `#${it.seq} ${it.batchNo || '-'}`).join(', '),
     metadata: { type: 'productionEdit', mode: 'review' },
   });
@@ -1226,11 +1227,13 @@ router.post('/', async (req, res) => {
       petitionNo,
     });
     const submittedBy = await resolveEmployeeActor(body.submittedBy);
+    const deliveredBy = body.deliveredBy?.name ? await resolveEmployeeActor(body.deliveredBy) : body.deliveredBy;
     const sampledBy = normalizeSampledBy(body.sampledBy);
     const routeTargets = routeTargetsForSubmission(body, items);
     const doc = await Petition.create({
       ...body,
       submittedBy,
+      deliveredBy,
       items,
       sampledBy,
       routeTargets,
@@ -1242,7 +1245,7 @@ router.post('/', async (req, res) => {
     logAudit(doc, {
       event: 'created',
       toStatus: doc.status,
-      actor: body.actor || body.submittedBy?.name || 'system',
+      actor: body.actor || submittedBy?.name || 'system',
       note: revisionOf ? `สร้างคำร้องใหม่ (แก้ไขจาก ${body.revisionOf})` : 'สร้างคำร้องใหม่',
       metadata: revisionOf ? { revisionOf: String(revisionOf) } : undefined,
     });
