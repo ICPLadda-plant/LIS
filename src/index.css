@@ -1,5 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600;700&display=swap');
 
+/* ฟอนต์เอกสาร A4 (ใบคำขอ, COA, รายงาน) — ส่งไฟล์ไปเองเพราะ Windows หลายเครื่องไม่มี Angsana New
+   ถ้าเครื่องมีฟอนต์อยู่แล้วจะใช้ของเครื่องก่อน (local) */
+@font-face {
+  font-family: 'Angsana New';
+  src: local('Angsana New'), local('AngsanaNew'), url('./assets/fonts/angsana-new-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Angsana New';
+  src: local('Angsana New Bold'), local('AngsanaNew-Bold'), url('./assets/fonts/angsana-new-bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Angsana New';
+  src: local('Angsana New Italic'), local('AngsanaNew-Italic'), url('./assets/fonts/angsana-new-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'Angsana New';
+  src: local('Angsana New Bold Italic'), local('AngsanaNew-BoldItalic'), url('./assets/fonts/angsana-new-bold-italic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: block;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

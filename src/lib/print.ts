@@ -112,10 +112,15 @@ function openLocalPrintWindow(title: string, html: string, docType: PrintDocType
     }
     printWindow.onafterprint = cleanup;
     printWindow.focus();
-    window.setTimeout(() => {
-      printWindow.print();
-      window.setTimeout(cleanup, 60_000);
-    }, 50);
+    // รอให้ฟอนต์เอกสาร (เช่น Angsana New ที่ส่งจาก server) โหลดเสร็จก่อนเปิด print dialog
+    const fontsReady = printWindow.document.fonts?.ready ?? Promise.resolve();
+    const fontTimeout = new Promise((resolve) => window.setTimeout(resolve, 3000));
+    void Promise.race([fontsReady, fontTimeout]).then(() => {
+      window.setTimeout(() => {
+        printWindow.print();
+        window.setTimeout(cleanup, 60_000);
+      }, 50);
+    });
   };
 
   document.body.appendChild(iframe);
