@@ -107,7 +107,7 @@ function toArray<T extends string>(v: T | T[] | null | undefined): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
-function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissionNo: string; customerCode: string }) {
+function PageOne({ lr, customerCode, yearShort }: { lr: LabRequest; customerCode: string; yearShort: string }) {
   const sa = lr.serviceAgreement;
   const lar = lr.labAgreementReview;
   const createdDate = splitBuddhist(lr.createdAt);
@@ -132,13 +132,11 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
         </div>
         <div className="pr-p1-meta-row">
           <b>อ้างอิงใบขอรับบริการเลขที่ TA</b>{' '}
-          <EditableText className="pr-line pr-line-md" value={submissionNo} />
+          <EditableText className="pr-line pr-line-md" />
         </div>
         <div className="pr-p1-meta-row">
           <b>รหัสลูกค้า</b>{' '}
-          <EditableText className="pr-line pr-line-sm" value={customerCode} />
-          <span> / </span>
-          <EditableText className="pr-line pr-line-xs" />
+          <EditableText className="pr-line pr-line-sm" value={customerCode ? `${customerCode}/${yearShort}` : ''} />
         </div>
 
         <div className="pr-p1-notify">
@@ -395,18 +393,28 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
 
 type LabTestRow = { testItem: string; method: string };
 
-function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, labTestsBySeq = {} }: { lr: LabRequest; petition: Petition; items: PetitionItem[]; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown>; labTestsBySeq?: Record<number, LabTestRow[]> }) {
+type PrintRow = ReturnType<typeof expandItemsBySampleQuantity>[number];
+
+/** จำนวนแถวตัวอย่างต่อแผ่นของใบคำขอรับบริการ เกินจากนี้ขึ้นแผ่นใหม่ (แผ่นที่ 1/2, 2/2, ...) */
+const SERVICE_REQUEST_ROWS_PER_SHEET = 8;
+
+function chunkRows(rows: PrintRow[], size: number): PrintRow[][] {
+  if (rows.length === 0) return [[]];
+  const sheets: PrintRow[][] = [];
+  for (let i = 0; i < rows.length; i += size) sheets.push(rows.slice(i, i + size));
+  return sheets;
+}
+
+function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgParam, requestValues = {}, labTestsBySeq = {} }: { lr: LabRequest; petition: Petition; printRows: PrintRow[]; sheetNo: number; sheetCount: number; qcResults: QCTestResult[]; sgParam: SgParameter | null; requestValues?: Record<string, unknown>; labTestsBySeq?: Record<number, LabTestRow[]> }) {
   const sampleReceivedAt = petition.labReceivedAt || null;
   const receivedDateTime = sampleReceivedAt ? new Date(sampleReceivedAt) : null;
   const receivedTime = receivedDateTime && !Number.isNaN(receivedDateTime.getTime())
     ? `${String(receivedDateTime.getHours()).padStart(2, '0')}.${String(receivedDateTime.getMinutes()).padStart(2, '0')} น.`
     : '';
   const td = new Set(lr.testDelivery ?? []);
-  const yearShort = String((new Date(petition.createdAt).getFullYear() + 543) % 100).padStart(2, '0');
   const requester = lr.requester;
   const sampleReturnReturn = lr.sampleReturn === 'return';
   const sampleReturnNoReturn = lr.sampleReturn === 'discard';
-  const printRows = expandItemsBySampleQuantity(items);
   return (
     <section className="pr-page2">
       <FitToBox className="pr-p2-inner" contentClassName="pr-fit-col">
@@ -416,14 +424,14 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, 
           <div className="pr-p2-top-r">
             <div className="pr-p2-sheet">
               <span>แผ่นที่</span>
-              <EditableText className="pr-line-fill pr-center" value="1" />
+              <EditableText className="pr-line-fill pr-center" value={String(sheetNo)} />
               <span>/</span>
-              <EditableText className="pr-line-fill pr-center" value={yearShort} />
+              <EditableText className="pr-line-fill pr-center" value={String(sheetCount)} />
             </div>
             <div className="pr-p2-infobox">
               <div className="pr-fill-row">
                 <span>เลขที่ขอรับบริการ :</span>
-                <EditableText className="pr-line-fill" value={lr.labRequestNo} />
+                <EditableText className="pr-line-fill" />
               </div>
               <div className="pr-fill-row">
                 <span>วันที่รับตัวอย่าง :</span>
@@ -658,18 +666,22 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
   });
   const labItems = pickQcLabSideItems(petition, petition.items.filter((it) => shouldSendItemToLab(it)), 'lab');
   const itemsToShow = labItems.length > 0 ? labItems : petition.items.filter((it) => it.seq === labRequest.sampleSeq);
-  // เลขที่ใบนำส่งใช้ค่าเดียวทั้งใบ (default = เลขคำขอ) — ดึงจากรายการที่ใบนี้อ้างถึง
-  const submissionNo = itemsToShow[0]?.submissionNo ?? petition.items[0]?.submissionNo ?? '';
+  const sheets = chunkRows(expandItemsBySampleQuantity(itemsToShow), SERVICE_REQUEST_ROWS_PER_SHEET);
+  // ปี พ.ศ. 2 หลักของใบคำขอ ต่อท้ายรหัสลูกค้า เช่น TI P02/69
+  const createdAt = new Date(petition.createdAt ?? labRequest.createdAt ?? Date.now());
+  const yearShort = String(((Number.isNaN(createdAt.getTime()) ? new Date() : createdAt).getFullYear() + 543) % 100).padStart(2, '0');
   return (
     <>
       <style>{PRINT_CSS}</style>
       <div className="pr-root">
         <PageOne
           lr={labRequest}
-          submissionNo={submissionNo}
           customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
+          yearShort={yearShort}
         />
-        <PageTwo lr={labRequest} petition={petition} items={itemsToShow} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
+        {sheets.map((rows, index) => (
+          <PageTwo key={index} lr={labRequest} petition={petition} printRows={rows} sheetNo={index + 1} sheetCount={sheets.length} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
+        ))}
       </div>
     </>
   );
