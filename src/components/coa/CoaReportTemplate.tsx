@@ -2,6 +2,7 @@ import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import SIRIPICH_SIGNATURE_URL from "@/assets/siripich-signature.png";
 import COA_FINAL_PAGE_TEMPLATE_URL from "@/assets/coa-final-page-template.png";
 import type { CoaReportPage, CoaReportSample } from "@/lib/coaReport";
+import { isAiContentTestItem } from "@/lib/aiToleranceCriteria";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
 export const COA_REPORT_CSS = `
@@ -66,7 +67,7 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
 
   const renderRows = (selectedRows: typeof rows) => selectedRows.map((row, index) => {
     const hasUnit = row.unit === "%" ? row.result?.includes("%") : row.result?.endsWith(row.unit || "");
-    const result = `${row.result}${row.unit && !hasUnit ? ` ${row.unit}` : ""}`;
+    const result = `${row.result}${!isAiContentTestItem(row.testItem) && row.unit && !hasUnit ? ` ${row.unit}` : ""}`;
     return /date\s*of\s*analysis/i.test(row.testItem || "") ? (
       <tr key={`${row.testItem}-${index}`}><td colSpan={2}>{row.testItem}</td><td>{dayMonthYear(result)}</td></tr>
     ) : (
@@ -317,7 +318,7 @@ function StandardCoaPage({ page, index }: { page: CoaReportPage; index: number }
             {sample.rows.length ? sample.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 <td>{row.testItem || "-"}</td>
-                <td className="coa-center">{row.result || "-"}{sample.selectedResultsOnly && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</td>
+                <td className="coa-center">{row.result || "-"}{sample.selectedResultsOnly && !isAiContentTestItem(row.testItem) && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</td>
                 <td className="coa-center">{row.criteria || "-"}</td>
                 <td className="coa-center">{row.method || "-"}</td>
               </tr>

@@ -43,18 +43,18 @@ describe("CoaReportTemplate", () => {
       .toBeLessThan(rows.findIndex((row) => row.textContent?.includes("BATCH NO.")));
   });
 
-  it("does not append a duplicate percent unit after W/W", () => {
+  it("does not append any stored unit after an AI result", () => {
     const pages = buildCoaReportPages({
       coaNo: "00012026",
       sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade A", commonName: "PRODUCT 10% SP", batchNo: "B1" }],
-      resultSnapshots: [{ itemSeq: 1, testItem: "%AI content (W/W)", result: "10.1 %W/W", unit: "%" }],
+      resultSnapshots: [{ itemSeq: 1, testItem: "%AI content (W/W)", result: "10.1%", unit: "% W/W%" }],
       formSelections: [{ itemSeq: 1, resultKeys: ["ai"] }],
     } as Parameters<typeof buildCoaReportPages>[0]);
 
     render(<CoaReportTemplate pages={pages} />);
 
-    expect(screen.getByText("10.1 %W/W")).toBeInTheDocument();
-    expect(screen.queryByText("10.1 %W/W %")).not.toBeInTheDocument();
+    expect(screen.getByText("10.1%")).toBeInTheDocument();
+    expect(screen.queryByText(/10\.1% W\/W%/)).not.toBeInTheDocument();
   });
 
   it("renders the special GR/WP/SP COA form", () => {
