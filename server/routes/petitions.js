@@ -44,6 +44,7 @@ const {
   routeTargetsForSubmission,
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
+const { canEditWholePetition } = require('../lib/productionPetitionEdit');
 
 function sampleIdsFromPetition(petition) {
   if (!petition || !Array.isArray(petition.items)) return [];
@@ -88,6 +89,51 @@ function changedLabResultSeqs(before, after) {
 const { nextDocumentNumber } = require('../lib/documentNumber');
 function nextPetitionNo() {
   return nextDocumentNumber('petition', Petition, 'petitionNo');
+}
+
+// Production แก้คำขอที่ส่งเข้า LIS แล้วแบบเพิ่ม/ลดรายการ → ผู้ใช้ตรวจซ้ำในหน้าคำขอแผนกผลิต
+// แล้วบันทึกทับใบเดิม (เลขคำขอเดิม) เพื่อพิมพ์สติกเกอร์ใหม่ ไม่สร้างใบที่สองซ้อน
+async function replaceProductionPetition(body, res) {
+  const petitionNo = String(body.replacePetitionNo || '').trim();
+  const requestNo = String(body.productionWorkflow?.requestNo || '').trim();
+  const petition = await Petition.findOne({ petitionNo, deletedAt: null });
+  if (!petition) return res.status(404).json({ error: { message: `ไม่พบคำขอ ${petitionNo}` } });
+  if (!requestNo || petition.productionWorkflow?.requestNo !== requestNo) {
+    return res.status(403).json({ error: { message: 'requestNo ไม่ตรงกับคำขอ' } });
+  }
+  if (!canEditWholePetition(petition)) {
+    return res.status(409).json({ error: { message: 'รับตัวอย่างแล้ว แก้ไขรายการไม่ได้' } });
+  }
+  const previous = petition.toObject().items || [];
+  const items = normalizePetitionItems(body.items, { department: petition.submittedBy?.department, petitionNo })
+    .map((item, index) => {
+      const old = previous[index];
+      return old?.sampleId && Number(old.seq) === Number(item.seq) ? { ...item, sampleId: old.sampleId } : item;
+    });
+  const update = { items, routeTargets: routeTargetsForSubmission(body, items) ?? [] };
+  if (Array.isArray(body.prodOrderNos)) update.prodOrderNos = body.prodOrderNos;
+  const sampledBy = normalizeSampledBy(body.sampledBy);
+  if (sampledBy) update.sampledBy = sampledBy;
+  const saved = await Petition.findOneAndUpdate(
+    { _id: petition._id, status: petition.status, __v: petition.__v == null ? { $exists: false } : petition.__v },
+    { $set: update, $inc: { __v: 1 } },
+    { new: true, runValidators: true },
+  );
+  if (!saved) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
+  // ใบคำขอรับบริการ Lab ผูกกับรายการ Lab ตัวแรก — ย้ายตามรายการที่แก้ (หน้าเว็บอัปเดตรายละเอียดต่อ)
+  const labRequest = await LabRequest.findOne({ petitionId: saved._id, deletedAt: null }).sort({ createdAt: 1 }).lean();
+  const firstLab = saved.items.find((item) => item.sendToLab === true);
+  if (labRequest && firstLab) {
+    await LabRequest.updateOne({ _id: labRequest._id }, { $set: { batchNo: firstLab.batchNo, sampleSeq: firstLab.seq } });
+  }
+  logAudit(saved, {
+    event: 'updated',
+    toStatus: saved.status,
+    actor: body.actor || body.submittedBy?.name || 'Production System',
+    note: 'Production แก้ไขรายการและตรวจใบคำขออีกครั้ง: ' + saved.items.map((it) => `#${it.seq} ${it.batchNo || '-'}`).join(', '),
+    metadata: { type: 'productionEdit', mode: 'review' },
+  });
+  return res.json({ ...saved.toObject(), existingLabRequestId: labRequest ? String(labRequest._id) : null });
 }
 
 function badRequest(res, message) {
@@ -1150,6 +1196,7 @@ router.post('/', async (req, res) => {
     if (Object.keys(body).some(key => key.startsWith('additionalSampleRequests') || key.startsWith('$'))) return badRequest(res, 'รอบตัวอย่างเพิ่มต้องสร้างหลังรับและบันทึกผลตรวจเท่านั้น');
     const submissionError = validatePetitionSubmission(body);
     if (submissionError) return badRequest(res, submissionError);
+    if (body.replacePetitionNo) return await replaceProductionPetition(body, res);
     let revisionOf = null;
     if (body.revisionOf) {
       if (!mongoose.Types.ObjectId.isValid(body.revisionOf)) {

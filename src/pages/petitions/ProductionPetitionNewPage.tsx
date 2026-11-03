@@ -12,7 +12,7 @@ import ItemsStep, { qcLabSampleTargets, type ItemRowValues } from '@/components/
 import type { SubmitterValues } from '@/components/petition/wizard/SubmitterPicker';
 import LabRequestStep, { type LabRequestRowValues } from '@/components/petition/wizard/LabRequestStep';
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
-import { createPetition, createLabRequest } from '@/hooks/usePetition';
+import { createPetition, createLabRequest, updateLabRequest } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
 import { resolveHrEmployeeName, useEmployeeOptions } from '@/hooks/useExternalLookups';
 import { api } from '@/lib/api';
@@ -631,6 +631,8 @@ export default function ProductionPetitionNewPage({
   }, [effectiveSearchParams]);
   const prodOrderNos = prodOrderNosFromState?.length ? prodOrderNosFromState : prodOrderNosFromQuery;
   const productionRequestNo = getQueryValue(effectiveSearchParams, ['requestNo', 'request_no', 'submissionNo']);
+  // Production แก้คำขอที่อยู่ใน LIS แล้ว (เพิ่ม/ลดรายการ) → ตรวจซ้ำแล้วบันทึกทับใบเดิมแทนการสร้างใบใหม่
+  const editPetitionNo = integrationMode ? getQueryValue(effectiveSearchParams, ['editPetitionNo']) : '';
   const productionRequesterEmail = getQueryValue(effectiveSearchParams, ['requesterEmail', 'requester_email', 'email']);
   // QC รายวันที่ฝ่ายผลิตเลือก → "สุ่มโดย" บนป้าย และผู้นำส่งที่ /scanner
   const sampledBy = useMemo(() => {
@@ -969,14 +971,19 @@ export default function ProductionPetitionNewPage({
         } : undefined,
         cause: '',
         revisionOf: revisionOfId || undefined,
+        replacePetitionNo: editPetitionNo || undefined,
       };
-      const created = await createPetition(payload as Parameters<typeof createPetition>[0]);
+      const created = await createPetition(payload as Parameters<typeof createPetition>[0]) as Petition & { existingLabRequestId?: string | null };
 
       if (labBatches.length > 0 && labRequest) {
         try {
-          await createLabRequest({ ...labRequest, petitionId: created._id });
+          if (created.existingLabRequestId) {
+            await updateLabRequest(created.existingLabRequestId, labRequest as Parameters<typeof updateLabRequest>[1]);
+          } else {
+            await createLabRequest({ ...labRequest, petitionId: created._id });
+          }
         } catch (e) {
-          setError(`สร้างใบคำขอรับบริการไม่สำเร็จ: ${e instanceof Error ? e.message : 'unknown'}`);
+          setError(`${created.existingLabRequestId ? 'แก้ไข' : 'สร้าง'}ใบคำขอรับบริการไม่สำเร็จ: ${e instanceof Error ? e.message : 'unknown'}`);
         }
       }
       if (publicMode) {
@@ -1012,7 +1019,7 @@ export default function ProductionPetitionNewPage({
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-green-600" />
                 <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-foreground">สร้างคำขอเรียบร้อย</h2>
+                  <h2 className="text-lg font-semibold text-foreground">{editPetitionNo ? 'บันทึกการแก้ไขคำขอเรียบร้อย' : 'สร้างคำขอเรียบร้อย'}</h2>
                   <p className="text-sm text-muted-foreground">
                     เลขที่คำขอ: <span className="font-semibold text-foreground">{createdPetition.petitionNo}</span>
                   </p>
@@ -1061,6 +1068,11 @@ export default function ProductionPetitionNewPage({
                   </p>
                 )}
                 <p className="text-blue-800">Please review the imported sample data before saving.</p>
+                {editPetitionNo && (
+                  <p className="font-medium text-orange-700">
+                    แก้ไขคำขอ <span className="font-semibold">{editPetitionNo}</span> — ตรวจรายการอีกครั้งแล้วกดบันทึก ระบบจะบันทึกทับใบเดิมและให้พิมพ์สติกเกอร์ใหม่
+                  </p>
+                )}
                 {sampledBy && (
                   <p>
                     สุ่มโดย (QC รายวัน): <span className="font-semibold">{sampledBy.name}</span>

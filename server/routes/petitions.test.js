@@ -316,3 +316,51 @@ test('latestDeliverableRevision follows repeated rejected resubmissions', async 
     Petition.findOne = originalFindOne;
   }
 });
+
+
+// Production แก้คำขอที่อยู่ใน LIS แล้วแบบเพิ่ม/ลดรายการ → บันทึกทับใบเดิม ไม่สร้างใบใหม่
+test('POST / with replacePetitionNo overwrites the existing production petition instead of creating one', async () => {
+  const LabRequest = require('../models/LabRequest');
+  const originals = { findOne: Petition.findOne, findOneAndUpdate: Petition.findOneAndUpdate, create: Petition.create, labFindOne: LabRequest.findOne };
+  const existing = {
+    _id: 'p1', petitionNo: 'P-2611-0001', status: 'deliveringQC', __v: 3,
+    submittedBy: { name: 'Prod', department: 'ผลิต 01' },
+    productionWorkflow: { requestNo: 'SA1' },
+    items: [{ seq: 1, sampleName: 'A', batchNo: 'B-1', sampleId: 'S-1' }],
+  };
+  existing.toObject = () => existing;
+  let update;
+  let created = false;
+  try {
+    Petition.findOne = async () => existing;
+    Petition.findOneAndUpdate = async (query, change) => {
+      assert.deepEqual(query, { _id: 'p1', status: 'deliveringQC', __v: 3 });
+      update = change.$set;
+      const saved = { ...existing, ...change.$set };
+      return { ...saved, toObject: () => saved };
+    };
+    Petition.create = async () => { created = true; };
+    LabRequest.findOne = () => ({ sort: () => ({ lean: async () => null }) });
+    const items = [
+      { seq: 1, sampleName: 'A', commonName: 'A', batchNo: 'B-1', productionDate: '2026-11-03', sendToQc: true, sendToLab: false },
+      { seq: 2, sampleName: 'A', commonName: 'A', batchNo: 'B-2', productionDate: '2026-11-03', sendToQc: true, sendToLab: false },
+    ];
+    const body = { dept: 'production', submittedBy: { name: 'Prod', department: 'ผลิต 01' }, items, replacePetitionNo: 'P-2611-0001', productionWorkflow: { requestNo: 'SA1' } };
+    const res = await invoke('/', 'post', { body });
+    assert.equal(res.statusCode, 200);
+    assert.equal(created, false);
+    assert.equal(res.body.petitionNo, 'P-2611-0001');
+    assert.deepEqual(update.items.map((it) => it.batchNo), ['B-1', 'B-2']);
+    assert.equal(update.items[0].sampleId, 'S-1');
+    assert.equal(res.body.existingLabRequestId, null);
+
+    const mismatch = await invoke('/', 'post', { body: { ...body, productionWorkflow: { requestNo: 'OTHER' } } });
+    assert.equal(mismatch.statusCode, 403);
+  } finally {
+    Petition.findOne = originals.findOne;
+    Petition.findOneAndUpdate = originals.findOneAndUpdate;
+    Petition.create = originals.create;
+    LabRequest.findOne = originals.labFindOne;
+  }
+});
+
