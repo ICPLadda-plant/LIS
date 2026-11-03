@@ -180,7 +180,7 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
                         </div>
                         <div className="pr-terms-item">
                           <span className="pr-terms-num">2.</span>
-                          <span>การรายงานผลทดสอบจะไม่มีบริการด้านการให้ความเห็น และการแปรผลไม่ตัดสินผล</span>
+                          <span>การรายงานผลทดสอบจะไม่ระบุการให้ความเห็น การแปลผล การตัดสินผล และการรายงานที่ระบุการเป็นไปตามข้อกำหนด</span>
                         </div>
                         <div className="pr-terms-item">
                           <span className="pr-terms-num">3.</span>
