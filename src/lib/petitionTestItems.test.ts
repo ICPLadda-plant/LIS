@@ -200,6 +200,17 @@ describe('warehouse category (RM/FG) scoping', () => {
     expect(matchParametersForItem({ ...item, itemNo: 'R-1000' }, [param], [], { petitionCategory: 'FG' })).toEqual([]);
   });
 
+  it('treats production bulk codes (RS-/RSPH-) on FG petitions as FG so Lab %AI still applies', () => {
+    const param = makeParam({ scope: 'lab', applyAll: false, categories: ['FG'] });
+    const item = makeItem({ itemNo: 'RS-BTC4-24D3_76', sendToQc: true, sendToLab: true, testItems: '' });
+    const fg = { petitionCategory: getPetitionCategory({ dept: 'production' }) };
+
+    expect(matchParametersForItem(item, [param], [], fg)).toEqual([param]);
+    expect(matchParametersForItem({ ...item, itemNo: 'RSPH-BML0_005-RD' }, [param], [], fg)).toEqual([param]);
+    // ไม่รู้ฝ่ายของคำขอ (เช่นหน้าตั้งค่า) ยังจับคลังตามรหัส RS = RM เหมือนเดิม
+    expect(matchParametersForItem(item, [param])).toEqual([]);
+  });
+
   // หมวดหมู่ทำหน้าที่เป็น "ประตู" (AND) ไม่ใช่มิติ OR ตัวที่หก — ตรงกับหน้าจอ
   // ที่ให้เลือกหมวดหมู่ย่อยได้ต่อเมื่อเลือก RM/FG แล้ว
   it('matches a category-only param by item code warehouse', () => {

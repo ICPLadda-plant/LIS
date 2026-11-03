@@ -33,6 +33,13 @@ export function getItemWarehouseCategory(item: PetitionItem): 'RM' | 'FG' | '' {
   return '';
 }
 
+// รหัส RS-/RSPH- คือสินค้า bulk ที่ฝ่ายผลิตผลิตเอง รหัสขึ้นต้นด้วย R จึงถูกนับเป็นคลัง RM
+// แต่เมื่อมากับคำขอฝั่ง FG (ฝ่ายผลิต/FG) ต้องตรวจแบบสินค้า FG เช่น %AI ของ Lab
+function petitionItemCategory(item: PetitionItem, petitionCategory: PetitionCategory): string {
+  if (petitionCategory === 'FG' && getItemSubCategory(item).startsWith('RS')) return 'FG';
+  return getItemWarehouseCategory(item) || petitionCategory;
+}
+
 // "หมวดหมู่ย่อย" ครอบคลุมทุก code ที่ขึ้นต้นด้วย prefix ที่เลือก — เลือก RO ได้ ROLS/ROPH
 // ด้วย (ตรงกับข้อความกำกับในหน้า Parameter Settings)
 function subCategoryMatches(prefixes: string[] | undefined, subCategory: string): boolean {
@@ -112,7 +119,7 @@ export function facetsForPetitionItem(
     productType: getItemProductType(item),
     subCategory: getItemSubCategory(item),
     itemGroupIds,
-    category: getItemWarehouseCategory(item) || petitionCategory,
+    category: petitionItemCategory(item, petitionCategory),
   };
 }
 
