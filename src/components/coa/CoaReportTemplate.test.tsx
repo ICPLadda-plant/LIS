@@ -4,6 +4,11 @@ import CoaReportTemplate, { COA_REPORT_CSS } from "./CoaReportTemplate";
 import { buildCoaReportPages, type CoaReportPage } from "@/lib/coaReport";
 
 describe("CoaReportTemplate", () => {
+  it("uses the ICP letterhead template only on the final COA page", () => {
+    expect(COA_REPORT_CSS).toContain(".coa-page:last-child");
+    expect(COA_REPORT_CSS).toContain("coa-final-page-template.png");
+  });
+
   it.each(["GLYPHOSATE 48% SL", "EMAMECTIN BENZOATE 2% W/V ME", "Product 2% GR", "BROMADIOLONE 0.005%", "Other product"])(
     "renders only selected parameter results in the existing %s form",
     (commonName) => {

@@ -1,5 +1,6 @@
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import SIRIPICH_SIGNATURE_URL from "@/assets/siripich-signature.png";
+import COA_FINAL_PAGE_TEMPLATE_URL from "@/assets/coa-final-page-template.png";
 import type { CoaReportPage, CoaReportSample } from "@/lib/coaReport";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
@@ -40,6 +41,7 @@ export const COA_REPORT_CSS = `
 .coa-brom-table th:nth-child(2), .coa-brom-table td:nth-child(2) { width: 34%; }
 .coa-brom-table th:nth-child(3), .coa-brom-table td:nth-child(3) { width: 24%; }
 .coa-brom-sign { margin-top: 30mm; margin-left: auto; width: 78mm; text-align: center; line-height: 1.55; }
+.coa-page:last-child { padding-top: 42mm; padding-bottom: 40mm; background: #fff url("${COA_FINAL_PAGE_TEMPLATE_URL}") center / 100% 100% no-repeat; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 @media screen { .coa-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 .coa-root h1, .coa-root th, .coa-title, .print-heading { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT} !important; }
 `;
