@@ -45,6 +45,7 @@ const {
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
 const { canEditWholePetition } = require('../lib/productionPetitionEdit');
+const { sendProductionCancel } = require('../lib/productionCallback');
 
 function sampleIdsFromPetition(petition) {
   if (!petition || !Array.isArray(petition.items)) return [];
@@ -1793,28 +1794,85 @@ router.post('/:id/review', serializePetitionWrite(async (req, res) => {
   }
 }));
 
+async function softDeletePetitionTree(doc, actor) {
+  await doc.softDelete(actor);
+  const sampleIds = sampleIdsFromPetition(doc);
+  if (sampleIds.length > 0) {
+    await Promise.all([
+      Sample.softDeleteMany({ id: { $in: sampleIds } }, actor),
+      PhysicalResult.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
+      Approval.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
+      RealtimeDensity.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
+    ]);
+  }
+}
+
+// คำขอจาก Production: แจ้ง Production ก่อน ถ้าแจ้งไม่สำเร็จจะไม่ยกเลิก/ลบ เพื่อให้สองระบบตรงกัน
+async function notifyProductionCancelled(res, doc, info) {
+  if (!doc.productionWorkflow?.requestNo) return true;
+  try {
+    await sendProductionCancel(doc, info);
+    return true;
+  } catch (err) {
+    res.status(502).json({ error: { message: `แจ้งยกเลิกไปที่ Production ไม่สำเร็จ: ${err.message}` } });
+    return false;
+  }
+}
+
+function canCancelPetition(user, petition) {
+  const roles = normalizeRoles(user);
+  if (roles.some((role) => ['admin', 'qc-head', 'lab-head'].includes(role))) return true;
+  if (petition.status !== 'deliveringQC') return false;
+  if (user.employeeId && user.employeeId === petition.submittedBy?.employeeId) return true;
+  const email = String(user.email || '').toLowerCase();
+  return !!email && email === String(petition.productionWorkflow?.requesterEmail || '').toLowerCase();
+}
+
+// POST /api/petitions/:id/cancel  { reason } — LIS ยกเลิกคำขอ แจ้ง Production แล้วนำออกจากคิวงาน
+router.post('/:id/cancel', serializePetitionWrite(async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return badRequest(res, 'กรุณาระบุเหตุผลที่ยกเลิกคำขอ');
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    const doc = await Petition.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (!canCancelPetition(user, doc)) {
+      return res.status(403).json({ error: { message: 'เฉพาะ Admin, หัวหน้า QC หรือหัวหน้า Lab ที่ยกเลิกคำขอได้' } });
+    }
+    if (doc.status === 'approved') return res.status(409).json({ error: { message: 'คำขอนี้ออกผลแล้ว ยกเลิกไม่ได้' } });
+    const actor = user.name || user.email;
+    const at = new Date();
+    if (!(await notifyProductionCancelled(res, doc, { reason, actor, at }))) return;
+    doc.cancellation = { reason, by: actor, at };
+    logAudit(doc, {
+      event: 'deleted',
+      fromStatus: doc.status,
+      actor,
+      note: `ยกเลิกคำขอ: ${reason}`,
+      metadata: { type: 'cancelled', reason, productionRequestNo: doc.productionWorkflow?.requestNo },
+    });
+    await softDeletePetitionTree(doc, actor);
+    res.json({ success: true, petitionNo: doc.petitionNo, cancellation: doc.cancellation });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+}));
+
 // DELETE /api/petitions/:id
 router.delete('/:id', async (req, res) => {
   try {
     const actor = req.query.actor || (req.body && req.body.actor) || 'system';
     const doc = await Petition.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (!(await notifyProductionCancelled(res, doc, { reason: 'ลบคำร้องใน LIS', actor }))) return;
     logAudit(doc, {
       event: 'deleted',
       fromStatus: doc.status,
       actor,
       note: 'ลบคำร้อง',
     });
-    await doc.softDelete(actor);
-    const sampleIds = sampleIdsFromPetition(doc);
-    if (sampleIds.length > 0) {
-      await Promise.all([
-        Sample.softDeleteMany({ id: { $in: sampleIds } }, actor),
-        PhysicalResult.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-        Approval.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-        RealtimeDensity.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-      ]);
-    }
+    await softDeletePetitionTree(doc, actor);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });

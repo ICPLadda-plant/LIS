@@ -70,9 +70,24 @@ function buildCallbackBody(petition) {
   };
 }
 
-async function sendProductionStatus(petition) {
+// LIS ยกเลิกคำขอ → Production เปลี่ยนคำขอเป็น cancelled พร้อมเหตุผล
+function buildCancelCallbackBody(petition, { reason, actor, at } = {}) {
+  const requestNo = String(petition?.productionWorkflow?.requestNo || '').trim();
+  if (!requestNo) return null;
+  const why = String(reason || '').trim();
+  return {
+    request_no: requestNo,
+    petition_no: petition.petitionNo,
+    lis_status: 'cancelled',
+    result_summary: `LIS ${petition.petitionNo}: ยกเลิกคำขอ${why ? ` — ${why}` : ''}`,
+    cancel_reason: why,
+    cancelled_by: String(actor || '').trim(),
+    cancelled_at: (at ? new Date(at) : new Date()).toISOString(),
+  };
+}
+
+async function postProductionCallback(body) {
   const url = callbackUrl();
-  const body = buildCallbackBody(petition);
   if (!url || !body) return { skipped: true };
   const raw = JSON.stringify(body);
   const headers = { 'Content-Type': 'application/json' };
@@ -88,6 +103,14 @@ async function sendProductionStatus(petition) {
   }
   if (!json.updated) console.warn('[productionCallback] ไม่พบ request_no ใน Production:', body.request_no);
   return { ...json, lis_status: body.lis_status };
+}
+
+function sendProductionStatus(petition) {
+  return postProductionCallback(buildCallbackBody(petition));
+}
+
+function sendProductionCancel(petition, info) {
+  return postProductionCallback(buildCancelCallbackBody(petition, info));
 }
 
 // โหลด petition ล่าสุด แล้วส่งถ้าสถานะหรือรอบตัวอย่างเพิ่มเปลี่ยน
@@ -116,4 +139,18 @@ function notifyProductionOnEvent(petition) {
   }, 1500);
 }
 
-module.exports = { deriveProductionStatus, buildCallbackBody, sendProductionStatus, syncPetition, notifyProductionOnEvent };
+// approvals ยังเรียกแจ้งราย batch อยู่ — สถานะทั้งใบคำนวณใหม่จาก petition ล่าสุดอยู่แล้ว จึงส่งต่อให้ sync ปกติ
+function notifyProductionBatches(petition) {
+  notifyProductionOnEvent(petition);
+}
+
+module.exports = {
+  deriveProductionStatus,
+  buildCallbackBody,
+  buildCancelCallbackBody,
+  sendProductionStatus,
+  sendProductionCancel,
+  syncPetition,
+  notifyProductionOnEvent,
+  notifyProductionBatches,
+};

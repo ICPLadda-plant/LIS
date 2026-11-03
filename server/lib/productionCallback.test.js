@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { deriveProductionStatus, buildCallbackBody } = require('./productionCallback');
+const { deriveProductionStatus, buildCallbackBody, buildCancelCallbackBody } = require('./productionCallback');
 
 const base = { petitionNo: 'P-1', productionWorkflow: { requestNo: 'SA1' }, items: [{ seq: 1, sampleName: 'A', batchNo: 'B1', sendToLab: true }] };
 const s = (o) => deriveProductionStatus({ ...base, ...o });
@@ -45,5 +45,16 @@ test('callback ส่งรายการตัวอย่างที่ข�
   assert.equal(body.lis_status, 'more_sample');
   assert.deepEqual(body.more_sample.items[0], { item_seq: 1, quantity: 2, sample_name: 'A', batch_no: 'B1', lot_no: '', sent_amount: null, sent_unit: null });
   assert.equal(buildCallbackBody({ ...base, productionWorkflow: undefined, status: 'approved' }), null);
+});
+
+test('ยกเลิกคำขอ: ส่ง cancelled พร้อมเหตุผล ผู้ยกเลิก และเวลา', () => {
+  const at = new Date('2026-11-03T03:00:00Z');
+  const body = buildCancelCallbackBody({ ...base, status: 'pendingReview' }, { reason: 'ส่งคำขอซ้ำ', actor: 'หัวหน้า QC', at });
+  assert.equal(body.request_no, 'SA1');
+  assert.equal(body.lis_status, 'cancelled');
+  assert.equal(body.cancel_reason, 'ส่งคำขอซ้ำ');
+  assert.equal(body.cancelled_by, 'หัวหน้า QC');
+  assert.equal(body.cancelled_at, at.toISOString());
+  assert.equal(buildCancelCallbackBody({ ...base, productionWorkflow: undefined }, { reason: 'x' }), null);
 });
 

@@ -12,7 +12,9 @@ import {
   Sparkles,
   Trash2,
   UserCheck,
+  XCircle,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
 import PageHeader from '@/components/lis/PageHeader';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
@@ -169,6 +171,9 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
   const groupMembership = useItemGroupMembership();
   const { data: labRequests } = useLabRequestsByPetition(data?._id);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   const [editReasonOpen, setEditReasonOpen] = useState(false);
   const [editReasonType, setEditReasonType] = useState('กรอกผลผิด');
   const [editReasonOther, setEditReasonOther] = useState('');
@@ -256,6 +261,20 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
     }
   }
 
+  async function handleCancel() {
+    if (!data || !cancelReason.trim()) return;
+    setCancelling(true);
+    try {
+      await api.cancelPetition(data._id, cancelReason.trim());
+      toast.success(`ยกเลิกคำขอ ${data.petitionNo} แล้ว`, { description: 'แจ้งสถานะยกเลิกไปที่ระบบ Production แล้ว' });
+      refetchSamples();
+      navigate('/petition', { replace: true });
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : 'ยกเลิกคำขอไม่สำเร็จ');
+      setCancelling(false);
+    }
+  }
+
   return (
     <AppLayout
       className="print:block print:min-h-0 print:bg-white"
@@ -274,7 +293,14 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
           const isQcHead = normalizeRoles(user).includes('qc-head');
           const isRequester = user?.name === data.submittedBy?.name;
           const canEdit = data.status === 'deliveringQC' && isRequester;
-          const canDelete = isAdmin || (data.status === 'deliveringQC' && isRequester);
+          const fromProduction = !!data.productionWorkflow?.requestNo;
+          const roles = normalizeRoles(user);
+          const canCancel = fromProduction && data.status !== 'approved' && (
+            roles.some((role) => ['admin', 'qc-head', 'lab-head'].includes(role)) ||
+            (data.status === 'deliveringQC' && isRequester)
+          );
+          // คำขอจาก Production ใช้ "ยกเลิกคำขอ" (มีเหตุผลและแจ้ง Production) แทนการลบ
+          const canDelete = !fromProduction && (isAdmin || (data.status === 'deliveringQC' && isRequester));
           const hasLabRequests = (labRequests?.length ?? 0) > 0;
           const serviceLabRequest = serviceLabRequestFor(data, labRequests);
           const isResultMode = mode === 'result';
@@ -388,6 +414,16 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                         <Button variant="primary-outline" size="sm" onClick={() => setEditReasonOpen(true)}>
                           <Pencil className="h-4 w-4" />
                           แก้ไขผล (QC Head)
+                        </Button>
+                      )}
+                      {!isResultMode && canCancel && (
+                        <Button
+                          variant="danger-outline"
+                          size="sm"
+                          onClick={() => { setCancelReason(''); setCancelOpen(true); }}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          ยกเลิกคำขอ
                         </Button>
                       )}
                       {!isResultMode && canDelete && (
@@ -509,6 +545,46 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                         className="bg-destructive hover:bg-destructive/90"
                       >
                         {deleting ? 'กำลังลบ...' : 'ยืนยัน'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <AlertDialog
+                  open={cancelOpen}
+                  onOpenChange={(open) => {
+                    if (!open && !cancelling) setCancelOpen(false);
+                  }}
+                >
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>ยกเลิกคำขอ {data.petitionNo}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        ระบบจะแจ้งระบบ Production ว่า LIS ยกเลิกคำขอ {data.productionWorkflow?.requestNo} พร้อมเหตุผลนี้
+                        และนำคำขอออกจากคิวงาน LIS — ย้อนกลับไม่ได้
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <label className="space-y-1 text-sm font-medium">
+                      เหตุผลที่ยกเลิก
+                      <textarea
+                        className="min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        placeholder="เช่น ตัวอย่างไม่ครบ, ส่งคำขอซ้ำ"
+                        value={cancelReason}
+                        onChange={(e) => setCancelReason(e.target.value)}
+                        disabled={cancelling}
+                      />
+                    </label>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={cancelling}>ปิด</AlertDialogCancel>
+                      <AlertDialogAction
+                        disabled={cancelling || !cancelReason.trim()}
+                        className="bg-red-500 text-white hover:bg-red-600"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleCancel();
+                        }}
+                      >
+                        {cancelling ? 'กำลังยกเลิก...' : 'ยืนยันยกเลิกคำขอ'}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

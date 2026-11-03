@@ -208,6 +208,12 @@ const PetitionSchema = new mongoose.Schema(
     labExpected: { type: mongoose.Schema.Types.Mixed, default: null },
     prodOrderNos: { type: [String], default: [], index: true },
     productionWorkflow: ProductionWorkflowSchema,
+    // LIS ยกเลิกคำขอ (routes/petitions.js POST /:id/cancel) — เอกสารถูก soft delete ต่อทันที
+    cancellation: {
+      reason: String,
+      by: String,
+      at: Date,
+    },
     additionalSampleRequests: {
       type: [new mongoose.Schema({
         qrCode: { type: String, required: true },

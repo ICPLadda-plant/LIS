@@ -928,6 +928,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ actor, note }),
     }),
+  cancelPetition: (petitionId: string, reason: string) =>
+    request<{ success: true; petitionNo: string }>(`/petitions/${petitionId}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
   approvePetition: (
     petitionId: string,
     actor: string,
