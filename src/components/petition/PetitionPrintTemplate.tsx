@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { customerCodeForPetition } from '@/lib/customerCode';
@@ -29,20 +30,66 @@ function splitBuddhist(iso?: string | null): { d: string; m: string; y: string }
   };
 }
 
+/** ช่องข้อความที่พิมพ์เพิ่มได้ในหน้าตัวอย่างก่อนพิมพ์ ค่าที่พิมพ์อยู่ใน DOM จึงติดไปกับเอกสารที่ส่งพิมพ์ */
+function EditableText({ value, className, style }: { value?: string | null; className: string; style?: CSSProperties }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.textContent = value ?? '';
+  }, [value]);
+  return (
+    <span
+      ref={ref}
+      className={`${className} pr-edit`}
+      style={style}
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.preventDefault();
+      }}
+      onPaste={(e) => {
+        e.preventDefault();
+        const pasted = e.clipboardData.getData('text/plain').replace(/\s+/g, ' ');
+        document.execCommand('insertText', false, pasted);
+      }}
+    />
+  );
+}
+
+/** ช่องติ๊กที่กดสลับได้ในหน้าตัวอย่างก่อนพิมพ์ เริ่มจากค่าที่บันทึกไว้ในระบบ */
+function useToggle(checked?: boolean) {
+  const [on, setOn] = useState(!!checked);
+  useEffect(() => setOn(!!checked), [checked]);
+  const toggle = () => setOn((v) => !v);
+  return {
+    on,
+    props: {
+      role: 'checkbox' as const,
+      'aria-checked': on,
+      tabIndex: 0,
+      onClick: toggle,
+      onKeyDown: (e: KeyboardEvent<HTMLSpanElement>) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          toggle();
+        }
+      },
+    },
+  };
+}
+
 function CB({ checked }: { checked?: boolean }) {
-  return <span className={`pr-cb${checked ? ' pr-cb-x' : ''}`} aria-hidden />;
+  const { on, props } = useToggle(checked);
+  return <span className={`pr-cb pr-toggle${on ? ' pr-cb-x' : ''}`} {...props} />;
 }
 
 function RD({ checked }: { checked?: boolean }) {
-  return <span className={`pr-rd${checked ? ' pr-rd-x' : ''}`} aria-hidden />;
+  const { on, props } = useToggle(checked);
+  return <span className={`pr-rd pr-toggle${on ? ' pr-rd-x' : ''}`} {...props} />;
 }
 
-function Line({ value, width }: { value?: string; width?: string }) {
-  return (
-    <span className="pr-line" style={width ? { minWidth: width } : undefined}>
-      {value || ' '}
-    </span>
-  );
+function Line({ value, width }: { value?: string | null; width?: string }) {
+  return <EditableText className="pr-line" value={value} style={width ? { minWidth: width } : undefined} />;
 }
 
 function reportAddress(lr: LabRequest): string {
@@ -85,13 +132,13 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
         </div>
         <div className="pr-p1-meta-row">
           <b>อ้างอิงใบขอรับบริการเลขที่ TA</b>{' '}
-          <span className="pr-line pr-line-md">{submissionNo}</span>
+          <EditableText className="pr-line pr-line-md" value={submissionNo} />
         </div>
         <div className="pr-p1-meta-row">
           <b>รหัสลูกค้า</b>{' '}
-          <span className="pr-line pr-line-sm">{customerCode}</span>
+          <EditableText className="pr-line pr-line-sm" value={customerCode} />
           <span> / </span>
-          <span className="pr-line pr-line-xs" />
+          <EditableText className="pr-line pr-line-xs" />
         </div>
 
         <div className="pr-p1-notify">
@@ -278,9 +325,7 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
                         <CB checked={isStandardMethod && lar?.acceptable === true} /> พร้อมรับงาน&nbsp;&nbsp;
                         <CB checked={isStandardMethod && lar?.acceptable === false} /> ไม่พร้อมรับงาน&nbsp;เนื่องจาก
                       </span>
-                      <span className="pr-line-fill">
-                        {isStandardMethod && lar?.acceptable === false ? lar?.notAcceptableReason : ' '}
-                      </span>
+                      <EditableText className="pr-line-fill" value={isStandardMethod && lar?.acceptable === false ? lar?.notAcceptableReason : ''} />
                     </div>
 
                     <div className="pr-mt-sm">
@@ -292,9 +337,7 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
                         1.&nbsp;<CB checked={isCustomMethod && lar?.methodSuitable === true} /> เหมาะสม&nbsp;&nbsp;
                         <CB checked={isCustomMethod && lar?.methodSuitable === false} /> ไม่เหมาะสม&nbsp;เนื่องจาก
                       </span>
-                      <span className="pr-line-fill">
-                        {isCustomMethod && lar?.methodSuitable === false ? lar?.methodSuitableReason : ' '}
-                      </span>
+                      <EditableText className="pr-line-fill" value={isCustomMethod && lar?.methodSuitable === false ? lar?.methodSuitableReason : ''} />
                     </div>
                     <div className="pr-ind">
                       2. เครื่องมือทดสอบ (เครื่องมือ <Line width="4cm" value={lar?.equipmentName ?? ''} /> )
@@ -319,9 +362,7 @@ function PageOne({ lr, submissionNo, customerCode }: { lr: LabRequest; submissio
                         <CB checked={isCustomMethod && lar?.acceptable === true} /> พร้อมรับงาน&nbsp;&nbsp;
                         <CB checked={isCustomMethod && lar?.acceptable === false} /> ไม่พร้อมรับงาน&nbsp;เนื่องจาก
                       </span>
-                      <span className="pr-line-fill">
-                        {isCustomMethod && lar?.acceptable === false ? lar?.notAcceptableReason : ' '}
-                      </span>
+                      <EditableText className="pr-line-fill" value={isCustomMethod && lar?.acceptable === false ? lar?.notAcceptableReason : ''} />
                     </div>
                   </div>
 
@@ -375,22 +416,22 @@ function PageTwo({ lr, petition, items, qcResults, sgParam, requestValues = {}, 
           <div className="pr-p2-top-r">
             <div className="pr-p2-sheet">
               <span>แผ่นที่</span>
-              <span className="pr-line-fill pr-center">1</span>
+              <EditableText className="pr-line-fill pr-center" value="1" />
               <span>/</span>
-              <span className="pr-line-fill pr-center">{yearShort}</span>
+              <EditableText className="pr-line-fill pr-center" value={yearShort} />
             </div>
             <div className="pr-p2-infobox">
               <div className="pr-fill-row">
                 <span>เลขที่ขอรับบริการ :</span>
-                <span className="pr-line-fill">{lr.labRequestNo}</span>
+                <EditableText className="pr-line-fill" value={lr.labRequestNo} />
               </div>
               <div className="pr-fill-row">
                 <span>วันที่รับตัวอย่าง :</span>
-                <span className="pr-line-fill">{buddhistShort(sampleReceivedAt)}</span>
+                <EditableText className="pr-line-fill" value={buddhistShort(sampleReceivedAt)} />
               </div>
               <div className="pr-fill-row">
                 <span>เวลา :</span>
-                <span className="pr-line-fill">{receivedTime}</span>
+                <EditableText className="pr-line-fill" value={receivedTime} />
               </div>
             </div>
           </div>
@@ -712,6 +753,13 @@ const PRINT_CSS = `
 .pr-line-xs { min-width: 0.9cm; }
 .pr-line-sm { min-width: 1.8cm; }
 .pr-line-md { min-width: 4.5cm; }
+.pr-edit { min-height: 1em; outline: none; }
+.pr-toggle { cursor: pointer; }
+@media screen {
+  .pr-edit { cursor: text; }
+  .pr-edit:hover, .pr-toggle:hover { background: rgba(37, 99, 235, 0.08); }
+  .pr-edit:focus, .pr-toggle:focus-visible { background: rgba(37, 99, 235, 0.12); outline: 1px dashed #2563eb; }
+}
 .pr-center { text-align: center; }
 .pr-italic { font-style: italic; color: #333; }
 .pr-note { font-size: 9pt; color: #333; }
