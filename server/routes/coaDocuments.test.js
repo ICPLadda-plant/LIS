@@ -484,7 +484,7 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   ]));
 
   assert.equal(docs.length, 1);
-  assert.equal(docs[0]._id, 'external-coa-request-SO26040020-10000');
+  assert.equal(docs[0]._id, 'external-coa-request-SO26040020-10000-outstanding-100');
   assert.equal(docs[0].status, 'requested');
   assert.equal(docs[0].petitionNoSnapshot, 'SO26040020');
   assert.equal(docs[0].customerSnapshot.name, 'Customer A');
@@ -494,7 +494,7 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
     commonName: 'SPIRODICLOFEN 24 % W/V SC',
     batchNo: 'B-CUSTOMER-001',
     lotNo: 'L-CUSTOMER-001',
-    productionDate: '2026-04-18',
+    productionDate: '2026-04-01',
     sampleId: 'FC-CAVAL-1X16',
     condition: '16*1 L',
   });
@@ -502,7 +502,7 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   assert.equal(docs[0].externalCoaRequest.appearance, 'เม็ดยาสีแดง');
 });
 
-test('externalCoaRowsToDocuments keeps the latest ERP update before checking the COA mark', () => {
+test('externalCoaRowsToDocuments keeps separate requests when the outstanding quantity changes', () => {
   const base = { SaleOrderNo: 'SO-LATEST', Line: 10000, ItemNo: 'F-1' };
   const removed = router.externalCoaRowsToDocuments([
     { ...base, UpdateDate: '2026-10-01T08:00:00.000Z', remark: 'ส่งพร้อม COA' },
@@ -516,6 +516,13 @@ test('externalCoaRowsToDocuments keeps the latest ERP update before checking the
   ]);
   assert.equal(latest.sampleSnapshots[0].sampleName, 'Updated name');
   assert.equal(latest.updatedAt, '2026-10-03T08:00:00.000Z');
+
+  const repeated = router.externalCoaRowsToDocuments([
+    { ...base, OutstandingQty: 100, remark: 'COA' },
+    { ...base, OutstandingQty: 40, remark: 'COA' },
+  ]);
+  assert.equal(repeated.length, 2);
+  assert.notEqual(repeated[0]._id, repeated[1]._id);
 });
 
 test('attachDensityToExternalCoaDocuments adds averaged valid Density for the resolved Batch', () => {
@@ -538,7 +545,7 @@ test('attachDensityToExternalCoaDocuments adds averaged valid Density for the re
   }]);
 });
 
-test('enrichExternalCoaDocumentsWithHistory resolves the current Batch before Density lookup', () => {
+test('enrichExternalCoaDocumentsWithHistory does not replace a Batch resolved from ERP Stock', () => {
   const [source] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO-HISTORY', Line: 10000, ItemNo: 'F-1', TradeName: 'Trade A', CommonName: 'COMMON A', remark: 'COA',
   }]);
@@ -546,14 +553,14 @@ test('enrichExternalCoaDocumentsWithHistory resolves the current Batch before De
     ...source,
     sampleSnapshots: [{ ...source.sampleSnapshots[0], batchNo: 'FG261029-021', lotNo: 'FG261029-021' }],
   };
-  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withErpLot], [source], [{
+  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withErpLot], [{
     _id: 'coa-history',
     status: 'approved',
     updatedAt: '2026-10-29T08:00:00.000Z',
     sampleSnapshots: [{ sampleId: 'F-1', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: '013' }],
   }]);
 
-  assert.equal(enriched.sampleSnapshots[0].batchNo, '013');
+  assert.equal(enriched.sampleSnapshots[0].batchNo, 'FG261029-021');
   assert.equal(enriched.sampleSnapshots[0].lotNo, 'FG261029-021');
 });
 
@@ -570,6 +577,18 @@ test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', ()
 
   assert.equal(doc.sampleSnapshots[0].lotNo, 'NEW-26S-BRM0.005-GR(ER)-176-110869');
   assert.equal(doc.sampleSnapshots[0].productionDate, '2026-08-11');
+});
+
+test('externalCoaRowsToDocuments prefers the explicit ERP production date over a date encoded in the lot', () => {
+  const [doc] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26040024',
+    Line: 10000,
+    LotNo: '26S-BRM0.005-GR-176-110869',
+    ProductionDate: '2026-08-12',
+    remark: 'COA',
+  }]);
+
+  assert.equal(doc.sampleSnapshots[0].productionDate, '2026-08-12');
 });
 
 test('enrichExternalCoaDocumentsWithErpLots adds the ERP Lot to a COA request row', () => {

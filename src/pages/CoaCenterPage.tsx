@@ -73,6 +73,15 @@ function batchProductionLabel(sample: CoaSampleSnapshot) {
   return [batch, productionDate].filter(Boolean).join(" / ");
 }
 
+function externalRequestQuantityLabel(doc: CoaDocument) {
+  const request = doc.externalCoaRequest;
+  if (!request) return "-";
+  const unit = request.unit?.trim();
+  const format = (value?: number) => value == null ? "-" : value.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  const suffix = unit ? ` ${unit}` : "";
+  return `ขอ ${format(request.quantity)}${suffix} / คงเหลือ ${format(request.outstandingQty)}${suffix}`;
+}
+
 function customerName(doc: CoaDocument) {
   return doc.customerSnapshot?.name || doc.customerSnapshot?.company || "-";
 }
@@ -832,6 +841,7 @@ export default function CoaCenterPage() {
       customerName(doc),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.sampleName)),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName)),
+      joinValues(doc.sampleSnapshots?.map((sample) => sample.lotNo)),
       joinValues(doc.sampleSnapshots?.map(batchProductionLabel)),
     ].join(" ").toLowerCase().includes(query)), query, (doc) => {
       const samples = doc.sampleSnapshots ?? [];
@@ -915,6 +925,7 @@ export default function CoaCenterPage() {
   const showCompanyColumn = showApprovedCommandColumns;
   const showCommonNameColumn = !showApprovedCommandColumns;
   const showLotColumn = !showApprovedCommandColumns;
+  const showQuantityColumn = showCreateActions;
   const showStatusColumn = activeTab !== "all" && !showInProgressReviewColumns && !showCreateActions && !showApprovedCommandColumns;
   const showCommandColumn = showPrintActions || showCreateActions || showEditActions || showApprovalActions;
   const tableColumnCount = [
@@ -925,6 +936,7 @@ export default function CoaCenterPage() {
     showCompanyColumn,
     showCommonNameColumn,
     showLotColumn,
+    showQuantityColumn,
     showStatusColumn,
     showCommandColumn,
   ].filter(Boolean).length;
@@ -1197,6 +1209,7 @@ export default function CoaCenterPage() {
                   {showCompanyColumn && <th className="px-4 py-3">ชื่อลูกค้า</th>}
                   {showCommonNameColumn && <th className="px-4 py-3">ชื่อสามัญ</th>}
                   {showLotColumn && <th className="px-4 py-3">BATCH No. (แบช + วันที่ผลิตตามฉลาก)</th>}
+                  {showQuantityColumn && <th className="px-4 py-3">จำนวนที่ลูกค้าขอ</th>}
                   {showStatusColumn && <th className="px-4 py-3">สถานะ</th>}
                   {showCommandColumn && <th className="px-4 py-3">คำสั่ง</th>}
                 </tr>
@@ -1250,6 +1263,7 @@ export default function CoaCenterPage() {
                     {showCompanyColumn && <td className="px-4 py-3">{customerName(doc)}</td>}
                     {showCommonNameColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName))}</td>}
                     {showLotColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map(batchProductionLabel))}</td>}
+                    {showQuantityColumn && <td className="whitespace-nowrap px-4 py-3">{externalRequestQuantityLabel(doc)}</td>}
                     {showStatusColumn && (
                       <td className="px-4 py-3">
                         <Badge variant={workflowStageBadgeVariantFor(workflowStageFor(doc))}>

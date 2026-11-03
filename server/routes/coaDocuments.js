@@ -172,6 +172,22 @@ function externalCoaKey(link) {
   return `${link?.saleOrderNo || ''}:${link?.line ?? ''}`;
 }
 
+function externalRequestMatchesDocument(doc, request) {
+  if (doc.externalRequestId && doc.externalRequestId === request._id) return true;
+  if (externalCoaKey(doc.externalCoaRequest) !== externalCoaKey(request.externalCoaRequest)) return false;
+  if (doc.externalCoaRequest?.outstandingQty != null) {
+    return doc.externalCoaRequest.outstandingQty === request.externalCoaRequest?.outstandingQty;
+  }
+  const saved = doc.sampleSnapshots?.[0] || {};
+  const current = request.sampleSnapshots?.[0] || {};
+  if (!current.batchNo && !current.productionDate) return true;
+  if (saved.batchNo || saved.productionDate) {
+    return normalizeCoaMatchValue(saved.batchNo) === normalizeCoaMatchValue(current.batchNo)
+      && normalizeIsoDate(saved.productionDate) === normalizeIsoDate(current.productionDate);
+  }
+  return true;
+}
+
 async function assertExternalCoaRequest(link) {
   if (!link) return;
   const rows = await fetchExternalCoaDocuments();
@@ -382,7 +398,9 @@ function firstExternalValue(row, keys) {
 }
 
 function externalNumber(row, keys) {
-  const value = Number(firstExternalValue(row, keys));
+  const raw = firstExternalValue(row, keys);
+  if (!raw) return undefined;
+  const value = Number(raw);
   return Number.isFinite(value) ? value : undefined;
 }
 
@@ -402,10 +420,12 @@ function isExternalCoaRequest(row) {
 }
 
 function externalCoaRequestId(row) {
+  const outstandingQty = firstExternalValue(row, ['OutstandingQty']);
   return [
     'external-coa-request',
     firstExternalValue(row, ['SaleOrderNo']) || 'no-order',
     firstExternalValue(row, ['Line']) || firstExternalValue(row, ['ItemNo']) || 'no-line',
+    ...(outstandingQty ? ['outstanding', outstandingQty] : []),
   ].map((part) => String(part).replace(/[^A-Za-z0-9_-]+/g, '-')).join('-');
 }
 
@@ -437,9 +457,10 @@ function externalCoaRowToDocument(row) {
   const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
   const lotDescription = externalCoaLotDescription(row);
   const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']) || lotDescription;
-  const productionDate = lotSnapshot(lotNo).productionDate
+  const productionDate = externalCoaProductionDate(row)
+    || lotSnapshot(lotNo).productionDate
     || lotSnapshot(lotDescription).productionDate
-    || externalCoaProductionDate(row);
+    || '';
   const date = externalCoaDate(row);
   const updatedAt = firstExternalValue(row, ['UpdateDate']) || date;
   const sampleSnapshot = {
@@ -551,11 +572,10 @@ function attachDensityToExternalCoaDocuments(documents, densityRows = []) {
   });
 }
 
-function enrichExternalCoaDocumentsWithHistory(documents, sourceDocuments, historyDocuments) {
-  const sourceById = new Map(sourceDocuments.map((doc) => [doc._id, doc]));
+function enrichExternalCoaDocumentsWithHistory(documents, historyDocuments) {
   return documents.map((doc) => {
-    const sourceSample = sourceById.get(doc._id)?.sampleSnapshots?.[0] || {};
-    if (sourceSample.batchNo || sourceSample.lotNo) return doc;
+    const currentSample = doc.sampleSnapshots?.[0] || {};
+    if (currentSample.batchNo || currentSample.lotNo) return doc;
     const history = findBestCoaHistorySample(historyDocuments, doc);
     const historyBatch = manualText(history?.sample?.batchNo || history?.sample?.lotNo);
     if (!historyBatch || !doc.sampleSnapshots?.length) return doc;
@@ -921,25 +941,24 @@ router.get('/', async (req, res) => {
       : [];
     const externalRowsWithCurrentBatch = enrichExternalCoaDocumentsWithHistory(
       enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences),
-      externalRows,
       externalCoaHistory,
     );
     const enrichedExternalRows = await enrichExternalCoaDocumentsWithDensity(externalRowsWithCurrentBatch).catch((error) => {
       console.warn('[coa-documents] Density sync failed:', error.message);
       return externalRowsWithCurrentBatch;
     });
-    const linkedExternalKeys = new Set(externalRows.length
+    const linkedExternalRequests = externalRows.length
       ? (await CoaDocument.find({
           'externalCoaRequest.saleOrderNo': { $in: externalRows.map((row) => row.externalCoaRequest.saleOrderNo) },
           status: { $nin: ['cancelled', 'superseded', 'rejected'] },
-        }).sort({ updatedAt: -1 }).lean()).map((doc) => externalCoaKey(doc.externalCoaRequest))
-      : []);
+        }).sort({ updatedAt: -1 }).lean())
+      : [];
     res.json({
       items: sortCoaRows([
         ...documents,
         ...requestedRows,
         ...filterExternalCoaDocuments(enrichedExternalRows, req.query)
-          .filter((row) => !linkedExternalKeys.has(externalCoaKey(row.externalCoaRequest))),
+          .filter((row) => !linkedExternalRequests.some((doc) => externalRequestMatchesDocument(doc, row))),
       ]),
     });
   } catch (error) {
