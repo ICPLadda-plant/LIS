@@ -14,6 +14,7 @@ import LabRequestStep, { type LabRequestRowValues } from '@/components/petition/
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
 import { createPetition, createLabRequest } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveHrEmployeeName, useEmployeeOptions } from '@/hooks/useExternalLookups';
 import { api } from '@/lib/api';
 import { canPrintSampleLabel } from '@/lib/petitionPrintability';
 import {
@@ -700,18 +701,27 @@ export default function ProductionPetitionNewPage({
     email: integrationMode ? integrationActor.email : '',
   });
   const [delivererTouched, setDelivererTouched] = useState(false);
+  const { options: hrEmployees } = useEmployeeOptions();
 
   // Re-sync submitter when user auth resolves (read-only — always match logged-in user)
+  // ชื่อผู้ยื่นใช้ชื่อภาษาไทยจากรายชื่อ HR (จับคู่ด้วยอีเมล) ถ้าไม่พบใช้ชื่อจากบัญชี
   useEffect(() => {
     if (integrationMode) {
-      setSubmitter(integrationActor);
+      setSubmitter({
+        ...integrationActor,
+        name: resolveHrEmployeeName(hrEmployees, integrationActor.email, integrationActor.name),
+      });
       if (!delivererTouched) {
         setDeliverer(integrationActor);
       }
     } else if (user?.name) {
-      setSubmitter({ employeeId: user.id ?? '', name: user.name, email: user.email ?? '' });
+      setSubmitter({
+        employeeId: user.id ?? '',
+        name: resolveHrEmployeeName(hrEmployees, user.email, user.name),
+        email: user.email ?? '',
+      });
     }
-  }, [user?.id, user?.name, delivererTouched, integrationMode, integrationActor]);
+  }, [user?.id, user?.name, user?.email, delivererTouched, integrationMode, integrationActor, hrEmployees]);
 
   const [items, setItems] = useState<ItemRowValues[]>(() =>
     initialQueryItems.length ? initialQueryItems : [makeBlankItem(1)],

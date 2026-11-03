@@ -169,6 +169,17 @@ function normalizeEmployeeOptions(payload: unknown): EmployeeOption[] {
     .filter((option) => option.name);
 }
 
+/** หาชื่อพนักงาน (ภาษาไทย) จากรายชื่อ HR ด้วยอีเมล ถ้าไม่พบคืนชื่อเดิม */
+export function resolveHrEmployeeName(
+  options: EmployeeOption[],
+  email: string | null | undefined,
+  fallbackName: string,
+): string {
+  const normalizedEmail = (email ?? '').trim().toLowerCase();
+  if (!normalizedEmail) return fallbackName;
+  return options.find((option) => option.email === normalizedEmail)?.name || fallbackName;
+}
+
 function isInactiveEmployee(row: Record<string, unknown>): boolean {
   const active = row.is_active ?? row.active ?? row.status;
   if (active !== undefined && active !== null) {
