@@ -564,6 +564,28 @@ test('enrichExternalCoaDocumentsWithHistory does not replace a Batch resolved fr
   assert.equal(enriched.sampleSnapshots[0].lotNo, 'FG261029-021');
 });
 
+test('enrichExternalCoaDocumentsWithHistory keeps the production date paired with the historical Batch', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-HISTORY-DATE', Line: 10000, ItemNo: 'F-1', TradeName: 'Trade A', CommonName: 'COMMON A', remark: 'COA',
+  }]);
+  const withMfDate = {
+    ...source,
+    sampleSnapshots: [{ ...source.sampleSnapshots[0], productionDate: '2026-10-02' }],
+  };
+  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withMfDate], [{
+    _id: 'coa-history',
+    status: 'approved',
+    updatedAt: '2026-10-03T08:00:00.000Z',
+    sampleSnapshots: [{
+      sampleId: 'F-1', sampleName: 'Trade A', commonName: 'COMMON A',
+      batchNo: '013', productionDate: '2026-09-23',
+    }],
+  }]);
+
+  assert.equal(enriched.sampleSnapshots[0].batchNo, '013');
+  assert.equal(enriched.sampleSnapshots[0].productionDate, '2026-09-23');
+});
+
 test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', () => {
   const [doc] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO26040022',

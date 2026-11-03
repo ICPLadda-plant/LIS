@@ -579,10 +579,16 @@ function enrichExternalCoaDocumentsWithHistory(documents, historyDocuments) {
     const history = findBestCoaHistorySample(historyDocuments, doc);
     const historyBatch = manualText(history?.sample?.batchNo || history?.sample?.lotNo);
     if (!historyBatch || !doc.sampleSnapshots?.length) return doc;
+    const historyProductionDate = normalizeIsoDate(history?.sample?.productionDate)
+      || lotSnapshot(history?.sample?.lotNo || historyBatch).productionDate;
     return {
       ...doc,
       sampleSnapshots: doc.sampleSnapshots.map((sample, index) => (
-        index === 0 ? { ...sample, batchNo: historyBatch } : sample
+        index === 0 ? {
+          ...sample,
+          batchNo: historyBatch,
+          ...(historyProductionDate ? { productionDate: historyProductionDate } : {}),
+        } : sample
       )),
     };
   });
