@@ -718,12 +718,14 @@ export default function ProductionPetitionNewPage({
   // ชื่อผู้ยื่นใช้ชื่อภาษาไทยจากรายชื่อ HR (จับคู่ด้วยอีเมล) ถ้าไม่พบใช้ชื่อจากบัญชี
   useEffect(() => {
     if (integrationMode) {
-      setSubmitter({
+      // production ส่งชื่อจากบัญชีของตัวเองมา (มักเป็นภาษาอังกฤษ) → ใช้ชื่อไทยจาก HR ทั้งผู้ยื่นและผู้นำส่ง
+      const resolvedActor = {
         ...integrationActor,
         name: resolveHrEmployeeName(hrEmployees, integrationActor.email, integrationActor.name),
-      });
+      };
+      setSubmitter(resolvedActor);
       if (!delivererTouched) {
-        setDeliverer(integrationActor);
+        setDeliverer(resolvedActor);
       }
     } else if (user?.name) {
       setSubmitter({

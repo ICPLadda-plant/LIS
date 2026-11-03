@@ -157,8 +157,11 @@ router.post('/sso', async (req, res) => {
     let user = await User.findOne({ email: normalizedEmail });
 
     if (user) {
-      user.name = String(payload.name || '').trim() || user.name || normalizedEmail;
-      user.department = String(payload.dept || '').trim() || user.department || 'Unassigned';
+      // ผูกกับพนักงาน HR แล้ว → ชื่อ/แผนกจาก HR (ภาษาไทย) เป็นหลัก ไม่ให้ชื่อจาก production เขียนทับ
+      if (!user.employeeId) {
+        user.name = String(payload.name || '').trim() || user.name || normalizedEmail;
+        user.department = String(payload.dept || '').trim() || user.department || 'Unassigned';
+      }
       user.position = user.position || 'Unassigned';
       if (!user.authProvider || user.authProvider === 'local') user.authProvider = 'production';
       user.lastActive = now;
