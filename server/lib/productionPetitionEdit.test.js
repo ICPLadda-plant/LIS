@@ -1,4 +1,5 @@
 const {
+  applyItemNotes,
   buildEditedItems,
   canEditWholePetition,
   replaceProductionNote,
@@ -47,6 +48,27 @@ describe('productionPetitionEdit', () => {
     expect(replaceProductionNote('MF: X | Item: A | MF: X | Priority: urgent', 'ใหม่'))
       .toBe('ใหม่ | Item: A | MF: X | Priority: urgent');
     expect(replaceProductionNote('เก่า | Item: A', '')).toBe('Item: A');
+  });
+
+  test('uses each row note when production sends notes per batch', () => {
+    const items = buildEditedItems([], [
+      { sampleName: 'A', batchNo: 'B1', qty: '10', unit: 'G', note: 'โน้ต B1', itemNo: 'RS-1' },
+      { sampleName: 'A', batchNo: 'B2', qty: '10', unit: 'G', note: '', itemNo: 'RS-1' },
+    ], { note: 'ของคำขอ', petitionNo: 'P1' });
+    expect(items.map((it) => it.note)).toEqual(['โน้ต B1 | Item: RS-1', 'Item: RS-1']);
+  });
+
+  test('applies note-only edits per batch and keeps Item/MF suffix', () => {
+    const items = [
+      { seq: 1, sampleName: 'A', batchNo: 'B1', note: 'เก่า | Item: RS-1' },
+      { seq: 2, sampleName: 'A', batchNo: 'B2', note: 'เก่า | Item: RS-1' },
+    ];
+    const out = applyItemNotes(items, [
+      { seq: 1, sampleName: 'A', batchNo: 'B1', note: 'ใหม่ 1' },
+      { seq: 2, sampleName: 'A', batchNo: 'B2', note: '' },
+    ], 'ไม่ใช้');
+    expect(out.map((it) => it.note)).toEqual(['ใหม่ 1 | Item: RS-1', 'Item: RS-1']);
+    expect(applyItemNotes(items, [], 'ทั้งใบ').map((it) => it.note)).toEqual(['ทั้งใบ | Item: RS-1', 'ทั้งใบ | Item: RS-1']);
   });
 });
 
