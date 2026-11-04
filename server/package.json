@@ -14,7 +14,9 @@
     "backfill:stock-standard-label-runs": "node scripts/backfill-stock-standard-label-runs.js",
     "backfill:stock-standard-label-runs:commit": "node scripts/backfill-stock-standard-label-runs.js --commit",
     "backfill:ai-density": "node scripts/backfill-ai-density-results.js",
-    "backfill:ai-density:commit": "node scripts/backfill-ai-density-results.js --commit"
+    "backfill:ai-density:commit": "node scripts/backfill-ai-density-results.js --commit",
+    "backfill:sample-label-numbers": "node scripts/backfill-sample-label-numbers.js",
+    "backfill:sample-label-numbers:commit": "node scripts/backfill-sample-label-numbers.js --commit"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

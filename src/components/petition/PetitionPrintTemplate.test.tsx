@@ -36,3 +36,29 @@ describe('PetitionPrintTemplate QC + Lab samples', () => {
     expect(screen.getAllByText('26S-FPN0.3-156')).toHaveLength(1);
   });
 });
+
+describe('PetitionPrintTemplate header fields', () => {
+  const makePetition = (count: number) => ({
+    _id: 'p2',
+    petitionNo: 'P-2611-0001',
+    dept: 'production',
+    createdAt: '2026-11-03T03:00:00.000Z',
+    submittedBy: { name: 'x', department: 'ผลิต 2', submittedAt: '' },
+    items: Array.from({ length: count }, (_, i) => ({ seq: i + 1, sampleName: `S${i + 1}`, batchNo: `B-${i + 1}`, sendToLab: true, sampleQuantity: 1, submissionNo: 'TA-999' })),
+  }) as unknown as Petition;
+  const labRequest = { sampleSeq: 1, labRequestNo: 'L-2611-0001', requester: {} } as unknown as LabRequest;
+
+  it('numbers the service request sheets and leaves the request numbers blank', () => {
+    const { container } = render(<PetitionPrintTemplate petition={makePetition(9)} labRequest={labRequest} />);
+    const sheets = [...container.querySelectorAll('.pr-p2-sheet')].map((el) => el.textContent);
+    expect(sheets).toEqual(['แผ่นที่1/2', 'แผ่นที่2/2']);
+    expect(container.textContent).not.toContain('L-2611-0001');
+    expect(container.querySelector('.pr-p1-meta-row .pr-line')?.textContent).toBe('');
+    expect(screen.getByText('TI P02/69')).toBeTruthy();
+  });
+
+  it('prints 1/1 when all samples fit on one sheet', () => {
+    const { container } = render(<PetitionPrintTemplate petition={makePetition(2)} labRequest={labRequest} />);
+    expect([...container.querySelectorAll('.pr-p2-sheet')].map((el) => el.textContent)).toEqual(['แผ่นที่1/1']);
+  });
+});
