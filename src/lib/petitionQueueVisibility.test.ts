@@ -48,6 +48,14 @@ describe('petitionQueueVisibility', () => {
     } as Petition)).toBe(true);
   });
 
+  it('shows Lab work that is still being delivered so it can be assigned before the sample arrives', () => {
+    expect(isVisibleInAssignQueue({
+      status: 'deliveringQC',
+      submittedBy: { department: 'Production' },
+      items: [{ seq: 1, sampleName: 'Lab sample', batchNo: 'B-1', sendToLab: true }],
+    } as Petition)).toBe(true);
+  });
+
   it('keeps assigned Lab work visible after Lab receives sample', () => {
     const labReceivedPetition = {
       ...receivedStalePetition,
