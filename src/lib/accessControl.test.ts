@@ -117,6 +117,11 @@ describe("userCanAccessPath", () => {
       expect(userCanAccessPath(user, "/lab-testing/abc", navGroups)).toBe(true);
     });
 
+    it("grants the lab approval review page when /lab-approval is granted", () => {
+      const user = { role: "lab-head", status: "active" as const, permissions: ["/lab-approval"] };
+      expect(userCanAccessPath(user, "/lab-approval/abc", navGroups)).toBe(true);
+    });
+
     it("grants the MF gap medicine list when lab send conditions is granted", () => {
       const user = { role: "lab", status: "active" as const, permissions: ["/lab-send-conditions"] };
       expect(userCanAccessPath(user, "/mf-gap-medicines", navGroups)).toBe(true);
