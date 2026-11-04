@@ -17,6 +17,8 @@ const IMPLIED_CHILD_PATHS: Record<string, string[]> = {
     "/petitions/new",
   ],
   "/record-results": ["/record-results/:id"],
+  "/lab-results": ["/lab-results/:id"],
+  "/stock": ["/stock/scan/:qrId"],
   "/qc-testing": ["/qc-testing/:id"],
   "/qc-approval": ["/qc-approval/:id"],
   "/lab-approval": ["/lab-approval/:id"],
