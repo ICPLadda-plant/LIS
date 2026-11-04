@@ -8,6 +8,7 @@ const Approval = require('../models/Approval');
 const RealtimeDensity = require('../models/RealtimeDensity');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
 const { buildSearchRankingStages } = require('../lib/searchRanking');
+const { PRODUCTION_PREFIX_RX, productionLineLabel, productionLineQueryRegex } = require('../lib/productionDepartment');
 const { labResultDocs, snapshotOf, clearLabResults, restoreLabResults } = require('../lib/labResultActions');
 const {
   bellDescribe,
@@ -221,6 +222,8 @@ async function matchStandardTime(machine) {
 }
 
 // GET /api/petitions?page=1&limit=20&status=&search=
+// ?submitterGroup=production → เฉพาะคำร้องที่ผู้ยื่นอยู่แผนกผลิต (มุมมองของฝ่ายผลิต)
+// ?submitterDepartment=ผลิต 3 → เฉพาะสายผลิตนั้น ("ผลิต 03" นับเป็นสายเดียวกัน)
 router.get('/', async (req, res) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -230,10 +233,14 @@ router.get('/', async (req, res) => {
     const search = (req.query.search || '').trim();
     const assignedToEmployeeId = String(req.query.assignedToEmployeeId || '').trim();
     const assignedToNames = queryStringList(req.query.assignedToName);
+    const productionOnly = req.query.submitterGroup === 'production';
+    const submitterDepartment = String(req.query.submitterDepartment || '').trim();
 
     const q = {};
     if (dept && ['production', 'rm', 'fg'].includes(String(dept))) q.dept = dept;
     const andConditions = [];
+    if (productionOnly) andConditions.push({ 'submittedBy.department': PRODUCTION_PREFIX_RX });
+    if (submitterDepartment) andConditions.push({ 'submittedBy.department': productionLineQueryRegex(submitterDepartment) });
     const assigneeConditions = [];
     if (assignedToEmployeeId) assigneeConditions.push({ 'assignedTo.employeeId': assignedToEmployeeId });
     assignedToNames.forEach((name) => assigneeConditions.push({ 'assignedTo.name': name }));
@@ -321,7 +328,7 @@ router.get('/', async (req, res) => {
       delete q.$or;
     }
 
-    const [docs, total, summaryTotal, statusCountRows] = await Promise.all([
+    const [docs, total, summaryTotal, statusCountRows, productionDepartmentRows] = await Promise.all([
       search
         ? Petition.aggregate([
           { $match: { ...q, deletedAt: null } },
@@ -340,8 +347,15 @@ router.get('/', async (req, res) => {
         { $match: summaryQ },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
+      productionOnly
+        ? Petition.distinct('submittedBy.department', { 'submittedBy.department': PRODUCTION_PREFIX_RX, deletedAt: null })
+        : Promise.resolve(null),
     ]);
     const statusCounts = Object.fromEntries(statusCountRows.map((row) => [row._id, row.count]));
+    const submitterDepartments = productionDepartmentRows
+      ? [...new Set(productionDepartmentRows.map(productionLineLabel).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'th', { numeric: true }))
+      : undefined;
     // Lazy phase advance for petitions whose phase2DueAt has elapsed
     const now = new Date();
     const items = [];
@@ -351,7 +365,7 @@ router.get('/', async (req, res) => {
       }
       items.push(doc.toObject());
     }
-    res.json({ items, total, page, limit, summaryTotal, statusCounts });
+    res.json({ items, total, page, limit, summaryTotal, statusCounts, submitterDepartments });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });
   }

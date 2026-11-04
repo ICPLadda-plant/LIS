@@ -45,6 +45,7 @@ import { normalizeRoles } from '@/lib/roles';
 import { petitionStatusBadge } from '@/lib/statusBadge';
 import { formatStockQuantityWithUnit } from '@/lib/stockQuantity';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
+import { isProductionDepartment } from '@/lib/productionDepartment';
 import { rankSearchResults } from '@/lib/searchRanking';
 import { formatDate, formatDateTime, formatMonth } from '@/lib/dateTime';
 import { cn } from '@/lib/utils';
@@ -732,6 +733,9 @@ export default function PetitionListPage({
   const roles = normalizeRoles(user);
   const canViewAll = roles.includes('admin');
   const department = String(user?.department ?? '').trim();
+  // แผนกผลิตเห็นคำร้องของฝ่ายผลิตทั้งหมด จึงให้ server กรองและแบ่งหน้าเหมือน admin
+  const isProductionViewer = !canViewAll && isProductionDepartment(department);
+  const serverPaged = canViewAll || isProductionViewer;
   const canSeeSixMonthMedicineTab = roles.includes('admin') || roles.includes('qc-head') || department === FG_WAREHOUSE_DEPARTMENT;
   const canSeeFgQualityAlertsTab = roles.includes('admin') || department === FG_WAREHOUSE_DEPARTMENT;
   const canCreatePetition = canUserCreatePetition(user, canAccess(NEW_PETITION_PATH));
@@ -753,6 +757,7 @@ export default function PetitionListPage({
   };
 
   const status = searchParams.get('status') ?? '';
+  const productionLine = isProductionViewer ? searchParams.get('productionLine') ?? '' : '';
   const search =
     searchParams.get('search') ??
     searchParams.get('q') ??
@@ -784,23 +789,31 @@ export default function PetitionListPage({
 
   const params = useMemo(
     () => ({
-      page: canViewAll ? page : 1,
-      limit: canViewAll ? PAGE_SIZE : 500,
+      page: serverPaged ? page : 1,
+      limit: serverPaged ? PAGE_SIZE : 500,
       status: status || undefined,
       search: search || undefined,
+      submitterGroup: isProductionViewer ? ('production' as const) : undefined,
+      submitterDepartment: productionLine || undefined,
     }),
-    [page, status, search, canViewAll],
+    [page, status, search, serverPaged, isProductionViewer, productionLine],
   );
   const { data, loading, error, refresh } = usePetitionList(params);
   const summaryParams = useMemo(
     () => ({
       page: 1,
-      limit: canViewAll ? PAGE_SIZE : 500,
+      limit: serverPaged ? PAGE_SIZE : 500,
       search: search || undefined,
+      submitterGroup: isProductionViewer ? ('production' as const) : undefined,
+      submitterDepartment: productionLine || undefined,
     }),
-    [canViewAll, search],
+    [serverPaged, search, isProductionViewer, productionLine],
   );
   const { data: summaryData } = usePetitionList(summaryParams);
+  const productionLineOptions = useMemo(() => {
+    const options = summaryData?.submitterDepartments ?? data?.submitterDepartments ?? [];
+    return productionLine && !options.includes(productionLine) ? [...options, productionLine] : options;
+  }, [data?.submitterDepartments, productionLine, summaryData?.submitterDepartments]);
 
   const { data: highlighted = [] } = useQuery({
     queryKey: ['petitions', 'highlight', highlightKey],
@@ -888,9 +901,9 @@ export default function PetitionListPage({
     [applyVisibilityFilter, highlighted],
   );
 
-  const totalCount = canViewAll ? data?.total ?? 0 : ownedItems.length;
+  const totalCount = serverPaged ? data?.total ?? 0 : ownedItems.length;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
-  const visibleItems = canViewAll
+  const visibleItems = serverPaged
     ? ownedItems
     : ownedItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -955,21 +968,23 @@ export default function PetitionListPage({
     setSearchParams(new URLSearchParams(), { replace: false });
   }
 
-  const hasFilters = !!status || !!search;
+  const hasFilters = !!status || !!search || !!productionLine;
   const emptyTitle = hasFilters
     ? 'ไม่พบคำร้องตามเงื่อนไขที่ค้นหา'
     : canViewAll
       ? 'ยังไม่มีคำร้องในระบบ'
-      : 'ยังไม่มีคำร้องที่คุณยื่นหรือได้รับมอบหมาย';
+      : isProductionViewer
+        ? 'ยังไม่มีคำร้องของฝ่ายผลิต'
+        : 'ยังไม่มีคำร้องที่คุณยื่นหรือได้รับมอบหมาย';
 
-  const summaryTotalCount = canViewAll
+  const summaryTotalCount = serverPaged
     ? summaryData?.summaryTotal ?? summaryData?.total ?? totalCount
     : summaryOwnedItems.length;
 
   const summaryCards = SUMMARY_STATUS_GROUPS.map((group) => {
     const count = group.statuses.length === 0
       ? summaryTotalCount
-      : canViewAll && summaryData?.statusCounts
+      : serverPaged && summaryData?.statusCounts
         ? group.statuses.reduce((sum, statusItem) => sum + (summaryData.statusCounts?.[statusItem] ?? 0), 0)
         : summaryOwnedItems.filter((petition) => group.statuses.includes(petition.status)).length;
     const active =
@@ -1125,6 +1140,25 @@ export default function PetitionListPage({
               placeholder: 'ค้นหาเลขคำร้อง, ผู้ยื่น, ชื่อตัวอย่าง',
             }}
             filters={
+              <>
+              {isProductionViewer && (
+                <Select
+                  value={productionLine || 'all'}
+                  onValueChange={(value) =>
+                    updateParams({ productionLine: value === 'all' ? undefined : value, page: undefined })
+                  }
+                >
+                  <SelectTrigger aria-label="สายผลิต" className="h-10 w-full sm:w-44">
+                    <SelectValue placeholder="ผลิตทั้งหมด" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">ผลิตทั้งหมด</SelectItem>
+                    {productionLineOptions.map((line) => (
+                      <SelectItem key={line} value={line}>{line}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Popover>
                 <PopoverTrigger asChild>
                   <button
@@ -1184,6 +1218,7 @@ export default function PetitionListPage({
                   </div>
                 </PopoverContent>
               </Popover>
+              </>
             }
             right={
               <>
