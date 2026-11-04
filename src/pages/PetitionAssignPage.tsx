@@ -743,6 +743,7 @@ export default function PetitionAssignPage() {
     <AppLayout>
         <LabScanAcceptModal
           open={scanOpen}
+          pendingPetitions={awaitingReceive}
           onClose={() => setScanOpen(false)}
           onAccepted={() => {
             setScanOpen(false);

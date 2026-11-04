@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { normalizeRoles } from '@/lib/roles';
 import { additionalSamplePayload, extractScannedCode, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
+import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
 
 const READER_ID = 'qc-receive-qr-reader';
 type Phase = 'scanning' | 'confirming' | 'loading' | 'success' | 'error' | 'no-camera';
@@ -49,9 +50,11 @@ interface Props {
   onReceived: () => void;
   /** โหมดกรอกเลขคำร้องอย่างเดียว (ไม่เปิดกล้อง) — ใช้กับปุ่ม "กรอกเลขรับตัวอย่าง" */
   manualOnly?: boolean;
+  /** คำร้องที่รอรับ — ถ้าส่งมาจะแสดง Dropdown ให้เลือกแทนการพิมพ์/สแกน */
+  pendingPetitions?: Petition[];
 }
 
-export default function QrReceiveModal({ open, onClose, onReceived, manualOnly = false }: Props) {
+export default function QrReceiveModal({ open, onClose, onReceived, manualOnly = false, pendingPetitions }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>('scanning');
@@ -254,6 +257,8 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
   if (!open) return null;
 
   const targetStatusCfg = PETITION_STATUS_CONFIG.pendingReview;
+  const receivedKeys = new Set(receivedList.map((row) => row._id));
+  const selectablePetitions = pendingPetitions?.filter((p) => !receivedKeys.has(p._id));
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -318,6 +323,9 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
               }}
               className="space-y-2"
             >
+              {selectablePetitions && (
+                <PendingPetitionSelect petitions={selectablePetitions} onPick={(code) => { void fetchAndConfirm(code); }} />
+              )}
               {!manualOnly && (
                 <div className="flex items-center gap-2 text-xs text-grey-400">
                   <div className="h-px flex-1 bg-grey-200" />

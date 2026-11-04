@@ -75,6 +75,10 @@ export default function QCTestingPage() {
       ],
     };
   }));
+  // คำร้องที่ QC ยังไม่รับ → ใช้เป็นตัวเลือกใน Dropdown ของ popup รับตัวอย่าง
+  const pendingQcReceive = petitions.filter(
+    (p) => !qcReceivedAt(p) && !['success', 'approved', 'rejected'].includes(p.status),
+  );
 
   // Bulk-fetch abnormal flag for petitions that may have results
   // (sampleSent has no results yet, so skip it)
@@ -247,6 +251,7 @@ export default function QCTestingPage() {
     </div>
     <QrReceiveModal
       open={scanOpen}
+      pendingPetitions={pendingQcReceive}
       onClose={() => setScanOpen(false)}
       onReceived={() => {
         refresh();

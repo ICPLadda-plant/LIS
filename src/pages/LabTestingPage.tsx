@@ -280,6 +280,7 @@ export default function LabTestingPage() {
           open={scanOpen}
           claimOnReceive
           initialCode={scanCode}
+          pendingPetitions={awaitingReceive}
           onClose={() => setScanOpen(false)}
           onAccepted={() => { refresh(); refreshAwaiting(); }}
         />
