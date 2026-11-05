@@ -536,9 +536,7 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petit
 
   return documents.map((source) => {
     const requestMatch = findBestRequestItem(petitions, source, labRequests);
-    const resolved = sampleFromSources(source, stockRows, mfRows, requestMatch?.item, {
-      preferPetitionProductionDate: requestMatch?.identityTier === 1,
-    }).sample;
+    const resolved = sampleFromSources(source, stockRows, mfRows, requestMatch?.item).sample;
     const samples = source.sampleSnapshots || [];
     if (!samples.length || (!resolved.lotNo && !resolved.batchNo && !resolved.productionDate)) return source;
     return {
@@ -1063,7 +1061,6 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       references.stockRows,
       references.mfRows,
       requestMatch?.item || coaHistoryMatch?.sample,
-      { preferPetitionProductionDate: requestMatch?.identityTier === 1 },
     );
     const sample = sourceData.sample;
     let authoritativeBatch = manualText(

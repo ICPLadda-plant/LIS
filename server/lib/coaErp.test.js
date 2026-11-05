@@ -462,11 +462,37 @@ test('finished-good COA request can use the matching bulk production batch and d
     loca_code: 'DAMAGE',
     lot_no: 'FG250721-012',
     registering_date: '2026-02-10',
-  }], [], requestMatch.item, { preferPetitionProductionDate: requestMatch.identityTier === 1 });
+  }], [], requestMatch.item);
 
   assert.equal(requestMatch.item.batchNo, '074-079');
   assert.equal(result.sample.batchNo, '074-079');
   assert.equal(result.sample.productionDate, '2026-11-04');
+});
+
+test('bulk RM lot date overrides a stale production request date for a finished-good COA', () => {
+  const source = {
+    sampleSnapshots: [{ sampleName: 'โบรมาดิโอการ์ด - อ.ย.', commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)' }],
+    externalCoaRequest: { itemNo: 'FPH-BROMD-1X20', shipmentDate: '2026-11-05' },
+  };
+  const requestMatch = findBestRequestItem([{
+    updatedAt: '2026-11-05',
+    items: [{
+      itemNo: 'RSPH-BML0_005-RD',
+      sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)',
+      commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)',
+      batchNo: '26S-BRM0.005-GMP(R)-240',
+      productionDate: '2026-11-05',
+    }],
+  }], source);
+  const result = sampleFromSources(source, [{
+    item_no: 'RSPH-BML0_005-RD',
+    lot_no: 'RM261106-001',
+    registering_date: '2026-11-05',
+    stock_qty_base: 921,
+  }], [], requestMatch.item);
+
+  assert.equal(result.sample.batchNo, '26S-BRM0.005-GMP(R)-240');
+  assert.equal(result.sample.productionDate, '2026-11-06');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {

@@ -215,7 +215,7 @@ function normalizeIsoDate(value) {
 
 function lotDate(lotNo) {
   const value = text(lotNo);
-  const fgDate = value.match(/^(?:FG)?(\d{2})(\d{2})(\d{2})(?:-|$)/i);
+  const fgDate = value.match(/^(?:[A-Z]{2})?(\d{2})(\d{2})(\d{2})(?:-|$)/i);
   if (fgDate) {
     const year = 2000 + Number(fgDate[1]);
     const month = Number(fgDate[2]);
@@ -952,11 +952,15 @@ function mergeResultRows(primaryRows, fallbackRows) {
   return rows;
 }
 
-function sampleFromSources(source, stockRows, mfRows, petitionItem = null, options = {}) {
+function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const itemNo = text(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
   const commonName = text(source?.sampleSnapshots?.[0]?.commonName);
   const normalizedItemNo = itemCode(itemNo);
-  const productRows = stockRows.filter((row) => rowMatchesItem(row, normalizedItemNo));
+  const normalizedPetitionItemNo = itemCode(petitionItem?.itemNo);
+  const productRows = stockRows.filter((row) => (
+    rowMatchesItem(row, normalizedItemNo)
+    || rowMatchesItem(row, normalizedPetitionItemNo)
+  ));
   const commonRows = stockRows.filter((row) => !normalizedItemNo && normalizeText(row.common_name || row.commonName) === normalizeText(commonName));
   const stockCandidates = [...productRows, ...commonRows]
     .filter((row) => lotFromRow(row))
@@ -989,9 +993,6 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null, optio
   )) || mfBatchRows[0];
   const erpRequestProductionDate = lotSnapshot(requestedLot || requestedBatch).productionDate
     || normalizeIsoDate(sourceSample.productionDate);
-  const preferredPetitionProductionDate = options.preferPetitionProductionDate
-    ? normalizeIsoDate(petitionItem?.productionDate)
-    : '';
   const mfBatch = batchFromRow(mf);
   const mfDate = mfDateMatch?.productionDate || productionDateFromRow(mf);
   const matchingStock = stockCandidates.find((row) => {
@@ -1018,13 +1019,21 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null, optio
   const erpStockProductionDate = stock
     ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock)).productionDate
     : '';
-  const erpProductionDate = preferredPetitionProductionDate || (erpRequestLot
+  const petitionStock = normalizedPetitionItemNo && normalizedPetitionItemNo !== normalizedItemNo
+    ? stockCandidates.find((row) => rowMatchesItem(row, normalizedPetitionItemNo))
+    : null;
+  const petitionStockProductionDate = petitionStock
+    ? lotSnapshot(lotFromRow(petitionStock), productionDateFromRow(petitionStock)).productionDate
+    : '';
+  const erpProductionDate = erpRequestLot
     ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
-    : authoritativeErpLot?.productionDate
+    : petitionStockProductionDate
+      || authoritativeErpLot?.productionDate
       || erpRequestProductionDate
       || matchingStockLot?.productionDate
       || normalizeIsoDate(mfDate)
-      || erpStockProductionDate);
+      || normalizeIsoDate(petitionItem?.productionDate)
+      || erpStockProductionDate;
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
   const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;
