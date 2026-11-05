@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import PageHeader from '@/components/lis/PageHeader';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
 import ItemsStep, { qcLabSampleTargets, type ItemRowValues } from '@/components/petition/wizard/ItemsStep';
+import { productionDateFromLotNo } from '@/lib/coaLot';
 import type { SubmitterValues } from '@/components/petition/wizard/SubmitterPicker';
 import LabRequestStep, { type LabRequestRowValues } from '@/components/petition/wizard/LabRequestStep';
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
@@ -327,6 +328,10 @@ function makeQuantityLabel(qty: string, unit: string): string {
   return [qty, unit].filter(Boolean).join(' ');
 }
 
+function importedProductionDate(productionDate: string, batchNo: string, lotNo: string): string {
+  return productionDateFromLotNo(batchNo) || productionDateFromLotNo(lotNo) || productionDate;
+}
+
 // Production ส่ง QC + Lab เป็น 2 ชิ้นตัวอย่างใน batch เดียว: qty = ชิ้น QC, labQty = ชิ้น Lab (มากกว่า)
 // เก็บเป็นรายการเดียว 2 ตัวอย่าง เพื่อให้กฎ ถพ./อนุมัติรายรายการยังเห็นว่าเป็นตัวอย่างเดียวที่ส่งทั้งสองฝั่ง
 export function withProductionLabSample(item: ItemRowValues, labQty: string, unit: string): ItemRowValues {
@@ -488,7 +493,11 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
 
   if (itemCount <= 1) {
     if (!singleItem) return [];
-    const productionDate = productionDates[0] || singleItem.productionDate || '';
+    const productionDate = importedProductionDate(
+      productionDates[0] || singleItem.productionDate || '',
+      singleItem.batchNo,
+      singleItem.lotNo,
+    );
     const submittedQuantity = quantities[0] ?? '';
     const submittedUnit = quantityUnits[0] ?? '';
     const labelQuantity = makeQuantityLabel(submittedQuantity, submittedUnit);
@@ -508,6 +517,9 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
 
   const items: ItemRowValues[] = [];
   for (let i = 0; i < itemCount; i += 1) {
+    const batchNo = valueAt(batchNos, i, false);
+    const lotNo = valueAt(lotNos, i, false);
+    const productionDate = importedProductionDate(valueAt(productionDates, i), batchNo, lotNo);
     const note = [
       valueAt(notes, i),
       valueAt(itemNos, i, false) ? `Item: ${valueAt(itemNos, i, false)}` : '',
@@ -522,10 +534,10 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       ...makeBlankItem(i + 1),
       itemNo: valueAt(itemNos, i, false),
       sampleName: valueAt(sampleNames, i),
-      batchNo: valueAt(batchNos, i, false),
-      lotNo: valueAt(lotNos, i, false),
+      batchNo,
+      lotNo,
       commonName: valueAt(commonNames, i),
-      productionDate: valueAt(productionDates, i) || null,
+      productionDate: productionDate || null,
       packageUnit: valueAt(packageUnits, i),
       testItems: valueAt(testItems, i),
       sendToLab: sendToLabFromDefault({
@@ -537,7 +549,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       note,
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
-      labelSampledDate: labelSendDate(i, valueAt(productionDates, i)),
+      labelSampledDate: labelSendDate(i, productionDate),
       submittedQuantity: valueAt(quantities, i, false),
       submittedUnit: valueAt(quantityUnits, i),
     };
