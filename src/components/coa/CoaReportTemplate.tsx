@@ -259,7 +259,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
           </tr>
           <tr>
             <td>Wax block size</td>
-            <td>5.88 gm ± 5%</td>
+            <td>{sample?.waxBlockSizeCriteria || "5.88 gm ± 5%"}</td>
             <td>{sample?.waxBlockSizeResult === "-" ? "" : sample?.waxBlockSizeResult}</td>
           </tr>
           <tr>

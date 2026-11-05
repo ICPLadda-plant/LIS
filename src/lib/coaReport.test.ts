@@ -295,6 +295,20 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].samples[0].aiContentResult).toBe("0.0051%");
     expect(pages[0].samples[0].aiContentCriteria).toBe("0.005% ± 0.00125");
     expect(pages[0].samples[0].waxBlockSizeResult).toBe("5.90 gm");
+    expect(pages[0].samples[0].waxBlockSizeCriteria).toBe("5.88 gm ± 5%");
     expect(pages[0].samples[0].dateOfAnalysis).toBe("20/08/2026");
+  });
+
+  it("uses the large Bromadiolone wax block specification from the reference form", () => {
+    const pages = buildCoaReportPages({
+      sampleSnapshots: [{
+        itemSeq: 1,
+        sampleName: "ยาหนูก้อนใหญ่",
+        commonName: "BROMADIOLONE 0.005%",
+      }],
+      resultSnapshots: [{ itemSeq: 1, testItem: "Wax block size", result: "25.10 g" }],
+    } as CoaDocument);
+
+    expect(pages[0].samples[0].waxBlockSizeCriteria).toBe("23.50-26.00 g");
   });
 });

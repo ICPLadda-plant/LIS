@@ -283,6 +283,7 @@ describe("CoaReportTemplate", () => {
         aiContentCriteria: "0.005% ± 0.00125",
         densityResult: "-",
         waxBlockSizeResult: "5.90 gm",
+        waxBlockSizeCriteria: "5.88 gm ± 5%",
         dateOfAnalysis: "20/08/2026",
         rows: [],
       }],

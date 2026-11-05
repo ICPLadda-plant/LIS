@@ -16,6 +16,7 @@ export type CoaReportSample = CoaSampleSnapshot & {
   aiContentCriteria: string;
   densityResult: string;
   waxBlockSizeResult: string;
+  waxBlockSizeCriteria?: string;
   dateOfAnalysis: string;
 };
 
@@ -99,6 +100,16 @@ function waxBlockSizeResult(rows: CoaResultSnapshot[]): string {
   return rows.find((row) => /wax\s*block\s*size/i.test(row.testItem ?? ""))?.result || "-";
 }
 
+function waxBlockSizeCriteria(rows: CoaResultSnapshot[], sample: CoaSampleSnapshot): string {
+  const row = rows.find((item) => /wax\s*block\s*size/i.test(item.testItem ?? ""));
+  if (row?.criteria && row.criteria !== "-") return row.criteria;
+  const result = Number(row?.result?.match(/\d+(?:\.\d+)?/)?.[0]);
+  const product = [sample.sampleName, sample.condition].filter(Boolean).join(" ");
+  return /ก้อนใหญ่|large\s*(?:wax\s*)?block/i.test(product) || result > 10
+    ? "23.50-26.00 g"
+    : "5.88 gm ± 5%";
+}
+
 function densityResult(rows: CoaResultSnapshot[]): string {
   return rows.find((row) => /density/i.test(row.testItem ?? ""))?.result || "-";
 }
@@ -144,6 +155,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       aiContentCriteria: resolvedAiContentCriteria,
       densityResult: densityResult(rows),
       waxBlockSizeResult: waxBlockSizeResult(rows),
+      waxBlockSizeCriteria: waxBlockSizeCriteria(rows, sample),
       dateOfAnalysis: dateOfAnalysis(rows),
     };
   });
