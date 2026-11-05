@@ -274,7 +274,7 @@ describe("buildCoaReportPages", () => {
         itemSeq: 1,
         sampleName: "Red Wax Block",
         commonName: "BROMADIOLONE 0.005%",
-        batchNo: "B-008",
+        batchNo: "26S-BRM0.005-GMP(R)-240",
         lotNo: "LOT-008",
         productionDate: "2026-08-15",
       }],
@@ -291,7 +291,7 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].template).toBe("bromadiolone0005");
     expect(pages[0].issueDate).toBe("August 20, 2026");
     expect(pages[0].samples[0].product).toBe("Red Wax Block (BROMADIOLONE 0.005%)");
-    expect(pages[0].samples[0].batchLabel).toBe("LOT-008 / B-008");
+    expect(pages[0].samples[0].batchLabel).toBe("240");
     expect(pages[0].samples[0].aiContentResult).toBe("0.0051%");
     expect(pages[0].samples[0].aiContentCriteria).toBe("0.005% ± 0.00125");
     expect(pages[0].samples[0].waxBlockSizeResult).toBe("5.90 gm");
