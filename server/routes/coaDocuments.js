@@ -529,13 +529,16 @@ function externalCoaRowsToDocuments(payload) {
     .map(externalCoaRowToDocument);
 }
 
-function enrichExternalCoaDocumentsWithErpLots(documents, references = {}) {
+function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petitions = [], labRequests = []) {
   const stockRows = Array.isArray(references.stockRows) ? references.stockRows : [];
   const mfRows = Array.isArray(references.mfRows) ? references.mfRows : [];
   if (!stockRows.length && !mfRows.length) return documents;
 
   return documents.map((source) => {
-    const resolved = sampleFromSources(source, stockRows, mfRows).sample;
+    const requestMatch = findBestRequestItem(petitions, source, labRequests);
+    const resolved = sampleFromSources(source, stockRows, mfRows, requestMatch?.item, {
+      preferPetitionProductionDate: requestMatch?.identityTier === 1,
+    }).sample;
     const samples = source.sampleSnapshots || [];
     if (!samples.length || (!resolved.lotNo && !resolved.batchNo && !resolved.productionDate)) return source;
     return {
@@ -928,13 +931,16 @@ router.get('/', async (req, res) => {
           return { stockRows: [], mfRows: [] };
         })
       : Promise.resolve({ stockRows: [], mfRows: [] });
-    const [documents, requestedRows, externalRows, erpReferences] = await Promise.all([
+    const [documents, requestedRows, externalRows, erpReferences, productionPetitions] = await Promise.all([
       CoaDocument.find(filter).sort({ updatedAt: -1 }).lean(),
       shouldIncludeRequestedRows(req.query)
         ? requestedCoaRows({ petitionNo: req.query.petitionNo })
         : Promise.resolve([]),
       externalPromise,
       erpReferencesPromise,
+      shouldFetchExternal
+        ? Petition.find({ status: { $ne: 'rejected' } }).sort({ updatedAt: -1 }).limit(500).lean()
+        : Promise.resolve([]),
     ]);
     const externalItemNos = [...new Set(externalRows
       .map((row) => row.externalCoaRequest?.itemNo)
@@ -946,7 +952,7 @@ router.get('/', async (req, res) => {
       }).sort({ updatedAt: -1 }).limit(500).lean()
       : [];
     const externalRowsWithCurrentBatch = enrichExternalCoaDocumentsWithHistory(
-      enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences),
+      enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences, productionPetitions),
       externalCoaHistory,
     );
     const enrichedExternalRows = await enrichExternalCoaDocumentsWithDensity(externalRowsWithCurrentBatch).catch((error) => {
@@ -1057,6 +1063,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       references.stockRows,
       references.mfRows,
       requestMatch?.item || coaHistoryMatch?.sample,
+      { preferPetitionProductionDate: requestMatch?.identityTier === 1 },
     );
     const sample = sourceData.sample;
     let authoritativeBatch = manualText(

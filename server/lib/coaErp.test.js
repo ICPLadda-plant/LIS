@@ -439,6 +439,36 @@ test('LIS petition Lot supplies the production date paired with its Batch', () =
   assert.equal(result.sample.productionDate, '2026-09-12');
 });
 
+test('finished-good COA request can use the matching bulk production batch and date by common name', () => {
+  const source = {
+    sampleSnapshots: [{ sampleName: 'กะรัต 35', commonName: 'CYPERMETHRIN 35% W/V EC' }],
+    externalCoaRequest: {
+      itemNo: 'F-KRT35-200',
+      shipmentDate: '2026-11-05',
+    },
+  };
+  const requestMatch = findBestRequestItem([{
+    updatedAt: '2026-11-04',
+    items: [{
+      itemNo: 'RS-CY35-V',
+      sampleName: 'CYPERMETHRIN 35% W/V EC',
+      commonName: 'CYPERMETHRIN 35% W/V EC',
+      batchNo: '074-079',
+      productionDate: '2026-11-04',
+    }],
+  }], source);
+  const result = sampleFromSources(source, [{
+    item_no: 'F-KRT35-200',
+    loca_code: 'DAMAGE',
+    lot_no: 'FG250721-012',
+    registering_date: '2026-02-10',
+  }], [], requestMatch.item, { preferPetitionProductionDate: requestMatch.identityTier === 1 });
+
+  assert.equal(requestMatch.item.batchNo, '074-079');
+  assert.equal(result.sample.batchNo, '074-079');
+  assert.equal(result.sample.productionDate, '2026-11-04');
+});
+
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {
   assert.equal(batchSimilarity('26S-GLY48-005', '26S-GLY48-005'), 1);
   assert.ok(batchSimilarity('26S-GLY48-005', '26S-GLY48-006') > batchSimilarity('26S-GLY48-005', '26S-OMT50-515'));

@@ -564,10 +564,11 @@ function findBestRequestItem(petitions, source, labRequests = []) {
   for (const petition of petitions || []) {
     for (const item of petition.items || []) {
       const itemNoMatch = Boolean(sourceItemNo) && itemCode(item.itemNo) === sourceItemNo;
-      const nameMatch = Boolean(sourceSampleName && sourceCommonName)
-        && normalizeText(item.sampleName) === sourceSampleName
+      const commonNameMatch = Boolean(sourceCommonName)
         && normalizeText(item.commonName) === sourceCommonName;
-      if (!itemNoMatch && !nameMatch) continue;
+      const nameMatch = commonNameMatch && Boolean(sourceSampleName)
+        && normalizeText(item.sampleName) === sourceSampleName;
+      if (!itemNoMatch && !commonNameMatch) continue;
       const batchNo = text(item.batchNo || item.lotNo || labRequestBatch(labRequests, petition, item));
       if (!batchNo) continue;
       const productionDate = normalizeIsoDate(item.productionDate)
@@ -577,7 +578,7 @@ function findBestRequestItem(petitions, source, labRequests = []) {
       candidates.push({
         petition,
         item: item.batchNo || item.lotNo ? item : { ...item, batchNo },
-        identityTier: itemNoMatch ? 2 : 1,
+        identityTier: itemNoMatch ? 3 : nameMatch ? 2 : 1,
         identityScore: Number(Boolean(sourceCommonName) && normalizeText(item.commonName) === sourceCommonName) * 2
           + Number(Boolean(sourceSampleName) && normalizeText(item.sampleName) === sourceSampleName),
         dateBucket: hasTargetAndProduction ? (productionTime <= targetTime ? 0 : 1) : 2,
@@ -951,7 +952,7 @@ function mergeResultRows(primaryRows, fallbackRows) {
   return rows;
 }
 
-function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
+function sampleFromSources(source, stockRows, mfRows, petitionItem = null, options = {}) {
   const itemNo = text(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
   const commonName = text(source?.sampleSnapshots?.[0]?.commonName);
   const normalizedItemNo = itemCode(itemNo);
@@ -988,6 +989,9 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   )) || mfBatchRows[0];
   const erpRequestProductionDate = lotSnapshot(requestedLot || requestedBatch).productionDate
     || normalizeIsoDate(sourceSample.productionDate);
+  const preferredPetitionProductionDate = options.preferPetitionProductionDate
+    ? normalizeIsoDate(petitionItem?.productionDate)
+    : '';
   const mfBatch = batchFromRow(mf);
   const mfDate = mfDateMatch?.productionDate || productionDateFromRow(mf);
   const matchingStock = stockCandidates.find((row) => {
@@ -1014,13 +1018,13 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const erpStockProductionDate = stock
     ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock)).productionDate
     : '';
-  const erpProductionDate = erpRequestLot
+  const erpProductionDate = preferredPetitionProductionDate || (erpRequestLot
     ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
     : authoritativeErpLot?.productionDate
       || erpRequestProductionDate
       || matchingStockLot?.productionDate
       || normalizeIsoDate(mfDate)
-      || erpStockProductionDate;
+      || erpStockProductionDate);
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
   const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;
