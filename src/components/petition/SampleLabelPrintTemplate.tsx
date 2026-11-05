@@ -88,7 +88,7 @@ const LABEL_HEADER_LINE_2 = 'ลัดดา จำกัด';
 const LABEL_HEADER_TEXT = `${LABEL_HEADER_LINE_1} ${LABEL_HEADER_LINE_2}`;
 const DOCUMENT_NUMBER_LABEL = 'เลขที่';
 const LABEL_FOOTER_TEXT = 'F-LAB-01-12 Rev : 00 02/11/69';
-// สินค้า อย. / ปศุสัตว์ ต้องใช้ป้ายแบบมีสัญลักษณ์อันตราย (ให้ผู้ส่งวงกลมสัญลักษณ์ที่ตรงกับสาร)
+// สินค้า อย. ต้องใช้ป้ายแบบมีสัญลักษณ์อันตราย (ให้ผู้ส่งวงกลมสัญลักษณ์ที่ตรงกับสาร); สินค้าปศุสัตว์ใช้ป้ายแบบปกติ
 const HAZARD_LABEL_FOOTER_TEXT = 'F-LAB-01-10 Rev : 02 11/07/69';
 const HAZARD_PICTOGRAMS = [
   { src: ghsEnvironment, label: 'อันตรายต่อสิ่งแวดล้อม' },
