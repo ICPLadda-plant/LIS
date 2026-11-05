@@ -280,7 +280,7 @@ describe("buildCoaReportPages", () => {
       }],
       resultSnapshots: [
         { itemSeq: 1, testItem: "%AI content (W/W)", result: "0.0051%" },
-        { itemSeq: 1, testItem: "Wax block size", result: "5.90 gm" },
+        { itemSeq: 1, testItem: "Wax block size", result: "5.90 gm", criteria: "ค่าจาก Lab ที่ไม่ใช้" },
         { itemSeq: 1, testItem: "Date of analysis", result: "2026-08-20" },
       ],
       approval: { approvedBy: { name: "QC Head" }, approvedAt: "2026-08-20T00:00:00.000Z" },

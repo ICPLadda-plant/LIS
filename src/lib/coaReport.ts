@@ -107,7 +107,6 @@ function waxBlockSizeResult(rows: CoaResultSnapshot[]): string {
 
 function waxBlockSizeCriteria(rows: CoaResultSnapshot[], sample: CoaSampleSnapshot): string {
   const row = rows.find((item) => /wax\s*block\s*size/i.test(item.testItem ?? ""));
-  if (row?.criteria && row.criteria !== "-") return row.criteria;
   const result = Number(row?.result?.match(/\d+(?:\.\d+)?/)?.[0]);
   const product = [sample.sampleName, sample.condition].filter(Boolean).join(" ");
   return /ก้อนใหญ่|large\s*(?:wax\s*)?block/i.test(product) || result > 10
