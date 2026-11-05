@@ -300,7 +300,9 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Red Wax Block (BROMADIOLONE 0.005%)");
     expect(screen.getByText("Red wax block")).toBeInTheDocument();
     expect(screen.getByText("0.005% ± 0.00125")).toBeInTheDocument();
-    expect(screen.getByText("5.88 gm ± 5%")).toBeInTheDocument();
+    const waxBlockCells = within(screen.getByText("Wax block size").closest("tr")!).getAllByRole("cell");
+    expect(waxBlockCells).toHaveLength(2);
+    expect(waxBlockCells[0]).toHaveAttribute("colspan", "2");
     expect(screen.getByText("LOT-008 / B-008")).toBeInTheDocument();
     expect(screen.getByText("5.90 gm")).toBeInTheDocument();
   });
