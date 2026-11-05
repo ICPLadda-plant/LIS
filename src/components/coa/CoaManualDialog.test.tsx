@@ -106,6 +106,53 @@ describe("CoaManualDialog", () => {
     ]);
   });
 
+  it("shows and saves rodent block weight instead of Density for Bromadiolone 0.005%", async () => {
+    vi.mocked(api.updateCoaDocument).mockResolvedValue({} as CoaDocument);
+    const request = {
+      _id: "manual-coa-bromadiolone",
+      sourceType: "erpManual",
+      externalRequestId: "external-coa-request-SO-BROM-10000",
+      revision: 0,
+      status: "draft",
+      petitionId: "",
+      petitionNoSnapshot: "SO-BROM",
+      selectedItemSeqs: [10000],
+      sampleSnapshots: [{
+        itemSeq: 10000,
+        sampleName: "โบรมาดิโอการ์ด",
+        commonName: "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+        batchNo: "26S-BRM0.005-GMP(R)-240",
+        productionDate: "2026-11-06",
+      }],
+      resultSnapshots: [
+        { itemSeq: 10000, testItem: "Wax block size", result: "5.89", criteria: "5.88 gm ± 5%", unit: "g" },
+      ],
+    } as CoaDocument;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <CoaManualDialog open onOpenChange={vi.fn()} request={request} onSaved={vi.fn()} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByLabelText("น้ำหนักก้อนยาหนู *")).toHaveValue("5.89");
+    expect(screen.queryByLabelText("Density at 30°C (g/cm³) *")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Date of analysis *"), { target: { value: "2026-11-06" } });
+    fireEvent.change(screen.getByLabelText("เกณฑ์ความคลาดเคลื่อน *"), { target: { value: "0.005% ± 0.00125" } });
+    fireEvent.change(screen.getByLabelText("%AI content (W/V) *"), { target: { value: "0.0051" } });
+    fireEvent.change(screen.getByLabelText("Appearance *"), { target: { value: "Red wax block" } });
+    fireEvent.click(screen.getByRole("button", { name: "บันทึกร่าง COA" }));
+
+    await waitFor(() => expect(api.updateCoaDocument).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(api.updateCoaDocument).mock.calls[0][1].results).toContainEqual(expect.objectContaining({
+      testItem: "Wax block size",
+      result: "5.89",
+      unit: "g",
+    }));
+  });
+
   it("shows the production date from an existing draft Lot No.", async () => {
     const request = {
       _id: "manual-coa-1",

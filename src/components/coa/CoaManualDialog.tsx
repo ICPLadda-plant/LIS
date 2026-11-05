@@ -29,11 +29,15 @@ type ResultForm = {
   appearance: string;
 };
 
+function isBromadiolone0005(commonName?: string): boolean {
+  return /^BROMADIOLONE\s+0\.005%(?:\s|$)/i.test(commonName?.trim() || "");
+}
+
 function resultFieldsForCommonName(commonName?: string): Array<[keyof ResultForm, string, "date" | "text"]> {
   const fields: Array<[keyof ResultForm, string, "date" | "text"]> = [
     ["analysisDate", "Date of analysis", "date"],
     ["aiCriteria", "เกณฑ์ความคลาดเคลื่อน", "text"],
-    ["density", "Density at 30°C (g/cm³)", "text"],
+    ["density", isBromadiolone0005(commonName) ? "น้ำหนักก้อนยาหนู" : "Density at 30°C (g/cm³)", "text"],
     ["aiResult", aiContentTestItemForCommonName(commonName), "text"],
     ["appearance", "Appearance", "text"],
   ];
@@ -60,7 +64,11 @@ function productionDateForSample(sample: CoaSampleSnapshot) {
 function resultFormFromRows(rows: CoaResultSnapshot[], commonName?: string): ResultForm {
   const appearance = rows.find((row) => /^appearance$/i.test(row.testItem?.trim() || ""));
   const ai = rows.find((row) => isAiContentTestItem(row.testItem));
-  const density = rows.find((row) => /density/i.test(row.testItem || ""));
+  const density = rows.find((row) => (
+    isBromadiolone0005(commonName)
+      ? /wax\s*block\s*size|น้ำหนักก้อนยาหนู/i.test(row.testItem || "")
+      : /density/i.test(row.testItem || "")
+  ));
   const analysisDate = rows.find((row) => /date\s*of\s*analysis/i.test(row.testItem || ""));
   const appearanceCriteria = appearance?.criteria?.trim();
   return {
@@ -76,10 +84,11 @@ function resultFormFromRows(rows: CoaResultSnapshot[], commonName?: string): Res
 
 function resultRowsFromForm(itemSeq: number, values: ResultForm, commonName?: string): CoaResultSnapshot[] {
   const aiResult = values.aiResult.trim();
+  const bromadiolone = isBromadiolone0005(commonName);
   const rows: CoaResultSnapshot[] = [
     { itemSeq, testItem: "Appearance", result: "Conform", criteria: values.appearance.trim(), method: "Visual", unit: "" },
     { itemSeq, testItem: aiContentTestItemForCommonName(commonName), result: aiResult && /%$/.test(aiResult) ? aiResult : aiResult ? `${aiResult}%` : "", criteria: values.aiCriteria.trim(), unit: "%", method: "" },
-    { itemSeq, testItem: "Density at 30°C (g/cm³)", result: values.density.trim(), criteria: "-", unit: "g/cm³", method: "DMA 501" },
+    { itemSeq, testItem: bromadiolone ? "Wax block size" : "Density at 30°C (g/cm³)", result: values.density.trim(), criteria: "-", unit: bromadiolone ? "g" : "g/cm³", method: bromadiolone ? "" : "DMA 501" },
     { itemSeq, testItem: "Date of analysis", result: values.analysisDate.trim(), criteria: "-", unit: "", method: "" },
   ];
   return isGrWpSpCommonName(commonName)
