@@ -25,6 +25,7 @@ type ResultForm = {
   analysisDate: string;
   aiCriteria: string;
   density: string;
+  waxBlockCriteria: string;
   aiResult: string;
   appearance: string;
 };
@@ -38,6 +39,7 @@ function resultFieldsForCommonName(commonName?: string): Array<[keyof ResultForm
     ["analysisDate", "Date of analysis", "date"],
     ["aiCriteria", "เกณฑ์ความคลาดเคลื่อน", "text"],
     ["density", isBromadiolone0005(commonName) ? "น้ำหนักก้อนยาหนู" : "Density at 30°C (g/cm³)", "text"],
+    ...(isBromadiolone0005(commonName) ? [["waxBlockCriteria", "เกณฑ์น้ำหนักต่อก้อน", "text"] as const] : []),
     ["aiResult", aiContentTestItemForCommonName(commonName), "text"],
     ["appearance", "Appearance", "text"],
   ];
@@ -47,7 +49,7 @@ function resultFieldsForCommonName(commonName?: string): Array<[keyof ResultForm
 }
 
 function emptyResultForm(): ResultForm {
-  return { analysisDate: "", aiCriteria: "", density: "", aiResult: "", appearance: "" };
+  return { analysisDate: "", aiCriteria: "", density: "", waxBlockCriteria: "", aiResult: "", appearance: "" };
 }
 
 function dateValue(value?: string) {
@@ -75,6 +77,9 @@ function resultFormFromRows(rows: CoaResultSnapshot[], commonName?: string): Res
     analysisDate: dateValue(analysisDate?.result),
     aiCriteria: resolveAiToleranceCriteria(commonName, ai?.criteria) || "",
     density: density?.result || "",
+    waxBlockCriteria: isBromadiolone0005(commonName) && density?.criteria && density.criteria !== "-"
+      ? density.criteria
+      : isBromadiolone0005(commonName) ? "5.88 gm ± 5%" : "",
     aiResult: ai?.result || "",
     appearance: appearanceCriteria && appearanceCriteria !== "-"
       ? appearanceCriteria
@@ -88,7 +93,7 @@ function resultRowsFromForm(itemSeq: number, values: ResultForm, commonName?: st
   const rows: CoaResultSnapshot[] = [
     { itemSeq, testItem: "Appearance", result: "Conform", criteria: values.appearance.trim(), method: "Visual", unit: "" },
     { itemSeq, testItem: aiContentTestItemForCommonName(commonName), result: aiResult && /%$/.test(aiResult) ? aiResult : aiResult ? `${aiResult}%` : "", criteria: values.aiCriteria.trim(), unit: "%", method: "" },
-    { itemSeq, testItem: bromadiolone ? "Wax block size" : "Density at 30°C (g/cm³)", result: values.density.trim(), criteria: "-", unit: bromadiolone ? "g" : "g/cm³", method: bromadiolone ? "" : "DMA 501" },
+    { itemSeq, testItem: bromadiolone ? "Wax block size" : "Density at 30°C (g/cm³)", result: values.density.trim(), criteria: bromadiolone ? values.waxBlockCriteria.trim() : "-", unit: bromadiolone ? "g" : "g/cm³", method: bromadiolone ? "" : "DMA 501" },
     { itemSeq, testItem: "Date of analysis", result: values.analysisDate.trim(), criteria: "-", unit: "", method: "" },
   ];
   return isGrWpSpCommonName(commonName)

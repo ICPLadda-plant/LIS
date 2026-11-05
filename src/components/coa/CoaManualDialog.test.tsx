@@ -137,6 +137,7 @@ describe("CoaManualDialog", () => {
     );
 
     expect(await screen.findByLabelText("น้ำหนักก้อนยาหนู *")).toHaveValue("5.89");
+    expect(screen.getByLabelText("เกณฑ์น้ำหนักต่อก้อน *")).toHaveValue("5.88 gm ± 5%");
     expect(screen.queryByLabelText("Density at 30°C (g/cm³) *")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Date of analysis *"), { target: { value: "2026-11-06" } });
@@ -149,6 +150,7 @@ describe("CoaManualDialog", () => {
     expect(vi.mocked(api.updateCoaDocument).mock.calls[0][1].results).toContainEqual(expect.objectContaining({
       testItem: "Wax block size",
       result: "5.89",
+      criteria: "5.88 gm ± 5%",
       unit: "g",
     }));
   });
