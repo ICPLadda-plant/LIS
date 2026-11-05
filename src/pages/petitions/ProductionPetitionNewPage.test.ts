@@ -244,6 +244,23 @@ describe('R&D integration request rules', () => {
 });
 
 describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
+  it('merges a QC-only row and a Lab-only row of the same batch even without routeTargets', () => {
+    const sample = { sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)', unit: 'G', mfNo: 'MF1' };
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samples: [
+        { ...sample, batchNo: 'B-240', qty: 300, sendToQc: '1', sendToLab: '0' },
+        { ...sample, batchNo: 'B-240', qty: 500, sendToQc: '0', sendToLab: '1' },
+        { ...sample, batchNo: 'B-241', qty: 300, sendToQc: '1', sendToLab: '0' },
+        { ...sample, batchNo: 'B-241', qty: 500, sendToQc: '0', sendToLab: '1' },
+      ],
+    }));
+
+    expect(items.map(({ seq, batchNo, sendToQc, sendToLab, labelQuantities, labelQuantitySides }) => ({ seq, batchNo, sendToQc, sendToLab, labelQuantities, labelQuantitySides }))).toEqual([
+      { seq: 1, batchNo: 'B-240', sendToQc: true, sendToLab: true, labelQuantities: ['300 G', '500 G'], labelQuantitySides: ['qc', 'lab'] },
+      { seq: 2, batchNo: 'B-241', sendToQc: true, sendToLab: true, labelQuantities: ['300 G', '500 G'], labelQuantitySides: ['qc', 'lab'] },
+    ]);
+  });
+
   it('merges two rows of the same batch into one item with two quantities', () => {
     const items = makeInitialItemsFromQuery(new URLSearchParams(
       'routeTargets=qc,lab&sampleName=Foo,Foo&batchNo=B1,B1&qty=50,200&unit=ml',
