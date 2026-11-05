@@ -1151,6 +1151,7 @@ function densityForBatch(rows, batchNo) {
 }
 
 module.exports = {
+  aiFromQcResults,
   batchSimilarity,
   cleanLegacyBatch,
   densityBatchFamily,

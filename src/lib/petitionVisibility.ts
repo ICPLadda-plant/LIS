@@ -2,6 +2,7 @@ import type { ParameterItem } from '@/lib/api';
 import { isAssignedTo } from '@/lib/assignment';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem } from '@/lib/petitionTestItems';
 import { shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isProductionDepartment } from '@/lib/productionDepartment';
 import { normalizeRoles } from '@/lib/roles';
 import type { Petition } from '@/types/petition.types';
 
@@ -19,6 +20,7 @@ export type PetitionVisibilityUser = {
   email?: string;
   name?: string;
   employeeId?: string;
+  department?: string;
   role?: string;
   roles?: string[];
 };
@@ -68,6 +70,8 @@ export function canSeePetition(
   const roles = normalizeRoles(user);
   if (roles.includes('admin')) return true;
   if (isOwnSubmission(petition, user)) return true;
+  // แผนกผลิตเห็นคำร้องของฝ่ายผลิตทุกสาย แม้ไม่ได้เป็นผู้ยื่นเอง
+  if (isProductionDepartment(user.department) && isProductionDepartment(petition.submittedBy?.department)) return true;
   if (isAssignedTo(petition.assignedTo, user)) return true;
   if (RECEIVED_STATUSES.has(petition.status)) {
     if (roles.some(isLabRole) && petitionHasLabItems(petition)) return true;

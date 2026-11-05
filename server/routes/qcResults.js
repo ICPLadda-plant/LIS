@@ -419,6 +419,8 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       actor: enteredBy?.name || enteredBy?.email,
       sampleName,
     });
+    // ค่า ถพ. เปลี่ยน → ส่งผลราย batch ให้ Production (ข้ามเองถ้าค่าไม่เปลี่ยน)
+    if (isSgParameter(paramForCheck)) require('../lib/productionCallback').notifyProductionOnEvent(petitionForEdit);
 
     // If this field has triggersPhase2 and was filled in Phase 1, schedule advance
     if (phaseNum === 1 && fieldDef?.triggersPhase2 && paramForCheck) {
@@ -514,6 +516,7 @@ router.put("/entries", serializePetitionWrite(async (req, res) => {
       const actor = enteredBy?.name || enteredBy?.email;
       logSgEditAfterConfirm({ petition: petitionForEdit, parameter, itemSeq, fieldLabel: 'ค่าถพ.', before: before.value, after: after.value, actor, sampleName });
       logSgEditAfterConfirm({ petition: petitionForEdit, parameter, itemSeq, fieldLabel: SG_TEMP_LABEL, before: before.temperature, after: after.temperature, actor, sampleName });
+      require('../lib/productionCallback').notifyProductionOnEvent(petitionForEdit);
     }
 
     res.json(doc);

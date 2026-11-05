@@ -223,6 +223,33 @@ describe("LabTestingDetailPage", () => {
     expect(screen.queryByText(/เกณฑ์กลาง 1\.7100–1\.8900 %/)).not.toBeInTheDocument();
   });
 
+  it("shows a separate %AI input set for each substance of a mixed product", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [{ ...fixtures.petition.items[0], sampleName: "ABAMECTIN 1.8% + EMAMECTIN 2% W/V EC", commonName: "ABAMECTIN 1.8% + EMAMECTIN 2% W/V EC" }],
+      },
+      results: [{
+        ...fixtures.results[0],
+        values: {
+          "Area Inj.1::abamectin": "10", "Area Inj.2::abamectin": "20", "Area Inj.3::abamectin": "30",
+          "Area Inj.1::emamectin": "100", "Area Inj.2::emamectin": "200", "Area Inj.3::emamectin": "300",
+        },
+      }],
+    };
+    render(<LabTestingDetailPage />);
+
+    const first = await screen.findByRole("region", { name: "ชุด %AI สารที่ 1: ABAMECTIN" });
+    const second = screen.getByRole("region", { name: "ชุด %AI สารที่ 2: EMAMECTIN" });
+    expect(within(first).getByText("Area Inj.1")).toBeInTheDocument();
+    expect(within(first).getByText(/%AI — ABAMECTIN/)).toBeInTheDocument();
+    expect(within(first).getByDisplayValue("20.00")).toBeInTheDocument();
+    expect(within(second).getByText(/%AI — EMAMECTIN/)).toBeInTheDocument();
+    expect(within(second).getByDisplayValue("200.00")).toBeInTheDocument();
+    expect(within(second).queryByDisplayValue("20.00")).not.toBeInTheDocument();
+  });
+
   it("shows the FG %AI parameter for a production petition without an item code", async () => {
     mockState.activeFixtures = {
       ...fixtures,

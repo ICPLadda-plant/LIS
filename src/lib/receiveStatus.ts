@@ -93,7 +93,8 @@ export function labAssignBoardStatusBadge(
 ): StatusBadge {
   if (isLabRecheckPending(p)) return toneBadge('warning', 'Re-check · เปลี่ยนผู้รับงานได้');
   if (assigned) return toneBadge('info', 'assign แล้ว');
-  if (!labReceivedAt(p)) return statusBadge('sampleSent');
+  // ตัวอย่างยังไม่ถึง Lab (assign ล่วงหน้าได้) → "กำลังส่งตัวอย่าง"
+  if (!labReceivedAt(p)) return statusBadge('deliveringQC');
   return statusBadge('pendingReview');
 }
 

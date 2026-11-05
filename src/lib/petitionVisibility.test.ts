@@ -33,4 +33,13 @@ describe('canSeePetition', () => {
     expect(canSeePetition(makePetition('BATCH-2'), { roles: ['lab-analyze'] })).toBe(false);
     expect(canSeePetition(makePetition('BATCH-6'), { roles: ['lab-analyze'] })).toBe(true);
   });
+
+  it('lets production users see petitions from every production line, but not other departments', () => {
+    const fromLine3 = { ...makePetition('BATCH-2'), submittedBy: { name: 'Other', department: 'ผลิต 03', submittedAt: '' } };
+    const fromIt = { ...makePetition('BATCH-2'), submittedBy: { name: 'Other', department: 'IT', submittedAt: '' } };
+    const viewer = { name: 'Line 1 user', department: 'ผลิต 1', roles: ['viewer'] };
+    expect(canSeePetition(fromLine3, viewer)).toBe(true);
+    expect(canSeePetition(fromIt, viewer)).toBe(false);
+    expect(canSeePetition(fromLine3, { ...viewer, department: 'IT' })).toBe(false);
+  });
 });

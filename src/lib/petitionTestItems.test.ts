@@ -421,6 +421,19 @@ describe('visibleEnumOptions', () => {
     expect(visibleEnumOptions(field, makeItem({ commonName: 'ulv', sampleName: 'X ULV' }))).toContain('ของเหลวใส');
     expect(visibleEnumOptions(field, makeItem({ commonName: 'EW' }))).not.toContain('ของเหลวใส');
   });
+
+  it('falls back to all options when every option is filtered out', () => {
+    const field = makeEnumField({
+      optionFilters: {
+        'ของเหลวใส': { productTypes: ['water'] },
+        'ของเหลวขุ่น': { productTypes: ['water'] },
+        'ผงละเอียด': { itemGroups: ['gRodent'] },
+      },
+    });
+    const item = makeItem({ commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)', sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)' });
+    expect(visibleEnumOptions(field, item)).toEqual(['ของเหลวใส', 'ของเหลวขุ่น', 'ผงละเอียด']);
+    expect(visibleEnumOptions(field, item, ['gRodent'])).toEqual(['ผงละเอียด']);
+  });
 });
 
 describe('item-group matching', () => {

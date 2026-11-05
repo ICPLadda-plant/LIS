@@ -101,9 +101,9 @@ describe('labTrackStatusBadge accept step', () => {
 });
 
 describe('labAssignBoardStatusBadge', () => {
-  it('Lab not received yet shows sent sample even if QC already received', () => {
+  it('Lab not received yet shows the sample is still on its way even if QC already received', () => {
     const p = { status: 'pendingReview' as const, qcReceivedAt: T1 };
-    expect(labAssignBoardStatusBadge(p).label).toBe('ส่งตัวอย่างแล้ว');
+    expect(labAssignBoardStatusBadge(p).label).toBe('กำลังส่งตัวอย่าง');
   });
 
   it('assigned card shows assigned wording on the Lab assign board', () => {

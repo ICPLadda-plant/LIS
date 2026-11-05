@@ -7,9 +7,9 @@ const LabRequest = require('../models/LabRequest');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { resolveEmployeeActor } = require('../lib/employeeResolver');
 const {
+  applyItemNotes,
   buildEditedItems,
   canEditWholePetition,
-  replaceProductionNote,
   routeTargetsForItems,
 } = require('../lib/productionPetitionEdit');
 
@@ -164,8 +164,11 @@ router.put('/petitions/:petitionNo', async (req, res) => {
       }
       auditNote = 'Production แก้ไขคำขอก่อนรับตัวอย่าง: ' + items.map((it) => `#${it.seq} ${it.batchNo} ${it.labelQuantity || ''}`.trim()).join(', ');
     } else {
-      update = { items: petition.toObject().items.map((item) => ({ ...item, note: replaceProductionNote(item.note, note) })) };
-      auditNote = 'Production แก้ไขหมายเหตุ: ' + (note || '-');
+      const itemNotes = Array.isArray(req.body?.itemNotes) ? req.body.itemNotes : [];
+      update = { items: applyItemNotes(petition.toObject().items, itemNotes, note) };
+      auditNote = 'Production แก้ไขหมายเหตุ: ' + (itemNotes.length
+        ? itemNotes.map((n) => `#${n.seq} ${n.batchNo || '-'}: ${String(n.note || '').trim() || '-'}`).join(', ')
+        : (note || '-'));
     }
     const saved = await Petition.findOneAndUpdate(
       { _id: petition._id, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v },
