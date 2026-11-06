@@ -1472,6 +1472,23 @@ export default function CoaCenterPage() {
                           >
                             เสร็จสิ้น
                           </Button>
+                          {canDeleteCoa && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="gap-2"
+                              disabled={deleteCoa.isPending}
+                              aria-label={`ลบ COA ${coaDisplayNo(doc)}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDelete(doc);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              ลบ
+                            </Button>
+                          )}
                         </div>
                       </td>
                     )}

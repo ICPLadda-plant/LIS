@@ -735,6 +735,7 @@ describe("CoaCenterPage", () => {
     expect(screen.getByRole("button", { name: "เปิดดูไฟล์ COA 00012026" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "แก้ไข COA 00012026" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "เสร็จสิ้น COA 00012026" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ลบ COA 00012026" })).toBeInTheDocument();
   });
 
   it("simulates a BROMADIOLONE 0.005% COA through QC Head approval", async () => {
@@ -755,6 +756,7 @@ describe("CoaCenterPage", () => {
     expect(within(inProgressRow).getByRole("button", { name: "เปิดดูไฟล์ COA 13482026" })).toBeInTheDocument();
     expect(within(inProgressRow).getByRole("button", { name: "แก้ไข COA 13482026" })).toBeInTheDocument();
     expect(within(inProgressRow).getByRole("button", { name: "เสร็จสิ้น COA 13482026" })).toBeInTheDocument();
+    expect(within(inProgressRow).getByRole("button", { name: "ลบ COA 13482026" })).toBeInTheDocument();
 
     fireEvent.click(within(inProgressRow).getByRole("button", { name: "เสร็จสิ้น COA 13482026" }));
 
