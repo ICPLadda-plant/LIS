@@ -801,6 +801,7 @@ describe("CoaCenterPage", () => {
     expect(screen.getByText("Customer D")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "พิมพ์ COA 00032026" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "บันทึกไฟล์ PDF COA 00032026" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "ส่งอีเมล COA 00032026" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "ลบ COA 00032026" })).toBeEnabled();
   });
 

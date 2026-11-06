@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { CheckCircle2, FileCheck2, Printer, XCircle } from "lucide-react";
+import { CheckCircle2, FileCheck2, Mail, Printer, XCircle } from "lucide-react";
+import { toast } from "sonner";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
@@ -15,7 +16,8 @@ import CoaStatusBadge from "@/components/coa/CoaStatusBadge";
 import { api } from "@/lib/api";
 import { buildCoaReportPages } from "@/lib/coaReport";
 import { allowedCoaActions, canPrintCoa, canReviewCoa, isCoaQcHead } from "@/lib/coaStatus";
-import { openPrintPdf } from "@/lib/print";
+import { createPrintPdfBlob, openPrintPdf } from "@/lib/print";
+import { sendMicrosoftMailWithPdf } from "@/lib/microsoftMail";
 import { useAuth } from "@/hooks/useAuth";
 import { normalizeRoles, primaryRole } from "@/lib/roles";
 
@@ -29,6 +31,9 @@ export default function CoaDetailPage() {
   const [manualOpen, setManualOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [remark, setRemark] = useState("");
   const pdfRef = useRef<HTMLDivElement>(null);
   const pdfDownloadKeyRef = useRef("");
@@ -36,6 +41,11 @@ export default function CoaDetailPage() {
     queryKey: ["coa", id],
     queryFn: () => api.getCoaDocument(id),
     enabled: Boolean(id),
+  });
+  const { data: employees = [] } = useQuery<Array<{ employeeId: string; name: string; department: string; email?: string }>>({
+    queryKey: ["employees", "directory"],
+    queryFn: () => api.get("/employees/directory"),
+    enabled: emailOpen,
   });
   const roles = normalizeRoles(user);
   const activeRole = user?.role || primaryRole(roles);
@@ -95,6 +105,32 @@ export default function CoaDetailPage() {
       setPrintOpen(true);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("email") === "1" && printable) setEmailOpen(true);
+  }, [printable, searchParams]);
+
+  async function sendEmail() {
+    if (!doc || !recipientEmail || !pdfRef.current) return;
+    setSendingEmail(true);
+    try {
+      const documentNo = doc.coaNo || doc.petitionNoSnapshot || id;
+      await sendMicrosoftMailWithPdf({
+        to: recipientEmail,
+        subject: `COA ${documentNo}`,
+        body: `แนบเอกสาร COA ${documentNo}`,
+        fileName: `COA-${documentNo}.pdf`,
+        pdf: await createPrintPdfBlob("coa", pdfRef.current, COA_REPORT_CSS),
+      });
+      toast.success("ส่ง COA ทางอีเมลเรียบร้อยแล้ว");
+      setEmailOpen(false);
+      setRecipientEmail("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "ส่งอีเมลไม่สำเร็จ");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   useEffect(() => {
     if (searchParams.get("pdf") !== "1" || !printable || !doc || !pdfRef.current) return;
@@ -204,6 +240,38 @@ export default function CoaDetailPage() {
             <Button type="button" variant="outline" disabled={reject.isPending} onClick={() => setRejectOpen(false)}>ยกเลิก</Button>
             <Button type="button" variant="destructive" disabled={!reason.trim() || reject.isPending} onClick={() => reject.mutate()}>
               {reject.isPending ? "กำลังส่งกลับ..." : "ยืนยันไม่อนุมัติ"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={emailOpen} onOpenChange={(open) => { if (!sendingEmail) setEmailOpen(open); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ส่ง COA ทางอีเมล</DialogTitle>
+            <DialogDescription>เลือกพนักงานภายในบริษัท ระบบจะแนบไฟล์ PDF และส่งจากบัญชี Microsoft ของคุณ</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor="coa-email-recipient" className="text-sm font-medium text-foreground">ผู้รับ</label>
+            <select
+              id="coa-email-recipient"
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground"
+              value={recipientEmail}
+              disabled={sendingEmail}
+              onChange={(event) => setRecipientEmail(event.target.value)}
+            >
+              <option value="">เลือกพนักงาน</option>
+              {employees.filter((employee) => employee.email).map((employee) => (
+                <option key={employee.employeeId} value={employee.email}>
+                  {employee.name} · {employee.department} · {employee.email}
+                </option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={sendingEmail} onClick={() => setEmailOpen(false)}>ยกเลิก</Button>
+            <Button type="button" className="gap-2" disabled={!recipientEmail || sendingEmail} onClick={() => void sendEmail()}>
+              <Mail className="h-4 w-4" />
+              {sendingEmail ? "กำลังส่ง..." : "ส่งอีเมล"}
             </Button>
           </DialogFooter>
         </DialogContent>

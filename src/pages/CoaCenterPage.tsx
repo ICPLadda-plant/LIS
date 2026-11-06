@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, Trash2, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Mail, Pencil, Printer, Trash2, TrendingUp, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -1347,6 +1347,21 @@ export default function CoaCenterPage() {
                         >
                           <FileDown className="h-4 w-4" />
                           บันทึกไฟล์ PDF
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 gap-2"
+                          disabled={!canPrintCoa(doc.status)}
+                          aria-label={`ส่งอีเมล COA ${doc.coaNo || doc.petitionNoSnapshot || doc._id}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/coa/${doc._id}?email=1`);
+                          }}
+                        >
+                          <Mail className="h-4 w-4" />
+                          ส่งอีเมล
                         </Button>
                         {canDeleteCoa && (
                           <Button
