@@ -4,10 +4,38 @@ import {
   hasRequiredLabRequestStep,
   isResearchAndDevelopmentDepartment,
   makeInitialItemsFromQuery,
+  integrationPayloadToSearchParams,
   objectToSearchParams,
   requiresMasterItemSelection,
   requiresDeliveryAndBatch,
 } from './ProductionPetitionNewPage';
+
+describe('integrationPayloadToSearchParams', () => {
+  it('reads the query string Production posted exactly as if it came from the URL', () => {
+    const query = new URLSearchParams({
+      requestNo: 'SA261106000001',
+      'samples[0][sampleName]': 'A',
+      'samples[0][batchNo]': 'B-1',
+      'samples[0][note]': 'หมายเหตุตัวแรก',
+      'samples[1][sampleName]': 'A',
+      'samples[1][batchNo]': 'B-2',
+      'samples[1][note]': '',
+    }).toString();
+
+    const params = integrationPayloadToSearchParams({ query });
+
+    expect(params.toString()).toBe(query);
+    // ช่องว่างของตัวสุดท้ายต้องคงไว้ ไม่งั้น LIS เอาค่าของตัวแรกมาเติมแทน
+    expect(makeInitialItemsFromQuery(params).map((item) => item.note)).toEqual(['หมายเหตุตัวแรก', '']);
+  });
+
+  it('still accepts the object payload of older callers', () => {
+    const params = integrationPayloadToSearchParams({ requestNo: 'SA1', samples: [{ sampleName: 'A', batchNo: 'B-1' }] });
+
+    expect(params.get('requestNo')).toBe('SA1');
+    expect(params.get('samples[0][batchNo]')).toBe('B-1');
+  });
+});
 
 describe('buildProductionReturnUrl', () => {
   it('returns production list with original request number and LIS petition number', () => {

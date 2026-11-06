@@ -43,6 +43,7 @@ router.post('/petitions', async (req, res) => {
     await ProductionIntegrationRequest.create({ token, payload });
     const prefix = req.originalUrl.startsWith('/LIS/') ? '/LIS' : '';
     res.status(201).json({
+      ok: true,
       token,
       redirectUrl: `${prefix}/petitions/ProductionIntegrationPetitionNewPage?integrationToken=${encodeURIComponent(token)}`,
     });
