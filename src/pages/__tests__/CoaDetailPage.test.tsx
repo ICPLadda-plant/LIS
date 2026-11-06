@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   openPrintPdf: vi.fn(),
   createPrintPdfBlob: vi.fn(),
   sendMicrosoftMailWithPdf: vi.fn(),
+  ensureMicrosoftMailAccount: vi.fn(),
 }));
 
 vi.mock("@/components/lis/AppLayout", () => ({
@@ -46,7 +47,10 @@ vi.mock("@/lib/print", () => ({
   openPrintPdf: mocks.openPrintPdf,
   createPrintPdfBlob: mocks.createPrintPdfBlob,
 }));
-vi.mock("@/lib/microsoftMail", () => ({ sendMicrosoftMailWithPdf: mocks.sendMicrosoftMailWithPdf }));
+vi.mock("@/lib/microsoftMail", () => ({
+  ensureMicrosoftMailAccount: mocks.ensureMicrosoftMailAccount,
+  sendMicrosoftMailWithPdf: mocks.sendMicrosoftMailWithPdf,
+}));
 
 function documentWith(status: string) {
   return {
@@ -98,6 +102,7 @@ beforeEach(() => {
   mocks.openPrintPdf.mockResolvedValue(undefined);
   mocks.createPrintPdfBlob.mockResolvedValue(new Blob(["pdf"]));
   mocks.sendMicrosoftMailWithPdf.mockResolvedValue(undefined);
+  mocks.ensureMicrosoftMailAccount.mockResolvedValue({ username: "sender@icpladda.com" });
 });
 
 describe("CoaDetailPage", () => {

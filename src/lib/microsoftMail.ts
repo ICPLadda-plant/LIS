@@ -10,6 +10,15 @@ async function blobBase64(blob: Blob): Promise<string> {
   });
 }
 
+export async function ensureMicrosoftMailAccount() {
+  const existing = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
+  if (existing) return existing;
+  const login = await msalInstance.loginPopup({ scopes: ["User.Read", "Mail.Send"], prompt: "select_account" });
+  if (!login.account) throw new Error("ไม่พบบัญชี Microsoft หลังเข้าสู่ระบบ");
+  msalInstance.setActiveAccount(login.account);
+  return login.account;
+}
+
 export async function sendMicrosoftMailWithPdf(input: {
   to: string;
   subject: string;
@@ -17,8 +26,7 @@ export async function sendMicrosoftMailWithPdf(input: {
   fileName: string;
   pdf: Blob;
 }): Promise<void> {
-  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0];
-  if (!account) throw new Error("ไม่พบบัญชี Microsoft ที่ล็อกอิน");
+  const account = await ensureMicrosoftMailAccount();
   let token;
   try {
     token = await msalInstance.acquireTokenSilent({ account, scopes: ["Mail.Send"] });

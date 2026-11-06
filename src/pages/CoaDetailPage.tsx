@@ -17,7 +17,7 @@ import { api } from "@/lib/api";
 import { buildCoaReportPages } from "@/lib/coaReport";
 import { allowedCoaActions, canPrintCoa, canReviewCoa, isCoaQcHead } from "@/lib/coaStatus";
 import { createPrintPdfBlob, openPrintPdf } from "@/lib/print";
-import { sendMicrosoftMailWithPdf } from "@/lib/microsoftMail";
+import { ensureMicrosoftMailAccount, sendMicrosoftMailWithPdf } from "@/lib/microsoftMail";
 import { useAuth } from "@/hooks/useAuth";
 import { normalizeRoles, primaryRole } from "@/lib/roles";
 
@@ -115,6 +115,7 @@ export default function CoaDetailPage() {
     if (!doc || !recipientEmail || !pdfRef.current) return;
     setSendingEmail(true);
     try {
+      await ensureMicrosoftMailAccount();
       const documentNo = doc.coaNo || doc.petitionNoSnapshot || id;
       await sendMicrosoftMailWithPdf({
         to: recipientEmail,
