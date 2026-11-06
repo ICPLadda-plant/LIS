@@ -26,7 +26,7 @@ const PHYSICAL_ENGLISH = {
   'ใส': 'Clear', 'ไม่มีสี': 'Colorless', 'ใสไม่มีสี': 'Colorless', 'ขาว': 'White',
   'ดำ': 'Black', 'แดง': 'Red', 'ส้ม': 'Orange', 'เหลือง': 'Yellow', 'เขียว': 'Green',
   'ฟ้า': 'Light blue', 'น้ำเงิน': 'Blue', 'ม่วง': 'Purple', 'ชมพู': 'Pink',
-  'น้ำตาล': 'Brown', 'เทา': 'Gray', 'เหลืองอ่อน': 'Pale yellow',
+  'น้ำตาล': 'Brown', 'เทา': 'Gray', 'เหลืองอ่อน': 'Pale yellow', 'ขาวนวล': 'Off white',
 };
 
 function text(value) {
@@ -364,6 +364,10 @@ function physicalFromQc(result) {
     }
   }
   const unique = [...new Set(values)];
+  const sources = unique.map((value) => value.replace(/^สี/, ''));
+  if (sources.includes('ผงละเอียด') && sources.includes('ขาวนวล')) {
+    return { raw: unique.join(' '), english: 'Off white powder', complete: true };
+  }
   const english = unique.map(translatePhysicalValue).filter(Boolean);
   return {
     raw: unique.join(' '),

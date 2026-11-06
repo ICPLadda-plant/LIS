@@ -587,6 +587,7 @@ test('physical QC values are translated to English and preserve unknown values f
     english: 'Clear liquid, Orange',
     complete: true,
   });
+  assert.equal(physicalFromQc({ values: { 'ลักษณะ': 'ผงละเอียด', 'สี': 'สีขาวนวล' } }).english, 'Off white powder');
   assert.equal(physicalFromQc({ values: { 'ลักษณะ': 'ของเหลวใส', 'สี': 'สีที่ยังไม่ได้แปล' } }).complete, false);
 });
 
