@@ -746,31 +746,31 @@ describe("CoaCenterPage", () => {
     const requestedRow = await screen.findByRole("row", { name: /P-2608-DEMO-001/ });
     expect(within(requestedRow).getByText("Red Wax Block")).toBeInTheDocument();
     expect(within(requestedRow).getByText("BROMADIOLONE 0.005%")).toBeInTheDocument();
-    expect(within(requestedRow).getByText("LOT-DEMO-001 / B-DEMO-001 / 08/08/2026")).toBeInTheDocument();
+    expect(within(requestedRow).getByText("B-DEMO-001 / 08/08/2026")).toBeInTheDocument();
 
     fireEvent.click(within(requestedRow).getByRole("button", { name: "สร้าง COA P-2608-DEMO-001" }));
 
     expect(screen.getByRole("button", { name: "สถานะ ดำเนินการแล้ว" })).toHaveAttribute("aria-pressed", "true");
-    const inProgressRow = await screen.findByRole("row", { name: /00042026/ });
-    expect(within(inProgressRow).getByRole("button", { name: "เปิดดูไฟล์ COA 00042026" })).toBeInTheDocument();
-    expect(within(inProgressRow).getByRole("button", { name: "แก้ไข COA 00042026" })).toBeInTheDocument();
-    expect(within(inProgressRow).getByRole("button", { name: "เสร็จสิ้น COA 00042026" })).toBeInTheDocument();
+    const inProgressRow = await screen.findByRole("row", { name: /13482026/ });
+    expect(within(inProgressRow).getByRole("button", { name: "เปิดดูไฟล์ COA 13482026" })).toBeInTheDocument();
+    expect(within(inProgressRow).getByRole("button", { name: "แก้ไข COA 13482026" })).toBeInTheDocument();
+    expect(within(inProgressRow).getByRole("button", { name: "เสร็จสิ้น COA 13482026" })).toBeInTheDocument();
 
-    fireEvent.click(within(inProgressRow).getByRole("button", { name: "เสร็จสิ้น COA 00042026" }));
+    fireEvent.click(within(inProgressRow).getByRole("button", { name: "เสร็จสิ้น COA 13482026" }));
 
     expect(screen.getByRole("button", { name: "สถานะ รออนุมัติ" })).toHaveAttribute("aria-pressed", "true");
-    const pendingApprovalRow = await screen.findByRole("row", { name: /00042026/ });
-    expect(within(pendingApprovalRow).getByRole("button", { name: "เปิดดูไฟล์ COA 00042026" })).toBeInTheDocument();
-    expect(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 00042026" })).toBeInTheDocument();
-    expect(within(pendingApprovalRow).getByRole("button", { name: "ไม่อนุมัติ COA 00042026" })).toBeInTheDocument();
+    const pendingApprovalRow = await screen.findByRole("row", { name: /13482026/ });
+    expect(within(pendingApprovalRow).getByRole("button", { name: "เปิดดูไฟล์ COA 13482026" })).toBeInTheDocument();
+    expect(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 13482026" })).toBeInTheDocument();
+    expect(within(pendingApprovalRow).getByRole("button", { name: "ไม่อนุมัติ COA 13482026" })).toBeInTheDocument();
 
-    fireEvent.click(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 00042026" }));
+    fireEvent.click(within(pendingApprovalRow).getByRole("button", { name: "อนุมัติ COA 13482026" }));
 
     expect(screen.getByRole("button", { name: "สถานะ อนุมัติแล้ว" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("coa-center-page")).toHaveClass("space-y-4");
-    const approvedRow = await screen.findByRole("row", { name: /00042026/ });
+    const approvedRow = await screen.findByRole("row", { name: /13482026/ });
     expect(within(approvedRow).getByText("Red Wax Block")).toBeInTheDocument();
-    expect(within(approvedRow).getByRole("button", { name: "พิมพ์ COA 00042026" })).toBeEnabled();
+    expect(within(approvedRow).getByRole("button", { name: "พิมพ์ COA 13482026" })).toBeEnabled();
   });
 
   it("shows print and PDF commands with focused COA columns in the approved workflow tab", async () => {

@@ -32,7 +32,9 @@ type CoaDocumentStage = "requested" | "inProgress" | "pendingApproval" | "approv
 type CoaWorkflowStage = "all" | CoaDocumentStage;
 
 const BROMADIOLONE_DEMO_COA_ID = "demo-coa-bromadiolone-0005";
-const BROMADIOLONE_DEMO_COA_NO = "00042026";
+const BROMADIOLONE_DEMO_COA_NO = "13482026";
+const BROMADIOLONE_DEMO_SEQUENCE = 1348;
+const BROMADIOLONE_DEMO_CREATED_AT = "2026-11-07T00:00:00.000+07:00";
 
 type DemoCoaEditForm = {
   sampleName: string;
@@ -134,13 +136,12 @@ function replaceDemoResult(rows: CoaDocument["resultSnapshots"], testItem: strin
   return replaced ? nextRows : [...nextRows, { itemSeq: 1, testItem, result }];
 }
 
-function makeBromadioloneDemoCoa(status: CoaDocument["status"] = "requested", now = new Date()): CoaDocument {
-  const isoNow = now.toISOString();
+function makeBromadioloneDemoCoa(status: CoaDocument["status"] = "requested"): CoaDocument {
   return {
     _id: BROMADIOLONE_DEMO_COA_ID,
     coaNo: status === "requested" ? null : BROMADIOLONE_DEMO_COA_NO,
     coaYear: 2026,
-    sequence: status === "requested" ? undefined : 4,
+    sequence: status === "requested" ? undefined : BROMADIOLONE_DEMO_SEQUENCE,
     revision: 0,
     status,
     petitionId: "demo-petition-bromadiolone-0005",
@@ -166,8 +167,8 @@ function makeBromadioloneDemoCoa(status: CoaDocument["status"] = "requested", no
     print: { printCount: 0 },
     createdBy: { name: "Demo User", email: "demo@example.com", role: "demo" },
     updatedBy: { name: "Demo User", email: "demo@example.com", role: "demo" },
-    createdAt: isoNow,
-    updatedAt: isoNow,
+    createdAt: BROMADIOLONE_DEMO_CREATED_AT,
+    updatedAt: BROMADIOLONE_DEMO_CREATED_AT,
   };
 }
 
@@ -673,7 +674,7 @@ export default function CoaCenterPage() {
       setDemoCoa({
         ...doc,
         coaNo: doc.coaNo || BROMADIOLONE_DEMO_COA_NO,
-        sequence: doc.sequence || 4,
+        sequence: doc.sequence || BROMADIOLONE_DEMO_SEQUENCE,
         status: "draft",
         updatedBy: actor,
         updatedAt: new Date().toISOString(),
@@ -729,9 +730,9 @@ export default function CoaCenterPage() {
       setDemoCoa({
         ...doc,
         coaNo: doc.coaNo || BROMADIOLONE_DEMO_COA_NO,
-        sequence: doc.sequence || 4,
+        sequence: doc.sequence || BROMADIOLONE_DEMO_SEQUENCE,
         status: "approved",
-        approval: { ...doc.approval, approvedBy: actor, approvedAt: new Date().toISOString() },
+        approval: { ...doc.approval, approvedBy: actor, approvedAt: BROMADIOLONE_DEMO_CREATED_AT },
         updatedBy: actor,
         updatedAt: new Date().toISOString(),
       });

@@ -47,13 +47,6 @@ function formatGregorianDate(value?: string): string {
   return date.toLocaleDateString("en-GB");
 }
 
-function formatEnglishDate(value?: string): string {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-}
-
 function addYears(value: string | undefined, years: number): string {
   if (!value) return "-";
   const date = new Date(value);
@@ -173,7 +166,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       template,
       coaNo: doc.coaNo || "-",
       revision: doc.revision || 0,
-      issueDate: template === "standard" ? formatDate(doc.approval?.approvedAt) : formatEnglishDate(doc.approval?.approvedAt),
+      issueDate: formatGregorianDate(doc.approval?.approvedAt),
       petitionNo: doc.petitionNoSnapshot || "-",
       customer: doc.customerSnapshot || {},
       samples: group,

@@ -48,7 +48,7 @@ export const COA_REPORT_CSS = `
 `;
 
 function dayMonthYear(value: string) {
-  return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");
+  return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3/$2/$1");
 }
 
 function ApprovalSignature({ page, fallbackUrl }: { page: CoaReportPage; fallbackUrl?: string }) {
