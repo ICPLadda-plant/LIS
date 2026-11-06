@@ -62,7 +62,7 @@ describe("CoaReportTemplate", () => {
       template: "grWpSp",
       coaNo: "00052026",
       revision: 0,
-      issueDate: "20/08/2026",
+      issueDate: "August 20, 2026",
       petitionNo: "P-2608-0005",
       customer: {},
       samples: [{
@@ -92,7 +92,7 @@ describe("CoaReportTemplate", () => {
     const { rerender } = render(<CoaReportTemplate pages={[page]} />);
 
     expect(screen.getByText("CERTIFICATE OF ANALYSIS")).toBeInTheDocument();
-    expect(screen.getAllByText("20/08/2026")).not.toHaveLength(0);
+    expect(screen.getByText("August 20, 2026")).toBeInTheDocument();
     expect(screen.queryByText("Month Date, ค.ศ.")).not.toBeInTheDocument();
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Trade Herbicide (Glyphosate 48% SL GR)");
     expect(screen.getByText(/MANUFACTURING DATE/).closest("div")).toHaveTextContent("MANUFACTURING DATE : 15/08/2026");
@@ -177,7 +177,7 @@ describe("CoaReportTemplate", () => {
       template: "liquid",
       coaNo: "00062026",
       revision: 0,
-      issueDate: "20/08/2026",
+      issueDate: "August 20, 2026",
       petitionNo: "P-2608-0006",
       customer: {},
       samples: [{
@@ -217,7 +217,7 @@ describe("CoaReportTemplate", () => {
     expect(window.getComputedStyle(section).fontSize).toBe("18pt");
     expect(window.getComputedStyle(screen.getByText("CERTIFICATE OF ANALYSIS")).fontSize).toBe("20pt");
     expect(COA_REPORT_CSS).toContain(".coa-liquid-page .coa-special-table th { font-weight: 400 !important; }");
-    expect(screen.getAllByText("20/08/2026")).not.toHaveLength(0);
+    expect(screen.getByText("August 20, 2026")).toBeInTheDocument();
     expect(screen.queryByText("Month DATE, ค.ศ.")).not.toBeInTheDocument();
     expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["TEST ITEM", "Specification", "Result"]);
     expect(screen.getByText("Clear liquid")).toBeInTheDocument();
@@ -257,7 +257,7 @@ describe("CoaReportTemplate", () => {
     const appearanceCells = within(screen.getByText("Appearance").closest("tr")!).getAllByRole("cell");
     expect(appearanceCells[1]).toBeEmptyDOMElement();
     expect(appearanceCells[2]).toBeEmptyDOMElement();
-    expect(screen.getAllByText("20/08/2026")).toHaveLength(1);
+    expect(screen.queryByText("August 20, 2026")).not.toBeInTheDocument();
   });
 
   it("renders the BROMADIOLONE 0.005% wax block COA form", () => {
@@ -265,7 +265,7 @@ describe("CoaReportTemplate", () => {
       template: "bromadiolone0005",
       coaNo: "00082026",
       revision: 0,
-      issueDate: "20/08/2026",
+      issueDate: "August 20, 2026",
       petitionNo: "P-2608-0008",
       customer: {},
       samples: [{
@@ -295,7 +295,7 @@ describe("CoaReportTemplate", () => {
     render(<CoaReportTemplate pages={[page]} />);
 
     expect(screen.getByText("CERTIFICATE OF ANALYSIS")).toBeInTheDocument();
-    expect(screen.getAllByText("20/08/2026")).not.toHaveLength(0);
+    expect(screen.getByText("August 20, 2026")).toBeInTheDocument();
     expect(screen.queryByText("Month DATE, ค.ศ.")).not.toBeInTheDocument();
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Red Wax Block (BROMADIOLONE 0.005%)");
     expect(screen.getByText("Red wax block")).toBeInTheDocument();
