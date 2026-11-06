@@ -44,7 +44,8 @@ export default function CoaDetailPage() {
   });
   const { data: employees = [] } = useQuery<Array<{ employeeId: string; name: string; department: string; email?: string }>>({
     queryKey: ["employees", "directory"],
-    queryFn: () => api.get("/employees/directory"),
+    queryFn: () => api.get<Array<{ employeeId: string; name: string; department: string; email?: string }>>("/employees/directory")
+      .then((response) => response.data.data),
     enabled: emailOpen,
   });
   const roles = normalizeRoles(user);
