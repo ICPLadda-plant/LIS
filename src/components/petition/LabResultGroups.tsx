@@ -2,6 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MediaThumbnails } from "@/components/lis/MediaThumbnails";
 import { cn } from "@/lib/utils";
 import type { ApprovalItemGroup } from "@/lib/qcApprovalRows";
 
@@ -67,7 +68,13 @@ export default function LabResultGroups({ groups, renderGroupActions }: Props) {
                             <td className="py-1.5 pr-3 break-words">
                               {row.label}{row.unit ? <span className="text-muted-foreground"> ({row.unit})</span> : null}
                             </td>
-                            <td className="py-1.5 pr-3 font-mono font-semibold break-words">{row.value || "-"}</td>
+                            <td className="py-1.5 pr-3 font-mono font-semibold break-words">
+                              {row.mediaUrls && row.mediaUrls.length > 0 ? (
+                                <MediaThumbnails urls={row.mediaUrls} />
+                              ) : (
+                                row.value || "-"
+                              )}
+                            </td>
                             <td className="py-1.5 pr-3 text-muted-foreground break-words">{row.standardText || "-"}</td>
                             <td className="py-1.5 pr-3">
                               {row.abnormal ? (

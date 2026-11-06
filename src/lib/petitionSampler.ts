@@ -64,6 +64,22 @@ export function formatSampleLabelDocumentNumber(petitionNo: string | null | unde
   return number ? `${number.seq}/${number.year}` : "";
 }
 
+/**
+ * ช่อง "เลขที่ใบนำส่งตัวอย่าง" ในใบคำขอรับบริการ: ใช้เลขป้ายนำส่ง เช่น P01/69 (ฝั่ง QC ก่อน แล้วฝั่ง LAB)
+ * เลข P/L นับต่อเนื่องทั้งปี พ.ศ. ห้ามแปลงจากเลขคำร้อง P-YYMM-NNNN เพราะลำดับนั้นเริ่มใหม่ทุกเดือน
+ * ถ้าผู้ใช้กรอกเลขที่ใบนำส่งเองซึ่งไม่ใช่เลขคำร้อง หรือคำขอยังไม่มีเลข P/L ให้แสดงค่าที่บันทึกไว้
+ */
+export function serviceRequestSubmissionNo(
+  petition: Pick<Petition, "petitionNo" | "sampleLabelNumbers">,
+  item: Pick<Petition["items"][number], "submissionNo">,
+): string {
+  const entered = String(item.submissionNo ?? "").trim();
+  if (entered && entered !== petition.petitionNo) return entered;
+  const number = sampleLabelSideNumber(petition, "qc") ?? sampleLabelSideNumber(petition, "lab");
+  if (number) return `${number.seq}/${number.year}`;
+  return entered;
+}
+
 /** ตัดวงเล็บท้ายชื่อ เช่น "นายสมชาย ใจดี (ชาย)" → "นายสมชาย ใจดี" */
 function withoutTrailingParenthesis(name: string): string {
   return name.replace(/\s*\([^()]*\)\s*$/u, "").trim();

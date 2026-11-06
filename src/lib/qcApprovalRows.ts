@@ -16,6 +16,7 @@ import { calculatedAiFieldKind } from "@/lib/aiCalculation";
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, stripAiSubstanceSuffix } from "@/lib/aiSubstanceFields";
 import { sampleRoundFor } from "@/lib/additionalSamples";
 import { isPhaseTriggerParameter, visibleFieldsForPhase } from "@/lib/phaseRetest";
+import { mediaUrlsFromValue } from "@/lib/mediaUrls";
 
 // ต่อท้ายชื่อแถวผลรอบตรวจซ้ำ เพื่อให้หน้าออกผลและรายงานแยกค่าก่อน/หลัง trigger (เช่น อบ 14 วัน) ได้
 export const PHASE2_ROW_SUFFIX = "ตรวจซ้ำ Phase 2";
@@ -25,6 +26,8 @@ export interface ApprovalFieldRow {
   label: string;
   unit?: string;
   value: string;
+  /** รูป/วิดีโอที่อัปโหลด (ช่องชนิด photo) ให้หน้าแสดงเป็นรูปย่อแทนข้อความ path */
+  mediaUrls?: string[];
   standardText: string;
   abnormal: boolean;
   note: string;
@@ -226,6 +229,7 @@ export function buildApprovalGroups(
                   label: labelParts.join(" · "),
                   unit: unit.field.unit,
                   value: asStr(raw),
+                  mediaUrls: mediaUrlsFromValue(raw),
                   standardText: rowStandardText,
                   abnormal: rowAbnormal,
                   note,
@@ -242,6 +246,7 @@ export function buildApprovalGroups(
                 key: `${k}__extra__${key}__p${phase}__e${ei}`,
                 label: [extraRowLabel(key, item.commonName), entryLabel].filter(Boolean).join(" · "),
                 value: asStr(raw),
+                mediaUrls: mediaUrlsFromValue(raw),
                 standardText: "",
                 abnormal: false,
                 note: "",

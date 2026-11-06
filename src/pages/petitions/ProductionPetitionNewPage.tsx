@@ -186,6 +186,13 @@ export function objectToSearchParams(input: unknown): URLSearchParams {
   return params;
 }
 
+// Production ส่ง query string ทั้งก้อนผ่าน POST (ยาวเกินใส่ URL ได้) → อ่านเหมือนมาจาก URL ทุกประการ
+// ห้ามแปลงผ่าน objectToSearchParams เพราะจะทิ้งช่องว่าง แล้วตัวอย่างท้าย ๆ ไปได้ค่าของตัวแรกแทน
+export function integrationPayloadToSearchParams(payload: unknown): URLSearchParams {
+  const query = (payload as { query?: unknown } | null)?.query;
+  return typeof query === 'string' ? new URLSearchParams(query) : objectToSearchParams(payload);
+}
+
 export function buildProductionReturnUrl(searchParams: URLSearchParams, createdPetition?: Pick<Petition, 'petitionNo'> | null): string {
   const petitionNo = createdPetition?.petitionNo;
   const requestNo = getQueryValue(searchParams, ['requestNo', 'request_no', 'submissionNo']);
@@ -389,6 +396,50 @@ function routesToQcAndLab(searchParams: URLSearchParams): boolean {
   return targets.includes('qc') && targets.includes('lab');
 }
 
+function itemSides(item: ItemRowValues, side: 'qc' | 'lab'): Array<'qc' | 'lab'> {
+  const quantities = item.labelQuantities ?? [];
+  return item.labelQuantitySides?.length === quantities.length ? item.labelQuantitySides : quantities.map(() => side);
+}
+
+// Production บางครั้งส่ง batch เดียวมาเป็น 2 แถว: แถวส่ง QC อย่างเดียว + แถวส่ง Lab (%AI) อย่างเดียว
+// โดยไม่แนบ routeTargets มา — ต้องรวมเป็น 1 รายการ 2 ชิ้นตัวอย่าง (เหมือน labQty) ไม่งั้นคำขอแตกเป็นรายการซ้ำชื่อเดียวกัน
+export function mergeSplitQcLabRows(items: ItemRowValues[]): ItemRowValues[] {
+  const key = (item: ItemRowValues) => {
+    const batchNo = item.batchNo.trim().toUpperCase();
+    return batchNo ? `${item.sampleName.trim().toUpperCase()}|${batchNo}` : '';
+  };
+  const isQcOnly = (item: ItemRowValues) => item.sendToQc !== false && !item.sendToLab;
+  const isLabOnly = (item: ItemRowValues) => item.sendToQc === false && item.sendToLab === true;
+  const used = new Set<ItemRowValues>();
+  const merged: ItemRowValues[] = [];
+  for (const item of items) {
+    if (used.has(item)) continue;
+    const itemKey = key(item);
+    const partner = itemKey && (isQcOnly(item) || isLabOnly(item))
+      ? items.find((other) => other !== item && !used.has(other) && key(other) === itemKey
+        && (isQcOnly(item) ? isLabOnly(other) : isQcOnly(other)))
+      : undefined;
+    if (!partner) {
+      merged.push(item);
+      continue;
+    }
+    used.add(partner);
+    const [qc, lab] = isQcOnly(item) ? [item, partner] : [partner, item];
+    const labelQuantities = [...(qc.labelQuantities ?? []), ...(lab.labelQuantities ?? [])];
+    merged.push({
+      ...qc,
+      sendToQc: true,
+      sendToLab: true,
+      sampleQuantity: labelQuantities.length || qc.sampleQuantity,
+      labelQuantities,
+      labelQuantity: labelQuantities.join(', '),
+      labelQuantitySides: [...itemSides(qc, 'qc'), ...itemSides(lab, 'lab')],
+      note: qc.note === lab.note || !lab.note ? qc.note : [qc.note, lab.note].filter(Boolean).join(' | '),
+    });
+  }
+  return merged.map((item, index) => ({ ...item, seq: index + 1 }));
+}
+
 // ส่งทั้ง QC และ LAB: Production อาจส่ง batch เดียวกันมาเป็น 2 แถว (แถวละปริมาณ)
 // แต่ฟอร์มต้องการ 1 รายการต่อ batch ที่มีปริมาณ 2 ค่า จึงรวมแถวให้ก่อน
 export function mergeQcLabSameBatchItems(items: ItemRowValues[]): ItemRowValues[] {
@@ -570,7 +621,8 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     }
   }
 
-  return routesToQcAndLab(searchParams) ? mergeQcLabSameBatchItems(items) : dedupeImportedItems(items);
+  const pairedItems = mergeSplitQcLabRows(items);
+  return routesToQcAndLab(searchParams) ? mergeQcLabSameBatchItems(pairedItems) : dedupeImportedItems(pairedItems);
 }
 
 function makeBlankLabRequest(
@@ -636,7 +688,7 @@ export default function ProductionPetitionNewPage({
     let alive = true;
     api.get<unknown>(`/production-integration/petitions/${encodeURIComponent(integrationToken)}`)
       .then((res) => {
-        if (alive) setPostedSearchParams(objectToSearchParams(res.data.data));
+        if (alive) setPostedSearchParams(integrationPayloadToSearchParams(res.data.data));
       })
       .catch((err) => {
         if (alive) setError(err instanceof Error ? err.message : 'โหลดข้อมูลจาก Production ไม่สำเร็จ');
@@ -857,9 +909,9 @@ export default function ProductionPetitionNewPage({
   const [createdPetition, setCreatedPetition] = useState<Petition | null>(null);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
   const routeTargets = useMemo<PetitionRouteTarget[] | null>(() => {
-    const targets = (searchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
+    const targets = (effectiveSearchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
     return targets.length ? targets : null;
-  }, [searchParams]);
+  }, [effectiveSearchParams]);
   const splitQcLab = Boolean(routeTargets?.includes('qc') && routeTargets.includes('lab'));
 
   function validateStep(): boolean {
