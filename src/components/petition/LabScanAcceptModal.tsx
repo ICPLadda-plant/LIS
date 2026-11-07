@@ -13,6 +13,7 @@ import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/pet
 import { isLabAwaitingSgConfirmation, SG_PENDING_LABEL } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { additionalSamplePayload, extractScannedCode, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
+import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
 
 const READER_ID = 'lab-accept-qr-reader';
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
@@ -35,9 +36,11 @@ interface Props {
   claimOnReceive?: boolean;
   /** เปิดมาพร้อมเลขคำร้อง (กดจากการ์ด) — ข้ามการสแกน ไปหน้ายืนยันทันที */
   initialCode?: string;
+  /** คำร้องที่รอรับ — ถ้าส่งมาจะแสดง Dropdown ให้เลือกแทนการพิมพ์/สแกน */
+  pendingPetitions?: Petition[];
 }
 
-export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOnly = false, claimOnReceive = false, initialCode }: Props) {
+export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOnly = false, claimOnReceive = false, initialCode, pendingPetitions }: Props) {
   const { user } = useAuth();
   const isFullAccess = normalizeRoles(user).some((r) => FULL_ACCESS_ROLES.has(r));
 
@@ -276,6 +279,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
               }}
               className="space-y-2"
             >
+              {pendingPetitions && (
+                <PendingPetitionSelect petitions={pendingPetitions} onPick={(code) => { void fetchAndCheck(code); }} />
+              )}
               {!manualOnly && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <div className="h-px flex-1 bg-border" />

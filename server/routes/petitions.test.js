@@ -129,24 +129,65 @@ test('GET / awaitingQcApproval returns petitions after either track confirms res
   }
 });
 
-test('PATCH /:id/assign requires Lab receipt, not QC receipt', async () => {
+test('PATCH /:id/assign works before Lab receives the sample and leaves machine choice for start', async () => {
   const originalFindOne = Petition.findOne;
-  const originalSave = Petition.prototype.save;
+  const doc = {
+    status: 'sampleSent',
+    async save() { throw new Error('stop-after-assign'); },
+  };
   try {
-    let saved = false;
-    Petition.findOne = async () => ({ status: 'pendingReview', qcReceivedAt: new Date(), receivedAt: new Date() });
-    Petition.prototype.save = async () => { saved = true; };
+    Petition.findOne = async () => doc;
     const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/assign', 'patch', {
       params: { id: 'P-2609-0001' },
       body: { employeeId: 'E1', name: 'Analyst' },
       headers,
     }));
-    assert.equal(res.statusCode, 409);
-    assert.match(res.body.error.message, /Lab ต้องรับตัวอย่างก่อน/);
-    assert.equal(saved, false);
+    assert.match(res.body.error.message, /stop-after-assign/);
+    assert.equal(doc.assignedTo.employeeId, 'E1');
+    assert.equal(doc.assignedTo.acceptedAt, undefined);
+    assert.equal(doc.status, 'sampleSent');
   } finally {
     Petition.findOne = originalFindOne;
-    Petition.prototype.save = originalSave;
+  }
+});
+
+test('POST /:id/accept requires Lab receipt before starting work', async () => {
+  const originalFindOne = Petition.findOne;
+  try {
+    Petition.findOne = async () => ({ status: 'sampleSent', assignedTo: { employeeId: 'E77', name: 'Analyst A' } });
+    const res = await withLabUser(ANALYST, undefined, (headers) => invoke('/:id/accept', 'post', {
+      params: { id: 'P-2609-0001' },
+      body: { machines: [] },
+      headers,
+    }));
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body.error.message, /Lab ต้องรับตัวอย่างก่อนจึงจะเริ่มงานได้/);
+  } finally {
+    Petition.findOne = originalFindOne;
+  }
+});
+
+test('POST /:id/accept saves the machines chosen by the person starting work', async () => {
+  const originalFindOne = Petition.findOne;
+  const doc = {
+    status: 'inProgress',
+    labReceivedAt: new Date(),
+    assignedTo: { employeeId: 'E77', name: 'Analyst A' },
+    markModified() {},
+    async save() { throw new Error('stop-after-accept'); },
+  };
+  try {
+    Petition.findOne = async () => doc;
+    const res = await withLabUser(ANALYST, undefined, (headers) => invoke('/:id/accept', 'post', {
+      params: { id: 'P-2609-0001' },
+      body: { machines: [{ machineId: 'm1', code: 'NOPE-1', name: 'No standard machine' }, { code: 'bad' }] },
+      headers,
+    }));
+    assert.match(res.body.error.message, /stop-after-accept/);
+    assert.ok(doc.assignedTo.acceptedAt instanceof Date);
+    assert.deepEqual(doc.assignedMachines.map((m) => m.code), ['NOPE-1']);
+  } finally {
+    Petition.findOne = originalFindOne;
   }
 });
 
@@ -206,6 +247,7 @@ test('POST /:id/claim assigns the work to the logged-in analyst, ignoring body i
     assert.equal(doc.assignedTo.employeeId, 'E77');
     assert.equal(doc.assignedTo.name, 'Analyst A');
     assert.equal(doc.assignedTo.assignedBy, 'Analyst A');
+    assert.equal(doc.assignedTo.acceptedAt, undefined);
     assert.equal(doc.status, 'inProgress');
   } finally {
     Petition.findOne = originalFindOne;

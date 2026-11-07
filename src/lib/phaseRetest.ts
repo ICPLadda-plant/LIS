@@ -51,7 +51,7 @@ const isEmptyValue = (value: unknown): boolean => {
 export function missingValuesBeforePhaseTrigger(
   parameters: ParameterItem[],
   valueSetsFor: (parameter: ParameterItem) => Record<string, unknown>[],
-  unitsFor: (field: ParameterValueField) => { key: string; field: ParameterValueField }[],
+  unitsFor: (field: ParameterValueField, parameter: ParameterItem) => { key: string; field: ParameterValueField }[],
 ): string[] {
   const missing: string[] = [];
   parameters.forEach((parameter) => {
@@ -63,7 +63,7 @@ export function missingValuesBeforePhaseTrigger(
       if (NON_RESULT_FIELD_TYPES.has(field.type)) return;
       if (isAiParameter && calculatedAiFieldKind(field.label)) return;
       if (field.label.trim() === SG_TEMP_LABEL) return;
-      unitsFor(field).forEach((unit) => {
+      unitsFor(field, parameter).forEach((unit) => {
         if (valueSets.some((values) => isEmptyValue(values[unit.key]))) {
           missing.push(`${parameter.name} › ${unit.field.label}`);
         }

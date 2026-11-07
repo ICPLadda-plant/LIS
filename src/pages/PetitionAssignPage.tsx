@@ -2,18 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowRight,
-  ClipboardCheck,
   Cog,
   GripVertical,
   Hand,
   Inbox,
-  PackageOpen,
   QrCode,
   Search,
-  UserCheck,
   Users,
-  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
@@ -23,23 +18,13 @@ import PageToolbar from '@/components/lis/PageToolbar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import LabFreeAssignControl from '@/components/petition/LabFreeAssignControl';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import { useAuth } from '@/hooks/useAuth';
 import { usePetitionList } from '@/hooks/usePetition';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
-import { api, type MachineItem } from '@/lib/api';
+import { api } from '@/lib/api';
 import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
 import { isLabRecheckPending, labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
@@ -63,12 +48,9 @@ const formatThaiDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' })
     .format(new Date(iso));
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
-import { getMachineSuggestions, type MachineSuggestion } from '@/lib/aiApi';
 import { DEV_MODE, synthesizeDevAssignees } from '@/config/dev';
 import { isAssignedTo } from '@/lib/assignment';
-import { parseSubstances } from '@/lib/substances';
-import { readSlotMethods, machineMatchesMethod, type MethodDoc } from '@/lib/methodRegistry';
-import { groupMachineMethods } from '@/lib/assignMachineGrouping';
+import { type MethodDoc } from '@/lib/methodRegistry';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { rankSearchResults } from '@/lib/searchRanking';
 import { requestPetitionNotificationsRefresh } from '@/lib/petitionFlowWatcher';
@@ -76,55 +58,17 @@ import { cn } from '@/lib/utils';
 import {
   type Petition,
   type PetitionAssignee,
-  type PetitionAssignedMachine,
-  type PetitionItem,
 } from '@/types/petition.types';
 import { isUrgentPetition, prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
 
-// One substance within a commonName (split by "+"), with the AND-set of method
-// codes the simple-method config assigned to it. `methods.length === 0` means
-// "not yet configured" → that slot blocks Assign.
-type SubstanceSlot = {
-  name: string;
-  methods: string[];   // AND-set of method codes required for this substance
-};
-
-type SubstanceGroup = {
-  groupKey: string;       // `${sampleName.lower}||${commonName.lower}`
-  sampleName: string;
-  commonName: string;
-  items: PetitionItem[];
-  slots: SubstanceSlot[];  // per-substance, positional — aligned to parseSubstances(commonName)
-};
-
-// Master-items lookup
-type MasterItemRaw = Record<string, unknown>;
-const MASTER_COMMON_NAME_KEYS = ['common_name', 'commonname', 'commonName', 'item_name2', 'itemType'];
-const MASTER_ITEM_NO_KEYS = ['item_no', 'itemCode', 'item_code', 'code', 'Code', 'ITEM_CODE'];
-
-function pickField(item: MasterItemRaw, keys: string[]): string {
-  for (const key of keys) {
-    const value = item[key];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      return String(value).trim();
-    }
-  }
-  return '';
-}
-
-function groupKeyOf(sampleName: string, commonName: string): string {
-  return `${(sampleName || '').trim().toLowerCase()}||${(commonName || '').trim().toLowerCase()}`;
-}
-
-// Sample-number label for a substance group, e.g. items with seq 1 and 2 → "1+2".
-function sampleSeqLabel(group: SubstanceGroup): string {
-  return group.items
-    .map((item) => item.seq)
-    .filter((seq) => seq !== undefined && seq !== null)
-    .sort((a, b) => a - b)
-    .join('+');
-}
+import {
+  buildSubstanceGroups,
+  groupHasUnassignable,
+  sampleSeqLabel,
+  type SubstanceGroup,
+} from '@/lib/labSubstanceGroups';
+import { useLabMethodSlots } from '@/hooks/useLabMethodSlots';
 
 interface EmployeeAssignee {
   id: number;
@@ -136,75 +80,6 @@ interface EmployeeAssignee {
   isActive: boolean;
 }
 
-function employeeLabel(employee: EmployeeAssignee) {
-  return `${employee.name} (${employee.employeeId})`;
-}
-
-function machineLabel(machine: MachineItem) {
-  return machine.code ? `${machine.code} - ${machine.name}` : machine.name;
-}
-
-function toAssignedMachine(
-  machine: MachineItem,
-  group: SubstanceGroup,
-): PetitionAssignedMachine {
-  return {
-    machineId: machine._id || machine.code,
-    code: machine.code,
-    name: machine.name,
-    location: machine.location,
-    sampleName: group.sampleName || undefined,
-    commonName: group.commonName || undefined,
-  };
-}
-
-// commonName (lowercased) → positional method-code AND-sets, index i = parseSubstances()[i].
-// An empty inner array means that substance has no configured method.
-type SlotMethods = string[][];
-
-function buildSubstanceGroups(
-  petition: Petition,
-  commonNameToSlots: Map<string, SlotMethods>,
-): SubstanceGroup[] {
-  const groups = new Map<string, SubstanceGroup>();
-  petition.items.forEach((item) => {
-    const sampleName = (item.sampleName ?? '').trim();
-    const commonName = (item.commonName ?? '').trim();
-    const key = groupKeyOf(sampleName, commonName);
-    let group = groups.get(key);
-    if (!group) {
-      const substances = parseSubstances(commonName);
-      const slotMethods = commonNameToSlots.get(commonName.toLowerCase()) ?? [];
-      group = {
-        groupKey: key,
-        sampleName,
-        commonName,
-        items: [],
-        slots: substances.map((name, idx) => ({
-          name,
-          methods: slotMethods[idx] ?? [],
-        })),
-      };
-      groups.set(key, group);
-    }
-    group.items.push(item);
-  });
-  return Array.from(groups.values());
-}
-
-// A group cannot be assigned when it has no substances, or any slot has no
-// configured method / an unknown / inactive method code.
-function groupHasUnassignable(group: SubstanceGroup, methodByCode: Map<string, MethodDoc>): boolean {
-  if (group.slots.length === 0) return true;
-  return group.slots.some(
-    (s) =>
-      s.methods.length === 0 ||
-      s.methods.some((code) => {
-        const method = methodByCode.get(code);
-        return !method || method.active === false;
-      }),
-  );
-}
 
 export default function PetitionAssignPage() {
   const navigate = useNavigate();
@@ -293,20 +168,9 @@ export default function PetitionAssignPage() {
   const [fetchedEmployees, setFetchedEmployees] = useState<EmployeeAssignee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(true);
   const [employeesError, setEmployeesError] = useState<string | null>(null);
-  const [machines, setMachines] = useState<MachineItem[]>([]);
-  const [machinesLoading, setMachinesLoading] = useState(true);
-  const [machinesError, setMachinesError] = useState<string | null>(null);
-  // machinesByPetition[petitionId][groupKey][methodCode] = machineId.
-  // Keyed per (group, machine-backed method code): substances in a group that
-  // share an instrument type share one machine (one picker per type).
-  const [machinesByPetition, setMachinesByPetition] =
-    useState<Record<string, Record<string, Record<string, string>>>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
-  const [machineSuggestions, setMachineSuggestions] = useState<Record<string, MachineSuggestion[]>>({});
-  // A petition dragged onto a staff card (or "รับงาน" in free-assign mode) → open the machine-picking dialog.
-  const [dropTarget, setDropTarget] = useState<{ petitionId: string; employeeId: string; claim?: boolean } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -331,29 +195,6 @@ export default function PetitionAssignPage() {
     };
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    setMachinesLoading(true);
-    setMachinesError(null);
-
-    api.getMachines()
-      .then((items) => {
-        if (!alive) return;
-        setMachines((items ?? []).filter((m) => m.status !== 'retired'));
-      })
-      .catch((err: Error) => {
-        if (!alive) return;
-        setMachinesError(err.message);
-      })
-      .finally(() => {
-        if (alive) setMachinesLoading(false);
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   // In dev mode prepend fake Lab dev users so a petition can be assigned and
   // then viewed on the lab pages by switching to that role (HR API has no dev
   // staff). Always shown, even if the HR fetch failed.
@@ -366,93 +207,19 @@ export default function PetitionAssignPage() {
     () => new Map(employees.map((employee) => [employee.employeeId, employee])),
     [employees],
   );
-  const machineById = useMemo(
-    () => new Map(machines.map((machine) => [machine._id || machine.code, machine])),
-    [machines],
-  );
 
-  // Method registry — required-method lookups by code.
-  const { data: registryMethods = [] } = useQuery({
-    queryKey: ['methods'],
-    queryFn: () => api.getMethods(),
-    staleTime: 5 * 60_000,
-  });
   const { data: labParameters = [], isPending: parametersLoading, error: parametersError } = useQuery({
     queryKey: ['assign-lab-parameters'],
     queryFn: () => api.getParameters(),
     staleTime: 5 * 60_000,
   });
   const groupMembership = useItemGroupMembership();
-  const methodByCode = useMemo(
-    () => new Map(registryMethods.map((m) => [m.code, m])),
-    [registryMethods],
-  );
+  // method ต่อสาร ใช้แสดงป้าย "ยังตั้ง method ไม่ครบ" บนการ์ด (เลือกเครื่องตอนเริ่มงาน)
+  const { methodByCode, commonNameToSlots } = useLabMethodSlots();
 
   const loading = pendingLoading || inProgressLoading || staleReceivedLoading || recheckLoading || parametersLoading;
   const error = pendingError || inProgressError || staleReceivedError || recheckError || (parametersError instanceof Error ? parametersError.message : null);
 
-  const { data: masterItems = [] } = useQuery<MasterItemRaw[]>({
-    queryKey: ['master-items-for-petition-assign'],
-    queryFn: async () => {
-      const res = await api.get<unknown>('/master-items');
-      const payload = res.data.data;
-      if (Array.isArray(payload)) return payload as MasterItemRaw[];
-      if (payload && typeof payload === 'object') {
-        const arr =
-          (payload as { data?: unknown }).data ??
-          (payload as { items?: unknown }).items;
-        if (Array.isArray(arr)) return arr as MasterItemRaw[];
-      }
-      return [];
-    },
-    staleTime: 5 * 60_000,
-  });
-
-  const { data: simpleMethods = [] } = useQuery<Array<{ itemNo: string; methods?: string[][]; instruments?: string[] }>>({
-    queryKey: ['simple-methods'],
-    queryFn: async () => {
-      const res = await api.get<Array<{ itemNo: string; methods?: string[][]; instruments?: string[] }>>('/simple-methods');
-      // Keep raw entries — readSlotMethods (applied below with the per-commonName
-      // substance count) normalises new `methods` and legacy `instruments`.
-      return (res.data.data ?? []).map((entry) => ({
-        itemNo: entry.itemNo,
-        methods: entry.methods,
-        instruments: entry.instruments,
-      }));
-    },
-    staleTime: 5 * 60_000,
-  });
-
-  // commonName (lowercased) → positional method-code AND-sets per substance.
-  // Master items sharing a commonName are merged slot-by-slot (first slot with
-  // any configured method wins), preserving which methods belong to which substance.
-  const commonNameToSlots = useMemo(() => {
-    const itemNoToEntry = new Map<string, { methods?: string[][]; instruments?: string[] }>();
-    simpleMethods.forEach((entry) => {
-      if (entry.itemNo) itemNoToEntry.set(entry.itemNo.trim(), entry);
-    });
-
-    const map = new Map<string, SlotMethods>();
-    masterItems.forEach((item) => {
-      const commonName = pickField(item, MASTER_COMMON_NAME_KEYS);
-      if (!commonName) return;
-      const itemNo = pickField(item, MASTER_ITEM_NO_KEYS);
-      const entry = itemNoToEntry.get(itemNo);
-      if (!entry) return;
-      const key = commonName.trim().toLowerCase();
-      const count = parseSubstances(commonName).length;
-      const slots = readSlotMethods(entry, count);
-      if (slots.every((s) => s.length === 0)) return;
-      const current = map.get(key) ?? (Array.from({ length: count }, () => [] as string[]) as SlotMethods);
-      const merged = Array.from(
-        { length: Math.max(count, current.length, slots.length) },
-        (_, i) => (current[i] && current[i].length > 0 ? current[i] : (slots[i] ?? [])),
-      ) as SlotMethods;
-      map.set(key, merged);
-    });
-
-    return map;
-  }, [masterItems, simpleMethods]);
 
   const queuePetitions = useMemo(() => {
     // งาน re-check ที่ยัง inProgress ซ้ำกับ inProgressData — กันการ์ดซ้ำด้วย _id
@@ -478,98 +245,6 @@ export default function PetitionAssignPage() {
     });
     return out;
   }, [queuePetitions, commonNameToSlots]);
-
-  useEffect(() => {
-    const seen = new Set<string>();
-    queuePetitions.forEach((petition) => {
-      const groups = groupsByPetition.get(petition._id) ?? [];
-      groups.forEach((g) => {
-        if (seen.has(g.groupKey)) return;
-        seen.add(g.groupKey);
-        getMachineSuggestions(g.commonName, petition.dept).then((suggestions) => {
-          if (suggestions.length > 0) {
-            setMachineSuggestions((prev) => ({ ...prev, [g.groupKey]: suggestions }));
-          }
-        });
-      });
-    });
-  }, [queuePetitions, groupsByPetition]);
-
-  // Baseline (methodCode → machineId) mapping for a group, derived from saved
-  // assignedMachines: each saved machine is first-fit matched to a distinct
-  // machine-backed method it satisfies. assignedMachines carries no method tag,
-  // so reload re-binds by first-fit — safe because GC/HPLC prefixes are mutually
-  // exclusive and each group now holds at most one machine per method type.
-  function baselineSlotsForGroup(petition: Petition, group: SubstanceGroup): Record<string, string> {
-    const saved = (petition.assignedMachines ?? []).filter(
-      (m) => groupKeyOf(m.sampleName ?? '', m.commonName ?? '') === group.groupKey,
-    );
-    const result: Record<string, string> = {};
-    const used = new Set<string>();
-    groupMachineMethods(group.slots, methodByCode).forEach((gm) => {
-      const match = saved.find((m) => {
-        if (used.has(m.machineId)) return false;
-        const machine = machineById.get(m.machineId);
-        return !!machine && machineMatchesMethod(machine.name, gm.method, registryMethods);
-      });
-      if (match) {
-        result[gm.code] = match.machineId;
-        used.add(match.machineId);
-      }
-    });
-    return result;
-  }
-
-  // Selected machine ids per methodCode for a group.
-  function getSelectedSlotMachines(petition: Petition, group: SubstanceGroup): Record<string, string> {
-    const perGroup = machinesByPetition[petition._id];
-    if (perGroup && perGroup[group.groupKey] !== undefined) {
-      return perGroup[group.groupKey];
-    }
-    return baselineSlotsForGroup(petition, group);
-  }
-
-  // Single-select per (group, machine-backed method): picking a machine sets that
-  // type's requirement; picking the already-selected machine clears it.
-  function setMachineForMethod(
-    petitionId: string,
-    groupKey: string,
-    methodCode: string,
-    machineKey: string,
-  ) {
-    setMachinesByPetition((prev) => {
-      const petition = allPetitions.find((p) => p._id === petitionId);
-      const groups = petition ? buildSubstanceGroups(petition, commonNameToSlots) : [];
-      const group = groups.find((g) => g.groupKey === groupKey);
-      const baselineMap: Record<string, Record<string, string>> = { ...(prev[petitionId] ?? {}) };
-      if (baselineMap[groupKey] === undefined) {
-        baselineMap[groupKey] = petition && group ? baselineSlotsForGroup(petition, group) : {};
-      }
-      const current = { ...baselineMap[groupKey] };
-      if (current[methodCode] === machineKey) delete current[methodCode];
-      else current[methodCode] = machineKey;
-      baselineMap[groupKey] = current;
-      return { ...prev, [petitionId]: baselineMap };
-    });
-  }
-
-  // A group is assignable iff it has substances, every slot has ≥1 configured
-  // method that resolves to a known + active registry method, AND every distinct
-  // machine-backed method type has a selected machine. Bench methods need no
-  // selection; empty/unknown/inactive method codes keep Assign blocked.
-  function isGroupSatisfied(petition: Petition, group: SubstanceGroup): boolean {
-    if (group.slots.length === 0) return false;
-    const allSlotsConfigured = group.slots.every((slot) => {
-      if (slot.methods.length === 0) return false;
-      return slot.methods.every((code) => {
-        const method = methodByCode.get(code);
-        return !!method && method.active !== false;
-      });
-    });
-    if (!allSlotsConfigured) return false;
-    const sel = getSelectedSlotMachines(petition, group);
-    return groupMachineMethods(group.slots, methodByCode).every((gm) => !!sel[gm.code]);
-  }
 
   function refreshPetitions() {
     refreshPending();
@@ -605,75 +280,41 @@ export default function PetitionAssignPage() {
       };
     }));
   }, [allPetitions, search]);
+  // คำร้องที่ Lab ยังไม่รับตัวอย่าง (ทั้งที่ assign แล้วและยังไม่ assign) ใช้เป็นรายการให้สแกนรับ
   const awaitingReceive = useMemo(
-    () => visiblePetitions.filter((petition) => !petition.assignedTo && !labReceivedAt(petition)),
+    () => visiblePetitions.filter((petition) => !labReceivedAt(petition)),
     [visiblePetitions],
   );
 
-  async function assignPetition(petition: Petition, employeeIdOverride?: string, claim = false): Promise<boolean> {
-    if (!labReceivedAt(petition)) {
-      toast.error('Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้');
-      return false;
-    }
+  // มอบหมาย/รับงานได้ทันทีแม้ Lab ยังไม่รับตัวอย่าง — เครื่องมือให้ผู้รับงานเลือกตอนกด "เริ่มงาน"
+  async function assignPetition(petition: Petition, employeeId: string, claim = false): Promise<boolean> {
     if (!hasAssignableLabParameter(petition, labParameters, groupMembership)) {
       toast.error('คำร้องนี้ไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่าง');
       return false;
     }
-    const employeeId = employeeIdOverride || petition.assignedTo?.employeeId || '';
-    const employee = claim ? selfEmployee : employeeById.get(employeeId);
+    const employee = claim ? selfEmployee : resolveEmployee(employeeId);
     if (!employee) {
       toast.error('กรุณาเลือกเจ้าหน้าที่');
       return false;
     }
-
-    const groups = groupsByPetition.get(petition._id) ?? buildSubstanceGroups(petition, commonNameToSlots);
-
-    // every substance must have a configured method, and every machine-backed
-    // method must have a machine picked
-    const incomplete = groups.some((group) => !isGroupSatisfied(petition, group));
-    if (incomplete) {
-      toast.error('กรุณาเลือกเครื่องให้ครบทุกสารก่อน assign');
-      return false;
-    }
-
-    const machinesPayload: PetitionAssignedMachine[] = [];
-    const seen = new Set<string>();
-    groups.forEach((group) => {
-      Object.values(getSelectedSlotMachines(petition, group)).forEach((id) => {
-        if (!id) return;
-        const dedupeKey = `${group.groupKey}::${id}`;
-        if (seen.has(dedupeKey)) return;
-        seen.add(dedupeKey);
-        const machine = machineById.get(id);
-        if (machine) machinesPayload.push(toAssignedMachine(machine, group));
-      });
-    });
+    if (!claim && petition.assignedTo?.employeeId === employee.employeeId) return true;
 
     setSavingId(petition._id);
     try {
       if (claim) {
         // server ใช้ตัวตนจาก session; employeeId ใช้เฉพาะ role จำลองตอน dev
-        await api.post<Petition>(`/petitions/${petition._id}/claim`, {
-          employeeId: employee.employeeId,
-          machines: machinesPayload,
-        });
+        await api.post<Petition>('/petitions/' + petition._id + '/claim', { employeeId: employee.employeeId });
       } else {
-        await api.patch<Petition>(`/petitions/${petition._id}/assign`, {
-          ...({
-            employeeId: employee.employeeId,
-            name: employee.name,
-            department: employee.department,
-            position: employee.position,
-          } satisfies PetitionAssignee),
-          machines: machinesPayload,
-        });
+        await api.patch<Petition>('/petitions/' + petition._id + '/assign', {
+          employeeId: employee.employeeId,
+          name: employee.name,
+          department: employee.department,
+          position: employee.position,
+        } satisfies PetitionAssignee);
       }
-      const machineSummary = machinesPayload.length
-        ? ` (เครื่อง: ${machinesPayload.map((m) => m.code).join(', ')})`
-        : '';
       toast.success(claim
-        ? `รับงาน ${petition.petitionNo}${machineSummary} แล้ว`
-        : `Assign ${petition.petitionNo} ให้ ${employee.name}${machineSummary} แล้ว`);
+        ? 'รับงาน ' + petition.petitionNo + ' แล้ว กด "เริ่มงาน" ที่หน้าการทดสอบ Lab เพื่อเลือกเครื่อง'
+        : 'Assign ' + petition.petitionNo + ' ให้ ' + employee.name + ' แล้ว');
       requestPetitionNotificationsRefresh();
       refreshPetitions();
       return true;
@@ -686,35 +327,34 @@ export default function PetitionAssignPage() {
     }
   }
 
-  const dropPetition = dropTarget
-    ? allPetitions.find((p) => p._id === dropTarget.petitionId) ?? null
-    : null;
-  // Existing assignments remain visible even when HR no longer returns that
-  // person in /employees/assignees. Reuse saved assignee data so dropping on
-  // that fallback column still opens machine selection instead of doing nothing.
-  const dropEmployee = dropTarget
-    ? dropTarget.claim ? selfEmployee : employeeById.get(dropTarget.employeeId) ?? (() => {
-        const saved = allPetitions.find(
-          (petition) => petition.assignedTo?.employeeId === dropTarget.employeeId,
-        )?.assignedTo;
-        return saved
-          ? {
-              id: 0,
-              employeeId: saved.employeeId,
-              name: saved.name,
-              department: saved.department ?? '',
-              position: saved.position ?? '',
-              empType: 'saved',
-              isActive: true,
-            }
-          : null;
-      })()
-    : null;
+  // ผู้รับงานที่ HR ไม่ส่งมาแล้วยังแสดงเป็นคอลัมน์อยู่ — ใช้ข้อมูลที่บันทึกไว้ในคำร้องแทน
+  function resolveEmployee(employeeId: string): EmployeeAssignee | null {
+    const known = employeeById.get(employeeId);
+    if (known) return known;
+    const saved = allPetitions.find((petition) => petition.assignedTo?.employeeId === employeeId)?.assignedTo;
+    return saved
+      ? {
+          id: 0,
+          employeeId: saved.employeeId,
+          name: saved.name,
+          department: saved.department ?? '',
+          position: saved.position ?? '',
+          empType: 'saved',
+          isActive: true,
+        }
+      : null;
+  }
 
-  async function confirmDropAssign() {
-    if (!dropTarget || !dropPetition) return;
-    const ok = await assignPetition(dropPetition, dropTarget.employeeId, !!dropTarget.claim);
-    if (ok) setDropTarget(null);
+  function handleDropPetition(petitionId: string, employeeId: string) {
+    if (savingId) return;
+    const petition = allPetitions.find((p) => p._id === petitionId);
+    if (petition) void assignPetition(petition, employeeId);
+  }
+
+  function handleClaimPetition(petitionId: string) {
+    if (savingId) return;
+    const petition = allPetitions.find((p) => p._id === petitionId);
+    if (petition) void assignPetition(petition, selfEmployee?.employeeId ?? '', true);
   }
 
   async function unassignPetition(petitionId: string) {
@@ -737,12 +377,13 @@ export default function PetitionAssignPage() {
     }
   }
 
-  const boardLoading = loading || employeesLoading || machinesLoading;
+  const boardLoading = loading || employeesLoading;
 
   return (
     <AppLayout>
         <LabScanAcceptModal
           open={scanOpen}
+          pendingPetitions={awaitingReceive}
           onClose={() => setScanOpen(false)}
           onAccepted={() => {
             setScanOpen(false);
@@ -753,9 +394,9 @@ export default function PetitionAssignPage() {
           <PageHeader
             title="Assign คำร้องให้เจ้าหน้าที่"
             description={canManage
-              ? 'รับตัวอย่าง Lab ก่อน แล้วลากคำร้องไปวางบนการ์ดเจ้าหน้าที่เพื่อเลือกเครื่องและ assign'
+              ? 'ลากคำร้องไปวางบนการ์ดเจ้าหน้าที่เพื่อ assign ได้ทันที แม้ยังไม่ส่งหรือยังไม่รับตัวอย่าง เจ้าหน้าที่จะเลือกเครื่องตอนกดเริ่มงาน'
               : canClaim
-                ? 'ช่วงมอบหมายอิสระ: กด "รับงาน" ที่คำร้องเพื่อเลือกเครื่องและรับงานนั้นเป็นของคุณ'
+                ? 'ช่วงมอบหมายอิสระ: กด "รับงาน" ที่คำร้องเพื่อรับงานนั้นเป็นของคุณ แล้วเลือกเครื่องตอนกดเริ่มงาน'
                 : 'ดูการมอบหมายงาน Lab ได้อย่างเดียว หัวหน้า Lab เป็นผู้มอบหมายงาน'}
             actions={
               <div className="flex flex-wrap items-center gap-2">
@@ -783,16 +424,16 @@ export default function PetitionAssignPage() {
               </CardHeader>
               <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
                 <div className="rounded-xl bg-muted px-3 py-3">
-                  <p className="font-medium text-foreground">1. รับตัวอย่าง Lab</p>
-                  <p className="mt-1 text-xs">สแกน QR หรือกรอกเลขคำร้องเพื่อรับตัวอย่างก่อน</p>
+                  <p className="font-medium text-foreground">1. เลือกผู้รับงาน</p>
+                  <p className="mt-1 text-xs">ลากคำร้องไปวางบนการ์ดเจ้าหน้าที่ได้ทันที แม้ยังไม่ส่งหรือยังไม่รับตัวอย่าง</p>
                 </div>
                 <div className="rounded-xl bg-muted px-3 py-3">
-                  <p className="font-medium text-foreground">2. เลือกผู้รับงาน</p>
-                  <p className="mt-1 text-xs">ลากคำร้องไปวางบนการ์ดเจ้าหน้าที่ของขั้นงานนั้น โดยผู้รับผิดชอบ QC และ Lab อาจเป็นคนละคนได้</p>
+                  <p className="font-medium text-foreground">2. รับตัวอย่าง Lab</p>
+                  <p className="mt-1 text-xs">สแกน QR หรือกรอกเลขคำร้องเมื่อตัวอย่างมาถึง Lab</p>
                 </div>
                 <div className="rounded-xl bg-muted px-3 py-3">
-                  <p className="font-medium text-foreground">3. ยืนยันเครื่องมือ</p>
-                  <p className="mt-1 text-xs">ตรวจสอบเครื่องมือและบันทึกให้จบใน dialog เดียว</p>
+                  <p className="font-medium text-foreground">3. เริ่มงานและเลือกเครื่อง</p>
+                  <p className="mt-1 text-xs">ผู้รับงานกด "เริ่มงาน" ที่หน้าการทดสอบ Lab แล้วเลือกเครื่องที่จะใช้เอง</p>
                 </div>
               </CardContent>
             </Card>
@@ -841,13 +482,11 @@ export default function PetitionAssignPage() {
             </Card>
           </div>
 
-          {(error || employeesError || machinesError) && (
+          {(error || employeesError) && (
             <div className="rounded-[10px] border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               {error
                 ? `โหลดคำร้องไม่สำเร็จ: ${error}`
-                : employeesError
-                  ? `โหลดข้อมูลพนักงานไม่สำเร็จ: ${employeesError}`
-                  : `โหลดข้อมูลเครื่องไม่สำเร็จ: ${machinesError}`}
+                : `โหลดข้อมูลพนักงานไม่สำเร็จ: ${employeesError}`}
             </div>
           )}
 
@@ -864,33 +503,6 @@ export default function PetitionAssignPage() {
               </div>
             </div>
 
-            {/* คำร้องที่ส่งตัวอย่างแล้ว แต่ Lab ยังไม่รับ: พักไว้ด้านบน เพราะยังลากมอบหมายไม่ได้ */}
-            {awaitingReceive.length > 0 && (
-              <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
-                <div className="mb-3 flex items-center gap-2">
-                  <PackageOpen className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">รอรับตัวอย่าง</span>
-                  <Badge variant="gray-soft" className="font-normal">{awaitingReceive.length}</Badge>
-                  <span className="ml-auto text-xs text-muted-foreground">รับตัวอย่างก่อน แล้วการ์ดจะย้ายลงไปงานรอมอบหมาย</span>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                  {awaitingReceive.map((petition) => (
-                    <PetitionCard
-                      key={petition._id}
-                      petition={petition}
-                      groups={groupsByPetition.get(petition._id) ?? []}
-                      methodByCode={methodByCode}
-                      dragging={false}
-                      canDragRole={false}
-                      onDragStart={() => {}}
-                      onDragEnd={() => {}}
-                      onClick={() => navigate(`/petition/${petition._id}`)}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className="mt-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
               <PageToolbar
                 search={{
@@ -901,7 +513,7 @@ export default function PetitionAssignPage() {
                 right={
                   <div className="rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
                     {canManage
-                      ? 'คำร้องที่ยังไม่รับตัวอย่างจะลากเพื่อ assign ไม่ได้'
+                      ? 'ลาก assign ได้ทุกใบ เครื่องมือเลือกตอนเริ่มงาน'
                       : canClaim
                         ? 'กดรับงานได้เฉพาะคำร้องที่ยังไม่มีผู้รับ'
                         : 'โหมดดูอย่างเดียว'}
@@ -917,13 +529,12 @@ export default function PetitionAssignPage() {
                 employees={employees}
                 groupsByPetition={groupsByPetition}
                 methodByCode={methodByCode}
-                machineById={machineById}
                 canAssign={canManage}
                 selfEmployee={canManage ? null : selfEmployee}
                 canClaim={canClaim}
-                onDropPetition={(petitionId, employeeId) => setDropTarget({ petitionId, employeeId })}
+                onDropPetition={handleDropPetition}
                 onUnassignPetition={unassignPetition}
-                onClaimPetition={(petitionId) => setDropTarget({ petitionId, employeeId: selfEmployee?.employeeId ?? '', claim: true })}
+                onClaimPetition={handleClaimPetition}
                 onPetitionClick={(id) => navigate(`/petition/${id}`)}
                 emptyPoolText="ไม่มีคำร้องที่รอ assign"
               />
@@ -931,22 +542,6 @@ export default function PetitionAssignPage() {
           </div>
         </div>
 
-        <MachineAssignDialog
-          petition={dropPetition}
-          employee={dropEmployee}
-          groups={dropPetition ? groupsByPetition.get(dropPetition._id) ?? [] : []}
-          machines={machines}
-          registryMethods={registryMethods}
-          methodByCode={methodByCode}
-          getSelectedSlotMachines={getSelectedSlotMachines}
-          onSelectMachine={setMachineForMethod}
-          isGroupSatisfied={isGroupSatisfied}
-          machineSuggestions={machineSuggestions}
-          saving={!!dropPetition && savingId === dropPetition._id}
-          confirmLabel={dropTarget?.claim ? 'รับงาน' : undefined}
-          onConfirm={confirmDropAssign}
-          onClose={() => setDropTarget(null)}
-        />
     </AppLayout>
   );
 }
@@ -961,7 +556,6 @@ interface AssignBoardProps {
   employees: EmployeeAssignee[];
   groupsByPetition: Map<string, SubstanceGroup[]>;
   methodByCode: Map<string, MethodDoc>;
-  machineById: Map<string, MachineItem>;
   canAssign: boolean;
   /** เจ้าหน้าที่ Lab ที่ไม่ใช่หัวหน้า: แสดงเฉพาะช่องงานของตัวเอง */
   selfEmployee?: EmployeeAssignee | null;
@@ -985,7 +579,6 @@ function AssignBoard({
   employees,
   groupsByPetition,
   methodByCode,
-  machineById,
   canAssign,
   selfEmployee,
   canClaim,
@@ -1000,8 +593,8 @@ function AssignBoard({
   const [overPool, setOverPool] = useState(false);
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
-  // แยกคำร้องที่ Lab ยังไม่รับตัวอย่าง ("ส่งตัวอย่างแล้ว") ไปพักไว้ เพราะยังลากมอบหมายไม่ได้
-  const readyToAssign = useMemo(() => unassigned.filter((p) => !!labReceivedAt(p)), [unassigned]);
+  // ลากมอบหมายได้ทุกใบ รวมใบที่ยังไม่ส่ง/ยังไม่รับตัวอย่าง (ป้ายสถานะบนการ์ดบอกว่ายังรอตัวอย่าง)
+  const readyToAssign = unassigned;
 
   const renderPoolCard = (petition: Petition) => (
     <PetitionCard
@@ -1188,7 +781,6 @@ function AssignBoard({
                         petition={petition}
                         groups={groupsByPetition.get(petition._id) ?? []}
                         methodByCode={methodByCode}
-                        machineById={machineById}
                         dragging={draggingId === petition._id}
                         canDragRole={canAssign}
                         onDragStart={() => setDraggingId(petition._id)}
@@ -1212,7 +804,6 @@ interface PetitionCardProps {
   petition: Petition;
   groups: SubstanceGroup[];
   methodByCode: Map<string, MethodDoc>;
-  machineById?: Map<string, MachineItem>;
   dragging: boolean;
   /** หัวหน้า Lab / admin เท่านั้นที่ลากเพื่อมอบหมายได้ */
   canDragRole: boolean;
@@ -1242,8 +833,8 @@ function PetitionCard({
     .map((m) => m.code)
     .filter(Boolean) as string[];
   const blocked = groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode));
-  const received = !!labReceivedAt(petition);
-  const canDrag = canDragRole && received;
+  // ลากได้ทุกใบ (รวมใบที่ยังไม่ส่ง/ยังไม่รับตัวอย่าง); เปลี่ยนผู้รับงานแล้วคนใหม่ต้องกดเริ่มงานเอง
+  const canDrag = canDragRole;
 
   return (
     <Card
@@ -1327,7 +918,7 @@ function PetitionCard({
             ยังตั้ง method ไม่ครบ
           </Badge>
         )}
-        {onClaim && !assigned && received && !blocked && (
+        {onClaim && !assigned && (
           <Button
             size="sm"
             variant="primary"
@@ -1344,387 +935,5 @@ function PetitionCard({
         )}
       </div>
     </Card>
-  );
-}
-
-// ————————————————————————————————————————————————————————————————
-// Machine-picking dialog (opened on drop)
-// ————————————————————————————————————————————————————————————————
-
-interface MachineAssignDialogProps {
-  petition: Petition | null;
-  employee: EmployeeAssignee | null;
-  groups: SubstanceGroup[];
-  machines: MachineItem[];
-  registryMethods: MethodDoc[];
-  methodByCode: Map<string, MethodDoc>;
-  getSelectedSlotMachines: (petition: Petition, group: SubstanceGroup) => Record<string, string>;
-  onSelectMachine: (petitionId: string, groupKey: string, methodCode: string, machineKey: string) => void;
-  isGroupSatisfied: (petition: Petition, group: SubstanceGroup) => boolean;
-  machineSuggestions: Record<string, MachineSuggestion[]>;
-  saving: boolean;
-  /** ข้อความปุ่มยืนยัน — ใช้ "รับงาน" ตอนเจ้าหน้าที่รับงานเอง */
-  confirmLabel?: string;
-  onConfirm: () => void;
-  onClose: () => void;
-}
-
-function MachineAssignDialog({
-  petition,
-  employee,
-  groups,
-  machines,
-  registryMethods,
-  methodByCode,
-  getSelectedSlotMachines,
-  onSelectMachine,
-  isGroupSatisfied,
-  machineSuggestions,
-  saving,
-  confirmLabel,
-  onConfirm,
-  onClose,
-}: MachineAssignDialogProps) {
-  const open = !!petition && !!employee;
-
-  const hasUnassignableGroup =
-    !!petition && (groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode)));
-  const allSatisfied = !!petition && groups.length > 0 && groups.every((g) => isGroupSatisfied(petition, g));
-  const isReassign = !!petition?.assignedTo;
-
-  const disabledReason = hasUnassignableGroup
-    ? 'ยังไม่ได้กำหนด method ของสารใน simple method — assign ไม่ได้'
-    : !allSatisfied
-      ? 'เลือกเครื่องให้ครบทุกสารก่อน'
-      : null;
-  const confirmDisabled = saving || hasUnassignableGroup || !allSatisfied;
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-2xl">
-        {petition && employee && (
-          <>
-            <DialogHeader>
-              <DialogTitle className="flex flex-wrap items-center gap-2">
-                <span className="text-primary-500">{petition.petitionNo}</span>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                <span className="inline-flex items-center gap-1.5">
-                  <UserCheck className="h-4 w-4 text-green-500" />
-                  {employee.name}
-                </span>
-              </DialogTitle>
-              <DialogDescription>
-                {employeeLabel(employee)} · {employee.department} — เมื่อยืนยันแล้ว คนนี้จะเป็นผู้รับงานของขั้นนี้
-                {isReassign && ' (กำลังเปลี่ยนผู้รับงาน/เครื่อง)'}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="max-h-[60vh] space-y-3 overflow-y-auto">
-              {groups.length === 0 ? (
-                <div className="rounded-md border border-border py-6 text-center text-sm text-muted-foreground">
-                  ไม่มีตัวอย่างให้ assign
-                </div>
-              ) : (
-                groups.map((group) => {
-                  const slotMachines = getSelectedSlotMachines(petition, group);
-                  const machineMethods = groupMachineMethods(group.slots, methodByCode);
-                  const notSet: string[] = [];
-                  const benchNotes: { key: string; label: string; substance: string }[] = [];
-                  const unknownCodes: { key: string; code: string }[] = [];
-                  group.slots.forEach((slot, sIdx) => {
-                    if (slot.methods.length === 0) {
-                      notSet.push(slot.name || `เครื่องที่ ${sIdx + 1}`);
-                      return;
-                    }
-                    slot.methods.forEach((code) => {
-                      const method = methodByCode.get(code);
-                      if (!method) {
-                        unknownCodes.push({ key: `${sIdx}-${code}`, code });
-                      } else if (!method.requiresMachine) {
-                        benchNotes.push({ key: `${sIdx}-${code}`, label: method.label, substance: slot.name });
-                      }
-                    });
-                  });
-                  const seqLabel = sampleSeqLabel(group);
-                  return (
-                    <div key={group.groupKey} className="rounded-lg border border-border bg-card p-3 text-card-foreground">
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="font-medium text-foreground">
-                          {group.commonName || group.sampleName || '(ไม่มีชื่อ)'}
-                        </span>
-                        {seqLabel && (
-                          <span className="text-xs text-muted-foreground">ตัวอย่าง #{seqLabel}</span>
-                        )}
-                      </div>
-
-                      {(machineSuggestions[group.groupKey] ?? []).length > 0 && (
-                        <div className="mb-2 flex flex-wrap items-center gap-1">
-                          <span className="text-[11px] text-muted-foreground">AI แนะนำ:</span>
-                          {machineSuggestions[group.groupKey].map((s) => (
-                            <span
-                              key={s.machineCode}
-                              className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary"
-                              title={`ใช้ ${s.usageCount} ครั้งใน 10 batches ล่าสุด`}
-                            >
-                              {s.machineCode} ({s.usageCount}/10)
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap items-start gap-1.5">
-                        {machineMethods.map((gm) => {
-                          const filteredMachines = machines.filter((m) =>
-                            machineMatchesMethod(m.name, gm.method, registryMethods),
-                          );
-                          return (
-                            <div key={gm.code}>
-                              <SingleMachinePicker
-                                slotLabel={
-                                  gm.substanceNames.length > 1
-                                    ? `ใช้ร่วม ${gm.substanceNames.length} สาร`
-                                    : ''
-                                }
-                                substanceName={gm.substanceNames.join(', ')}
-                                methodLabel={gm.method.label}
-                                machines={filteredMachines}
-                                selectedId={slotMachines[gm.code] || null}
-                                onSelect={(machineKey: string) =>
-                                  onSelectMachine(petition._id, group.groupKey, gm.code, machineKey)
-                                }
-                              />
-                              {filteredMachines.length === 0 && (
-                                <div className="mt-0.5 text-[11px] text-destructive">
-                                  ไม่พบเครื่องสำหรับ {gm.method.label}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {notSet.length > 0 && (
-                          <div className="w-[170px] shrink-0 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[10px] text-amber-700 dark:text-amber-300">
-                            <div className="truncate font-medium" title={notSet.join(', ')}>
-                              {notSet.join(', ')}
-                            </div>
-                            ยังไม่ได้ตั้ง method ในซิมเปิลเมธอด
-                          </div>
-                        )}
-                        {benchNotes.map((b) => (
-                          <Badge
-                            key={b.key}
-                            variant="gray-soft"
-                            className="shrink-0 px-1.5 py-1 text-[10px] font-medium"
-                            title={b.substance}
-                          >
-                            ทำที่โต๊ะ — {b.label}
-                          </Badge>
-                        ))}
-                        {unknownCodes.map((u) => (
-                          <Badge
-                            key={u.key}
-                            variant="red-soft"
-                            className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium"
-                          >
-                            method ไม่รู้จัก: {u.code}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <DialogFooter>
-              <Button variant="ghost" onClick={onClose}>
-                <X className="h-4 w-4" />
-                ยกเลิก
-              </Button>
-              {disabledReason ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-block">
-                      <Button variant="primary" disabled>
-                        <ClipboardCheck className="h-4 w-4" />
-                        {confirmLabel ?? (isReassign ? 'บันทึก' : 'Assign')}
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{disabledReason}</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button variant="primary" disabled={confirmDisabled} onClick={onConfirm}>
-                  <ClipboardCheck className="h-4 w-4" />
-                  {saving ? 'กำลังบันทึก...' : confirmLabel ?? (isReassign ? 'บันทึก' : 'Assign')}
-                </Button>
-              )}
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface SingleMachinePickerProps {
-  machines: MachineItem[];
-  selectedId: string | null;
-  onSelect: (machineKey: string) => void;
-  slotLabel: string;        // caption line, e.g. "ใช้ร่วม 2 สาร"; "" for a single substance
-  substanceName: string;    // e.g. "PROPANIL 36%"
-  methodLabel: string;      // required method label/code, e.g. "GC", "HPLC"
-  readOnly?: boolean;       // locked view — show selection without the picker
-}
-
-// One box = one machine slot. Single-select: picking a machine replaces the slot,
-// picking the already-selected one clears it.
-function SingleMachinePicker({
-  machines,
-  selectedId,
-  onSelect,
-  slotLabel,
-  substanceName,
-  methodLabel,
-  readOnly = false,
-}: SingleMachinePickerProps) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return machines;
-    const matches = machines.filter((m) =>
-      [m.code, m.name, m.location, m.model, m.manufacturer]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q)),
-    );
-    return rankSearchResults(matches, query, (machine) => ({
-      primary: [machine.code],
-      secondary: [machine.name, machine.location, machine.model, machine.manufacturer],
-    }));
-  }, [machines, query]);
-
-  const selected = useMemo(
-    () => machines.find((m) => (m._id || m.code) === selectedId) ?? null,
-    [machines, selectedId],
-  );
-
-  if (readOnly) {
-    return (
-      <div
-        title={substanceName}
-        className="w-[170px] shrink-0 rounded-md border border-border bg-muted/60 px-2 py-1.5"
-      >
-        <div className="flex items-center gap-1">
-          <span className="truncate text-[11px] font-medium text-foreground">
-            {substanceName || slotLabel}
-          </span>
-          <Badge
-            variant="blue-soft"
-            className="ml-auto shrink-0 px-1 py-0 text-[9px] font-medium"
-          >
-            {methodLabel}
-          </Badge>
-        </div>
-        {slotLabel && <div className="text-[9px] text-muted-foreground">{slotLabel}</div>}
-        <div className="mt-0.5 flex items-center gap-1">
-          <Cog className="h-3 w-3 shrink-0 text-muted-foreground" />
-          <span
-            className={`truncate text-xs ${
-              selected ? 'font-medium text-foreground' : 'text-muted-foreground'
-            }`}
-          >
-            {selected ? machineLabel(selected) : 'ไม่ได้เลือก'}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          title={substanceName}
-          className="w-[170px] shrink-0 rounded-md border border-border bg-background px-2 py-1.5 text-left text-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 data-[state=open]:border-primary"
-        >
-          <div className="flex items-center gap-1">
-            <span className="truncate text-[11px] font-medium text-foreground">
-              {substanceName || slotLabel}
-            </span>
-            <Badge
-              variant="blue-soft"
-              className="ml-auto shrink-0 px-1 py-0 text-[9px] font-medium"
-            >
-              {methodLabel}
-            </Badge>
-          </div>
-          {slotLabel && <div className="text-[9px] text-muted-foreground">{slotLabel}</div>}
-          <div className="mt-0.5 flex items-center gap-1">
-            <Cog className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span
-              className={`truncate text-xs ${
-                selected ? 'font-medium text-foreground' : 'text-muted-foreground'
-              }`}
-            >
-              {selected ? machineLabel(selected) : 'เลือกเครื่อง'}
-            </span>
-          </div>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-3" align="start">
-        <div className="relative mb-2">
-          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="ค้นหาเครื่อง (รหัส/ชื่อ/ตำแหน่ง)"
-            className="pl-8 h-8 text-xs"
-          />
-        </div>
-        <div className="max-h-64 overflow-y-auto space-y-1">
-          {filtered.length === 0 ? (
-            <div className="py-4 text-center text-xs text-muted-foreground">ไม่พบเครื่อง</div>
-          ) : (
-            filtered.map((machine) => {
-              const key = machine._id || machine.code;
-              const checked = key === selectedId;
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  onClick={() => {
-                    onSelect(key);
-                    setOpen(false);
-                  }}
-                  className={`flex w-full items-start gap-2 rounded px-2 py-1.5 text-left hover:bg-accent ${
-                    checked ? 'bg-primary/10' : ''
-                  }`}
-                >
-                  <span
-                    className={`mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
-                      checked ? 'border-primary' : 'border-border'
-                    }`}
-                  >
-                    {checked && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium text-foreground">
-                      {machineLabel(machine)}
-                    </span>
-                    {machine.location && (
-                      <span className="block truncate text-[11px] text-muted-foreground">
-                        {machine.location}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
   );
 }

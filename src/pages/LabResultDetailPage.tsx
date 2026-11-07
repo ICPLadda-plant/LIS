@@ -9,6 +9,7 @@ import { api, type ParameterItem } from "@/lib/api";
 import { usePetition, useLabRequestsByPetition } from "@/hooks/usePetition";
 import { useItemGroupMembership } from "@/hooks/useItemGroupMembership";
 import { buildApprovalGroups } from "@/lib/qcApprovalRows";
+import { aiSubstancesForItem } from "@/lib/aiSubstanceFields";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
 import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
@@ -80,17 +81,26 @@ export default function LabResultDetailPage() {
   // ใบคำนวณใช้ได้ทุกสาร: หัวกระดาษจากหน้ารายงาน แต่ค่าดิบ (Area Inj / % Sample) มาจาก groups
   // ของหน้านี้ ซึ่งเปิด includeResultOnlyFields — รายงาน Lab ปกติไม่มีแถวเหล่านี้
   const calcPages = pages
-    .map((page, i) => {
+    .flatMap((page, i) => {
       const seq = petition?.items?.[i]?.seq;
       const group = groups.find((g) => g.seq === seq);
-      if (!group) return page;
+      if (!group) return [page];
       const rows = group.params.flatMap((p) => p.rows.map((r) => ({
         testItem: `${r.label}${r.unit ? ` (${r.unit})` : ""}`,
         result: r.value || "-",
         criteria: "-",
         method: "-",
       })));
-      return { ...page, rows: [...rows, ...page.rows] };
+      // ยาผสม: ใบคำนวณแยกหน้าละสาร ใช้ค่าชุด %AI ของสารนั้น (ตัด " — ชื่อสาร" ออกจากชื่อช่อง)
+      const substances = aiSubstancesForItem(group.commonName);
+      if (substances.length === 0) return [{ ...page, rows: [...rows, ...page.rows] }];
+      return substances.map((substance) => {
+        const suffix = new RegExp(`\\s+—\\s+${substance.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s*(·|\\(|$))`, "i");
+        const ownRows = rows
+          .filter((row) => !/\s—\s/.test(row.testItem) || suffix.test(row.testItem))
+          .map((row) => ({ ...row, testItem: row.testItem.replace(suffix, "") }));
+        return { ...page, sample: { ...page.sample, name: substance.raw }, rows: [...ownRows, ...page.rows] };
+      });
     })
     .filter(hasCalculationData);
   // พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ

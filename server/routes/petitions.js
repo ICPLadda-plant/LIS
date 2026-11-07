@@ -8,6 +8,7 @@ const Approval = require('../models/Approval');
 const RealtimeDensity = require('../models/RealtimeDensity');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
 const { buildSearchRankingStages } = require('../lib/searchRanking');
+const { PRODUCTION_PREFIX_RX, productionLineLabel, productionLineQueryRegex } = require('../lib/productionDepartment');
 const { labResultDocs, snapshotOf, clearLabResults, restoreLabResults } = require('../lib/labResultActions');
 const {
   bellDescribe,
@@ -221,6 +222,8 @@ async function matchStandardTime(machine) {
 }
 
 // GET /api/petitions?page=1&limit=20&status=&search=
+// ?submitterGroup=production → เฉพาะคำร้องที่ผู้ยื่นอยู่แผนกผลิต (มุมมองของฝ่ายผลิต)
+// ?submitterDepartment=ผลิต 3 → เฉพาะสายผลิตนั้น ("ผลิต 03" นับเป็นสายเดียวกัน)
 router.get('/', async (req, res) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -230,10 +233,14 @@ router.get('/', async (req, res) => {
     const search = (req.query.search || '').trim();
     const assignedToEmployeeId = String(req.query.assignedToEmployeeId || '').trim();
     const assignedToNames = queryStringList(req.query.assignedToName);
+    const productionOnly = req.query.submitterGroup === 'production';
+    const submitterDepartment = String(req.query.submitterDepartment || '').trim();
 
     const q = {};
     if (dept && ['production', 'rm', 'fg'].includes(String(dept))) q.dept = dept;
     const andConditions = [];
+    if (productionOnly) andConditions.push({ 'submittedBy.department': PRODUCTION_PREFIX_RX });
+    if (submitterDepartment) andConditions.push({ 'submittedBy.department': productionLineQueryRegex(submitterDepartment) });
     const assigneeConditions = [];
     if (assignedToEmployeeId) assigneeConditions.push({ 'assignedTo.employeeId': assignedToEmployeeId });
     assignedToNames.forEach((name) => assigneeConditions.push({ 'assignedTo.name': name }));
@@ -321,7 +328,7 @@ router.get('/', async (req, res) => {
       delete q.$or;
     }
 
-    const [docs, total, summaryTotal, statusCountRows] = await Promise.all([
+    const [docs, total, summaryTotal, statusCountRows, productionDepartmentRows] = await Promise.all([
       search
         ? Petition.aggregate([
           { $match: { ...q, deletedAt: null } },
@@ -340,8 +347,15 @@ router.get('/', async (req, res) => {
         { $match: summaryQ },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
+      productionOnly
+        ? Petition.distinct('submittedBy.department', { 'submittedBy.department': PRODUCTION_PREFIX_RX, deletedAt: null })
+        : Promise.resolve(null),
     ]);
     const statusCounts = Object.fromEntries(statusCountRows.map((row) => [row._id, row.count]));
+    const submitterDepartments = productionDepartmentRows
+      ? [...new Set(productionDepartmentRows.map(productionLineLabel).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'th', { numeric: true }))
+      : undefined;
     // Lazy phase advance for petitions whose phase2DueAt has elapsed
     const now = new Date();
     const items = [];
@@ -351,7 +365,7 @@ router.get('/', async (req, res) => {
       }
       items.push(doc.toObject());
     }
-    res.json({ items, total, page, limit, summaryTotal, statusCounts });
+    res.json({ items, total, page, limit, summaryTotal, statusCounts, submitterDepartments });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });
   }
@@ -1317,7 +1331,8 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
       [`${side}ReceivedAt`]: now,
     };
     if (before.status === 'sampleSent' || before.status === 'deliveringQC') {
-      update.status = 'pendingReview';
+      // Lab assign ได้ก่อนตัวอย่างมาถึง — ใบที่มีผู้รับงานแล้วถือว่ากำลังดำเนินการทันทีที่รับตัวอย่าง
+      update.status = before.assignedTo?.employeeId ? 'inProgress' : 'pendingReview';
     }
     if (!before.sampleSentAt && (before.status === 'sampleSent' || before.status === 'deliveringQC')) {
       update.sampleSentAt = now;
@@ -1370,7 +1385,30 @@ function labNotReceived(doc) {
   return !doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt);
 }
 
-// ตั้ง assignedTo + เครื่องที่เลือก แล้วบันทึก audit — ใช้ร่วมกันทั้งหัวหน้ามอบหมายและเจ้าหน้าที่รับงานเอง
+// ทำความสะอาดรายการเครื่องจาก client แล้วผูก Standard Time ของแต่ละเครื่อง
+async function normalizeAssignedMachines(machines) {
+  const cleaned = machines
+    .filter((m) => m && m.machineId && m.code && m.name)
+    .map((m) => ({
+      machineId: String(m.machineId).trim(),
+      code: String(m.code).trim(),
+      name: String(m.name).trim(),
+      location: m.location ? String(m.location).trim() : undefined,
+      sampleName: m.sampleName ? String(m.sampleName).trim() : undefined,
+      commonName: m.commonName ? String(m.commonName).trim() : undefined,
+    }));
+  for (const machine of cleaned) {
+    const standard = await matchStandardTime(machine);
+    if (!standard) continue;
+    machine.standardTimeId = String(standard._id);
+    machine.estimatedMinutes = standard.standardTimeMin;
+    machine.estimatedSource = `${standard.instrument} / ${standard.analysisName}`;
+  }
+  return cleaned;
+}
+
+// ตั้ง assignedTo แล้วบันทึก audit — ใช้ร่วมกันทั้งหัวหน้ามอบหมายและเจ้าหน้าที่รับงานเอง
+// assign ได้ก่อน Lab รับตัวอย่าง; ผู้รับงานเลือกเครื่องตอนกด "เริ่มงาน" (POST /:id/accept)
 async function applyLabAssignment(doc, assignee, machines, { actor, note, claimed = false }) {
   const prevStatus = doc.status;
   const now = new Date();
@@ -1381,29 +1419,10 @@ async function applyLabAssignment(doc, assignee, machines, { actor, note, claime
     position: assignee.position ? String(assignee.position).trim() : undefined,
     assignedAt: now,
     assignedBy: actor ? String(actor).trim() : undefined,
-    // รับงานเอง (มอบหมายอิสระ) = รับงานทันที; หัวหน้า assign → รอเจ้าหน้าที่กดรับ
-    ...(claimed ? { acceptedAt: now, acceptedBy: String(assignee.name).trim() } : {}),
   };
 
   if (Array.isArray(machines)) {
-    const cleaned = machines
-      .filter((m) => m && m.machineId && m.code && m.name)
-      .map((m) => ({
-        machineId: String(m.machineId).trim(),
-        code: String(m.code).trim(),
-        name: String(m.name).trim(),
-        location: m.location ? String(m.location).trim() : undefined,
-        sampleName: m.sampleName ? String(m.sampleName).trim() : undefined,
-        commonName: m.commonName ? String(m.commonName).trim() : undefined,
-      }));
-    for (const machine of cleaned) {
-      const standard = await matchStandardTime(machine);
-      if (!standard) continue;
-      machine.standardTimeId = String(standard._id);
-      machine.estimatedMinutes = standard.standardTimeMin;
-      machine.estimatedSource = `${standard.instrument} / ${standard.analysisName}`;
-    }
-    doc.assignedMachines = cleaned;
+    doc.assignedMachines = await normalizeAssignedMachines(machines);
   }
   refreshLabExpected(doc);
 
@@ -1459,9 +1478,6 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(petitionQuery(req.params.id));
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
-    if (labNotReceived(doc)) {
-      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้' } });
-    }
 
     await applyLabAssignment(doc, { employeeId, name, department, position }, machines, {
       actor: user.name || user.email,
@@ -1505,7 +1521,7 @@ router.delete('/:id/assign', serializePetitionWrite(async (req, res) => {
   }
 }));
 
-// POST /api/petitions/:id/accept → เจ้าหน้าที่ที่ถูก assign กดรับงาน (เริ่มนับเวลาวิเคราะห์)
+// POST /api/petitions/:id/accept { machines } → เจ้าหน้าที่ที่ถูก assign กดเริ่มงาน + เลือกเครื่อง (เริ่มนับเวลาวิเคราะห์)
 router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
   try {
     const user = await currentUser(req);
@@ -1516,6 +1532,9 @@ router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
     if (!assignee?.employeeId) return res.status(409).json({ error: { message: 'งานนี้ยังไม่ได้มอบหมาย' } });
     if (['success', 'approved', 'rejected'].includes(doc.status)) return badRequest(res, 'งานนี้ปิดแล้ว');
     if (assignee.acceptedAt) return res.json(doc);
+    if (labNotReceived(doc)) {
+      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะเริ่มงานได้' } });
+    }
     const name = user.name || user.email;
     const employeeId = user.employeeId || (!user._id ? String(req.body?.employeeId || '').trim() : '');
     const isAssignee = (employeeId && employeeId === assignee.employeeId)
@@ -1526,15 +1545,19 @@ router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
     doc.assignedTo.acceptedAt = new Date();
     doc.assignedTo.acceptedBy = name;
     doc.markModified('assignedTo');
+    if (Array.isArray(req.body?.machines)) {
+      doc.assignedMachines = await normalizeAssignedMachines(req.body.machines);
+    }
     refreshLabExpected(doc);
     await doc.save();
+    const machineNote = doc.assignedMachines?.length ? ` (เครื่อง: ${doc.assignedMachines.map((m) => m.code).join(', ')})` : '';
     logAudit(doc, {
       event: 'accepted',
       fromStatus: doc.status,
       toStatus: doc.status,
       actor: name,
-      note: `${assignee.name} รับงาน`,
-      metadata: { side: 'lab', assignee: doc.assignedTo },
+      note: `${assignee.name} เริ่มงาน${machineNote}`,
+      metadata: { side: 'lab', assignee: doc.assignedTo, machines: doc.assignedMachines },
     });
     res.json(doc);
   } catch (err) {
@@ -1557,9 +1580,6 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(petitionQuery(req.params.id));
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
-    if (labNotReceived(doc)) {
-      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะรับงานได้' } });
-    }
     if (doc.assignedTo?.employeeId) {
       return res.status(409).json({ error: { message: `มีผู้รับงานนี้แล้ว (${doc.assignedTo.name})` } });
     }

@@ -4,10 +4,38 @@ import {
   hasRequiredLabRequestStep,
   isResearchAndDevelopmentDepartment,
   makeInitialItemsFromQuery,
+  integrationPayloadToSearchParams,
   objectToSearchParams,
   requiresMasterItemSelection,
   requiresDeliveryAndBatch,
 } from './ProductionPetitionNewPage';
+
+describe('integrationPayloadToSearchParams', () => {
+  it('reads the query string Production posted exactly as if it came from the URL', () => {
+    const query = new URLSearchParams({
+      requestNo: 'SA261106000001',
+      'samples[0][sampleName]': 'A',
+      'samples[0][batchNo]': 'B-1',
+      'samples[0][note]': 'หมายเหตุตัวแรก',
+      'samples[1][sampleName]': 'A',
+      'samples[1][batchNo]': 'B-2',
+      'samples[1][note]': '',
+    }).toString();
+
+    const params = integrationPayloadToSearchParams({ query });
+
+    expect(params.toString()).toBe(query);
+    // ช่องว่างของตัวสุดท้ายต้องคงไว้ ไม่งั้น LIS เอาค่าของตัวแรกมาเติมแทน
+    expect(makeInitialItemsFromQuery(params).map((item) => item.note)).toEqual(['หมายเหตุตัวแรก', '']);
+  });
+
+  it('still accepts the object payload of older callers', () => {
+    const params = integrationPayloadToSearchParams({ requestNo: 'SA1', samples: [{ sampleName: 'A', batchNo: 'B-1' }] });
+
+    expect(params.get('requestNo')).toBe('SA1');
+    expect(params.get('samples[0][batchNo]')).toBe('B-1');
+  });
+});
 
 describe('buildProductionReturnUrl', () => {
   it('returns production list with original request number and LIS petition number', () => {
@@ -244,6 +272,23 @@ describe('R&D integration request rules', () => {
 });
 
 describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
+  it('merges a QC-only row and a Lab-only row of the same batch even without routeTargets', () => {
+    const sample = { sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)', unit: 'G', mfNo: 'MF1' };
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samples: [
+        { ...sample, batchNo: 'B-240', qty: 300, sendToQc: '1', sendToLab: '0' },
+        { ...sample, batchNo: 'B-240', qty: 500, sendToQc: '0', sendToLab: '1' },
+        { ...sample, batchNo: 'B-241', qty: 300, sendToQc: '1', sendToLab: '0' },
+        { ...sample, batchNo: 'B-241', qty: 500, sendToQc: '0', sendToLab: '1' },
+      ],
+    }));
+
+    expect(items.map(({ seq, batchNo, sendToQc, sendToLab, labelQuantities, labelQuantitySides }) => ({ seq, batchNo, sendToQc, sendToLab, labelQuantities, labelQuantitySides }))).toEqual([
+      { seq: 1, batchNo: 'B-240', sendToQc: true, sendToLab: true, labelQuantities: ['300 G', '500 G'], labelQuantitySides: ['qc', 'lab'] },
+      { seq: 2, batchNo: 'B-241', sendToQc: true, sendToLab: true, labelQuantities: ['300 G', '500 G'], labelQuantitySides: ['qc', 'lab'] },
+    ]);
+  });
+
   it('merges two rows of the same batch into one item with two quantities', () => {
     const items = makeInitialItemsFromQuery(new URLSearchParams(
       'routeTargets=qc,lab&sampleName=Foo,Foo&batchNo=B1,B1&qty=50,200&unit=ml',

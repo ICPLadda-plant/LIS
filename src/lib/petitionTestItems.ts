@@ -360,6 +360,7 @@ export function parameterNamesForPetition(
 // option ที่ตั้ง filter ≥ 1 มิติ — OR ข้ามมิติ (เหมือน parameterAppliesToItem).
 // Categories (RM/FG) ระดับ option ยังไม่ enforce ที่ runtime — ต่างจากระดับ parameter
 // (parameterMatchesFacets) ที่บังคับแล้ว. จะเปิดใช้ต้องส่ง petition category เข้ามาที่นี่ด้วย.
+// ถ้า filter ตัดจนไม่เหลือตัวเลือกเลย ให้แสดงทุกตัวเลือกแทน — dropdown ว่างทำให้กรอกช่องบังคับไม่ได้
 export function visibleEnumOptions(
   field: ParameterValueField,
   item: PetitionItem,
@@ -378,7 +379,7 @@ export function visibleEnumOptions(
   const itemProductType = getItemProductType(item);
   const itemSubCat = getItemSubCategory(item);
 
-  return options.filter((opt) => {
+  const visible = options.filter((opt) => {
     const f = filters[opt];
     if (!f) return true;
     const itemNos = f.itemNos ?? [];
@@ -413,4 +414,5 @@ export function visibleEnumOptions(
     if (itemGroups.length > 0 && itemGroups.some((gid) => itemGroupIds.includes(gid))) return true;
     return false;
   });
+  return visible.length > 0 ? visible : options;
 }

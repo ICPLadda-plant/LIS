@@ -24,10 +24,8 @@ export function isVisibleInAssignQueue(petition: Petition): boolean {
   // Re-check may be redone by someone else on another day — show it again
   // (even after success) so it can be reassigned.
   if (isLabRecheckPending(petition)) return true;
-  // Keep received-but-unassigned work on the board so Lab can be assigned after
-  // accepting the sample, and keep assigned work visible during testing.
-  if (petition.assignedTo) return OPEN_TESTING_STATUSES.includes(petition.status);
-  return OPEN_TESTING_STATUSES.includes(petition.status) || isReceivedBeforeStatusAdvance(petition);
+  // Lab assign ได้ตั้งแต่ยังไม่ส่งตัวอย่าง (กำลังส่งตัวอย่าง) จนถึงระหว่างทดสอบ
+  return petition.status === 'deliveringQC' || OPEN_TESTING_STATUSES.includes(petition.status);
 }
 
 export function isWaitingForAssignment(petition: Petition): boolean {

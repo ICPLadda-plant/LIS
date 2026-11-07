@@ -3,6 +3,7 @@ import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { customerCodeForPetition } from '@/lib/customerCode';
 import { pickQcLabSideItems, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { serviceRequestSubmissionNo } from '@/lib/petitionSampler';
 import type { Petition, PetitionItem, QCTestResult } from '@/types/petition.types';
 import type { LabRequest } from '@/types/labRequest.types';
 import { resolveSpecificGravity, type SgParameter } from '@/lib/formSpecificGravity';
@@ -565,7 +566,7 @@ function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgPa
                 <td>{item.commonName || item.sampleName}</td>
                 <td>{item.batchNo}</td>
                 <td className="pr-center">{buddhistShort(item.productionDate)}</td>
-                <td>{item.submissionNo ?? ''}</td>
+                <td>{serviceRequestSubmissionNo(petition, item)}</td>
                 <td className="pr-center">{resolveSpecificGravity(qcResults, item.seq, sgParam) || String(requestValues[`${item.batchNo}\u0000${item.sampleName}`] ?? '')}</td>
                 <td>{item.packageUnit ?? ''}</td>
                 <td>{item.testUnit ?? ''}</td>

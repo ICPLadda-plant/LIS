@@ -40,7 +40,8 @@ function dbNameFromUri(uri) {
 
 // collection ที่ไม่ต้อง export ลง seed-data/: เป็น log ล้วน กู้คืนไปก็ไม่มีประโยชน์
 // แต่ auto-sync.ps1 จะ commit ไฟล์ใหม่ให้ทุกชั่วโมง (Node-RED ยิงนาทีละครั้ง)
-const SKIP_COLLECTIONS = ['apirequestlogs'];
+// productionintegrationrequests = ข้อมูลฝากชั่วคราวจาก production หมดอายุเองใน 2 วัน
+const SKIP_COLLECTIONS = ['apirequestlogs', 'productionintegrationrequests'];
 
 // ONLY (จาก --only) ชนะ skip list เสมอ เผื่ออยากดัมพ์ log จริงๆ
 function selectCollections(names, only = [], skip = SKIP_COLLECTIONS) {

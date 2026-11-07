@@ -2,7 +2,6 @@ import type { ParameterItem } from "@/lib/api";
 import type { Petition, PetitionItem, QCTestResult } from "@/types/petition.types";
 import { getPetitionCategory, itemGroupKey, matchParametersForItem } from "@/lib/petitionTestItems";
 import {
-  expandFieldForItem,
   fieldValueList,
   getEntryValues,
   isFieldAbnormal,
@@ -14,8 +13,10 @@ import {
 } from "@/lib/parameterValidation";
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange } from "@/lib/standardOperators";
 import { calculatedAiFieldKind } from "@/lib/aiCalculation";
+import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, stripAiSubstanceSuffix } from "@/lib/aiSubstanceFields";
 import { sampleRoundFor } from "@/lib/additionalSamples";
 import { isPhaseTriggerParameter, visibleFieldsForPhase } from "@/lib/phaseRetest";
+import { mediaUrlsFromValue } from "@/lib/mediaUrls";
 
 // ต่อท้ายชื่อแถวผลรอบตรวจซ้ำ เพื่อให้หน้าออกผลและรายงานแยกค่าก่อน/หลัง trigger (เช่น อบ 14 วัน) ได้
 export const PHASE2_ROW_SUFFIX = "ตรวจซ้ำ Phase 2";
@@ -25,6 +26,8 @@ export interface ApprovalFieldRow {
   label: string;
   unit?: string;
   value: string;
+  /** รูป/วิดีโอที่อัปโหลด (ช่องชนิด photo) ให้หน้าแสดงเป็นรูปย่อแทนข้อความ path */
+  mediaUrls?: string[];
   standardText: string;
   abnormal: boolean;
   note: string;
@@ -70,12 +73,28 @@ const AI_APPROVAL_ROW_ORDER = [
 ] as const;
 
 const aiApprovalRowRank = (label: string) => {
-  const normalized = label.split(" · ")[0].trim().toLowerCase();
+  const normalized = stripAiSubstanceSuffix(label.split(" · ")[0].trim()).toLowerCase();
   const rank = AI_APPROVAL_ROW_ORDER.indexOf(normalized as (typeof AI_APPROVAL_ROW_ORDER)[number]);
   if (rank >= 0) return rank;
   return calculatedAiFieldKind(normalized) === "ai"
     ? AI_APPROVAL_ROW_ORDER.length
     : AI_APPROVAL_ROW_ORDER.length + 1;
+};
+
+// ช่องที่ไม่ได้ตั้งค่าใน parameter แต่มีค่าบันทึกไว้ เช่น "Area Inj.1::abamectin" → "Area Inj.1 — ABAMECTIN"
+const extraRowLabel = (key: string, commonName: string | undefined) => {
+  const index = key.indexOf("::");
+  if (index < 0) return key;
+  const substanceKey = key.slice(index + 2);
+  const substance = aiSubstancesForItem(commonName).find((candidate) => candidate.key === substanceKey);
+  return `${key.slice(0, index)} — ${substance?.name ?? substanceKey}`;
+};
+
+// ลำดับสารของแถว (ยาผสม) จากชื่อหลัง " — " เช่น "Area Inj.1 — ABAMECTIN"; แถวที่ไม่ระบุสารไว้ท้ายสุด
+const aiApprovalSubstanceRank = (label: string, substanceKeys: string[]) => {
+  const match = label.split(" · ")[0].match(/\s+—\s+([^—]+)$/);
+  const index = match ? substanceKeys.indexOf(match[1].trim().toLowerCase()) : -1;
+  return index >= 0 ? index : substanceKeys.length;
 };
 
 /**
@@ -138,6 +157,7 @@ export function buildApprovalGroups(
       });
 
       const rows: ApprovalFieldRow[] = [];
+      const isAiParameter = isAiParameterFields(param.valueFields ?? []);
       const pushFields = (phase: 1 | 2) => {
         const phaseVals = phase === 2 ? v2 : v1;
         const ctx = buildCtx(phaseVals);
@@ -159,7 +179,7 @@ export function buildApprovalGroups(
             // reference fields are auto-resolved from substance standards elsewhere and intentionally omitted from approval rows
             if (field.type === "reference") return;
             handledKeys.add(field.label);
-            expandFieldForItem(field, item.commonName, { includeRestrictedStandards, category: petitionCategory }).forEach((unit) => {
+            expandAiAwareFieldForItem(field, item.commonName, { includeRestrictedStandards, category: petitionCategory }, isAiParameter).forEach((unit) => {
               handledKeys.add(unit.key);
               handledKeys.add(noteLabelFor(unit.key));
               const effectiveField = unit.field.conditionalMode
@@ -209,6 +229,7 @@ export function buildApprovalGroups(
                   label: labelParts.join(" · "),
                   unit: unit.field.unit,
                   value: asStr(raw),
+                  mediaUrls: mediaUrlsFromValue(raw),
                   standardText: rowStandardText,
                   abnormal: rowAbnormal,
                   note,
@@ -223,8 +244,9 @@ export function buildApprovalGroups(
               if (handledKeys.has(key) || key.endsWith("__note") || key.endsWith("__source")) return;
               rows.push({
                 key: `${k}__extra__${key}__p${phase}__e${ei}`,
-                label: [key.replace("::", " — "), entryLabel].filter(Boolean).join(" · "),
+                label: [extraRowLabel(key, item.commonName), entryLabel].filter(Boolean).join(" · "),
                 value: asStr(raw),
+                mediaUrls: mediaUrlsFromValue(raw),
                 standardText: "",
                 abnormal: false,
                 note: "",
@@ -237,8 +259,12 @@ export function buildApprovalGroups(
 
       pushFields(1);
       if (includePhase2) pushFields(2);
-      if ((param.valueFields ?? []).some((field) => calculatedAiFieldKind(field.label) === "ai")) {
-        rows.sort((a, b) => a.phase - b.phase || aiApprovalRowRank(a.label) - aiApprovalRowRank(b.label));
+      if (isAiParameter) {
+        const substanceKeys = aiSubstancesForItem(item.commonName).map((substance) => substance.key);
+        rows.sort((a, b) =>
+          a.phase - b.phase ||
+          aiApprovalSubstanceRank(a.label, substanceKeys) - aiApprovalSubstanceRank(b.label, substanceKeys) ||
+          aiApprovalRowRank(a.label) - aiApprovalRowRank(b.label));
       }
 
       return {
