@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Mail, Pencil, Printer, Trash2, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, Copy, FileCheck2, FileDown, FilePlus2, Folder, Layers3, Mail, Pencil, Printer, Tags, Trash2, TrendingUp, Wrench, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -385,20 +385,99 @@ function CoaNotificationAlert({
     : duplicateRequestDocs.some((doc) => workflowStageFor(doc) === "inProgress")
       ? "inProgress"
       : "approved";
+  const summaryItems = [
+    {
+      label: `รออนุมัติ ${pendingApprovalDocs.length} รายการ`,
+      value: pendingApprovalDocs.length,
+      hint: "รอ QC Head ตรวจ",
+      icon: AlertTriangle,
+      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+      bar: "bg-yellow-500",
+    },
+    {
+      label: `ต้องแก้ไขข้อมูลใหม่ ${correctionDocs.length} รายการ`,
+      value: correctionDocs.length,
+      hint: "ถูกส่งกลับให้แก้ไข",
+      icon: Wrench,
+      tone: "border-destructive/30 bg-destructive/10 text-destructive",
+      bar: "bg-destructive",
+    },
+    {
+      label: `ขอใบซ้ำ ${duplicateRequestDocs.length} รายการ`,
+      value: duplicateRequestDocs.length,
+      hint: "ใบแก้ไขหรือออกซ้ำ",
+      icon: Copy,
+      tone: "border-primary/30 bg-primary/10 text-primary",
+      bar: "bg-primary",
+    },
+    {
+      label: `ชื่อสามัญซ้ำ ${duplicateCommonNameGroups.length} กลุ่ม`,
+      value: duplicateCommonNameGroups.length,
+      hint: "กลุ่มชื่อที่ควรตรวจ",
+      icon: Tags,
+      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+      bar: "bg-yellow-500",
+    },
+    {
+      label: `Batch/วันที่ผลิตซ้ำ ${duplicateBatchProductionDateGroups.length} กลุ่ม`,
+      value: duplicateBatchProductionDateGroups.length,
+      hint: "กลุ่ม Batch ที่ควรตรวจ",
+      icon: Layers3,
+      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+      bar: "bg-yellow-500",
+    },
+    {
+      label: `อนุมัติแล้ว ${approvedDocs.length} รายการ`,
+      value: approvedDocs.length,
+      hint: "เอกสารพร้อมใช้งาน",
+      icon: CheckCircle2,
+      tone: "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300",
+      bar: "bg-green-500",
+    },
+  ];
+  const maxSummaryValue = Math.max(...summaryItems.map((item) => item.value), 1);
 
   return (
     <Alert data-testid="coa-notification-alert" className="border-border bg-card text-card-foreground shadow-sm [&>svg]:text-primary-500">
       <BellRing className="h-5 w-5" />
-      <AlertTitle className="flex flex-wrap items-center gap-2">
-        แจ้งเตือนเอกสาร COA
-        {pendingApprovalDocs.length > 0 && <Badge variant="primary-soft">รออนุมัติ {pendingApprovalDocs.length} รายการ</Badge>}
-        {correctionDocs.length > 0 && <Badge variant="primary-soft">ต้องแก้ไขข้อมูลใหม่ {correctionDocs.length} รายการ</Badge>}
-        {duplicateRequestDocs.length > 0 && <Badge variant="primary-soft">ขอใบซ้ำ {duplicateRequestDocs.length} รายการ</Badge>}
-        {duplicateCommonNameGroups.length > 0 && <Badge variant="primary-soft">ชื่อสามัญซ้ำ {duplicateCommonNameGroups.length} กลุ่ม</Badge>}
-        {duplicateBatchProductionDateGroups.length > 0 && <Badge variant="primary-soft">Batch/วันที่ผลิตซ้ำ {duplicateBatchProductionDateGroups.length} กลุ่ม</Badge>}
-        {approvedDocs.length > 0 && <Badge variant="primary-soft">อนุมัติแล้ว {approvedDocs.length} รายการ</Badge>}
-      </AlertTitle>
+      <AlertTitle className="text-base font-semibold text-foreground">แจ้งเตือนเอกสาร COA</AlertTitle>
       <AlertDescription>
+        <p className="text-sm text-muted-foreground">ภาพรวมงานที่ต้องติดตามและเอกสารที่พร้อมใช้งาน</p>
+        <div data-testid="coa-notification-summary" className="mt-4 rounded-lg border bg-muted/30 p-3">
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">ภาพรวมสถานะ</h3>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            {summaryItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-lg border bg-card p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-2xl font-bold leading-none text-foreground">{item.value}</div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground">{item.hint}</div>
+                    </div>
+                    <span className={`rounded-full border p-2 ${item.tone}`}>
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                    <div className={`h-full rounded-full ${item.bar}`} style={{ width: `${(item.value / maxSummaryValue) * 100}%` }} />
+                  </div>
+                  <span className="sr-only">{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="mt-5 flex items-center gap-2 border-b pb-2">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">รายละเอียดที่ต้องตรวจสอบ</h3>
+            <p className="text-xs text-muted-foreground">เลือกดูรายการเพื่อดำเนินการต่อ หรือเทียบข้อมูลที่อาจซ้ำกัน</p>
+          </div>
+        </div>
         <div className="mt-3 grid gap-3 xl:grid-cols-3">
           {pendingApprovalDocs.length > 0 && (
             <div className="rounded-md border bg-card p-3">
