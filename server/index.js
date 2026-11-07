@@ -100,6 +100,7 @@ mountApi('/chemical-requisitions', require('./routes/chemical-requisitions')); /
 mountApi('/temphum', require('./routes/temphum'));
 mountApi('/env-checks', require('./routes/envChecks'));
 mountApi('/env-room-config', require('./routes/envRoomConfig'));
+mountApi('/balance-control-config', require('./routes/balanceControlConfig')); // ค่า Control Chart เครื่องชั่ง
 mountApi('/document-number-config', require('./routes/documentNumberConfigs'));
 mountApi('/dashboard-layout', require('./routes/dashboardLayout'));
 mountApi('/user-favorites', require('./routes/userFavorites')); // รายการโปรดบน sidebar ต่อ user

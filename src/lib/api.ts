@@ -14,6 +14,7 @@ import type {
   SixMonthMedicineStockResponse,
 } from "@/types/stock";
 import type { EnvRoomConfig, EnvRoomConfigInput } from "@/lib/dailyCheckEnv";
+import type { BalanceControlConfig, BalanceControlConfigInput } from "@/lib/balanceControlChart";
 import type { DailyCheckPeriod } from "@/lib/dailyCheckPeriod";
 import type { StandardLabelCodeDefaults } from "@/lib/standardLabelCode";
 import {
@@ -685,6 +686,15 @@ export const api = {
     request<{ data: EnvRoomConfig[] }>("/env-room-config").then((r) => r.data),
   updateEnvRoomConfig: (slug: EnvRoomConfig["slug"], input: EnvRoomConfigInput) =>
     request<{ data: EnvRoomConfig }>(`/env-room-config/${slug}`, {
+      method: "PUT",
+      body: JSON.stringify(input),
+    }).then((r) => r.data),
+
+  // ── Balance QC control values (Mean/STD ต่อเครื่องชั่ง สำหรับ Control Chart) ──
+  getBalanceControlConfigs: () =>
+    request<{ data: BalanceControlConfig[] }>("/balance-control-config").then((r) => r.data),
+  updateBalanceControlConfig: (scaleId: string, input: BalanceControlConfigInput) =>
+    request<{ data: BalanceControlConfig }>(`/balance-control-config/${encodeURIComponent(scaleId)}`, {
       method: "PUT",
       body: JSON.stringify(input),
     }).then((r) => r.data),
