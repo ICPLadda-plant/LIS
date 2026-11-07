@@ -283,6 +283,8 @@ describe("CoaCenterPage", () => {
     expect(within(trend).getByText("GLYPHOSATE 48% SL")).toBeInTheDocument();
     expect(within(trend).getByText("Label %AI 48%")).toBeInTheDocument();
     expect(within(trend).getByText("Avg %AI 47.9%")).toBeInTheDocument();
+    expect(within(trend).getByRole("progressbar", { name: "Common A ขอ 2 ครั้ง" })).toHaveAttribute("aria-valuemax", "2");
+    expect(within(trend).getByRole("progressbar", { name: "GLYPHOSATE 48% SL ขอ 1 ครั้ง" })).toHaveAttribute("aria-valuenow", "1");
   });
 
   it("alerts COAs waiting for approval and COAs that need correction", async () => {

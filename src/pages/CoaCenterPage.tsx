@@ -893,6 +893,7 @@ export default function CoaCenterPage() {
   const coaRequestTrendTotal = useMemo(() => (
     coaRequestTrend.reduce((sum, entry) => sum + entry.requestCount, 0)
   ), [coaRequestTrend]);
+  const coaRequestTrendMax = coaRequestTrend[0]?.requestCount || 1;
   const coaRequestTrendScopeLabel = activeTab === "all"
     ? (openAllYear ? `แฟ้มปี ${buddhistYear(openAllYear)}` : "ทุกปี")
     : `ปี ${selectedYear}`;
@@ -1109,34 +1110,54 @@ export default function CoaCenterPage() {
               </div>
             ) : (
               <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <div className="space-y-3">
+                <div className="overflow-hidden rounded-lg border bg-muted/30">
+                  <div className="hidden grid-cols-[minmax(14rem,1fr)_minmax(12rem,2fr)_5rem] gap-4 border-b bg-muted px-4 py-2 text-xs font-semibold text-muted-foreground md:grid">
+                    <span>ชื่อยาและผล %AI</span>
+                    <span>ความถี่เทียบกับอันดับสูงสุด</span>
+                    <span className="text-right">สัดส่วน</span>
+                  </div>
+                  <div className="divide-y">
                   {coaRequestTrend.map((entry, index) => (
-                  <div key={entry.key} className="rounded-lg border border-border bg-muted/50 p-3">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div key={entry.key} className="grid gap-3 bg-card px-4 py-3 md:grid-cols-[minmax(14rem,1fr)_minmax(12rem,2fr)_5rem] md:items-center md:gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-50 px-1.5 text-xs text-primary-600">{index + 1}</span>
-                            <span className="truncate">{entry.commonName}</span>
-                          </div>
-                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                            <span>Label %AI {formatCoaTrendPercent(entry.labelAiPercent)}</span>
-                            <span>Avg %AI {formatCoaTrendPercent(entry.averageAiPercent, 4)}</span>
-                            {entry.latestAiResult && <span>ล่าสุด {entry.latestAiResult}</span>}
-                          </div>
+                          <span className="truncate">{entry.commonName}</span>
                         </div>
-                      <div className="text-right text-sm font-semibold text-primary-600">
-                          {entry.requestCount} ครั้ง
-                        <div className="text-xs font-normal text-muted-foreground">{formatCoaTrendPercent(entry.sharePercent, 1)} ของทั้งหมด</div>
+                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <span>Label %AI {formatCoaTrendPercent(entry.labelAiPercent)}</span>
+                          <span>Avg %AI {formatCoaTrendPercent(entry.averageAiPercent, 4)}</span>
+                          {entry.latestAiResult && <span>ล่าสุด {entry.latestAiResult}</span>}
                         </div>
                       </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-background">
+                      <div className="min-w-0">
+                        <div className="mb-1.5 flex items-center justify-between text-xs md:hidden">
+                          <span className="text-muted-foreground">ความถี่</span>
+                          <span className="font-semibold text-primary">{entry.requestCount} ครั้ง</span>
+                        </div>
                         <div
-                        className="h-full rounded-full bg-primary-500"
-                          style={{ width: `${Math.max(6, Math.min(100, entry.sharePercent))}%` }}
-                        />
+                          role="progressbar"
+                          aria-label={`${entry.commonName} ขอ ${entry.requestCount} ครั้ง`}
+                          aria-valuemin={0}
+                          aria-valuemax={coaRequestTrendMax}
+                          aria-valuenow={entry.requestCount}
+                          className="relative h-8 overflow-hidden rounded-md bg-muted"
+                        >
+                          <div
+                            className="flex h-full min-w-10 items-center justify-end rounded-md bg-primary-500 px-2 text-xs font-bold text-primary-foreground transition-[width]"
+                            style={{ width: `${(entry.requestCount / coaRequestTrendMax) * 100}%` }}
+                          >
+                            {entry.requestCount} ครั้ง
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-2 md:block md:text-right">
+                        <span className="text-xs text-muted-foreground md:hidden">สัดส่วนทั้งหมด</span>
+                        <span className="text-sm font-semibold text-foreground">{formatCoaTrendPercent(entry.sharePercent, 1)}</span>
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
                 {topCoaRequestTrend && (
                 <div className="rounded-lg border border-primary-100 bg-primary-50 p-4 text-sm text-primary-700">
