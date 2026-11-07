@@ -305,6 +305,11 @@ describe("CoaCenterPage", () => {
     expect(within(screen.getByTestId("coa-approved-summary")).getByText("00032026 · P-2608-0003")).toBeInTheDocument();
     expect(within(screen.getByTestId("coa-daily-request-summary")).getByText("3 คำขอ")).toBeInTheDocument();
 
+    const approvedDetailsCommand = screen.getByText("ดูรายละเอียดเอกสารที่อนุมัติ");
+    expect(approvedDetailsCommand.closest("details")).not.toHaveAttribute("open");
+    fireEvent.click(approvedDetailsCommand);
+    expect(approvedDetailsCommand.closest("details")).toHaveAttribute("open");
+
     fireEvent.click(screen.getByRole("button", { name: "ดูรายการรออนุมัติ" }));
     expect(await screen.findByRole("row", { name: /00022026/ })).toBeInTheDocument();
 

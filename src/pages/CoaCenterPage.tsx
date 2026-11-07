@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BellRing, CheckCircle2, Copy, FileCheck2, FileDown, FilePlus2, Folder, Layers3, Mail, Pencil, Printer, Tags, Trash2, TrendingUp, Wrench, XCircle } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, ChevronDown, Copy, FileCheck2, FileDown, FilePlus2, Folder, Layers3, Mail, Pencil, Printer, Tags, Trash2, TrendingUp, Wrench, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -558,42 +558,64 @@ function CoaNotificationAlert({
           )}
           {duplicateCommonNameGroups.length > 0 && (
             <div className="rounded-md border bg-card p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <AlertTriangle className="h-4 w-4" />
-                ชื่อสามัญซ้ำ
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <AlertTriangle className="h-4 w-4" />
+                    ชื่อสามัญซ้ำ
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">พบ {duplicateCommonNameGroups.length} กลุ่มที่ควรตรวจสอบ</p>
+                </div>
+                <Badge variant="yellow-soft">{duplicateCommonNameGroups.reduce((sum, group) => sum + group.documents.length, 0)} ใบ</Badge>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">พบชื่อสามัญเดียวกันในหลายเอกสาร COA ภายในช่วงที่กำลังดู</p>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {duplicateCommonNameGroups.map((group) => (
-                  <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
-                    <div className="flex flex-wrap items-center gap-2 font-semibold">
-                      <span>{group.label}</span>
-                      <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
-                    </div>
-                    <div className="mt-1 text-muted-foreground">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
-                  </li>
-                ))}
-              </ul>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียดชื่อสามัญซ้ำ
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {duplicateCommonNameGroups.map((group) => (
+                    <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-2 font-semibold">
+                        <span>{group.label}</span>
+                        <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
+                      </div>
+                      <div className="mt-1 text-muted-foreground">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
           {duplicateBatchProductionDateGroups.length > 0 && (
             <div className="rounded-md border bg-card p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <AlertTriangle className="h-4 w-4" />
-                Batch และวันที่ผลิตซ้ำ
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <AlertTriangle className="h-4 w-4" />
+                    Batch และวันที่ผลิตซ้ำ
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">พบ {duplicateBatchProductionDateGroups.length} กลุ่มที่ควรตรวจสอบ</p>
+                </div>
+                <Badge variant="yellow-soft">{duplicateBatchProductionDateGroups.reduce((sum, group) => sum + group.documents.length, 0)} ใบ</Badge>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">พบ Batch No. คู่กับวันที่ผลิตเดียวกันในหลายเอกสาร</p>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {duplicateBatchProductionDateGroups.map((group) => (
-                  <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
-                    <div className="flex flex-wrap items-center gap-2 font-semibold">
-                      <span>{group.label}</span>
-                      <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
-                    </div>
-                    <div className="mt-1">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
-                  </li>
-                ))}
-              </ul>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียด Batch และวันที่ผลิต
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {duplicateBatchProductionDateGroups.map((group) => (
+                    <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-2 font-semibold">
+                        <span>{group.label}</span>
+                        <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
+                      </div>
+                      <div className="mt-1">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
           {approvedDocs.length > 0 && (
@@ -613,14 +635,20 @@ function CoaNotificationAlert({
                   <div>อนุมัติวันนี้</div>
                 </div>
               </div>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {approvedPreviewDocs.map((doc) => (
-                  <li key={doc._id} className="rounded border bg-muted/50 px-2 py-1.5">
-                    <div className="font-semibold">{coaNotificationLabel(doc)}</div>
-                    <div>{customerName(doc)} · อนุมัติ {approvedSummaryDate(doc)}</div>
-                  </li>
-                ))}
-              </ul>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียดเอกสารที่อนุมัติ
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {approvedPreviewDocs.map((doc) => (
+                    <li key={doc._id} className="rounded border bg-muted/50 px-2 py-1.5">
+                      <div className="font-semibold">{coaNotificationLabel(doc)}</div>
+                      <div>{customerName(doc)} · อนุมัติ {approvedSummaryDate(doc)}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
           {dailyRequestSummaries.length > 0 && (
@@ -629,18 +657,26 @@ function CoaNotificationAlert({
                 <BellRing className="h-4 w-4" />
                 สรุปจำนวนคำขอแต่ละวัน
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">นับจากวันที่สร้างคำขอ COA ในช่วงข้อมูลที่กำลังดู</p>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {dailyRequestSummaries.map((summary) => (
-                  <li key={summary.dateKey} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-muted/50 px-2 py-1.5">
-                    <span className="font-semibold">{summary.label}</span>
-                    <span className="flex flex-wrap items-center gap-2">
-                      <Badge variant="primary-soft">{summary.count} คำขอ</Badge>
-                      {summary.approvedCount > 0 && <Badge variant="primary-soft">อนุมัติ {summary.approvedCount}</Badge>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {dailyRequestSummaries.length} วัน · รวม {dailyRequestSummaries.reduce((sum, summary) => sum + summary.count, 0)} คำขอ
+              </p>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียดคำขอแต่ละวัน
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {dailyRequestSummaries.map((summary) => (
+                    <li key={summary.dateKey} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-muted/50 px-2 py-1.5">
+                      <span className="font-semibold">{summary.label}</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Badge variant="primary-soft">{summary.count} คำขอ</Badge>
+                        {summary.approvedCount > 0 && <Badge variant="primary-soft">อนุมัติ {summary.approvedCount}</Badge>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
         </div>
