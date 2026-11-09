@@ -1,6 +1,12 @@
 package com.icpladda.lis.tv;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.DialogInterface;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -48,7 +54,28 @@ public class MainActivity extends Activity {
     private TextView clock;
     private TextView date;
     private TextView network;
+    private TextView startupLabel;
     private View firstTile;
+    private boolean resumed;
+
+    /** ทีวี Xiaomi กด Power แล้วเข้าสแตนด์บาย ไม่ได้บูตใหม่ จึงต้องจับตอนจอเปิดกลับมาด้วย */
+    private final BroadcastReceiver screenOn = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // รอให้ระบบพาหน้า Home ขึ้นมาก่อน ถ้าตอนตื่นมีหน้าคิวหรือแอปอื่นค้างอยู่ด้านบนก็ไม่ไปแทรก
+            handler.removeCallbacks(wakeCheck);
+            handler.postDelayed(wakeCheck, 2500);
+        }
+    };
+
+    private final Runnable wakeCheck = new Runnable() {
+        @Override
+        public void run() {
+            if (!resumed) return;
+            Startup.pending = true;
+            runPendingStartup();
+        }
+    };
 
     private final Runnable tick = new Runnable() {
         @Override
@@ -70,19 +97,54 @@ public class MainActivity extends Activity {
         firstTile.post(new Runnable() {
             @Override public void run() { firstTile.requestFocus(); }
         });
+        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(screenOn, filter, Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(screenOn, filter);
+        applyStartupExtra(getIntent());
+        if (Startup.consumeNewBoot(this)) Startup.pending = true;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        applyStartupExtra(intent);
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(wakeCheck);
+        unregisterReceiver(screenOn);
+        super.onDestroy();
+    }
+
+    /** ตั้งค่าผ่าน ADB ได้: am start -n com.icpladda.lis.tv/.MainActivity --es startup lab|qc|home */
+    private void applyStartupExtra(Intent intent) {
+        String mode = intent == null ? null : intent.getStringExtra("startup");
+        if (mode != null && Startup.setMode(this, mode)) updateStartupLabel();
+    }
+
+    private void runPendingStartup() {
+        if (!Startup.pending) return;
+        Startup.pending = false;
+        String mode = Startup.mode(this);
+        if (!Startup.HOME.equals(mode)) openQueue(mode);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        resumed = true;
         Ui.immersive(this);
         handler.removeCallbacks(tick);
         handler.post(tick);
+        updateStartupLabel();
+        runPendingStartup();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        resumed = false;
         handler.removeCallbacks(tick);
     }
 
@@ -147,6 +209,12 @@ public class MainActivity extends Activity {
         small.addView(smallTile("เครือข่าย", R.drawable.ic_wifi, new View.OnClickListener() {
             @Override public void onClick(View v) { openNetwork(); }
         }), weighted(12, 12));
+        LinearLayout startupTile = (LinearLayout) smallTile("", R.drawable.ic_power, new View.OnClickListener() {
+            @Override public void onClick(View v) { chooseStartup(); }
+        });
+        startupLabel = (TextView) startupTile.getChildAt(1);
+        startupLabel.setTextSize(16);
+        small.addView(startupTile, weighted(12, 12));
         small.addView(smallTile("ตั้งค่า", R.drawable.ic_settings, new View.OnClickListener() {
             @Override public void onClick(View v) { openSettings(); }
         }), weighted(12, 0));
@@ -265,6 +333,33 @@ public class MainActivity extends Activity {
         Intent i = new Intent(this, QueueActivity.class);
         i.putExtra(QueueActivity.EXTRA_MODE, mode);
         startActivity(i);
+    }
+
+    private void updateStartupLabel() {
+        if (startupLabel != null) startupLabel.setText("เปิดเครื่อง: " + Startup.label(Startup.mode(this)).replace("คิว ", ""));
+    }
+
+    private void chooseStartup() {
+        final String[] modes = Startup.MODES;
+        String[] labels = new String[modes.length];
+        int checked = 0;
+        String current = Startup.mode(this);
+        for (int i = 0; i < modes.length; i++) {
+            labels[i] = Startup.label(modes[i]) + (Startup.QC.equals(modes[i]) ? " (ค่าเริ่มต้น)" : "");
+            if (modes[i].equals(current)) checked = i;
+        }
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("เปิดเครื่องแล้วให้แสดงหน้าไหน")
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        Startup.setMode(MainActivity.this, modes[which]);
+                        updateStartupLabel();
+                        dialog.dismiss();
+                    }
+                })
+                .setNegativeButton("ยกเลิก", null)
+                .show();
     }
 
     private void openFiles() {

@@ -2,6 +2,7 @@ package com.icpladda.lis.tv;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -109,8 +110,21 @@ public class QueueActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        Startup.pending = false;
         Ui.immersive(this);
         web.onResume();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        String next = "qc".equals(intent.getStringExtra(EXTRA_MODE)) ? "qc" : "lab";
+        if (next.equals(mode)) return;
+        mode = next;
+        failed = false;
+        overlay.setText("กำลังเปิดคิว " + ("qc".equals(mode) ? "QC" : "Lab") + "…");
+        overlay.setVisibility(View.VISIBLE);
+        web.loadUrl(MainActivity.BASE_URL + "/queue/" + mode);
     }
 
     @Override
