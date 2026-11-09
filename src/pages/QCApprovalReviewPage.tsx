@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { FlaskConical, Loader2, AlertTriangle, CheckCircle2, FileCheck2, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
@@ -14,7 +14,6 @@ import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import type { Petition, QCTestResult } from "@/types/petition.types";
 import { buildApprovalGroups, filterApprovalGroupsByScope, type ApprovalItemGroup } from "@/lib/qcApprovalRows";
 import LabResultGroups from "@/components/petition/LabResultGroups";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useConfirm } from "@/context/ConfirmDialog";
@@ -37,7 +36,7 @@ import { formatDateTime as formatDateTimeValue } from "@/lib/dateTime";
 const formatDateTime = (value?: string | null) => formatDateTimeValue(value, "ยังไม่ยืนยันผล");
 
 const SIDES: ApprovalSide[] = ["qc", "lab"];
-const TAB_LABEL: Record<ApprovalSide, string> = { qc: "ค่ากายภาพ (QC)", lab: "AI (Lab)" };
+const SECTION_LABEL: Record<ApprovalSide, string> = { qc: "ค่ากายภาพ (QC)", lab: "AI (Lab)" };
 const TRACK_LABEL: Record<ApprovalSide, string> = { qc: "QC", lab: "Lab" };
 
 function groupHasAbnormal(group: ApprovalItemGroup) {
@@ -47,7 +46,6 @@ function groupHasAbnormal(group: ApprovalItemGroup) {
 export default function QCApprovalReviewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
 
   const { user } = useAuth();
   const canSeeRestrictedStandards = normalizeRoles(user).some((role) => role === "admin" || role === "qc-head");
@@ -76,12 +74,6 @@ export default function QCApprovalReviewPage() {
   const [results, setResults] = useState<QCTestResult[]>([]);
   const [dataLoaded, setDataLoaded] = useState({ params: false, results: false });
   const [petitionHasAbnormal, setPetitionHasAbnormal] = useState(false);
-
-  const requestedTab: ApprovalSide = searchParams.get("tab") === "lab" ? "lab" : "qc";
-  const [activeTab, setActiveTab] = useState<ApprovalSide>(requestedTab);
-  useEffect(() => {
-    if (allowedSides.length > 0 && !allowedSides.includes(activeTab)) setActiveTab(allowedSides[0]);
-  }, [activeTab, allowedSides]);
 
   useEffect(() => {
     // โหลดทุก scope (Lab + QC) — buildApprovalGroups กรอง lab param ให้เฉพาะ lab item + ตัด inactive เอง
@@ -273,13 +265,16 @@ export default function QCApprovalReviewPage() {
     const completedAt = s === "qc" ? petition.qcCompletedAt : petition.labCompletedAt;
     const completedBy = s === "qc" ? petition.qcCompletedBy : petition.labCompletedBy;
     return (
-      <TabsContent key={s} value={s} className="space-y-4">
-        <p className="text-sm text-muted-foreground">
+      <section key={s} aria-labelledby={`approval-section-${s}`} className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b pb-2">
+          <h2 id={`approval-section-${s}`} className="text-base font-semibold text-foreground">{SECTION_LABEL[s]}</h2>
+          <p className="text-sm text-muted-foreground">
           {TRACK_LABEL[s]} ยืนยันผล: {completedBy ? `${completedBy} · ` : ""}{formatDateTime(completedAt)}
           {s === "lab" && petition.labApprovedAt && (
             <> · หัวหน้า Lab ออกผล: {petition.labApprovedBy ? `${petition.labApprovedBy} · ` : ""}{formatDateTime(petition.labApprovedAt)}</>
           )}
-        </p>
+          </p>
+        </div>
         {completedAt && info.groups.length > 0 ? (
           <LabResultGroups groups={info.groups} renderGroupActions={renderItemStatus(s)} />
         ) : (
@@ -287,7 +282,7 @@ export default function QCApprovalReviewPage() {
             {info.items.length === 0 ? `คำร้องนี้ไม่มีผล${APPROVAL_SIDE_LABEL[s]}` : `รอผล ${TRACK_LABEL[s]}`}
           </p>
         )}
-      </TabsContent>
+      </section>
     );
   };
 
@@ -363,14 +358,7 @@ export default function QCApprovalReviewPage() {
         {allowedSides.length === 0 ? (
           <p className="text-sm text-muted-foreground">ไม่มีสิทธิ์ดูผลในหน้านี้</p>
         ) : (
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ApprovalSide)} className="space-y-4">
-            <TabsList>
-              {allowedSides.map((s) => (
-                <TabsTrigger key={s} value={s}>{TAB_LABEL[s]}</TabsTrigger>
-              ))}
-            </TabsList>
-            {allowedSides.map(renderSide)}
-          </Tabs>
+          <div className="space-y-8">{allowedSides.map(renderSide)}</div>
         )}
 
         {/* แผงตัดสิน — จุดเดียวที่ให้ผ่าน/ไม่ผ่าน (fixed bottom) */}

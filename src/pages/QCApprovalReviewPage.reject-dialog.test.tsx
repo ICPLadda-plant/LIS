@@ -141,8 +141,10 @@ describe("QCApprovalReviewPage", () => {
     expect(within(bar).getByRole("button", { name: "AI ผ่าน" })).toBeInTheDocument();
     expect(within(bar).getByRole("button", { name: "ผลไม่ผ่าน" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /อนุมัติรายการที่/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "ค่ากายภาพ (QC)" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "AI (Lab)" })).toBeInTheDocument();
+    // แสดงผลเรียงลงมา ไม่ใช้ tab
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(["ค่ากายภาพ (QC)", "AI (Lab)"]);
   });
 
   it("asks for a reason when issuing the Final Report with an abnormal physical value", async () => {
@@ -191,7 +193,8 @@ describe("QCApprovalReviewPage", () => {
     expect(await screen.findByRole("button", { name: "กายภาพผ่าน" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "AI ผ่าน" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ออก Final Report" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "AI (Lab)" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ค่ากายภาพ (QC)" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "AI (Lab)" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "ผลไม่ผ่าน" }));
     await screen.findByRole("dialog");
