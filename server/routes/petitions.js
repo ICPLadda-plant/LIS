@@ -48,13 +48,7 @@ const {
 const { canEditWholePetition } = require('../lib/productionPetitionEdit');
 const { assignMissingSampleLabelNumbers } = require('../lib/sampleLabelNumber');
 const { sendProductionCancel } = require('../lib/productionCallback');
-
-function sampleIdsFromPetition(petition) {
-  if (!petition || !Array.isArray(petition.items)) return [];
-  return petition.items
-    .map((item) => item.sampleId || `${petition.petitionNo}-${item.seq}`)
-    .filter(Boolean);
-}
+const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
 
 function logAudit(petition, payload) {
   if (!petition) return;
@@ -1823,19 +1817,6 @@ router.post('/:id/review', serializePetitionWrite(async (req, res) => {
     res.status(400).json({ error: { message: err.message } });
   }
 }));
-
-async function softDeletePetitionTree(doc, actor) {
-  await doc.softDelete(actor);
-  const sampleIds = sampleIdsFromPetition(doc);
-  if (sampleIds.length > 0) {
-    await Promise.all([
-      Sample.softDeleteMany({ id: { $in: sampleIds } }, actor),
-      PhysicalResult.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-      Approval.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-      RealtimeDensity.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-    ]);
-  }
-}
 
 // คำขอจาก Production: แจ้ง Production ก่อน ถ้าแจ้งไม่สำเร็จจะไม่ยกเลิก/ลบ เพื่อให้สองระบบตรงกัน
 async function notifyProductionCancelled(res, doc, info) {

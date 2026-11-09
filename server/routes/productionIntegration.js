@@ -6,6 +6,7 @@ const PetitionAuditLog = require('../models/PetitionAuditLog');
 const LabRequest = require('../models/LabRequest');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { resolveEmployeeActor } = require('../lib/employeeResolver');
+const { softDeletePetitionTree } = require('../lib/petitionSoftDelete');
 const {
   applyItemNotes,
   buildEditedItems,
@@ -189,6 +190,50 @@ router.put('/petitions/:petitionNo', async (req, res) => {
     const payload = { event: 'updated', toStatus: saved.status, actor, note: auditNote, metadata: { type: 'productionEdit', mode } };
     await PetitionAuditLog.create({ petitionId: saved._id, petitionNo: saved.petitionNo, ...payload });
     res.json({ ok: true, petitionNo: saved.petitionNo, mode });
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+});
+
+// Production ยกเลิกคำขอเอง: ทำได้เฉพาะก่อน QC/Lab รับตัวอย่าง (รับแล้วต้องให้หัวหน้า QC/Lab ยกเลิกใน LIS)
+// ไม่ callback กลับ Production เพราะ Production เป็นฝั่งที่สั่งยกเลิกและบันทึกสถานะเองหลัง LIS ตอบ ok
+// body: { requestNo, reason, cancelledBy?: { name, email } }
+router.post('/petitions/:petitionNo/cancel', async (req, res) => {
+  try {
+    if (!authorized(req)) return res.status(401).json({ error: { message: 'Unauthorized' } });
+    const requestNo = String(req.body?.requestNo || '').trim();
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return res.status(400).json({ error: { message: 'กรุณาระบุเหตุผลที่ยกเลิกคำขอ' } });
+    const petition = await Petition.findOne({ petitionNo: String(req.params.petitionNo) })
+      || (requestNo ? await Petition.findOne({ 'productionWorkflow.requestNo': requestNo, deletedAt: null }).sort({ createdAt: -1 }) : null);
+    if (!petition) return res.status(404).json({ error: { message: 'ไม่พบคำขอใน LIS', code: 'not_found' } });
+    if (!requestNo || petition.productionWorkflow?.requestNo !== requestNo) {
+      return res.status(403).json({ error: { message: 'requestNo ไม่ตรงกับคำขอ' } });
+    }
+    if (!canEditWholePetition(petition)) {
+      return res.status(409).json({ error: { message: 'QC/Lab รับตัวอย่างแล้ว ให้หัวหน้า QC หรือหัวหน้า Lab ยกเลิกคำขอใน LIS' } });
+    }
+    const cancelledBy = req.body?.cancelledBy ? await resolveEmployeeActor(req.body.cancelledBy) : null;
+    const actor = String(cancelledBy?.name || 'Production System').trim();
+    const at = new Date();
+    const fromStatus = petition.status;
+    const saved = await Petition.findOneAndUpdate(
+      { _id: petition._id, status: fromStatus, __v: petition.__v == null ? { $exists: false } : petition.__v },
+      { $set: { cancellation: { reason, by: actor, at } }, $inc: { __v: 1 } },
+      { new: true },
+    );
+    if (!saved) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
+    await PetitionAuditLog.create({
+      petitionId: saved._id,
+      petitionNo: saved.petitionNo,
+      event: 'deleted',
+      fromStatus,
+      actor,
+      note: `Production ยกเลิกคำขอ: ${reason}`,
+      metadata: { type: 'cancelled', source: 'production', reason, productionRequestNo: requestNo },
+    });
+    await softDeletePetitionTree(saved, actor);
+    res.json({ ok: true, petitionNo: saved.petitionNo, cancelledBy: actor, cancelledAt: at.toISOString() });
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
   }
