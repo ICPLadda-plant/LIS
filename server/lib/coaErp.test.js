@@ -554,6 +554,21 @@ test('uses the nearest ERP MF production date on or before shipment for the Batc
   assert.equal(result.mfCandidates[0].productionDate, '2026-07-20');
 });
 
+test('ignores an implausible legacy ERP production date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [1],
+    sampleSnapshots: [{ commonName: 'CARBENDAZIM 50% W/V SC', productionDate: '2026-04-26' }],
+    externalCoaRequest: { itemNo: 'ITEM-A' },
+  }, [], [{
+    item_no: 'ITEM-A',
+    prod_descript: 'CARBENDAZIM 50% W/V SC',
+    create_date: '1977-04-26T00:00:00.000Z',
+  }]);
+
+  assert.equal(result.sample.productionDate, '2026-04-26');
+  assert.equal(result.mfCandidates[0].productionDate, '');
+});
+
 test('reads positional Batch values after the product name and before production date', () => {
   const source = {
     selectedItemSeqs: [1],

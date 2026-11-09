@@ -138,7 +138,9 @@ function productionDateFromRow(row, fallback = '') {
     'create_date', 'createDate', 'production_date', 'productionDate',
     'mfg_date', 'manufacture_date', 'registering_date', 'registeringDate',
   ]);
-  return normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
+  const productionDate = normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
+  // ponytail: LIS production data is modern; widen this if pre-2000 records are imported intentionally.
+  return productionDate && Number(productionDate.slice(0, 4)) >= 2000 ? productionDate : '';
 }
 
 function bestMfProductionDate(rows, targetDate, requestedBatch = '') {
