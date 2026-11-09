@@ -1323,7 +1323,7 @@ test('revision approval aborts without activating the revision when supersession
   }
 });
 
-test('ERP autofill excludes AI from another batch and averages matching density readings', async () => {
+test('ERP autofill falls back to nearby AI and averages matching density readings', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1370,8 +1370,7 @@ test('ERP autofill excludes AI from another batch and averages matching density 
     assert.equal(res.body.sample.lotNo, '26S-ACT50-095-171069');
     assert.equal(res.body.sample.productionDate, '2026-10-17');
     assert.equal(res.body.match, null);
-    assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
-    assert.match(res.body.warnings.join(' '), /Batch No\./);
+    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '48.35%');
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '1.158');
     assert.equal(res.body.results.find((row) => row.testItem === 'Appearance'), undefined);
   } finally {
@@ -1899,4 +1898,59 @@ test('real-time Lab AI lookup falls back to the nearest previous batch', async (
     LegacyLabResult.find = originals.legacyFind;
     QCTestResult.find = originals.qcFind;
   }
+});
+
+test('real-time Lab AI lookup falls back to the nearest available batch when no previous batch exists', async () => {
+  const originals = {
+    petitionFind: Petition.find,
+    legacyFind: LegacyLabResult.find,
+    qcFind: QCTestResult.find,
+  };
+  const petition = {
+    _id: 'petition-ai-nearest', petitionNo: 'P-AI-NEAREST', updatedAt: '2026-10-08T00:00:00.000Z',
+    approvedAt: '2026-10-08T00:00:00.000Z', submittedBy: { department: 'QC' },
+    items: [{ seq: 1, sampleName: 'Product A', commonName: 'FENOBUCARB 50% EC', batchNo: '030' }],
+  };
+  try {
+    Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    LegacyLabResult.find = () => ({ lean: async () => [] });
+    QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
+      { petitionId: 'petition-ai-nearest', itemSeq: 1, parameterName: '%AI', values: { '%AI::fenobucarb': '50.12' }, updatedAt: '2026-10-08T00:00:00.000Z' },
+    ] }) });
+
+    const res = await invoke('/lab-ai-lookup', 'get', {
+      query: { batchNo: '029', commonName: 'FENOBUCARB 50% EC', sampleName: 'Product A' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ai.result, '50.12%');
+    assert.equal(res.body.match.batchNo, '030');
+  } finally {
+    Petition.find = originals.petitionFind;
+    LegacyLabResult.find = originals.legacyFind;
+    QCTestResult.find = originals.qcFind;
+  }
+});
+
+test('requested COA groups batches only when company and production date match', () => {
+  const rows = router.requestedCoaRowsFromPetition({
+    _id: 'petition-group',
+    petitionNo: 'P-GROUP',
+    submittedBy: { name: 'Requester' },
+    items: [
+      { seq: 1, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '028', productionDate: '2026-10-14' },
+      { seq: 2, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '029', productionDate: '2026-10-14' },
+      { seq: 3, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '030', productionDate: '2026-10-15' },
+      { seq: 4, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '031', productionDate: '2026-10-14' },
+    ],
+  }, [
+    { sampleSeq: 1, reportCustomerName: 'Company A' },
+    { sampleSeq: 2, reportCustomerName: 'Company A' },
+    { sampleSeq: 3, reportCustomerName: 'Company A' },
+    { sampleSeq: 4, reportCustomerName: 'Company B' },
+  ]);
+
+  assert.deepEqual(rows.map((row) => row.selectedItemSeqs), [[1, 2], [3], [4]]);
+  assert.deepEqual(rows.map((row) => row.customerSnapshot.company), ['Company A', 'Company A', 'Company B']);
+  assert.equal(new Set(rows.map((row) => row._id)).size, 3);
 });

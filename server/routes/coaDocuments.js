@@ -245,9 +245,10 @@ async function latestAiLabData(petitions, sample) {
   const commonName = manualText(sample?.commonName);
   const selection = findLatestAiLabItems(petitions, sample);
   const hasBatch = Boolean(manualText(sample?.batchNo || sample?.lotNo));
-  const candidates = selection.candidates
-    .filter((candidate) => !hasBatch || candidate.matchKind === 'exact' || candidate.matchKind === 'previous')
-    .slice(0, 100);
+  const batchCandidates = selection.candidates.filter((candidate) => (
+    candidate.matchKind === 'exact' || candidate.matchKind === 'previous'
+  ));
+  const candidates = (hasBatch && batchCandidates.length ? batchCandidates : selection.candidates).slice(0, 100);
   if (candidates.length) {
     const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
     const itemSeqs = [...new Set(candidates.flatMap((candidate) => candidate.items.map((item) => Number(item.seq))))];
@@ -780,30 +781,44 @@ function coveredSeqsByPetition(coas = []) {
   return covered;
 }
 
-function requestedCoaRowFromPetition(petition, labRequests = [], coveredSeqs = new Set()) {
+function requestedCoaRowsFromPetition(petition, labRequests = [], coveredSeqs = new Set()) {
   const labSeqs = labSeqSet(labRequests);
   const selectedItems = (petition.items || [])
     .filter((item) => labSeqs.size === 0 || labSeqs.has(Number(item.seq)))
     .filter((item) => !coveredSeqs.has(Number(item.seq)));
-  if (!selectedItems.length) return null;
+  if (!selectedItems.length) return [];
 
   const timestamp = petition.labApprovedAt || petition.updatedAt || petition.createdAt || new Date();
-  return {
-    _id: `requested:${petition._id}`,
+  const groups = new Map();
+  for (const item of selectedItems) {
+    const itemRequests = labRequests.filter((request) => Number(request.sampleSeq) === Number(item.seq));
+    const customer = customerSnapshotFromLabRequests(itemRequests, petition);
+    const productionDate = normalizeIsoDate(item.productionDate || item.labelSampledDate) || '';
+    const key = `${manualText(customer.company).toLowerCase()}\u0000${productionDate}`;
+    if (!groups.has(key)) groups.set(key, { items: [], labRequests: [], customer, productionDate });
+    const group = groups.get(key);
+    group.items.push(item);
+    group.labRequests.push(...itemRequests);
+  }
+
+  return [...groups.values()].map((group) => ({
+    _id: groups.size === 1
+      ? `requested:${petition._id}`
+      : `requested:${petition._id}:${group.items.map((item) => Number(item.seq)).join('-')}`,
     coaNo: null,
     revision: 0,
     status: 'requested',
     petitionId: String(petition._id),
     petitionNoSnapshot: petition.petitionNo,
-    selectedItemSeqs: selectedItems.map((item) => Number(item.seq)),
-    customerSnapshot: customerSnapshotFromLabRequests(labRequests, petition),
-    sampleSnapshots: selectedItems.map(sampleSnapshotFromPetitionItem),
+    selectedItemSeqs: group.items.map((item) => Number(item.seq)),
+    customerSnapshot: customerSnapshotFromLabRequests(group.labRequests, petition),
+    sampleSnapshots: group.items.map(sampleSnapshotFromPetitionItem),
     resultSnapshots: [],
     trendSnapshots: [],
     print: { printCount: 0 },
     createdAt: timestamp,
     updatedAt: timestamp,
-  };
+  }));
 }
 
 async function requestedCoaRows({ petitionNo } = {}) {
@@ -824,12 +839,11 @@ async function requestedCoaRows({ petitionNo } = {}) {
   const labRequestsByPetition = groupLabRequestsByPetition(labRequests);
   const coveredByPetition = coveredSeqsByPetition(existingCoas);
   return petitions
-    .map((petition) => requestedCoaRowFromPetition(
+    .flatMap((petition) => requestedCoaRowsFromPetition(
       petition,
       labRequestsByPetition.get(String(petition._id)) || [],
       coveredByPetition.get(String(petition._id)) || new Set(),
-    ))
-    .filter(Boolean);
+    ));
 }
 
 function shouldIncludeRequestedRows(query = {}) {
@@ -1711,3 +1725,4 @@ module.exports.externalCoaRowsToDocuments = externalCoaRowsToDocuments;
 module.exports.enrichExternalCoaDocumentsWithErpLots = enrichExternalCoaDocumentsWithErpLots;
 module.exports.attachDensityToExternalCoaDocuments = attachDensityToExternalCoaDocuments;
 module.exports.enrichExternalCoaDocumentsWithHistory = enrichExternalCoaDocumentsWithHistory;
+module.exports.requestedCoaRowsFromPetition = requestedCoaRowsFromPetition;
