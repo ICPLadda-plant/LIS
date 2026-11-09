@@ -998,8 +998,8 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     requestedBatch && normalizeBatch(batchFromRow(row)) === normalizeBatch(requestedBatch)
   )) || mfBatchRows[0];
   const erpRequestProductionDate = lotSnapshot(requestedLot || requestedBatch).productionDate
-    || normalizeIsoDate(sourceSample.productionDate)
-    || normalizeIsoDate(petitionItem?.productionDate);
+    || normalizeIsoDate(petitionItem?.productionDate)
+    || normalizeIsoDate(sourceSample.productionDate);
   const mfBatch = batchFromRow(mf);
   const mfDate = mfDateMatch?.productionDate || productionDateFromRow(mf);
   const matchingStock = stockCandidates.find((row) => {

@@ -390,6 +390,7 @@ test('LIS request production date stays paired with its Batch before a newer MF 
       commonName: 'FENOBUCARB 50% EC',
       batchNo: '029',
       sampleId: 'F-JAZ50-200',
+      productionDate: '2026-11-09',
     }],
     externalCoaRequest: { itemNo: 'F-JAZ50-200', shipmentDate: '2026-11-10T00:00:00.000Z' },
   }, [], [{
