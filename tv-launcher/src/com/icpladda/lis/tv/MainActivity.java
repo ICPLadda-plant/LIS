@@ -139,6 +139,7 @@ public class MainActivity extends Activity {
      * ตั้งค่าผ่าน ADB ได้:
      * am start -n com.icpladda.lis.tv/.MainActivity --es startup lab|qc|home
      *   --es power_on 08:00 --es power_off 17:00 --ez power_schedule true
+     *   --es power_days 1-6   (1=จันทร์ ... 7=อาทิตย์ หรือเขียนเป็น 123456)
      */
     private void applyStartupExtra(Intent intent) {
         if (intent == null) return;
@@ -148,6 +149,8 @@ public class MainActivity extends Activity {
         if (on >= 0) PowerSchedule.setOn(this, on);
         int off = PowerSchedule.parse(intent.getStringExtra("power_off"));
         if (off >= 0) PowerSchedule.setOff(this, off);
+        String days = intent.getStringExtra("power_days");
+        if (days != null) PowerSchedule.setDays(this, days);
         if (intent.hasExtra("power_schedule")) {
             PowerSchedule.setEnabled(this, intent.getBooleanExtra("power_schedule", true));
         }
@@ -370,7 +373,8 @@ public class MainActivity extends Activity {
         if (startupLabel == null) return;
         String line1 = "เปิดเครื่อง: " + Startup.label(Startup.mode(this)).replace("คิว ", "");
         String line2 = PowerSchedule.enabled(this)
-                ? PowerSchedule.format(PowerSchedule.onMinutes(this)) + "–" + PowerSchedule.format(PowerSchedule.offMinutes(this)) + " น."
+                ? PowerSchedule.daysLabel(PowerSchedule.days(this)) + " " + PowerSchedule.formatShort(PowerSchedule.onMinutes(this))
+                        + "–" + PowerSchedule.formatShort(PowerSchedule.offMinutes(this)) + " น."
                 : "ไม่ได้ตั้งเวลา";
         startupLabel.setText(line1 + "\n" + line2);
     }
@@ -380,7 +384,8 @@ public class MainActivity extends Activity {
         String[] items = {
                 "หน้าที่แสดงเมื่อเปิดเครื่อง: " + Startup.label(Startup.mode(this)),
                 "เวลาเปิดเครื่อง: " + PowerSchedule.format(PowerSchedule.onMinutes(this)) + " น.",
-                "เวลาปิดเครื่อง: " + PowerSchedule.format(PowerSchedule.offMinutes(this)) + " น.",
+                "วันที่เปิดเครื่อง: " + PowerSchedule.daysLabel(PowerSchedule.days(this)),
+                "เวลาปิดเครื่อง: " + PowerSchedule.format(PowerSchedule.offMinutes(this)) + " น. (ทุกวัน)",
                 "เปิด/ปิดเครื่องตามเวลา: " + (enabled ? "ใช้งาน" : "ไม่ใช้งาน"),
         };
         new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
@@ -390,7 +395,8 @@ public class MainActivity extends Activity {
                     public void onClick(DialogInterface dialog, int which) {
                         if (which == 0) chooseStartup();
                         else if (which == 1) pickTime(true);
-                        else if (which == 2) pickTime(false);
+                        else if (which == 2) pickDays();
+                        else if (which == 3) pickTime(false);
                         else {
                             PowerSchedule.setEnabled(MainActivity.this, !enabled);
                             updateStartupLabel();
@@ -402,6 +408,35 @@ public class MainActivity extends Activity {
     }
 
     private void pickTime(final boolean on) {
+        pickTimeInternal(on);
+    }
+
+    private void pickDays() {
+        final String current = PowerSchedule.days(this);
+        final boolean[] checked = new boolean[7];
+        for (int i = 0; i < 7; i++) checked[i] = PowerSchedule.isDayOn(current, i + 1);
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("วันที่เปิดเครื่องอัตโนมัติ")
+                .setMultiChoiceItems(PowerSchedule.DAY_FULL, checked, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which, boolean isChecked) {
+                        checked[which] = isChecked;
+                    }
+                })
+                .setPositiveButton("บันทึก", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        StringBuilder days = new StringBuilder();
+                        for (int i = 0; i < 7; i++) if (checked[i]) days.append(i + 1);
+                        PowerSchedule.setDays(MainActivity.this, days.toString());
+                        updateStartupLabel();
+                    }
+                })
+                .setNegativeButton("ยกเลิก", null)
+                .show();
+    }
+
+    private void pickTimeInternal(final boolean on) {
         int current = on ? PowerSchedule.onMinutes(this) : PowerSchedule.offMinutes(this);
         TimePickerDialog dialog = new TimePickerDialog(this, android.R.style.Theme_Holo_Dialog_NoActionBar,
                 new TimePickerDialog.OnTimeSetListener() {

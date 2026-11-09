@@ -21,7 +21,10 @@ public class PowerReceiver extends BroadcastReceiver {
 
     private static synchronized void holdUntilPowerOn(Context context) {
         releaseStandbyLock();
-        long wait = PowerSchedule.nextAt(PowerSchedule.onMinutes(context)) - System.currentTimeMillis() + 5 * 60_000L;
+        long nextOn = PowerSchedule.nextOnAt(context);
+        // ไม่มีวันเปิดเครื่อง: ไม่ต้องกันหลับลึก ปล่อยทีวีประหยัดไฟเต็มที่
+        if (nextOn < 0) return;
+        long wait = nextOn - System.currentTimeMillis() + 5 * 60_000L;
         PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
         standbyLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "lis:standby");
         standbyLock.setReferenceCounted(false);

@@ -1,11 +1,13 @@
 ﻿# ตั้งค่าทีวี Xiaomi Google TV ให้เป็นจอคิว LIS ในครั้งเดียว
-# ใช้: powershell -File tv-launcher/setup-tv.ps1 -Device 172.16.31.80:5555 [-Startup qc|lab|home] [-PowerOn 08:00] [-PowerOff 17:00]
+# ใช้: powershell -File tv-launcher/setup-tv.ps1 -Device 172.16.31.80:5555 [-Startup qc|lab|home] [-PowerOn 08:00] [-PowerOff 17:00] [-PowerDays 1-6]
 # ต้องเปิด "การแก้ไขข้อบกพร่องผ่าน USB" ในตัวเลือกสำหรับนักพัฒนาของทีวี และกดอนุญาตบนจอครั้งแรก
 param(
     [Parameter(Mandatory = $true)][string]$Device,
     [ValidateSet("qc", "lab", "home")][string]$Startup = "qc",
     [string]$PowerOn = "08:00",
     [string]$PowerOff = "17:00",
+    # วันที่เปิดเครื่องเอง 1=จันทร์ ... 7=อาทิตย์ เช่น 1-6 หรือ 123456 (เวลาปิดทำงานทุกวัน)
+    [string]$PowerDays = "1-6",
     [switch]$NoSchedule
 )
 $ErrorActionPreference = "Stop"
@@ -48,7 +50,7 @@ Shell "settings put secure screensaver_activate_on_dock 0"
 Shell "settings put global stay_on_while_plugged_in 7"
 
 $schedule = if ($NoSchedule) { "false" } else { "true" }
-Write-Host "ตั้งหน้าเปิดเครื่อง=$Startup เวลาเปิด=$PowerOn ปิด=$PowerOff ใช้ตารางเวลา=$schedule"
-Shell "am start -n $Pkg/.MainActivity --es startup $Startup --es power_on $PowerOn --es power_off $PowerOff --ez power_schedule $schedule"
+Write-Host "ตั้งหน้าเปิดเครื่อง=$Startup เวลาเปิด=$PowerOn วัน=$PowerDays ปิด=$PowerOff ใช้ตารางเวลา=$schedule"
+Shell "am start -n $Pkg/.MainActivity --es startup $Startup --es power_on $PowerOn --es power_off $PowerOff --es power_days $PowerDays --ez power_schedule $schedule"
 Shell "dumpsys alarm | grep -A2 '$Pkg.POWER' | grep origWhen"
 Write-Host "เสร็จแล้ว"
