@@ -18,8 +18,6 @@ import { useAccessibleTabs } from "@/hooks/useAccessibleTabs";
 import { sideApprovalState, type ApprovalSide } from "@/lib/itemApprovals";
 import SideApprovalBadge from "@/components/lis/approval/SideApprovalBadge";
 
-const API_BASE = import.meta.env.BASE_URL + "api";
-
 function priorityScore(
   petition: Petition,
   abnormalMap: Record<string, boolean>,
@@ -46,7 +44,6 @@ const QCApproval = () => {
   const petitions = useMemo(() => petitionData?.items ?? [], [petitionData?.items]);
   const petitionIds = useMemo(() => petitions.map((petition) => petition._id).join(","), [petitions]);
 
-  const [testersMap, setTestersMap] = useState<Record<string, string[]>>({});
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
@@ -85,24 +82,12 @@ const QCApproval = () => {
 
   useEffect(() => {
     if (petitions.length === 0) {
-      setTestersMap({});
       setAbnormalMap({});
       setReturnedMap({});
       return;
     }
     const ids = petitions.map((p) => p._id);
-    const idsParam = ids.join(",");
     let alive = true;
-    fetch(`${API_BASE}/qc-results/testers?petitionIds=${encodeURIComponent(idsParam)}`, {
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((map: Record<string, string[]>) => {
-        if (alive) setTestersMap(map || {});
-      })
-      .catch(() => {
-        if (alive) setTestersMap({});
-      });
     api.getAbnormalFlags(ids, { includeRestricted: true })
       .then((map) => {
         if (alive) setAbnormalMap(map || {});
@@ -167,23 +152,6 @@ const QCApproval = () => {
       cell: (p) => <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge>,
     },
     { key: "submitter", header: "ผู้นำส่ง", cell: (p) => p.submittedBy?.name ?? "-" },
-    {
-      key: "testers",
-      header: "ผู้ทดสอบ",
-      className: "max-w-[200px] text-sm text-muted-foreground align-top",
-      cell: (p) => {
-        const testers = testersMap[p._id] ?? [];
-        return testers.length > 0 ? (
-          <div className="flex flex-col gap-0.5">
-            {testers.map((name) => (
-              <span key={name}>{name}</span>
-            ))}
-          </div>
-        ) : (
-          "-"
-        );
-      },
-    },
     ...visibleSides.map((side): DataTableColumn<Petition> => ({
       key: `status-${side}`,
       header: side === "qc" ? "กายภาพ" : "AI",

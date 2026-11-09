@@ -127,6 +127,7 @@ describe("QCApproval", () => {
     deniedTabs.add("lab");
     renderPage();
 
+    expect(screen.queryByRole("columnheader", { name: "ผู้ทดสอบ" })).not.toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "กายภาพ" })).toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "AI" })).not.toBeInTheDocument();
     // คำร้องที่กายภาพผ่านแล้วไม่ต้องรอ QC Approver อีก
