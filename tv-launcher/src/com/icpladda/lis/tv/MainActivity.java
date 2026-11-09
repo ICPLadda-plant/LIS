@@ -2,6 +2,7 @@ package com.icpladda.lis.tv;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.TimePickerDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -55,6 +56,7 @@ public class MainActivity extends Activity {
     private TextView date;
     private TextView network;
     private TextView startupLabel;
+    static final String EXTRA_WAKE = "wake";
     private View firstTile;
     private boolean resumed;
 
@@ -93,6 +95,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         setContentView(buildLayout());
         firstTile.post(new Runnable() {
             @Override public void run() { firstTile.requestFocus(); }
@@ -102,12 +105,27 @@ public class MainActivity extends Activity {
         else registerReceiver(screenOn, filter);
         applyStartupExtra(getIntent());
         if (Startup.consumeNewBoot(this)) Startup.pending = true;
+        handleWake(getIntent());
+        PowerSchedule.schedule(this);
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         applyStartupExtra(intent);
+        handleWake(intent);
+    }
+
+    /** ถูกปลุกจากตารางเวลาเปิดเครื่อง: เปิดจอแล้วไปหน้าคิวตามที่ตั้งไว้ */
+    private void handleWake(Intent intent) {
+        if (intent == null || !intent.getBooleanExtra(EXTRA_WAKE, false)) return;
+        intent.removeExtra(EXTRA_WAKE);
+        if (Build.VERSION.SDK_INT >= 27) {
+            setTurnScreenOn(true);
+            setShowWhenLocked(true);
+        }
+        Startup.pending = true;
+        if (resumed) runPendingStartup();
     }
 
     @Override
@@ -117,10 +135,23 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    /** ตั้งค่าผ่าน ADB ได้: am start -n com.icpladda.lis.tv/.MainActivity --es startup lab|qc|home */
+    /**
+     * ตั้งค่าผ่าน ADB ได้:
+     * am start -n com.icpladda.lis.tv/.MainActivity --es startup lab|qc|home
+     *   --es power_on 08:00 --es power_off 17:00 --ez power_schedule true
+     */
     private void applyStartupExtra(Intent intent) {
-        String mode = intent == null ? null : intent.getStringExtra("startup");
-        if (mode != null && Startup.setMode(this, mode)) updateStartupLabel();
+        if (intent == null) return;
+        String mode = intent.getStringExtra("startup");
+        if (mode != null) Startup.setMode(this, mode);
+        int on = PowerSchedule.parse(intent.getStringExtra("power_on"));
+        if (on >= 0) PowerSchedule.setOn(this, on);
+        int off = PowerSchedule.parse(intent.getStringExtra("power_off"));
+        if (off >= 0) PowerSchedule.setOff(this, off);
+        if (intent.hasExtra("power_schedule")) {
+            PowerSchedule.setEnabled(this, intent.getBooleanExtra("power_schedule", true));
+        }
+        updateStartupLabel();
     }
 
     private void runPendingStartup() {
@@ -210,10 +241,10 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) { openNetwork(); }
         }), weighted(12, 12));
         LinearLayout startupTile = (LinearLayout) smallTile("", R.drawable.ic_power, new View.OnClickListener() {
-            @Override public void onClick(View v) { chooseStartup(); }
+            @Override public void onClick(View v) { powerMenu(); }
         });
         startupLabel = (TextView) startupTile.getChildAt(1);
-        startupLabel.setTextSize(16);
+        startupLabel.setTextSize(15);
         small.addView(startupTile, weighted(12, 12));
         small.addView(smallTile("ตั้งค่า", R.drawable.ic_settings, new View.OnClickListener() {
             @Override public void onClick(View v) { openSettings(); }
@@ -336,7 +367,53 @@ public class MainActivity extends Activity {
     }
 
     private void updateStartupLabel() {
-        if (startupLabel != null) startupLabel.setText("เปิดเครื่อง: " + Startup.label(Startup.mode(this)).replace("คิว ", ""));
+        if (startupLabel == null) return;
+        String line1 = "เปิดเครื่อง: " + Startup.label(Startup.mode(this)).replace("คิว ", "");
+        String line2 = PowerSchedule.enabled(this)
+                ? PowerSchedule.format(PowerSchedule.onMinutes(this)) + "–" + PowerSchedule.format(PowerSchedule.offMinutes(this)) + " น."
+                : "ไม่ได้ตั้งเวลา";
+        startupLabel.setText(line1 + "\n" + line2);
+    }
+
+    private void powerMenu() {
+        final boolean enabled = PowerSchedule.enabled(this);
+        String[] items = {
+                "หน้าที่แสดงเมื่อเปิดเครื่อง: " + Startup.label(Startup.mode(this)),
+                "เวลาเปิดเครื่อง: " + PowerSchedule.format(PowerSchedule.onMinutes(this)) + " น.",
+                "เวลาปิดเครื่อง: " + PowerSchedule.format(PowerSchedule.offMinutes(this)) + " น.",
+                "เปิด/ปิดเครื่องตามเวลา: " + (enabled ? "ใช้งาน" : "ไม่ใช้งาน"),
+        };
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("ตั้งค่าเปิด/ปิดเครื่อง")
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        if (which == 0) chooseStartup();
+                        else if (which == 1) pickTime(true);
+                        else if (which == 2) pickTime(false);
+                        else {
+                            PowerSchedule.setEnabled(MainActivity.this, !enabled);
+                            updateStartupLabel();
+                        }
+                    }
+                })
+                .setNegativeButton("ปิด", null)
+                .show();
+    }
+
+    private void pickTime(final boolean on) {
+        int current = on ? PowerSchedule.onMinutes(this) : PowerSchedule.offMinutes(this);
+        TimePickerDialog dialog = new TimePickerDialog(this, android.R.style.Theme_Holo_Dialog_NoActionBar,
+                new TimePickerDialog.OnTimeSetListener() {
+                    @Override
+                    public void onTimeSet(android.widget.TimePicker view, int hour, int minute) {
+                        if (on) PowerSchedule.setOn(MainActivity.this, hour * 60 + minute);
+                        else PowerSchedule.setOff(MainActivity.this, hour * 60 + minute);
+                        updateStartupLabel();
+                    }
+                }, current / 60, current % 60, true);
+        dialog.setTitle(on ? "เวลาเปิดเครื่อง" : "เวลาปิดเครื่อง");
+        dialog.show();
     }
 
     private void chooseStartup() {
