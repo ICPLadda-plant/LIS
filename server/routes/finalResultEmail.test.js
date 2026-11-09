@@ -7,10 +7,11 @@ const Role = require('../models/Role');
 const AccessGroup = require('../models/AccessGroup');
 const QCTestResult = require('../models/QCTestResult');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
-const { signToken, roundKey, requestFinalResultApproval } = require('../lib/finalResultEmail');
+const { replyRef, approvalSubject, approveMailto, requestFinalResultApproval } = require('../lib/finalResultEmail');
 const router = require('./finalResultEmail');
 
 process.env.FINAL_RESULT_EMAIL_SECRET = 'test-secret';
+process.env.FINAL_RESULT_EMAIL_WEBHOOK_URL = '';
 process.env.PRODUCTION_RESULT_CALLBACK_URL = '';
 
 const head = { _id: new mongoose.Types.ObjectId(), email: 'head@icpladda.com', name: 'หัวหน้า QC', roles: ['qc-head'], status: 'active', approvalStatus: 'approved' };
@@ -21,7 +22,7 @@ const preResult = [
 
 function makePetition(overrides = {}) {
   const doc = new Petition({
-    petitionNo: 'PT-001',
+    petitionNo: 'P-2611-0001',
     status: 'success',
     completedAt: new Date('2026-11-09T03:00:00Z'),
     routeTargets: ['qc'],
@@ -35,118 +36,130 @@ function makePetition(overrides = {}) {
   return doc;
 }
 
-function stub(t, model, method, impl) {
-  t.mock.method(model, method, impl);
+const lean = (value) => ({ lean: async () => value });
+
+function setup(t, petition, user = head) {
+  t.mock.method(Petition, 'findById', async () => petition);
+  t.mock.method(Petition, 'findOne', () => lean({ _id: petition._id }));
+  t.mock.method(User, 'findOne', () => lean(user));
+  t.mock.method(Role, 'find', () => lean([{ id: 'qc-head', permissions: ['/qc-approval'] }]));
+  t.mock.method(AccessGroup, 'find', () => lean([]));
+  t.mock.method(QCTestResult, 'find', () => lean([]));
+  t.mock.method(PetitionAuditLog, 'create', async () => ({}));
 }
 
-function lean(value) {
-  return { lean: async () => value };
+// เรียก middleware ทั้งสายของ POST /reply
+async function sendReply(body) {
+  const layer = router.stack.find((entry) => entry.route?.path === '/reply');
+  const handlers = layer.route.stack.map((s) => s.handle);
+  const req = { body: { ...body }, params: {} };
+  const res = { statusCode: 200, body: undefined, status(c) { this.statusCode = c; return this; }, json(p) { this.body = p; return this; } };
+  for (const h of handlers) {
+    let nextCalled = false;
+    await h(req, res, (err) => { if (err) throw err; nextCalled = true; });
+    if (!nextCalled) break;
+  }
+  return res.body;
 }
 
-function handler() {
-  const layer = router.stack.find((entry) => entry.route?.path === '/:id/approve');
-  return layer.route.stack[0].handle;
-}
+const replyFrom = (petition, email = head.email, text = 'อนุมัติ\r\n\r\nFrom: Local Service Plant\r\nSubject: ขออนุมัติออก Final Report') => ({
+  from: email.toUpperCase(),
+  subject: 'RE: ' + approvalSubject(petition, email),
+  body: text,
+});
 
-async function call(petition, body) {
-  const res = {
-    statusCode: 200,
-    body: undefined,
-    status(code) { this.statusCode = code; return this; },
-    json(payload) { this.body = payload; return this; },
-  };
-  await handler()({ params: { id: String(petition._id) }, body }, res, () => {});
-  return res;
-}
-
-function setup(t, petition) {
-  stub(t, Petition, 'findById', async () => petition);
-  stub(t, User, 'findOne', () => lean(head));
-  stub(t, Role, 'find', () => lean([{ id: 'qc-head', permissions: ['/qc-approval'] }]));
-  stub(t, AccessGroup, 'find', () => lean([]));
-  stub(t, QCTestResult, 'find', () => lean([]));
-  stub(t, PetitionAuditLog, 'create', async () => ({}));
-}
-
-const tokenFor = (petition) => signToken({ petitionId: String(petition._id), approverEmail: head.email, key: roundKey(petition) }, 'test-secret');
-
-test('กดอนุมัติจากเมล → ออก Final Report โดยคงผลอนุมัติรายรายการของ QC Approver', async (t) => {
+test('ตอบกลับว่า "อนุมัติ" → ออก Final Report โดยคงผลที่ QC Approver ตัดสินไว้ และคืนเมลยืนยัน', async (t) => {
   const petition = makePetition();
   setup(t, petition);
-  const res = await call(petition, { approverEmail: 'HEAD@icpladda.com', token: tokenFor(petition) });
-  assert.equal(res.statusCode, 200);
-  assert.equal(res.body.requesterEmail, 'requester@icpladda.com');
+  const res = await sendReply(replyFrom(petition));
+  assert.equal(res.ok, true);
+  assert.equal(res.code, 'approved');
+  assert.match(res.replySubject, /ออก Final Report P-2611-0001/);
+  assert.match(res.replyHtml, /ส่งอีเมลแจ้งผลผู้ขอแล้ว/);
   assert.equal(petition.status, 'approved');
   assert.equal(petition.conclusion, 'accepted-oos');
-  assert.match(petition.conclusionNote, /ค่าเกินเล็กน้อย/);
   assert.equal(petition.reviewHistory.at(-1).reviewedBy, 'หัวหน้า QC');
-  assert.deepEqual(petition.itemApprovals.map((a) => a.by), ['QC Approver', 'QC Approver']);
   assert.equal(petition.saved, 1);
 });
 
-test('ลิงก์ในเมลรอบเก่าใช้ไม่ได้หลังผลถูกแก้แล้วครบใหม่', async (t) => {
-  const petition = makePetition();
-  const oldToken = tokenFor(petition);
-  petition.completedAt = new Date('2026-11-10T03:00:00Z');
-  setup(t, petition);
-  const res = await call(petition, { approverEmail: head.email, token: oldToken });
-  assert.equal(res.statusCode, 403);
-  assert.equal(petition.status, 'success');
-  assert.equal(petition.saved, 0);
-});
-
-test('ใบที่ออก Final Result ไปแล้ว ตอบ already-approved โดยไม่แก้ข้อมูล', async (t) => {
-  const petition = makePetition({ status: 'approved' });
-  setup(t, petition);
-  const res = await call(petition, { approverEmail: head.email, token: tokenFor(petition) });
-  assert.equal(res.statusCode, 409);
-  assert.equal(res.body.code, 'already-approved');
-  assert.equal(petition.saved, 0);
-});
-
-test('ใบที่ยังไม่มีใครอนุมัติ → หัวหน้า QC กดจากเมลแล้วอนุมัติทุกรายการเป็นผลปกติและออก Final Report', async (t) => {
+test('ใบที่ยังไม่มีใครอนุมัติ → อนุมัติทุกรายการเป็นผลปกติแล้วออก Final Report', async (t) => {
   const petition = makePetition({ itemApprovals: [] });
   setup(t, petition);
-  const res = await call(petition, { approverEmail: head.email, token: tokenFor(petition) });
-  assert.equal(res.statusCode, 200);
-  assert.equal(petition.status, 'approved');
+  const res = await sendReply(replyFrom(petition));
+  assert.equal(res.ok, true);
   assert.equal(petition.conclusion, 'pass');
-  assert.deepEqual(petition.itemApprovals.map((a) => [a.seq, a.side, a.status, a.source, a.by]), [
-    [1, 'qc', 'approved', 'email', 'หัวหน้า QC'],
-    [2, 'qc', 'approved', 'email', 'หัวหน้า QC'],
+  assert.deepEqual(petition.itemApprovals.map((a) => [a.seq, a.side, a.source, a.by]), [
+    [1, 'qc', 'email', 'หัวหน้า QC'],
+    [2, 'qc', 'email', 'หัวหน้า QC'],
   ]);
 });
 
-test('มีรายการที่ไม่อนุมัติค้างอยู่ ต้องพิจารณาในระบบ', async (t) => {
-  const petition = makePetition({ itemApprovals: [{ seq: 1, side: 'qc', status: 'rejected', note: 'x' }] });
+test('ตอบกลับเพื่อถามคำถาม หรือพิมพ์ "ไม่อนุมัติ" → ไม่ออกผล', async (t) => {
+  for (const text of ['ขอดูผลก่อนครับ\r\nFrom: Local Service Plant ขออนุมัติ', 'ไม่อนุมัติ ค่าเกิน']) {
+    const petition = makePetition();
+    setup(t, petition);
+    const res = await sendReply(replyFrom(petition, head.email, text));
+    assert.equal(res.ok, false);
+    assert.equal(res.code, 'not-approval');
+    assert.equal(petition.saved, 0);
+    t.mock.restoreAll();
+  }
+});
+
+test('ผู้ส่งไม่ใช่คนที่ได้รับเมล (ส่งต่อให้คนอื่นตอบ) → รหัสไม่ผ่าน', async (t) => {
+  const petition = makePetition();
   setup(t, petition);
-  const res = await call(petition, { approverEmail: head.email, token: tokenFor(petition) });
-  assert.equal(res.statusCode, 409);
-  assert.equal(res.body.code, 'needs-review');
-  assert.equal(petition.status, 'success');
+  const res = await sendReply({ ...replyFrom(petition), from: 'other@icpladda.com' });
+  assert.equal(res.code, 'invalid-token');
   assert.equal(petition.saved, 0);
 });
 
-test('QC Approver (เห็นแค่ผลกายภาพ) ใช้ลิงก์ออก Final Report ไม่ได้', async (t) => {
+test('เมลรอบเก่าใช้ไม่ได้หลังผลถูกแก้แล้วครบใหม่', async (t) => {
   const petition = makePetition();
+  const old = replyFrom(petition);
+  petition.completedAt = new Date('2026-11-10T03:00:00Z');
   setup(t, petition);
-  t.mock.method(User, 'findOne', () => lean({ ...head, roles: ['qc-head', 'qc-approver'] }));
-  t.mock.method(Role, 'find', () => lean([
-    { id: 'qc-head', permissions: ['/stock'] },
-    { id: 'qc-approver', permissions: ['/qc-approval', 'deny:/qc-approval/lab'] },
-  ]));
-  const res = await call(petition, { approverEmail: head.email, token: tokenFor(petition) });
-  assert.equal(res.statusCode, 403);
+  const res = await sendReply(old);
+  assert.equal(res.code, 'invalid-token');
   assert.equal(petition.saved, 0);
 });
 
-test('ส่งคำขอถึง QC Head ทีละคน และไม่ส่งซ้ำในรอบเดียวกัน', async (t) => {
+test('ออก Final Report ไปแล้ว / มีรายการไม่อนุมัติ / ไม่มีสิทธิ์ → ไม่แก้ข้อมูล', async (t) => {
+  const cases = [
+    [makePetition({ status: 'approved' }), head, 'already-approved'],
+    [makePetition({ itemApprovals: [{ seq: 1, side: 'qc', status: 'rejected', note: 'x' }] }), head, 'needs-review'],
+    [makePetition(), { ...head, roles: ['qc-staff'] }, 'not-approver'],
+  ];
+  for (const [petition, user, code] of cases) {
+    setup(t, petition, user);
+    const res = await sendReply(replyFrom(petition));
+    assert.equal(res.code, code);
+    assert.equal(petition.saved, 0);
+    t.mock.restoreAll();
+  }
+});
+
+test('ไม่มีรหัสในหัวเรื่อง → ตอบกลับให้ใช้ปุ่มในเมล', async () => {
+  const res = await sendReply({ from: head.email, subject: 'RE: สอบถาม', body: 'อนุมัติ' });
+  assert.equal(res.code, 'no-ref');
+});
+
+test('ปุ่มในเมลเปิดเมลตอบกลับถึงกล่อง n8n พร้อมรหัสและคำว่าอนุมัติ', () => {
   const petition = makePetition();
+  const href = decodeURIComponent(approveMailto(petition, head.email));
+  assert.match(href, /^mailto:localservice\.plant@icpladda\.com\?subject=RE: \[LIS\] ขออนุมัติออก Final Report \[FR:P-2611-0001:[a-f0-9]{16}\]&body=อนุมัติ/);
+  assert.ok(href.includes(replyRef(petition, head.email)));
+});
+
+test('ส่งเมลถึง QC Head ทีละคน ครั้งเดียวต่อรอบ', async (t) => {
+  process.env.FINAL_RESULT_EMAIL_WEBHOOK_URL = 'https://n8n.example/webhook';
+  t.after(() => { process.env.FINAL_RESULT_EMAIL_WEBHOOK_URL = ''; });
+  const petition = makePetition({ itemApprovals: [] });
   const other = { ...head, _id: new mongoose.Types.ObjectId(), email: 'head2@icpladda.com', name: 'หัวหน้า 2' };
   const inactive = { ...head, _id: new mongoose.Types.ObjectId(), email: 'old@icpladda.com', status: 'inactive' };
-  stub(t, User, 'find', () => lean([head, other, inactive]));
+  t.mock.method(User, 'find', () => lean([head, other, inactive]));
   let claimed = false;
-  stub(t, Petition, 'updateOne', async () => {
+  t.mock.method(Petition, 'updateOne', async () => {
     if (claimed) return { matchedCount: 0 };
     claimed = true;
     return { matchedCount: 1 };
@@ -156,20 +169,12 @@ test('ส่งคำขอถึง QC Head ทีละคน และไม�
 
   const first = await requestFinalResultApproval(petition, { fetchImpl });
   assert.equal(first.sent, 2);
-  assert.deepEqual(sent.map((p) => p.approverEmail), ['head@icpladda.com', 'head2@icpladda.com']);
-  assert.equal(sent[0].callbackToken, tokenFor(petition));
-  assert.equal(sent[0].requesterEmail, 'requester@icpladda.com');
-  assert.match(sent[0].details, /ยอมรับผลไม่ปกติ/);
-  assert.match(sent[0].callbackUrl, new RegExp('/api/final-result-email/' + petition._id + '/approve$'));
+  assert.deepEqual(sent.map((m) => m.to), ['head@icpladda.com', 'head2@icpladda.com']);
+  assert.equal(sent[0].subject, approvalSubject(petition, head.email));
+  assert.notEqual(sent[0].subject, sent[1].subject); // รหัสผูกกับผู้รับแต่ละคน
+  assert.match(sent[0].html, /ตอบกลับเพื่ออนุมัติ Final Report/);
 
   const second = await requestFinalResultApproval(petition, { fetchImpl });
   assert.equal(second.skipped, 'already-sent');
   assert.equal(sent.length, 2);
-});
-
-test('ใบที่ยังทดสอบไม่ครบทุกฝั่ง ไม่ส่งเมล', async (t) => {
-  const petition = makePetition({ status: 'inProgress', completedAt: null, itemApprovals: [] });
-  t.mock.method(User, 'find', () => lean([head]));
-  const result = await requestFinalResultApproval(petition, { fetchImpl: async () => assert.fail('ไม่ควรส่ง') });
-  assert.equal(result.skipped, 'not-awaiting');
 });
