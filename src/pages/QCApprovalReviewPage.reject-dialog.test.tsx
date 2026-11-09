@@ -1,13 +1,14 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import QCApprovalReviewPage from "./QCApprovalReviewPage";
 
-const { navigateMock, decideMock, rejectPetitionMock, deniedTabs } = vi.hoisted(() => ({
+const { navigateMock, decideMock, rejectPetitionMock, deniedTabs, fixture } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   decideMock: vi.fn(),
   rejectPetitionMock: vi.fn(),
   deniedTabs: new Set<string>(),
+  fixture: { petition: {} as Record<string, unknown> },
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -33,17 +34,7 @@ vi.mock("@/components/lis/PageHeader", () => ({
 
 vi.mock("@/hooks/usePetition", () => ({
   usePetition: () => ({
-    data: {
-      _id: "p1",
-      petitionNo: "P-2607-0001",
-      dept: "rm",
-      status: "inProgress",
-      qcCompletedAt: "2026-07-13T00:30:00.000Z",
-      submittedBy: { name: "ผู้ยื่น A", submittedAt: "2026-07-13T00:00:00.000Z" },
-      items: [{ seq: 1, sampleName: "ตัวอย่าง A", batchNo: "RM-1", sampleId: "S-1" }],
-      createdAt: "2026-07-13T00:00:00.000Z",
-      updatedAt: "2026-07-13T00:00:00.000Z",
-    },
+    data: fixture.petition,
     loading: false,
     error: null,
     refresh: vi.fn(),
@@ -77,6 +68,10 @@ vi.mock("@/lib/api", () => ({
   },
 }));
 
+const row = (key: string, label: string, abnormal: boolean) => ({
+  key, label, value: "6.2", standardText: "6.5 - 7.5", abnormal, note: "", phase: 1,
+});
+
 vi.mock("@/lib/qcApprovalRows", () => ({
   buildApprovalGroups: () => [
     {
@@ -84,23 +79,8 @@ vi.mock("@/lib/qcApprovalRows", () => ({
       sampleName: "ตัวอย่าง A",
       sampleId: "S-1",
       params: [
-        {
-          parameterId: "param-1",
-          parameterName: "ความชื้น",
-          scope: "qc",
-          hasPhases: false,
-          rows: [
-            {
-              key: "row-1",
-              label: "ค่า pH",
-              value: "6.2",
-              standardText: "6.5 - 7.5",
-              abnormal: true,
-              note: "",
-              phase: 1,
-            },
-          ],
-        },
+        { parameterId: "param-1", parameterName: "ความชื้น", scope: "qc", hasPhases: false, rows: [row("row-1", "ค่า pH", true)] },
+        { parameterId: "param-2", parameterName: "%AI", scope: "lab", hasPhases: false, rows: [row("row-2", "สารสำคัญ", false)] },
       ],
       unmatched: false,
     },
@@ -118,6 +98,20 @@ vi.mock("sonner", () => ({
   },
 }));
 
+const basePetition = {
+  _id: "p1",
+  petitionNo: "P-2607-0001",
+  dept: "rm",
+  status: "inProgress",
+  routeTargets: ["qc", "lab"],
+  qcCompletedAt: "2026-07-13T00:30:00.000Z",
+  labCompletedAt: "2026-07-13T01:30:00.000Z",
+  submittedBy: { name: "ผู้ยื่น A", submittedAt: "2026-07-13T00:00:00.000Z" },
+  items: [{ seq: 1, sampleName: "ตัวอย่าง A", batchNo: "RM-1", sampleId: "S-1", sendToQc: true, sendToLab: true }],
+  createdAt: "2026-07-13T00:00:00.000Z",
+  updatedAt: "2026-07-13T00:00:00.000Z",
+};
+
 function renderPage(initialEntry = "/qc-approval/p1") {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
@@ -132,105 +126,101 @@ describe("QCApprovalReviewPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     deniedTabs.clear();
-    decideMock.mockResolvedValue({
-      _id: "p1",
-      petitionNo: "P-2607-0001",
-      dept: "rm",
-      status: "approved",
-      submittedBy: { name: "ผู้ยื่น A" },
-      items: [{ seq: 1, sampleName: "ตัวอย่าง A", batchNo: "RM-1", sampleId: "S-1" }],
-      itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "accepted-oos" }],
-    });
+    fixture.petition = { ...basePetition };
+    decideMock.mockResolvedValue({ ...basePetition, status: "inProgress" });
     rejectPetitionMock.mockResolvedValue({});
   });
 
-  it("asks for a reason before approving an abnormal item and sends a per-item decision", async () => {
+  it("gives the QC head one decision bar with physical, AI and Final Report choices", async () => {
     renderPage();
 
-    expect(await screen.findByText("รออนุมัติ")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "อนุมัติรายการที่ 1" }));
+    const finalButton = await screen.findByRole("button", { name: "ออก Final Report" });
+    const bar = finalButton.closest(".fixed") as HTMLElement;
+    expect(bar).toHaveClass("bottom-3");
+    expect(within(bar).getByRole("button", { name: "กายภาพผ่าน" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "AI ผ่าน" })).toBeInTheDocument();
+    expect(within(bar).getByRole("button", { name: "ผลไม่ผ่าน" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /อนุมัติรายการที่/ })).not.toBeInTheDocument();
+    // แสดงผลเรียงลงมา ไม่ใช้ tab
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(["ค่ากายภาพ (QC)", "AI (Lab)"]);
+  });
 
+  it("asks for a reason when issuing the Final Report with an abnormal physical value", async () => {
+    decideMock.mockResolvedValue({ ...basePetition, status: "approved" });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "ออก Final Report" }));
     const dialog = await screen.findByRole("dialog");
-    expect(dialog).toHaveTextContent("ยอมรับผลไม่ปกติ (QC)");
+    expect(dialog).toHaveTextContent("ยอมรับผลไม่ปกติ");
     fireEvent.change(screen.getByLabelText("เหตุผล"), { target: { value: "ลูกค้ายอมรับ" } });
-    fireEvent.click(screen.getByRole("button", { name: "อนุมัติ" }));
+    fireEvent.click(screen.getByRole("button", { name: "ยืนยันให้ผ่าน" }));
+
+    await waitFor(() => expect(decideMock).toHaveBeenCalledTimes(2));
+    expect(decideMock).toHaveBeenNthCalledWith(1, "p1", {
+      side: "qc", decision: "approve", note: "ลูกค้ายอมรับ", items: [{ seq: 1, abnormal: true }],
+    });
+    expect(decideMock).toHaveBeenNthCalledWith(2, "p1", {
+      side: "lab", decision: "approve", note: "ลูกค้ายอมรับ", items: [{ seq: 1, abnormal: false }],
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/qc-approval");
+  });
+
+  it("sends only the ticked failing side back for retesting", async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "ผลไม่ผ่าน" }));
+    await screen.findByRole("dialog");
+    const confirmButton = screen.getByRole("button", { name: "ยืนยันผลไม่ผ่าน" });
+    fireEvent.click(screen.getByLabelText("รายการที่ 1: ตัวอย่าง A / ความชื้น / ค่า pH"));
+    fireEvent.change(screen.getByLabelText("เหตุผล"), { target: { value: "สีผิดปกติ" } });
+    fireEvent.click(confirmButton);
 
     await waitFor(() => expect(decideMock).toHaveBeenCalledTimes(1));
     expect(decideMock).toHaveBeenCalledWith("p1", {
       side: "qc",
-      decision: "approve",
-      note: "ลูกค้ายอมรับ",
-      items: [{ seq: 1, abnormal: true }],
-    });
-    // อนุมัติครบทุกรายการ → server ปิดใบ → กลับหน้ารายการ
-    expect(navigateMock).toHaveBeenCalledWith("/qc-approval");
-  });
-
-  it("rejects a single item back to QC with a required reason", async () => {
-    decideMock.mockResolvedValue({ _id: "p1", status: "inProgress", items: [] });
-    renderPage();
-
-    fireEvent.click(await screen.findByRole("button", { name: "ไม่อนุมัติรายการที่ 1" }));
-    await screen.findByRole("dialog");
-    const send = screen.getByRole("button", { name: "ส่งกลับ" });
-    expect(send).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("เหตุผล"), { target: { value: "สีผิดปกติ" } });
-    fireEvent.click(send);
-
-    await waitFor(() => expect(decideMock).toHaveBeenCalledWith("p1", {
-      side: "qc",
       decision: "reject",
-      note: "สีผิดปกติ",
+      note: expect.stringContaining("ไม่ผ่าน: รายการที่ 1: ตัวอย่าง A / ความชื้น / ค่า pH"),
       items: [{ seq: 1, abnormal: false }],
-    }));
+    });
   });
 
-  it("keeps approve-all and the whole-petition reject in the fixed decision bar above TV overscan", async () => {
-    renderPage();
-
-    const approveAll = await screen.findByRole("button", { name: "อนุมัติทั้งหมด" });
-    const actionBar = approveAll.closest(".fixed");
-    expect(actionBar).not.toBeNull();
-    expect(actionBar).toHaveClass("bottom-3");
-    expect(actionBar).toHaveClass("pb-[calc(env(safe-area-inset-bottom)+0.75rem)]");
-    expect(screen.getByRole("button", { name: "ไม่อนุมัติทั้งคำร้อง" })).toBeInTheDocument();
-  });
-
-  it("routes a whole-petition rejection with parameter references", async () => {
-    renderPage();
-
-    fireEvent.click(await screen.findByRole("button", { name: "ไม่อนุมัติทั้งคำร้อง" }));
-    await screen.findByRole("dialog");
-    expect(screen.getByText("ส่งให้ใคร")).toBeInTheDocument();
-    expect(screen.getByLabelText("Lab")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByLabelText("QC"));
-    fireEvent.click(screen.getByLabelText("รายการที่ 1: ตัวอย่าง A / ความชื้น / ค่า pH"));
-    fireEvent.change(screen.getByLabelText("รายละเอียด"), { target: { value: "ต้องตรวจใหม่" } });
-    fireEvent.click(screen.getByRole("button", { name: "ส่งกลับ" }));
-
-    await waitFor(() => expect(rejectPetitionMock).toHaveBeenCalledTimes(1));
-    expect(rejectPetitionMock).toHaveBeenCalledWith("p1", "หัวหน้า QC", expect.stringContaining("ต้องตรวจใหม่"), "qc");
-    expect(rejectPetitionMock.mock.calls[0][2]).toContain("อ้างอิง parameter: รายการที่ 1: ตัวอย่าง A / ความชื้น / ค่า pH");
-    expect(navigateMock).toHaveBeenCalledWith("/qc-approval");
-  });
-
-  it("hides the Lab tab and Lab return target for a QC Approver", async () => {
+  it("limits a QC Approver to physical results and physical decisions", async () => {
     deniedTabs.add("lab");
     renderPage("/qc-approval/p1?tab=lab");
 
-    expect(await screen.findByRole("tab", { name: "ผล QC" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "ผล Lab" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "กายภาพผ่าน" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "AI ผ่าน" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ออก Final Report" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "ค่ากายภาพ (QC)" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "AI (Lab)" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "ไม่อนุมัติทั้งคำร้อง" }));
+    fireEvent.click(screen.getByRole("button", { name: "ผลไม่ผ่าน" }));
     await screen.findByRole("dialog");
-    expect(screen.getByLabelText("QC")).toBeInTheDocument();
-    expect(screen.queryByLabelText("Lab")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("กายภาพไม่ผ่าน")).toBeInTheDocument();
+    expect(screen.queryByLabelText("AI ไม่ผ่าน")).not.toBeInTheDocument();
   });
 
-  it("opens the reject dialog from the decision query", async () => {
-    renderPage("/qc-approval/p1?decision=reject");
+  it("shows who already passed the physical results and leaves the Final Report as the next step", async () => {
+    fixture.petition = {
+      ...basePetition,
+      itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "pass", by: "QC Approver A", at: "2026-07-13T01:00:00.000Z" }],
+    };
+    renderPage();
 
-    expect(await screen.findByRole("dialog")).toHaveTextContent("ไม่อนุมัติคำร้อง P-2607-0001");
+    expect(await screen.findByText(/มีคนให้กายภาพผ่านแล้ว: QC Approver A/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ออก Final Report" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "AI ผ่าน" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "กายภาพผ่าน" })).not.toBeInTheDocument();
+  });
+
+  it("lets the QC head pass physical while Lab results are still pending", async () => {
+    fixture.petition = { ...basePetition, labCompletedAt: null };
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "กายภาพผ่าน" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "ออก Final Report" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("รอผล Lab").length).toBeGreaterThan(0);
   });
 });

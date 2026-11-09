@@ -38,11 +38,26 @@ vi.mock("@/hooks/usePetition", () => ({
           petitionNo: "P-2608-0001",
           dept: "rm",
           status: "inProgress",
+          routeTargets: ["qc", "lab"],
           submittedBy: { name: "ผู้ยื่น A" },
           qcCompletedAt: "2026-08-05T01:00:00.000Z",
           labCompletedAt: null,
           completedAt: "2026-08-05T00:00:00.000Z",
-          items: [{ seq: 1, sampleName: "ตัวอย่าง A" }],
+          items: [{ seq: 1, sampleName: "ตัวอย่าง A", sendToQc: true, sendToLab: true }],
+          createdAt: "2026-08-05T00:00:00.000Z",
+          updatedAt: "2026-08-05T00:00:00.000Z",
+        },
+        {
+          _id: "p2",
+          petitionNo: "P-2608-0002",
+          dept: "rm",
+          status: "inProgress",
+          routeTargets: ["qc", "lab"],
+          submittedBy: { name: "ผู้ยื่น B" },
+          qcCompletedAt: "2026-08-05T01:00:00.000Z",
+          labCompletedAt: "2026-08-05T02:00:00.000Z",
+          items: [{ seq: 1, sampleName: "ตัวอย่าง B", sendToQc: true, sendToLab: true }],
+          itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "pass", by: "QC Approver A", at: "2026-08-05T01:30:00.000Z" }],
           createdAt: "2026-08-05T00:00:00.000Z",
           updatedAt: "2026-08-05T00:00:00.000Z",
         },
@@ -54,8 +69,8 @@ vi.mock("@/hooks/usePetition", () => ({
 
 vi.mock("@/lib/api", () => ({
   api: {
-    getAbnormalFlags: vi.fn(async () => ({ p1: false })),
-    getReturnedFlags: vi.fn(async () => ({ p1: false })),
+    getAbnormalFlags: vi.fn(async () => ({})),
+    getReturnedFlags: vi.fn(async () => ({})),
   },
 }));
 
@@ -68,6 +83,14 @@ vi.mock("@/hooks/useAccessibleTabs", () => ({
   useAccessibleTabs: () => ({ isVisible: (key: string) => !deniedTabs.has(key) }),
 }));
 
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <QCApproval />
+    </MemoryRouter>,
+  );
+}
+
 describe("QCApproval", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,49 +101,36 @@ describe("QCApproval", () => {
     })));
   });
 
-  it("shows command choices after QC confirms before Lab is complete", async () => {
-    render(
-      <MemoryRouter>
-        <QCApproval />
-      </MemoryRouter>,
-    );
-
-    expect(screen.getByRole("columnheader", { name: "คำสั่ง" })).toBeInTheDocument();
-    expect(screen.queryByRole("columnheader", { name: "สถานะ" })).not.toBeInTheDocument();
+  it("offers only a details button and shows that Lab results are still pending", async () => {
+    renderPage();
 
     const row = screen.getByRole("row", { name: /P-2608-0001/ });
-    expect(within(row).getByRole("button", { name: "อนุมัติ" })).toBeInTheDocument();
-    expect(within(row).getByRole("button", { name: "ไม่อนุมัติ" })).toBeInTheDocument();
-    expect(within(row).queryByRole("button", { name: "ตรวจสอบ" })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "อนุมัติ" })).not.toBeInTheDocument();
+    expect(within(row).getByText("รออนุมัติ")).toBeInTheDocument();
+    expect(within(row).getByText("รอผล Lab")).toBeInTheDocument();
 
-    fireEvent.click(within(row).getByRole("button", { name: "ไม่อนุมัติ" }));
-
-    await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/qc-approval/p1?tab=qc&decision=reject");
-    });
+    fireEvent.click(within(row).getByRole("button", { name: "ดูรายละเอียด" }));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/qc-approval/p1?tab=qc"));
   });
 
-  it("separates submitted QC and Lab results into tabs", async () => {
-    render(
-      <MemoryRouter>
-        <QCApproval />
-      </MemoryRouter>,
-    );
+  it("tells the QC head who already passed the physical results", () => {
+    renderPage();
 
-    expect(await screen.findByRole("tab", { name: "ผล QC (1)" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "ผล Lab (0)" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "ยืนยันผลเมื่อ" })).toBeInTheDocument();
+    const row = screen.getByRole("row", { name: /P-2608-0002/ });
+    expect(within(row).getByText("กายภาพผ่าน")).toBeInTheDocument();
+    expect(within(row).getByText(/โดย QC Approver A/)).toBeInTheDocument();
+    fireEvent.click(within(row).getByRole("button", { name: "ดูรายละเอียด" }));
+    expect(navigateMock).toHaveBeenCalledWith("/qc-approval/p2?tab=lab");
   });
 
-  it("hides the Lab tab when the role denies it (QC Approver)", async () => {
+  it("shows only physical status to a QC Approver", () => {
     deniedTabs.add("lab");
-    render(
-      <MemoryRouter>
-        <QCApproval />
-      </MemoryRouter>,
-    );
+    renderPage();
 
-    expect(await screen.findByRole("tab", { name: "ผล QC (1)" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: /ผล Lab/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "ผู้ทดสอบ" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "กายภาพ" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "AI" })).not.toBeInTheDocument();
+    // คำร้องที่กายภาพผ่านแล้วไม่ต้องรอ QC Approver อีก
+    expect(screen.queryByRole("row", { name: /P-2608-0002/ })).not.toBeInTheDocument();
   });
 });
