@@ -185,6 +185,13 @@ export function objectToSearchParams(input: unknown): URLSearchParams {
   return params;
 }
 
+// Production ส่ง query string ทั้งก้อนผ่าน POST (ยาวเกินใส่ URL ได้) → อ่านเหมือนมาจาก URL ทุกประการ
+// ห้ามแปลงผ่าน objectToSearchParams เพราะจะทิ้งช่องว่าง แล้วตัวอย่างท้าย ๆ ไปได้ค่าของตัวแรกแทน
+export function integrationPayloadToSearchParams(payload: unknown): URLSearchParams {
+  const query = (payload as { query?: unknown } | null)?.query;
+  return typeof query === 'string' ? new URLSearchParams(query) : objectToSearchParams(payload);
+}
+
 export function buildProductionReturnUrl(searchParams: URLSearchParams, createdPetition?: Pick<Petition, 'petitionNo'> | null): string {
   const petitionNo = createdPetition?.petitionNo;
   const requestNo = getQueryValue(searchParams, ['requestNo', 'request_no', 'submissionNo']);
@@ -669,7 +676,7 @@ export default function ProductionPetitionNewPage({
     let alive = true;
     api.get<unknown>(`/production-integration/petitions/${encodeURIComponent(integrationToken)}`)
       .then((res) => {
-        if (alive) setPostedSearchParams(objectToSearchParams(res.data.data));
+        if (alive) setPostedSearchParams(integrationPayloadToSearchParams(res.data.data));
       })
       .catch((err) => {
         if (alive) setError(err instanceof Error ? err.message : 'โหลดข้อมูลจาก Production ไม่สำเร็จ');
@@ -890,9 +897,9 @@ export default function ProductionPetitionNewPage({
   const [createdPetition, setCreatedPetition] = useState<Petition | null>(null);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
   const routeTargets = useMemo<PetitionRouteTarget[] | null>(() => {
-    const targets = (searchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
+    const targets = (effectiveSearchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
     return targets.length ? targets : null;
-  }, [searchParams]);
+  }, [effectiveSearchParams]);
   const splitQcLab = Boolean(routeTargets?.includes('qc') && routeTargets.includes('lab'));
 
   function validateStep(): boolean {
