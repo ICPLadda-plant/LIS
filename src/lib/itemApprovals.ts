@@ -15,7 +15,7 @@ export type ItemSideStatus = "approved" | "rejected" | "pending" | "none";
 
 type ApprovalPetition = Pick<
   Petition,
-  "status" | "conclusion" | "items" | "routeTargets" | "submittedBy" | "itemApprovals" | "labReceivedAt" | "labCompletedAt" | "labApprovedAt"
+  "status" | "conclusion" | "items" | "routeTargets" | "submittedBy" | "itemApprovals" | "labReceivedAt" | "labCompletedAt" | "labApprovedAt" | "qcCompletedAt"
 >;
 
 export function itemRequiresSide(petition: ApprovalPetition, item: PetitionItem | undefined, side: ApprovalSide): boolean {
@@ -49,6 +49,60 @@ export function sideApprovalProgress(petition: ApprovalPetition, side: ApprovalS
   const items = itemsForSide(petition, side);
   const approved = items.filter((item) => itemSideStatus(petition, item, side) === "approved").length;
   return { total: items.length, approved, pending: items.length - approved };
+}
+
+/** ชื่อฝั่งที่ผู้ใช้เห็นในหน้า /qc-approval: QC = ค่ากายภาพ, Lab = %AI */
+export const APPROVAL_SIDE_LABEL: Record<ApprovalSide, string> = { qc: "กายภาพ", lab: "AI" };
+
+/** "กายภาพผ่าน" / "AI ผ่าน" — เว้นวรรคหลังคำภาษาอังกฤษ */
+export function sideResultLabel(side: ApprovalSide, pass: boolean): string {
+  return `${APPROVAL_SIDE_LABEL[side]}${side === "lab" ? " " : ""}${pass ? "ผ่าน" : "ไม่ผ่าน"}`;
+}
+
+export type SideApprovalStateKind = "none" | "waiting-result" | "returned" | "pending" | "approved";
+
+export interface SideApprovalState {
+  kind: SideApprovalStateKind;
+  /** ข้อความสั้นสำหรับ badge เช่น "รอผล Lab", "รออนุมัติ", "กายภาพผ่าน" */
+  label: string;
+  total: number;
+  pending: number;
+  /** ผู้ให้ผ่านล่าสุดของฝั่งนี้ (เมื่ออนุมัติครบ) */
+  approvedBy?: string;
+  approvedAt?: string;
+  /** มีรายการที่ยอมรับผลไม่ปกติ */
+  acceptedOos?: boolean;
+}
+
+/** สถานะรวมของฝั่ง QC (กายภาพ) / Lab (AI) ในคำร้อง — ใช้ทั้งหน้ารายการและหน้ารายละเอียด */
+export function sideApprovalState(petition: ApprovalPetition, side: ApprovalSide): SideApprovalState {
+  const items = itemsForSide(petition, side);
+  const { total, pending } = sideApprovalProgress(petition, side);
+  if (!total) return { kind: "none", label: "-", total, pending };
+  if (pending === 0) {
+    const entries = items
+      .map((item) => findItemApproval(petition, item.seq, side))
+      .filter((entry): entry is PetitionItemApproval => Boolean(entry));
+    const latest = [...entries].sort((a, b) => String(b.at ?? "").localeCompare(String(a.at ?? "")))[0];
+    const acceptedOos = items.some((item) => itemOutOfSpec(petition, item, side));
+    return {
+      kind: "approved",
+      label: acceptedOos ? `${sideResultLabel(side, true)} (ยอมรับผลไม่ปกติ)` : sideResultLabel(side, true),
+      total,
+      pending,
+      approvedBy: latest?.by,
+      approvedAt: latest?.at,
+      acceptedOos,
+    };
+  }
+  const done = side === "qc" ? petition.qcCompletedAt : petition.labCompletedAt;
+  if (!done) {
+    const returned = items.some((item) => itemSideStatus(petition, item, side) === "rejected");
+    return returned
+      ? { kind: "returned", label: `ไม่ผ่าน — รอ ${side === "qc" ? "QC" : "Lab"} ทดสอบใหม่`, total, pending }
+      : { kind: "waiting-result", label: side === "qc" ? "รอผล QC" : "รอผล Lab", total, pending };
+  }
+  return { kind: "pending", label: "รออนุมัติ", total, pending };
 }
 
 function itemOutOfSpec(petition: ApprovalPetition, item: PetitionItem, side: ApprovalSide): boolean {
