@@ -21,10 +21,20 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
+
 /** เปิดหน้าคิว LIS เต็มจอ เปิดค้างได้ทั้งวัน และโหลดใหม่เองเมื่อเชื่อมต่อไม่ได้ */
 public class QueueActivity extends Activity {
     static final String EXTRA_MODE = "mode";
+    /** เปิดจากการเปิดเครื่อง/ตื่นจากสแตนด์บาย: แสดงหน้า loading อย่างน้อย STARTUP_DELAY_MS ก่อน */
+    static final String EXTRA_STARTUP = "startup";
     private static final long RETRY_MS = 10_000;
+    private static final long STARTUP_DELAY_MS = 10_000;
+    /** รอเน็ตนานสุดเท่านี้ แล้วลองโหลดเลย (ถ้าไม่ได้จะเข้าโหมดลองใหม่ทุก 10 วิ) */
+    private static final long MAX_WAIT_MS = 120_000;
+    /** ถ้าจอดับ/ถูกซ่อนนานกว่านี้ ตอนกลับมาให้รอเน็ตแล้วโหลดหน้าใหม่ */
+    private static final long RESUME_RELOAD_MS = 60_000;
     /** ให้หน้าเว็บจัด layout ตามความกว้างจอ Full HD แทนขนาด dp ของทีวี (ปกติ 960) */
     private static final String FIT_TV_JS =
             "(function(){var m=document.querySelector('meta[name=viewport]');"
@@ -37,12 +47,39 @@ public class QueueActivity extends Activity {
     private TextView overlay;
     private String mode;
     private boolean failed;
+    private boolean waiting;
+    private boolean probing;
+    private volatile boolean serverReachable;
+    private long waitStartedAt;
+    private long minDelayMs;
+    private long stoppedAt;
 
     private final Runnable retry = new Runnable() {
         @Override
         public void run() {
             failed = false;
             web.reload();
+        }
+    };
+
+    /** ทุก 1 วิ: นับถอยหลังขั้นต่ำ + เช็คว่าเข้าเซิร์ฟเวอร์ LIS ได้จริง แล้วค่อยโหลดหน้าคิว */
+    private final Runnable waitTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!waiting) return;
+            long elapsed = System.currentTimeMillis() - waitStartedAt;
+            boolean delayDone = elapsed >= minDelayMs;
+            if (delayDone && serverReachable || elapsed >= MAX_WAIT_MS) {
+                waiting = false;
+                showLoading("กำลังเปิดคิว " + modeLabel() + "…", null);
+                web.loadUrl(queueUrl());
+                return;
+            }
+            if (!probing && !serverReachable) probe();
+            long remain = Math.max(0, (minDelayMs - elapsed + 999) / 1000);
+            String status = serverReachable ? "เชื่อมต่อเครือข่ายแล้ว" : "กำลังรอเชื่อมต่อเครือข่าย…";
+            showLoading("กำลังเริ่มระบบคิว " + modeLabel(), status + (remain > 0 ? "  (" + remain + ")" : ""));
+            handler.postDelayed(this, 1000);
         }
     };
 
@@ -88,15 +125,61 @@ public class QueueActivity extends Activity {
         root.addView(web, new FrameLayout.LayoutParams(-1, -1));
 
         overlay = new TextView(this);
-        overlay.setText("กำลังเปิดคิว " + ("qc".equals(mode) ? "QC" : "Lab") + "…");
         overlay.setTextSize(28);
         overlay.setTextColor(Color.WHITE);
         overlay.setGravity(Gravity.CENTER);
+        overlay.setLineSpacing(0, 1.3f);
         overlay.setBackground(Ui.background());
         root.addView(overlay, new FrameLayout.LayoutParams(-1, -1));
 
         setContentView(root);
-        web.loadUrl(MainActivity.BASE_URL + "/queue/" + mode);
+        startWaiting(getIntent().getBooleanExtra(EXTRA_STARTUP, false));
+    }
+
+    private String modeLabel() { return "qc".equals(mode) ? "QC" : "Lab"; }
+
+    private String queueUrl() { return MainActivity.BASE_URL + "/queue/" + mode; }
+
+    private void showLoading(String title, String status) {
+        overlay.setText(status == null ? title : title + "\n" + status);
+        overlay.setVisibility(View.VISIBLE);
+    }
+
+    /** แสดงหน้า loading แล้วรอจนเน็ตพร้อม (และครบ 10 วิ ถ้าเป็นตอนเปิดเครื่อง) ก่อนโหลดหน้าคิว */
+    private void startWaiting(boolean startup) {
+        handler.removeCallbacks(retry);
+        handler.removeCallbacks(waitTick);
+        failed = false;
+        waiting = true;
+        serverReachable = false;
+        minDelayMs = startup ? STARTUP_DELAY_MS : 0;
+        waitStartedAt = System.currentTimeMillis();
+        web.stopLoading();
+        waitTick.run();
+    }
+
+    /** ลองเรียกเซิร์ฟเวอร์ LIS จริง (ไม่พึ่งการเช็คเน็ตของ Google ที่อาจถูกบล็อกในเครือข่ายบริษัท) */
+    private void probe() {
+        probing = true;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                boolean ok = false;
+                HttpURLConnection conn = null;
+                try {
+                    conn = (HttpURLConnection) new URL(MainActivity.BASE_URL + "/").openConnection();
+                    conn.setConnectTimeout(3000);
+                    conn.setReadTimeout(3000);
+                    conn.setRequestMethod("HEAD");
+                    ok = conn.getResponseCode() > 0;
+                } catch (Exception ignored) {
+                } finally {
+                    if (conn != null) conn.disconnect();
+                }
+                serverReachable = ok;
+                probing = false;
+            }
+        }, "lis-probe").start();
     }
 
     private void showError() {
@@ -113,18 +196,25 @@ public class QueueActivity extends Activity {
         Startup.pending = false;
         Ui.immersive(this);
         web.onResume();
+        // ตื่นจากสแตนด์บายด้วยรีโมทโดยหน้าคิวค้างอยู่: Wi-Fi อาจยังไม่กลับ ให้รอแล้วโหลดใหม่
+        if (stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > RESUME_RELOAD_MS) startWaiting(true);
+        stoppedAt = 0;
+    }
+
+    @Override
+    protected void onStop() {
+        stoppedAt = System.currentTimeMillis();
+        super.onStop();
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         String next = "qc".equals(intent.getStringExtra(EXTRA_MODE)) ? "qc" : "lab";
-        if (next.equals(mode)) return;
+        boolean startup = intent.getBooleanExtra(EXTRA_STARTUP, false);
+        if (next.equals(mode) && !startup) return;
         mode = next;
-        failed = false;
-        overlay.setText("กำลังเปิดคิว " + ("qc".equals(mode) ? "QC" : "Lab") + "…");
-        overlay.setVisibility(View.VISIBLE);
-        web.loadUrl(MainActivity.BASE_URL + "/queue/" + mode);
+        startWaiting(startup);
     }
 
     @Override
@@ -136,6 +226,7 @@ public class QueueActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacks(retry);
+        handler.removeCallbacks(waitTick);
         web.destroy();
         super.onDestroy();
     }
@@ -159,10 +250,7 @@ public class QueueActivity extends Activity {
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 // สลับระหว่างคิว Lab และ QC ด้วยปุ่มซ้าย/ขวา
                 mode = "qc".equals(mode) ? "lab" : "qc";
-                failed = false;
-                overlay.setText("กำลังเปิดคิว " + ("qc".equals(mode) ? "QC" : "Lab") + "…");
-                overlay.setVisibility(View.VISIBLE);
-                web.loadUrl(MainActivity.BASE_URL + "/queue/" + mode);
+                startWaiting(false);
                 return true;
             case KeyEvent.KEYCODE_BACK:
                 finish();

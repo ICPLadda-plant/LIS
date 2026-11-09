@@ -161,7 +161,7 @@ public class MainActivity extends Activity {
         if (!Startup.pending) return;
         Startup.pending = false;
         String mode = Startup.mode(this);
-        if (!Startup.HOME.equals(mode)) openQueue(mode);
+        if (!Startup.HOME.equals(mode)) openQueue(mode, true);
     }
 
     @Override
@@ -364,8 +364,13 @@ public class MainActivity extends Activity {
     }
 
     private void openQueue(String mode) {
+        openQueue(mode, false);
+    }
+
+    private void openQueue(String mode, boolean startup) {
         Intent i = new Intent(this, QueueActivity.class);
         i.putExtra(QueueActivity.EXTRA_MODE, mode);
+        i.putExtra(QueueActivity.EXTRA_STARTUP, startup);
         startActivity(i);
     }
 
