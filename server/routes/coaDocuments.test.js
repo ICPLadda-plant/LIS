@@ -1586,7 +1586,7 @@ test('ERP autofill keeps the production date paired with the matching LIS Lot', 
   }
 });
 
-test('ERP autofill fills the production date from MF after resolving the Batch from LIS', async () => {
+test('ERP autofill keeps the LIS production date paired with its resolved Batch', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1635,7 +1635,7 @@ test('ERP autofill fills the production date from MF after resolving the Batch f
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'LOT-CUSTOMER');
-    assert.equal(res.body.sample.productionDate, '2026-09-18');
+    assert.equal(res.body.sample.productionDate, '2026-06-16');
     assert.equal(res.body.dataSources.mf, true);
   } finally {
     global.fetch = originals.fetch;
@@ -1953,4 +1953,14 @@ test('requested COA groups batches only when company and production date match',
   assert.deepEqual(rows.map((row) => row.selectedItemSeqs), [[1, 2], [3], [4]]);
   assert.deepEqual(rows.map((row) => row.customerSnapshot.company), ['Company A', 'Company A', 'Company B']);
   assert.equal(new Set(rows.map((row) => row._id)).size, 3);
+});
+
+test('COA requests are ordered by nearest shipment date first', () => {
+  const rows = router.sortCoaRows([
+    { _id: 'later', externalCoaRequest: { shipmentDate: '2026-11-15' }, updatedAt: '2026-11-09' },
+    { _id: 'no-shipment', updatedAt: '2026-11-10' },
+    { _id: 'first', externalCoaRequest: { shipmentDate: '2026-11-10' }, updatedAt: '2026-11-08' },
+  ]);
+
+  assert.deepEqual(rows.map((row) => row._id), ['first', 'later', 'no-shipment']);
 });

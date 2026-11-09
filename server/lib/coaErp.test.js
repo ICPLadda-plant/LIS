@@ -382,6 +382,30 @@ test('request Batch keeps its matching request production date instead of an unr
   assert.equal(result.sample.productionDate, '2026-06-16');
 });
 
+test('LIS request production date stays paired with its Batch before a newer MF date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'แจ๊ส 50 อีซี',
+      commonName: 'FENOBUCARB 50% EC',
+      batchNo: '029',
+      sampleId: 'F-JAZ50-200',
+    }],
+    externalCoaRequest: { itemNo: 'F-JAZ50-200', shipmentDate: '2026-11-10T00:00:00.000Z' },
+  }, [], [{
+    item_no: 'F-JAZ50-200',
+    prod_descript: 'แจ๊ส 50 อีซี',
+    create_date: '2026-11-09T00:00:00.000Z',
+  }], {
+    itemNo: 'F-JAZ50-200',
+    batchNo: '029',
+    productionDate: '2026-11-07',
+  });
+
+  assert.equal(result.sample.batchNo, '029');
+  assert.equal(result.sample.productionDate, '2026-11-07');
+});
+
 test('customer COA request batch, lot and production date take precedence over ERP references', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],

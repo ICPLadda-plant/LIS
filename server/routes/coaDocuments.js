@@ -854,6 +854,13 @@ function shouldIncludeRequestedRows(query = {}) {
 
 function sortCoaRows(items = []) {
   return [...items].sort((a, b) => {
+    const aShipment = Date.parse(a.externalCoaRequest?.shipmentDate || '');
+    const bShipment = Date.parse(b.externalCoaRequest?.shipmentDate || '');
+    if (Number.isFinite(aShipment) || Number.isFinite(bShipment)) {
+      if (!Number.isFinite(aShipment)) return 1;
+      if (!Number.isFinite(bShipment)) return -1;
+      if (aShipment !== bShipment) return aShipment - bShipment;
+    }
     const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
     const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
     return bTime - aTime;
@@ -1726,3 +1733,4 @@ module.exports.enrichExternalCoaDocumentsWithErpLots = enrichExternalCoaDocument
 module.exports.attachDensityToExternalCoaDocuments = attachDensityToExternalCoaDocuments;
 module.exports.enrichExternalCoaDocumentsWithHistory = enrichExternalCoaDocumentsWithHistory;
 module.exports.requestedCoaRowsFromPetition = requestedCoaRowsFromPetition;
+module.exports.sortCoaRows = sortCoaRows;
