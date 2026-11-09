@@ -6,6 +6,7 @@ import "./index.css";
 import { loadAccessControl } from "./lib/accessControlSource";
 import { registerPwaServiceWorker } from "./lib/pwa";
 import { startBuildRefreshWatcher } from "./lib/buildRefresh";
+import { startOutageRecoveryWatcher } from "./lib/outageRecovery";
 import { applyAppPreferences, readAppPreferences } from "./lib/appPreferences";
 
 // Resolving the sign-in redirect must never be able to abort the render.
@@ -101,5 +102,6 @@ resolveActiveAccount().then((account) => {
 
   void registerPwaServiceWorker();
   startBuildRefreshWatcher();
+  startOutageRecoveryWatcher();
 });
 
