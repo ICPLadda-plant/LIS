@@ -19,7 +19,10 @@ if (-not (Test-Path $Apk)) { & (Join-Path $PSScriptRoot "build.ps1") }
 $state = (& $Adb -s $Device get-state 2>&1) -join ""
 if ($state -ne "device") { throw "ทีวี $Device ยังไม่พร้อม ($state) - กดอนุญาตการแก้ไขข้อบกพร่องบนจอทีวีแล้วรันใหม่" }
 
-function Shell([string]$cmd) { & $Adb -s $Device shell $cmd }
+function Shell([string]$cmd) {
+    & $Adb -s $Device shell $cmd
+    if ($LASTEXITCODE) { throw "คำสั่งบนทีวีล้มเหลว (ADB อาจหลุด): $cmd - ต่อใหม่แล้วรันสคริปต์ซ้ำได้" }
+}
 
 Write-Host "ติดตั้งแอป"
 & $Adb -s $Device install -r $Apk
