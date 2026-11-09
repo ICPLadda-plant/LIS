@@ -524,10 +524,34 @@ function externalCoaRowsToDocuments(payload) {
       latestById.set(id, { row, sortValue: Number.isFinite(timestamp) ? timestamp : index });
     }
   });
-  return [...latestById.values()]
+  const documents = [...latestById.values()]
     .map(({ row }) => row)
     .filter(isExternalCoaRequest)
     .map(externalCoaRowToDocument);
+  const groups = new Map();
+  for (const doc of documents) {
+    const key = [doc.petitionNoSnapshot, doc.customerSnapshot?.name, doc.customerSnapshot?.company,
+      normalizeIsoDate(doc.externalCoaRequest?.shipmentDate)]
+      .map((value) => manualText(value).toLowerCase()).join('\u0000');
+    if (!groups.has(key)) groups.set(key, [[]]);
+    const partitions = groups.get(key);
+    const line = doc.selectedItemSeqs[0];
+    const partition = partitions.find((rows) => !rows.some((row) => row.selectedItemSeqs.includes(line)));
+    if (partition) partition.push(doc);
+    else partitions.push([doc]);
+  }
+  return [...groups.values()].flat().map((rows) => {
+    if (rows.length === 1) return rows[0];
+    const first = rows[0];
+    const id = `external-coa-request-${first.petitionNoSnapshot}-group-${rows.map((row) => row.selectedItemSeqs[0]).join('-')}`;
+    return {
+      ...first, _id: id, petitionId: id,
+      selectedItemSeqs: rows.flatMap((row) => row.selectedItemSeqs),
+      sampleSnapshots: rows.flatMap((row) => row.sampleSnapshots),
+      trendSnapshots: rows.flatMap((row) => row.trendSnapshots),
+      remark: rows.map((row) => row.remark).filter(Boolean).join(' / '),
+    };
+  });
 }
 
 function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petitions = [], labRequests = []) {
@@ -536,18 +560,18 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petit
   if (!stockRows.length && !mfRows.length) return documents;
 
   return documents.map((source) => {
-    const requestMatch = findBestRequestItem(petitions, source, labRequests);
-    const resolved = sampleFromSources(source, stockRows, mfRows, requestMatch?.item).sample;
     const samples = source.sampleSnapshots || [];
-    if (!samples.length || (!resolved.lotNo && !resolved.batchNo && !resolved.productionDate)) return source;
+    if (!samples.length) return source;
     return {
       ...source,
-      sampleSnapshots: samples.map((sample, index) => index === 0 ? {
-        ...sample,
-        lotNo: resolved.lotNo || sample.lotNo,
-        batchNo: resolved.batchNo || sample.batchNo,
-        productionDate: resolved.productionDate || sample.productionDate,
-      } : sample),
+      sampleSnapshots: samples.map((sample) => {
+        const sampleSource = { ...source, selectedItemSeqs: [sample.itemSeq], sampleSnapshots: [sample],
+          externalCoaRequest: { ...source.externalCoaRequest, itemNo: sample.sampleId } };
+        const requestMatch = findBestRequestItem(petitions, sampleSource, labRequests);
+        const resolved = sampleFromSources(sampleSource, stockRows, mfRows, requestMatch?.item).sample;
+        return { ...sample, lotNo: resolved.lotNo || sample.lotNo, batchNo: resolved.batchNo || sample.batchNo,
+          productionDate: resolved.productionDate || sample.productionDate };
+      }),
     };
   });
 }
@@ -1479,7 +1503,7 @@ router.patch('/:id', async (req, res) => {
     const doc = await CoaDocument.findById(objectId(req.params.id));
     if (!doc) return res.status(404).json({ error: 'ไม่พบ COA' });
     assertCanTransition(doc.status, 'update', actor);
-    if (doc.sourceType === 'erpManual' && req.body.sample) {
+    if (doc.sourceType === 'erpManual' && (req.body.sample || req.body.samples)) {
       doc.set(manualCoaSnapshots(req.body, doc.selectedItemSeqs[0]));
     }
     if (req.body.selectedItemSeqs && doc.sourceType !== 'erpManual') {

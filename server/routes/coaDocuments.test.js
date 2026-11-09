@@ -525,6 +525,17 @@ test('externalCoaRowsToDocuments keeps separate requests when the outstanding qu
   assert.notEqual(repeated[0]._id, repeated[1]._id);
 });
 
+test('externalCoaRowsToDocuments groups different Batch lines for the same customer and shipment', () => {
+  const docs = router.externalCoaRowsToDocuments([
+    { CompanySource: 'ICPL', CustomerName: 'Customer A', SaleOrderNo: 'SO-MULTI', Line: 10000, BatchNo: '026', ShipmentDate: '2026-11-10', remark: 'COA' },
+    { CompanySource: 'ICPL', CustomerName: 'Customer A', SaleOrderNo: 'SO-MULTI', Line: 20000, BatchNo: '029', ShipmentDate: '2026-11-10', remark: 'COA' },
+  ]);
+
+  assert.equal(docs.length, 1);
+  assert.deepEqual(docs[0].selectedItemSeqs, [10000, 20000]);
+  assert.deepEqual(docs[0].sampleSnapshots.map((sample) => sample.batchNo), ['026', '029']);
+});
+
 test('attachDensityToExternalCoaDocuments adds averaged valid Density for the resolved Batch', () => {
   const [source] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO-DENSITY', Line: 10000, BatchNo: '26S-ABC-001', remark: 'COA',

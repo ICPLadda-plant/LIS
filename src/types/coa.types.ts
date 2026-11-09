@@ -134,7 +134,8 @@ export type CoaDocument = {
 
 export type ManualCoaInput = {
   externalRequestId: string;
-  sample: CoaSampleSnapshot;
+  sample?: CoaSampleSnapshot;
+  samples?: CoaSampleSnapshot[];
   results: CoaResultSnapshot[];
   remark?: string;
   _user?: unknown;
