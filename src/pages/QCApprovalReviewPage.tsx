@@ -23,6 +23,7 @@ import SideApprovalBadge from "@/components/lis/approval/SideApprovalBadge";
 import { useAccessibleTabs } from "@/hooks/useAccessibleTabs";
 import {
   APPROVAL_SIDE_LABEL,
+  awaitingFinalReport,
   findItemApproval,
   itemSideStatus,
   itemsForSide,
@@ -128,9 +129,16 @@ export default function QCApprovalReviewPage() {
   /** ฝั่งที่ผู้ใช้กดผ่าน/ไม่ผ่านได้ตอนนี้ (ยืนยันผลแล้วและยังมีรายการรอ) */
   const decidableSides = SIDES.filter((s) => canDecide(s) && side[s].pending.length > 0);
   const requiredSides = SIDES.filter((s) => side[s].items.length > 0);
-  // ออก Final Report ได้เมื่อเห็นครบทุกฝั่ง และทุกฝั่งที่ต้องอนุมัติ ผ่านแล้วหรือพร้อมให้ผ่านในครั้งเดียว
-  const canIssueFinal = canSeeQc && canSeeLab && decidableSides.length > 0 &&
-    requiredSides.every((s) => side[s].pending.length === 0 || decidableSides.includes(s));
+  // ออก Final Report ได้เฉพาะผู้ที่เห็นทั้งกายภาพและ AI (หัวหน้า QC / admin); QC Approver ออกได้แค่ Pre Result
+  const canFinalizeRole = canSeeQc && canSeeLab;
+  /** ผ่านครบทุกรายการแล้ว (Pre Result) รอออก Final Report */
+  const preResultIssued = petition ? awaitingFinalReport(petition) : false;
+  const qcOnly = side.qc.items.length > 0 && side.lab.items.length === 0;
+  // ทุกฝั่งที่ต้องอนุมัติ ผ่านแล้วหรือพร้อมให้ผ่านในครั้งเดียว
+  const canIssueFinal = canFinalizeRole && !isClosed && (preResultIssued || (decidableSides.length > 0 &&
+    requiredSides.every((s) => side[s].pending.length === 0 || decidableSides.includes(s))));
+  const sideButtonLabel = (s: ApprovalSide) =>
+    s === "qc" && qcOnly && !canFinalizeRole ? "ออกผลกายภาพ (Pre Result)" : sideResultLabel(s, true);
 
   const approveSides = useCallback(async (sides: ApprovalSide[], note?: string) => {
     if (!petition || sides.length === 0) return;
@@ -151,6 +159,8 @@ export default function QCApprovalReviewPage() {
       refresh?.();
       if (latest?.status === "approved") {
         toast.success("ออก Final Report เรียบร้อย");
+      } else if (latest && awaitingFinalReport(latest)) {
+        toast.success("ออก Pre Result แล้ว — รอหัวหน้า QC ออก Final Report");
       } else {
         toast.success(`บันทึก${sides.map((s) => sideResultLabel(s, true)).join(" และ ")}แล้ว`);
       }
@@ -163,13 +173,38 @@ export default function QCApprovalReviewPage() {
     }
   }, [petition, side, refresh, navigate]);
 
+  const issueFinal = useCallback(async () => {
+    if (!petition) return;
+    setSubmitting(true);
+    try {
+      const updated = await api.issueFinalReport(petition._id);
+      setUpdatedPetition(updated);
+      refresh?.();
+      toast.success("ออก Final Report เรียบร้อย");
+      navigate("/qc-approval");
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "ออก Final Report ไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
+    }
+  }, [petition, refresh, navigate]);
+
   const requestApprove = useCallback(async (sides: ApprovalSide[], final: boolean) => {
+    if (final && sides.length === 0) {
+      // ผ่านครบแล้ว (Pre Result) — เหลือแค่ออก Final Report
+      const ok = await confirm({
+        title: "ออก Final Report",
+        description: `ยืนยันออก Final Report ของคำร้อง ${petition?.petitionNo ?? ""}?`,
+      });
+      if (ok) await issueFinal();
+      return;
+    }
     if (sides.length === 0) return;
     if (sides.some((s) => side[s].pending.some((seq) => side[s].abnormal.has(seq)))) {
       setOosApprove(sides);
       return;
     }
-    const label = sides.map((s) => sideResultLabel(s, true)).join(" และ ");
+    const label = sides.map(sideButtonLabel).join(" และ ");
     const ok = await confirm({
       title: final ? "ออก Final Report" : label,
       description: final
@@ -178,7 +213,9 @@ export default function QCApprovalReviewPage() {
     });
     if (!ok) return;
     await approveSides(sides).catch(() => {});
-  }, [confirm, approveSides, side, petition?.petitionNo]);
+    // sideButtonLabel อ่านจาก side/canFinalizeRole ที่อยู่ใน deps แล้ว
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirm, approveSides, issueFinal, side, canFinalizeRole, petition?.petitionNo]);
 
   const handleFail = useCallback(async (decision: FailDecision) => {
     if (!petition) return;
@@ -229,8 +266,10 @@ export default function QCApprovalReviewPage() {
   }
 
   // ตัวเลือก "ไม่ผ่าน": parameter ของรายการที่ยังรอตัดสิน แยกตามฝั่งที่ผู้ใช้ตัดสินได้
-  const failSections: FailSection[] = decidableSides.map((s) => {
-    const pending = new Set(side[s].pending);
+  // ออก Pre Result แล้ว → ยังกด "ผลไม่ผ่าน" กับรายการที่ผ่านไปแล้วได้ก่อนออก Final Report
+  const failSides = SIDES.filter((s) => canDecide(s) && (side[s].pending.length > 0 || preResultIssued));
+  const failSections: FailSection[] = failSides.map((s) => {
+    const pending = new Set(side[s].pending.length > 0 ? side[s].pending : side[s].items.map((item) => item.seq));
     const options = side[s].groups
       .filter((group) => pending.has(group.seq))
       .flatMap((group) => group.params.flatMap((param) => param.rows.map((row) => ({
@@ -344,6 +383,11 @@ export default function QCApprovalReviewPage() {
                 );
               })}
             </CardContent>
+            {preResultIssued && (
+              <p className="border-t px-4 py-3 text-sm text-muted-foreground">
+                ออก Pre Result แล้ว — {canFinalizeRole ? "กด “ออก Final Report” เพื่อปิดคำร้อง" : "รอหัวหน้า QC ออก Final Report"}
+              </p>
+            )}
           </Card>
         )}
 
@@ -379,7 +423,7 @@ export default function QCApprovalReviewPage() {
                 className="gap-2"
               >
                 <CheckCircle2 className="h-4 w-4" />
-                {sideResultLabel(s, true)}
+                {sideButtonLabel(s)}
               </Button>
             ))}
             {canIssueFinal && (

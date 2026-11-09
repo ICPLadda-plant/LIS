@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Petition } from "@/types/petition.types";
-import { batchApprovalSummaries, sideApprovalProgress, sideApprovalState } from "./itemApprovals";
+import { awaitingFinalReport, batchApprovalSummaries, sideApprovalProgress, sideApprovalState } from "./itemApprovals";
 
 const base = {
   _id: "p1",
@@ -57,5 +57,18 @@ describe("sideApprovalState", () => {
       itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "pass", by: "QC A", at: "2026-11-07T09:00:00.000Z" }],
     } as Petition;
     expect(sideApprovalState(approved, "qc")).toMatchObject({ kind: "approved", label: "กายภาพผ่าน", approvedBy: "QC A" });
+  });
+
+  it("treats a QC-only request with physical passed as a Pre Result waiting for the Final Report", () => {
+    const qcOnly = {
+      ...base,
+      routeTargets: ["qc"],
+      qcCompletedAt: "2026-11-07T08:00:00.000Z",
+      items: [{ seq: 1, sampleName: "A", sendToQc: true }],
+      itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "pass" }],
+    } as unknown as Petition;
+    expect(awaitingFinalReport(qcOnly)).toBe(true);
+    expect(awaitingFinalReport({ ...qcOnly, status: "approved" } as Petition)).toBe(false);
+    expect(awaitingFinalReport(petition)).toBe(false);
   });
 });

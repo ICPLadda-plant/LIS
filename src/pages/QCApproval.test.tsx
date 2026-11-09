@@ -57,7 +57,20 @@ vi.mock("@/hooks/usePetition", () => ({
           qcCompletedAt: "2026-08-05T01:00:00.000Z",
           labCompletedAt: "2026-08-05T02:00:00.000Z",
           items: [{ seq: 1, sampleName: "ตัวอย่าง B", sendToQc: true, sendToLab: true }],
+          createdAt: "2026-08-05T00:00:00.000Z",
+          updatedAt: "2026-08-05T00:00:00.000Z",
           itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "pass", by: "QC Approver A", at: "2026-08-05T01:30:00.000Z" }],
+        },
+        {
+          _id: "p3",
+          petitionNo: "P-2608-0003",
+          dept: "rm",
+          status: "inProgress",
+          routeTargets: ["qc"],
+          submittedBy: { name: "ผู้ยื่น C" },
+          qcCompletedAt: "2026-08-05T01:00:00.000Z",
+          items: [{ seq: 1, sampleName: "ตัวอย่าง C", sendToQc: true }],
+          itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "pass", by: "QC Approver A" }],
           createdAt: "2026-08-05T00:00:00.000Z",
           updatedAt: "2026-08-05T00:00:00.000Z",
         },
@@ -123,6 +136,13 @@ describe("QCApproval", () => {
     expect(navigateMock).toHaveBeenCalledWith("/qc-approval/p2?tab=lab");
   });
 
+  it("keeps Pre Result requests in the QC head queue until the Final Report is issued", () => {
+    renderPage();
+
+    const row = screen.getByRole("row", { name: /P-2608-0003/ });
+    expect(within(row).getByText("Pre Result · รอออก Final Report")).toBeInTheDocument();
+  });
+
   it("shows only physical status to a QC Approver", () => {
     deniedTabs.add("lab");
     renderPage();
@@ -132,5 +152,6 @@ describe("QCApproval", () => {
     expect(screen.queryByRole("columnheader", { name: "AI" })).not.toBeInTheDocument();
     // คำร้องที่กายภาพผ่านแล้วไม่ต้องรอ QC Approver อีก
     expect(screen.queryByRole("row", { name: /P-2608-0002/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /P-2608-0003/ })).not.toBeInTheDocument();
   });
 });
