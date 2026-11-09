@@ -33,6 +33,7 @@ public class MainActivity extends Activity {
 
     /** แอปจัดการไฟล์ที่ลองเปิดตามลำดับ (Xiaomi / Google TV / Android ทั่วไป) */
     private static final String[] FILE_APPS = {
+            "com.cxinventor.file.explorer",
             "com.xiaomi.mitv.mediaexplorer",
             "com.mitv.mediaexplorer",
             "com.xiaomi.mitv.filemanager",
@@ -54,7 +55,9 @@ public class MainActivity extends Activity {
         public void run() {
             Date now = new Date();
             clock.setText(new SimpleDateFormat("HH:mm", thai).format(now));
-            date.setText(new SimpleDateFormat("EEEEที่ d MMMM yyyy", thai).format(now));
+            java.util.Calendar cal = java.util.Calendar.getInstance();
+            int buddhistYear = cal.get(java.util.Calendar.YEAR) + 543;
+            date.setText(new SimpleDateFormat("EEEEที่ d MMMM", thai).format(now) + " " + buddhistYear);
             network.setText("IP " + localIp());
             handler.postDelayed(this, 1000);
         }
@@ -64,7 +67,9 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(buildLayout());
-        firstTile.requestFocus();
+        firstTile.post(new Runnable() {
+            @Override public void run() { firstTile.requestFocus(); }
+        });
     }
 
     @Override
@@ -99,17 +104,17 @@ public class MainActivity extends Activity {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackground(Ui.background());
-        int pad = Ui.dp(this, 48);
-        root.setPadding(pad, Ui.dp(this, 32), pad, Ui.dp(this, 32));
+        int pad = Ui.dp(this, 40);
+        root.setPadding(pad, Ui.dp(this, 28), pad, Ui.dp(this, 32));
         root.setClipChildren(false);
         root.setClipToPadding(false);
 
         root.addView(buildHeader(), new LinearLayout.LayoutParams(-1, -2));
 
-        TextView section = label("เลือกจอคิว", 20, Ui.TEXT_MUTED, false);
+        TextView section = label("เลือกจอคิว", 16, Ui.TEXT_MUTED, false);
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-2, -2);
-        sp.topMargin = Ui.dp(this, 28);
-        sp.bottomMargin = Ui.dp(this, 12);
+        sp.topMargin = Ui.dp(this, 20);
+        sp.bottomMargin = Ui.dp(this, 10);
         root.addView(section, sp);
 
         LinearLayout big = row();
@@ -126,10 +131,10 @@ public class MainActivity extends Activity {
         big.addView(qc, weighted(16, 0));
         root.addView(big, new LinearLayout.LayoutParams(-1, 0, 3f));
 
-        TextView tools = label("เครื่องมือ", 20, Ui.TEXT_MUTED, false);
+        TextView tools = label("เครื่องมือ", 16, Ui.TEXT_MUTED, false);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
-        tp.topMargin = Ui.dp(this, 28);
-        tp.bottomMargin = Ui.dp(this, 12);
+        tp.topMargin = Ui.dp(this, 20);
+        tp.bottomMargin = Ui.dp(this, 10);
         root.addView(tools, tp);
 
         LinearLayout small = row();
@@ -145,7 +150,7 @@ public class MainActivity extends Activity {
         small.addView(smallTile("ตั้งค่า", R.drawable.ic_settings, new View.OnClickListener() {
             @Override public void onClick(View v) { openSettings(); }
         }), weighted(12, 0));
-        root.addView(small, new LinearLayout.LayoutParams(-1, 0, 1.3f));
+        root.addView(small, new LinearLayout.LayoutParams(-1, Ui.dp(this, 72)));
         return root;
     }
 
@@ -156,22 +161,22 @@ public class MainActivity extends Activity {
 
         ImageView logo = new ImageView(this);
         logo.setImageResource(R.drawable.icon);
-        header.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 56)));
+        header.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)));
 
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
-        titles.setPadding(Ui.dp(this, 16), 0, 0, 0);
-        titles.addView(label("ICP Ladda LIS", 28, Ui.TEXT, true));
-        network = label("", 15, Ui.TEXT_MUTED, false);
+        titles.setPadding(Ui.dp(this, 14), 0, 0, 0);
+        titles.addView(label("ICP Ladda LIS", 22, Ui.TEXT, true));
+        network = label("", 13, Ui.TEXT_MUTED, false);
         titles.addView(network);
         header.addView(titles, new LinearLayout.LayoutParams(0, -2, 1f));
 
         LinearLayout time = new LinearLayout(this);
         time.setOrientation(LinearLayout.VERTICAL);
         time.setGravity(Gravity.END);
-        clock = label("", 44, Ui.TEXT, true);
+        clock = label("", 34, Ui.TEXT, true);
         clock.setGravity(Gravity.END);
-        date = label("", 17, Ui.TEXT_MUTED, false);
+        date = label("", 14, Ui.TEXT_MUTED, false);
         date.setGravity(Gravity.END);
         time.addView(clock);
         time.addView(date);
@@ -181,9 +186,9 @@ public class MainActivity extends Activity {
 
     private View bigTile(String title, String subtitle, int icon, int accent, View.OnClickListener click) {
         LinearLayout tile = new LinearLayout(this);
-        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setOrientation(LinearLayout.HORIZONTAL);
         tile.setGravity(Gravity.CENTER_VERTICAL);
-        int p = Ui.dp(this, 32);
+        int p = Ui.dp(this, 28);
         tile.setPadding(p, p, p, p);
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[] {accent, darker(accent)});
@@ -195,16 +200,21 @@ public class MainActivity extends Activity {
         ImageView iv = new ImageView(this);
         iv.setImageResource(icon);
         tile.addView(iv, new LinearLayout.LayoutParams(Ui.dp(this, 72), Ui.dp(this, 72)));
-        TextView t = label(title, 44, Ui.TEXT, true);
-        t.setPadding(0, Ui.dp(this, 16), 0, Ui.dp(this, 4));
-        tile.addView(t);
-        tile.addView(label(subtitle, 20, 0xDDFFFFFF, false));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setPadding(Ui.dp(this, 24), 0, 0, 0);
+        texts.addView(label(title, 36, Ui.TEXT, true));
+        TextView sub = label(subtitle, 16, 0xDDFFFFFF, false);
+        sub.setPadding(0, Ui.dp(this, 4), 0, 0);
+        texts.addView(sub);
+        tile.addView(texts, new LinearLayout.LayoutParams(0, -2, 1f));
         return tile;
     }
 
     private View smallTile(String title, int icon, View.OnClickListener click) {
         LinearLayout tile = new LinearLayout(this);
-        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setOrientation(LinearLayout.HORIZONTAL);
         tile.setGravity(Gravity.CENTER);
         GradientDrawable bg = Ui.rounded(this, Ui.CARD, 16);
         tile.setBackground(bg);
@@ -213,10 +223,10 @@ public class MainActivity extends Activity {
 
         ImageView iv = new ImageView(this);
         iv.setImageResource(icon);
-        tile.addView(iv, new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44)));
-        TextView t = label(title, 22, Ui.TEXT, true);
-        t.setPadding(0, Ui.dp(this, 10), 0, 0);
-        tile.addView(t);
+        tile.addView(iv, new LinearLayout.LayoutParams(Ui.dp(this, 30), Ui.dp(this, 30)));
+        TextView t = label(title, 18, Ui.TEXT, true);
+        t.setPadding(Ui.dp(this, 12), 0, 0, 0);
+        tile.addView(t, new LinearLayout.LayoutParams(-2, -2));
         return tile;
     }
 

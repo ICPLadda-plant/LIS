@@ -24,6 +24,12 @@ import android.widget.TextView;
 public class QueueActivity extends Activity {
     static final String EXTRA_MODE = "mode";
     private static final long RETRY_MS = 10_000;
+    /** ให้หน้าเว็บจัด layout ตามความกว้างจอ Full HD แทนขนาด dp ของทีวี (ปกติ 960) */
+    private static final String FIT_TV_JS =
+            "(function(){var m=document.querySelector('meta[name=viewport]');"
+            + "if(!m){m=document.createElement('meta');m.name='viewport';document.head.appendChild(m);}"
+            + "var w=Math.max(screen.width*window.devicePixelRatio,1280);"
+            + "if(m.content!=='width='+w){m.content='width='+w;}})();";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private WebView web;
@@ -63,6 +69,7 @@ public class QueueActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
+                view.evaluateJavascript(FIT_TV_JS, null);
                 if (!failed) overlay.setVisibility(View.GONE);
             }
 
@@ -120,12 +127,20 @@ public class QueueActivity extends Activity {
     }
 
     @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        // ดักปุ่มรีโมทก่อนส่งให้หน้าเว็บ เพื่อให้สลับคิว/กลับหน้า Home ได้เสมอ
+        int keyCode = event.getKeyCode();
+        boolean handled = keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT
+                || keyCode == KeyEvent.KEYCODE_BACK
+                || (failed && (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER));
+        if (!handled) return super.dispatchKeyEvent(event);
+        if (event.getAction() != KeyEvent.ACTION_DOWN || event.getRepeatCount() > 0) return true;
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
-                if (failed) { handler.removeCallbacks(retry); retry.run(); return true; }
-                return super.onKeyDown(keyCode, event);
+                handler.removeCallbacks(retry);
+                retry.run();
+                return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
             case KeyEvent.KEYCODE_DPAD_RIGHT:
                 // สลับระหว่างคิว Lab และ QC ด้วยปุ่มซ้าย/ขวา
@@ -139,7 +154,7 @@ public class QueueActivity extends Activity {
                 finish();
                 return true;
             default:
-                return super.onKeyDown(keyCode, event);
+                return true;
         }
     }
 }
