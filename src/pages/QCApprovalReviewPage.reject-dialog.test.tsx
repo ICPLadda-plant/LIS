@@ -3,10 +3,11 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import QCApprovalReviewPage from "./QCApprovalReviewPage";
 
-const { navigateMock, decideMock, rejectPetitionMock, deniedTabs, fixture } = vi.hoisted(() => ({
+const { navigateMock, decideMock, rejectPetitionMock, issueFinalMock, deniedTabs, fixture } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   decideMock: vi.fn(),
   rejectPetitionMock: vi.fn(),
+  issueFinalMock: vi.fn(),
   deniedTabs: new Set<string>(),
   fixture: { petition: {} as Record<string, unknown> },
 }));
@@ -65,6 +66,7 @@ vi.mock("@/lib/api", () => ({
     getAbnormalFlags: vi.fn(async () => ({ p1: false })),
     decideApprovalItems: decideMock,
     rejectPetition: rejectPetitionMock,
+    issueFinalReport: issueFinalMock,
   },
 }));
 
@@ -222,5 +224,42 @@ describe("QCApprovalReviewPage", () => {
     expect(await screen.findByRole("button", { name: "กายภาพผ่าน" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "ออก Final Report" })).not.toBeInTheDocument();
     expect(screen.getAllByText("รอผล Lab").length).toBeGreaterThan(0);
+  });
+
+  it("lets a QC Approver issue the physical result of a QC-only request as a Pre Result", async () => {
+    deniedTabs.add("lab");
+    fixture.petition = {
+      ...basePetition,
+      routeTargets: ["qc"],
+      labCompletedAt: null,
+      items: [{ seq: 1, sampleName: "ตัวอย่าง A", batchNo: "RM-1", sampleId: "S-1", sendToQc: true }],
+    };
+    renderPage();
+
+    const preResult = await screen.findByRole("button", { name: "ออกผลกายภาพ (Pre Result)" });
+    expect(screen.queryByRole("button", { name: "ออก Final Report" })).not.toBeInTheDocument();
+    fireEvent.click(preResult);
+    // ค่ากายภาพผิดปกติ → ต้องระบุเหตุผลก่อน
+    await screen.findByRole("dialog");
+    fireEvent.change(screen.getByLabelText("เหตุผล"), { target: { value: "ยอมรับได้" } });
+    fireEvent.click(screen.getByRole("button", { name: "ยืนยันให้ผ่าน" }));
+    await waitFor(() => expect(decideMock).toHaveBeenCalledWith("p1", expect.objectContaining({ side: "qc", decision: "approve" })));
+  });
+
+  it("lets the QC head issue the Final Report after the Pre Result", async () => {
+    issueFinalMock.mockResolvedValue({ ...basePetition, status: "approved" });
+    fixture.petition = {
+      ...basePetition,
+      routeTargets: ["qc"],
+      labCompletedAt: null,
+      items: [{ seq: 1, sampleName: "ตัวอย่าง A", batchNo: "RM-1", sampleId: "S-1", sendToQc: true }],
+      itemApprovals: [{ seq: 1, side: "qc", status: "approved", conclusion: "pass", by: "QC Approver A" }],
+    };
+    renderPage();
+
+    expect(await screen.findByText(/ออก Pre Result แล้ว/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "ออก Final Report" }));
+    await waitFor(() => expect(issueFinalMock).toHaveBeenCalledWith("p1"));
+    expect(navigateMock).toHaveBeenCalledWith("/qc-approval");
   });
 });

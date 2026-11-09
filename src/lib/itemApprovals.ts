@@ -51,6 +51,14 @@ export function sideApprovalProgress(petition: ApprovalPetition, side: ApprovalS
   return { total: items.length, approved, pending: items.length - approved };
 }
 
+/** ผ่านครบทุกรายการทุกฝั่งแล้ว (Pre Result) แต่ยังไม่ได้ออก Final Report */
+export function awaitingFinalReport(petition: ApprovalPetition): boolean {
+  if (["approved", "rejected"].includes(petition.status)) return false;
+  const items = petition.items ?? [];
+  return items.length > 0 && items.every((item) =>
+    (["qc", "lab"] as ApprovalSide[]).every((side) => ["approved", "none"].includes(itemSideStatus(petition, item, side))));
+}
+
 /** ชื่อฝั่งที่ผู้ใช้เห็นในหน้า /qc-approval: QC = ค่ากายภาพ, Lab = %AI */
 export const APPROVAL_SIDE_LABEL: Record<ApprovalSide, string> = { qc: "กายภาพ", lab: "AI" };
 

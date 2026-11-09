@@ -15,7 +15,7 @@ import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
 import { useAccessibleTabs } from "@/hooks/useAccessibleTabs";
-import { sideApprovalState, type ApprovalSide } from "@/lib/itemApprovals";
+import { awaitingFinalReport, sideApprovalState, type ApprovalSide } from "@/lib/itemApprovals";
 import SideApprovalBadge from "@/components/lis/approval/SideApprovalBadge";
 
 function priorityScore(
@@ -67,9 +67,12 @@ const QCApproval = () => {
     () => [showQcTab && "qc", showLabTab && "lab"].filter(Boolean) as ApprovalSide[],
     [showQcTab, showLabTab],
   );
-  // แสดงคำร้องที่มีอย่างน้อยหนึ่งฝั่ง (ที่ผู้ใช้เห็น) ยืนยันผลแล้วและรอตัดสิน
+  // หัวหน้า QC / admin ออก Final Report ได้ จึงเห็นคำร้องที่ออก Pre Result แล้วด้วย
+  const canIssueFinal = showQcTab && showLabTab;
+  // แสดงคำร้องที่มีอย่างน้อยหนึ่งฝั่ง (ที่ผู้ใช้เห็น) ยืนยันผลแล้วและรอตัดสิน หรือรอออก Final Report
   const pendingPetitions = sortedPetitions.filter((petition) =>
-    visibleSides.some((side) => sideApprovalState(petition, side).kind === "pending"),
+    visibleSides.some((side) => sideApprovalState(petition, side).kind === "pending") ||
+    (canIssueFinal && awaitingFinalReport(petition)),
   );
   const detailPath = (petition: Petition) => {
     const side = visibleSides.find((s) => sideApprovalState(petition, s).kind === "pending") ?? visibleSides[0] ?? "qc";
@@ -127,6 +130,9 @@ const QCApproval = () => {
             )}
           </div>
           <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+            {canIssueFinal && awaitingFinalReport(p) && (
+              <Badge variant="blue-soft">Pre Result · รอออก Final Report</Badge>
+            )}
             {abnormalMap[p._id] && (
               <span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
                 ผิดปกติ
