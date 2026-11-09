@@ -434,7 +434,7 @@ test('customer COA request batch, lot and production date take precedence over E
   assert.equal(result.sample.productionDate, '2026-04-18');
 });
 
-test('LIS petition Lot supplies the production date paired with its Batch', () => {
+test('LIS petition keeps the label production date instead of deriving it from Lot', () => {
   const source = {
     selectedItemSeqs: [10000],
     sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'COMMON A' }],
@@ -461,7 +461,7 @@ test('LIS petition Lot supplies the production date paired with its Batch', () =
   assert.equal(petitionMatch.item.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.lotNo, 'FG260912-001');
-  assert.equal(result.sample.productionDate, '2026-09-12');
+  assert.equal(result.sample.productionDate, '2026-06-16');
 });
 
 test('finished-good COA request can use the matching bulk production batch and date by common name', () => {
