@@ -66,6 +66,7 @@ mountApi('/auth', require('./routes/auth'));
 mountApi('/profile', require('./routes/profile'));
 mountApi('/physical-results', require('./routes/physicalResults'));
 mountApi('/approvals', require('./routes/approvals'));
+mountApi('/final-result-email', require('./routes/finalResultEmail')); // n8n เรียกกลับเมื่อ QC Head กดอนุมัติในเมล
 mountApi('/densities', require('./routes/densities'));
 mountApi('/result-densities', require('./routes/result-densities'));
 mountApi('/request-values', require('./routes/request-values'));
