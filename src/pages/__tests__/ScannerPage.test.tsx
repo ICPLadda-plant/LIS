@@ -128,4 +128,65 @@ describe('ScannerPage camera failure fallback', () => {
     );
     expect(await screen.findByText('ตรวจสอบคำร้องก่อนยืนยัน')).toBeInTheDocument();
   });
+
+  it('อยู่หน้ายืนยันแล้วยิงเครื่องสแกนต่อ → เพิ่มเข้าคิวทันทีโดยไม่ต้องกดเพิ่มรายการ', async () => {
+    const secondPetition = { ...petition, _id: 'pet2', petitionNo: 'P-2506-0004' };
+    (api.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ data: { data: petition } })
+      .mockResolvedValueOnce({ data: { data: secondPetition } });
+    renderPage();
+
+    const typeScan = (code: string) => {
+      for (const key of code) fireEvent.keyDown(window, { key });
+      fireEvent.keyDown(window, { key: 'Enter' });
+    };
+
+    typeScan('P-2506-0003');
+    expect(await screen.findByText('ตรวจสอบคำร้องก่อนยืนยัน')).toBeInTheDocument();
+    typeScan('P-2506-0004');
+
+    await waitFor(() => expect(screen.getByText('ทั้งหมด 2 ตัวอย่าง')).toBeInTheDocument());
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('เพิ่ม P-2506-0004 เข้าคิวแล้ว');
+  });
+
+  it('ยิงรายการที่อยู่ในคิวซ้ำ → แจ้งเตือนในหน้ายืนยันโดยไม่ล้างคิว', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: petition } });
+    renderPage();
+    const typeScan = (code: string) => {
+      for (const key of code) fireEvent.keyDown(window, { key });
+      fireEvent.keyDown(window, { key: 'Enter' });
+    };
+
+    typeScan('P-2506-0003');
+    expect(await screen.findByText('ตรวจสอบคำร้องก่อนยืนยัน')).toBeInTheDocument();
+    typeScan('P-2506-0003');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('รายการนี้อยู่ในคิวแล้ว');
+    expect(screen.getByText('ทั้งหมด 1 ตัวอย่าง')).toBeInTheDocument();
+  });
+
+  it('ส่งสำเร็จแล้วยิงเครื่องสแกนต่อ → เริ่มคิวใหม่ทันทีโดยไม่ต้องกดสแกนคำร้องถัดไป', async () => {
+    const sampled = { ...petition, sampledBy: { employeeId: '7', name: 'ผู้สุ่ม' } };
+    const next = { ...sampled, _id: 'pet2', petitionNo: 'P-2506-0004' };
+    (api.get as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ data: { data: sampled } })
+      .mockResolvedValueOnce({ data: { data: next } });
+    (api.patch as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: { ...sampled, status: 'sampleSent' } } });
+    renderPage();
+    const typeScan = (code: string) => {
+      for (const key of code) fireEvent.keyDown(window, { key });
+      fireEvent.keyDown(window, { key: 'Enter' });
+    };
+
+    typeScan('P-2506-0003');
+    expect(await screen.findByText('ตรวจสอบคำร้องก่อนยืนยัน')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'ยืนยัน' }));
+    expect(await screen.findByRole('button', { name: 'สแกนคำร้องถัดไป' })).toBeInTheDocument();
+
+    typeScan('P-2506-0004');
+    expect(await screen.findByText('ตรวจสอบคำร้องก่อนยืนยัน')).toBeInTheDocument();
+    expect(screen.getByText('ทั้งหมด 1 ตัวอย่าง')).toBeInTheDocument();
+    expect(screen.getByText('P-2506-0004')).toBeInTheDocument();
+  });
 });
