@@ -373,6 +373,11 @@ interface LabRequestListResponse {
   limit: number;
 }
 
+export async function fetchLabRequestsByPetition(petitionId: string): Promise<LabRequest[]> {
+  const res = await apiFetch<LabRequestListResponse>(`/lab-requests?petitionId=${encodeURIComponent(petitionId)}&limit=100`);
+  return res.items ?? [];
+}
+
 export function useLabRequestsByPetition(petitionId: string | undefined) {
   const [data, setData] = useState<LabRequest[]>([]);
   const [loading, setLoading] = useState(true);

@@ -1319,6 +1319,10 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
     if (side === 'lab' && isLabAwaitingSgConfirmation(before)) {
       return res.status(409).json({ error: { message: 'รอ QC ยืนยันค่า ถพ. ก่อน Lab จึงรับตัวอย่างได้' } });
     }
+    if (side === 'lab') {
+      const reviewError = await labAgreementReviewError(before);
+      if (reviewError) return res.status(409).json({ error: { message: reviewError, code: 'LAB_AGREEMENT_REVIEW_REQUIRED' } });
+    }
     const now = new Date();
     const sideLabel = side === 'lab' ? 'Lab' : 'QC';
     const versionGuard = { ...q, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v };
@@ -1397,6 +1401,18 @@ function petitionQuery(id) {
 
 function labNotReceived(doc) {
   return !doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt);
+}
+
+// ISO 17025 ข้อ 7.1: Lab ต้องทบทวนคำขอ (ใบ L) และสรุปว่า "พร้อมรับงาน" ก่อนรับตัวอย่าง
+// คำร้องที่ไม่มีใบ L (เช่น QC อย่างเดียว / ข้อมูลเก่า) ไม่ต้องทบทวน
+async function labAgreementReviewError(petition) {
+  const requests = await LabRequest.find({ petitionId: petition._id, deletedAt: null }, { labAgreementReview: 1 }).lean();
+  if (!requests?.length) return null;
+  if (requests.some((request) => !request.labAgreementReview?.reviewedAt)) return 'กรุณาทบทวนคำขอก่อนรับงาน Lab';
+  if (requests.some((request) => request.labAgreementReview.acceptable === false)) {
+    return 'ผลทบทวนคำขอคือ "ไม่พร้อมรับงาน" จึงรับตัวอย่างไม่ได้';
+  }
+  return null;
 }
 
 // ทำความสะอาดรายการเครื่องจาก client แล้วผูก Standard Time ของแต่ละเครื่อง
