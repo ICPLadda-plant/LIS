@@ -303,6 +303,51 @@ describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
     ));
     expect(items.map((item) => item.batchNo)).toEqual(['B1', 'B2']);
   });
+
+  it('keeps the same batch as separate items when Production sends different parts', () => {
+    const sample = { sampleName: 'PACLOBUTRAZOL 25% SC', unit: 'CC', batchNo: 'B-526', sendToQc: '1', sendToLab: '0' };
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samples: [
+        { ...sample, qty: 100, qcQtys: '100', part: 'บน', lineRef: '11' },
+        { ...sample, qty: 100, qcQtys: '100', part: 'ล่าง', lineRef: '12' },
+      ],
+    }));
+
+    expect(items.map(({ batchNo, part, lineRef }) => ({ batchNo, part, lineRef }))).toEqual([
+      { batchNo: 'B-526', part: 'บน', lineRef: '11' },
+      { batchNo: 'B-526', part: 'ล่าง', lineRef: '12' },
+    ]);
+  });
+
+  it('does not merge rows Production confirmed as separate samples (different lineRef)', () => {
+    const sample = { sampleName: 'PACLOBUTRAZOL 25% SC', unit: 'CC', batchNo: 'B-526' };
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      routeTargets: 'qc,lab',
+      samples: [
+        { ...sample, qty: 100, sendToQc: '1', sendToLab: '0', qcQtys: '100', lineRef: 'a' },
+        { ...sample, qty: 500, sendToQc: '0', sendToLab: '1', labQtys: '500', lineRef: 'b' },
+      ],
+    }));
+
+    expect(items.map(({ seq, labelQuantities, labelQuantitySides }) => ({ seq, labelQuantities, labelQuantitySides }))).toEqual([
+      { seq: 1, labelQuantities: ['100 CC'], labelQuantitySides: ['qc'] },
+      { seq: 2, labelQuantities: ['500 CC'], labelQuantitySides: ['lab'] },
+    ]);
+  });
+
+  it('keeps one item with QC 100, 500 and Lab 500 portions sent as a single Production row', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      sampleName: 'PACLOBUTRAZOL 25% SC',
+      batchNo: 'B-526',
+      samples: [
+        { sampleName: 'PACLOBUTRAZOL 25% SC', batchNo: 'B-526', qty: 100, unit: 'CC', sendToQc: '1', sendToLab: '1', labQty: 500, qcQtys: '100,500', labQtys: '500', lineRef: 'k1' },
+      ],
+    }));
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ sampleQuantity: 3, labelQuantities: ['100 CC', '500 CC', '500 CC'], labelQuantitySides: ['qc', 'qc', 'lab'], lineRef: 'k1' });
+    expect(items[0].part).toBeUndefined();
+  });
 });
 
 describe('makeInitialItemsFromQuery — nested samples with commas in the name', () => {

@@ -978,6 +978,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  // ออก Final Report ของคำร้องที่ผ่านครบทุกรายการแล้ว (Pre Result) — เฉพาะหัวหน้า QC / admin
+  issueFinalReport: (petitionId: string) =>
+    request<import("@/types/petition.types").Petition>(`/approvals/petitions/${petitionId}/final`, {
+      method: "POST",
+    }),
   // Dev-only: raw-set petition.status via the gated backend dev endpoint
   // (bypasses business guards; companion fields are NOT touched).
   devSetPetitionStatus: (

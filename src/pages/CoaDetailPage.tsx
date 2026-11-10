@@ -12,6 +12,8 @@ import CoaAuditTimeline from "@/components/coa/CoaAuditTimeline";
 import CoaManualDialog from "@/components/coa/CoaManualDialog";
 import CoaReportTemplate, { COA_REPORT_CSS } from "@/components/coa/CoaReportTemplate";
 import CoaStatusBadge from "@/components/coa/CoaStatusBadge";
+import { MediaThumbnails } from "@/components/lis/MediaThumbnails";
+import { mediaUrlsFromText } from "@/lib/mediaUrls";
 import { api } from "@/lib/api";
 import { buildCoaReportPages } from "@/lib/coaReport";
 import { allowedCoaActions, canPrintCoa, canReviewCoa, isCoaQcHead } from "@/lib/coaStatus";
@@ -159,9 +161,14 @@ export default function CoaDetailPage() {
               <div className="font-medium text-foreground">{sample.sampleName || sample.commonName || `Sample ${sample.itemSeq}`}</div>
               <div className="text-sm text-muted-foreground">{sample.batchNo || sample.lotNo || "-"}</div>
               <ul className="mt-2 list-disc pl-5 text-sm text-foreground">
-                {doc.resultSnapshots.filter((row) => row.itemSeq === sample.itemSeq).map((row, index) => (
-                  <li key={index}>{row.testItem}: {row.result}</li>
-                ))}
+                {doc.resultSnapshots.filter((row) => row.itemSeq === sample.itemSeq).map((row, index) => {
+                  const mediaUrls = mediaUrlsFromText(row.result);
+                  return (
+                    <li key={index}>
+                      {row.testItem}: {mediaUrls.length ? <span className="mt-1 block"><MediaThumbnails urls={mediaUrls} /></span> : row.result}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

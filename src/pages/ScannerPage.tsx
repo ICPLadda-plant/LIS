@@ -24,6 +24,9 @@ const HARDWARE_SCAN_IDLE_MS = 250;
 const MIN_HARDWARE_SCAN_LENGTH = 3;
 type Phase = 'idle' | 'scanning' | 'confirming' | 'loading' | 'success' | 'error' | 'no-camera';
 type AddItemPhase = 'idle' | 'scanning' | 'loading' | 'error' | 'no-camera';
+// page = สแกนจากหน้าหลัก, dialog = จาก popup เพิ่มรายการ, queue = ยิงเครื่องสแกนตอนอยู่หน้ายืนยันเพื่อเพิ่มเข้าคิวทันที
+type ScanTarget = 'page' | 'dialog' | 'queue';
+type QueueNotice = { tone: 'ok' | 'error'; message: string } | null;
 
 type DeliveryItem = {
   petition: Petition;
@@ -34,6 +37,11 @@ function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tagName = target.tagName.toLowerCase();
   return target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+}
+
+// มือถือ/แท็บเล็ต (จอสัมผัส) ใช้กล้องเป็นหลัก ส่วน PC ใช้เครื่องยิงบาร์โค้ด
+function prefersCamera(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches);
 }
 
 
@@ -62,9 +70,12 @@ export default function ScannerPage() {
   const [addItemPhase, setAddItemPhase] = useState<AddItemPhase>('idle');
   const [addItemError, setAddItemError] = useState('');
   const [addItemManualCode, setAddItemManualCode] = useState('');
+  const [queueNotice, setQueueNotice] = useState<QueueNotice>(null);
   const scanBusy = useRef(false);
   const deliveryBusy = useRef(false);
   const deliveredRounds = useRef(new Set<string>());
+  // จำว่าผู้ใช้สแกนด้วยกล้องหรือไม่ เพื่อเปิดกล้องให้เองในรอบถัดไป ไม่ต้องกดปุ่มซ้ำ
+  const usedCameraRef = useRef(prefersCamera());
   const [errorMsg, setErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -76,6 +87,11 @@ export default function ScannerPage() {
   const presetDelivererNames = Array.from(new Set(presetDeliverers.filter(Boolean).map((preset) => preset.name)));
   const delivererReady = !needsManualDeliverer || Boolean(deliverer.name.trim());
 
+  // เข้าหน้าบนมือถือ → เปิดกล้องให้เลย ไม่ต้องกดปุ่ม "สแกน QR Code"
+  useEffect(() => {
+    if (usedCameraRef.current) setPhase('scanning');
+  }, []);
+
   useEffect(() => {
     if (phase !== 'scanning') return;
     let active = true;
@@ -85,6 +101,7 @@ export default function ScannerPage() {
       const config = { fps: 10, qrbox: { width: 250, height: 250 } };
       const onScan = (text: string) => {
         if (!active) return;
+        usedCameraRef.current = true;
         fetchAndConfirm(text);
       };
 
@@ -137,15 +154,17 @@ export default function ScannerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  const fetchAndConfirm = useCallback(async (id: string, fromAddItemDialog = false) => {
+  const fetchAndConfirm = useCallback(async (id: string, target: ScanTarget = 'page', freshQueue = false) => {
     const code = extractScannedCode(id);
     if (!code || scanBusy.current) return;
     scanBusy.current = true;
-    if (fromAddItemDialog) {
+    if (target === 'dialog') {
       setAddItemError('');
       setAddItemPhase('loading');
-    } else {
+    } else if (target === 'page') {
       setPhase('loading');
+    } else {
+      setQueueNotice(null);
     }
     try {
       const found = await fetchPetitionByScannedCode(code);
@@ -153,18 +172,21 @@ export default function ScannerPage() {
       if (request && (request.status === 'sent' || deliveredRounds.current.has(request._id))) {
         throw new Error('ตัวอย่างเพิ่มรอบนี้นำส่งแล้ว ไม่สามารถนำส่งซ้ำได้');
       }
-      if (deliveryItems.some((item) => item.petition._id === found._id && item.additionalRequest?._id === request?._id)) {
+      if (!freshQueue && deliveryItems.some((item) => item.petition._id === found._id && item.additionalRequest?._id === request?._id)) {
         throw new Error('รายการนี้อยู่ในคิวแล้ว');
       }
       const item = { petition: found, additionalRequest: request };
       setDeliveryItems((current) => [...current, item]);
       setAdditionalRequest(request ?? null);
       setPetition(found);
-      if (fromAddItemDialog) {
+      if (target === 'dialog') {
         scanBusy.current = false;
         setAddItemManualCode('');
         setAddItemPhase('idle');
         setAddItemOpen(false);
+      } else if (target === 'queue') {
+        scanBusy.current = false;
+        setQueueNotice({ tone: 'ok', message: `เพิ่ม ${found.petitionNo} เข้าคิวแล้ว` });
       } else {
         setPhase('confirming');
       }
@@ -173,9 +195,11 @@ export default function ScannerPage() {
         (err as { response?: { data?: { message?: string } } })?.response?.data
           ?.message ?? (err instanceof Error ? err.message : 'ไม่พบข้อมูลคำร้อง กรุณาตรวจสอบรหัส');
       scanBusy.current = false;
-      if (fromAddItemDialog) {
+      if (target === 'dialog') {
         setAddItemError(msg);
         setAddItemPhase('error');
+      } else if (target === 'queue') {
+        setQueueNotice({ tone: 'error', message: msg });
       } else {
         setErrorMsg(msg);
         setPhase('error');
@@ -207,7 +231,7 @@ export default function ScannerPage() {
     }
   }
 
-  function reset() {
+  const reset = useCallback(() => {
     scanBusy.current = false;
     deliveryBusy.current = false;
     setAdditionalRequest(null);
@@ -220,19 +244,28 @@ export default function ScannerPage() {
     setAddItemPhase('idle');
     setAddItemError('');
     setAddItemManualCode('');
+    setQueueNotice(null);
     setPhase('idle');
+  }, []);
+
+  function scanNext() {
+    reset();
+    if (usedCameraRef.current) setPhase('scanning');
   }
 
   function addAnotherDelivery() {
     scanBusy.current = false;
     setAddItemError('');
     setAddItemManualCode('');
-    setAddItemPhase('idle');
+    setQueueNotice(null);
+    setAddItemPhase(usedCameraRef.current ? 'scanning' : 'idle');
     setAddItemOpen(true);
   }
 
   useEffect(() => {
-    const acceptingScan = phase === 'idle' || phase === 'no-camera' || phase === 'error';
+    // รับการยิงจากเครื่องสแกนเกือบทุกจังหวะ: หน้าแรก, หน้ายืนยัน (เพิ่มเข้าคิว), หน้าส่งสำเร็จ (เริ่มคิวใหม่)
+    const acceptingScan = phase === 'idle' || phase === 'scanning' || phase === 'no-camera' || phase === 'error' || phase === 'success'
+      || (phase === 'confirming' && !addItemOpen);
 
     const clearHardwareScanBuffer = () => {
       hardwareScanBufferRef.current = '';
@@ -260,7 +293,17 @@ export default function ScannerPage() {
         clearHardwareScanBuffer();
         if (code.length >= MIN_HARDWARE_SCAN_LENGTH) {
           event.preventDefault();
-          fetchAndConfirm(code);
+          usedCameraRef.current = false;
+          if (phase === 'confirming') {
+            // กล้องปิดไปแล้วตั้งแต่เข้าหน้ายืนยัน จึงปลดล็อกให้ยิงชิ้นถัดไปเข้าคิวได้
+            scanBusy.current = false;
+            fetchAndConfirm(code, 'queue');
+          } else if (phase === 'success') {
+            reset();
+            fetchAndConfirm(code, 'page', true);
+          } else {
+            fetchAndConfirm(code);
+          }
         }
         return;
       }
@@ -275,7 +318,7 @@ export default function ScannerPage() {
       window.removeEventListener('keydown', handleHardwareScannerKeyDown);
       clearHardwareScanBuffer();
     };
-  }, [phase, fetchAndConfirm]);
+  }, [phase, addItemOpen, fetchAndConfirm, reset]);
 
   useEffect(() => {
     if (!addItemOpen || addItemPhase !== 'scanning') return;
@@ -283,7 +326,7 @@ export default function ScannerPage() {
     const scanner = new Html5Qrcode(ADDITIONAL_READER_ID);
     const config = { fps: 10, qrbox: { width: 250, height: 250 } };
     const onScan = (text: string) => {
-      if (active) fetchAndConfirm(text, true);
+      if (active) fetchAndConfirm(text, 'dialog');
     };
     const startWith = (source: MediaTrackConstraints | string) =>
       scanner.start(source, config, onScan, () => {});
@@ -450,6 +493,16 @@ export default function ScannerPage() {
                 ))}
               </div>
 
+              <p className="text-xs text-muted-foreground">ยิง QR Code ชิ้นถัดไปได้เลย ระบบจะเพิ่มเข้าคิวให้อัตโนมัติ</p>
+              {queueNotice && (
+                <p
+                  role={queueNotice.tone === 'error' ? 'alert' : 'status'}
+                  className={`text-sm ${queueNotice.tone === 'error' ? 'text-destructive' : 'text-green-700'}`}
+                >
+                  {queueNotice.message}
+                </p>
+              )}
+
               {additionalRequest && deliveryItems.length === 1 && (
                 <div className="rounded-lg border bg-card p-3 text-sm text-foreground space-y-1">
                   <p className="font-semibold">ตัวอย่างเพิ่ม · {additionalRequest.side.toUpperCase()} · รอบ {petition.additionalSampleRequests?.findIndex((request) => request._id === additionalRequest._id) + 1}</p>
@@ -549,7 +602,7 @@ export default function ScannerPage() {
                   event.preventDefault();
                   const code = addItemManualCode.trim();
                   if (!code) return;
-                  fetchAndConfirm(code, true);
+                  fetchAndConfirm(code, 'dialog');
                 }}
               >
                 <Button
@@ -608,7 +661,8 @@ export default function ScannerPage() {
             <p className="text-xs text-grey-400">
               {petition.deliveredBy?.name || deliverer.name || '-'} · {petitionDepartmentLabel(petition)}
             </p>
-            <Button variant="primary" className="mt-2 w-full" onClick={reset}>
+            <p className="text-xs text-muted-foreground">ยิง QR Code คำร้องถัดไปได้ทันที</p>
+            <Button variant="primary" className="mt-2 w-full" onClick={scanNext}>
               สแกนคำร้องถัดไป
             </Button>
           </div>
@@ -618,7 +672,7 @@ export default function ScannerPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center space-y-3">
             <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
             <p className="text-red-600 font-medium">{errorMsg || 'เกิดข้อผิดพลาด'}</p>
-            <Button variant="primary" className="w-full" onClick={reset}>
+            <Button variant="primary" className="w-full" onClick={scanNext}>
               ลองใหม่
             </Button>
           </div>
