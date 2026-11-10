@@ -63,6 +63,7 @@ import {
   formatTSetComparison,
   isSgMachineUnitKey,
   isSgTemperatureEditable,
+  selectDensitySyncRow,
   sourceSiblingKey,
 } from '@/lib/densitySync';
 
@@ -391,7 +392,7 @@ export default function QCTestingDetailPage() {
   const [valuesPhase2, setValuesPhase2] = useState<Record<string, Record<string, unknown>>>({});
   // Local mirror of QCTestResult.entries for multiEntry params, keyed by resultKey.
   const [entriesByKey, setEntriesByKey] = useState<Record<string, Record<string, unknown>[]>>({});
-  const [densityOptionsByKey, setDensityOptionsByKey] = useState<Record<string, string[]>>({});
+  const [densityDocsByKey, setDensityDocsByKey] = useState<Record<string, Record<string, unknown>[]>>({});
   const [manualDensityKeys, setManualDensityKeys] = useState<Record<string, boolean>>({});
   // How many entry cards to show per multiEntry resultKey (user-driven via "เพิ่มรายการ").
   // Effective count = max(this, savedEntries.length, 1) — never hides saved data, always ≥1 empty form.
@@ -719,51 +720,6 @@ export default function QCTestingDetailPage() {
       }
     },
     [user, entriesByKey, id, loadResults, autosaves, additionalSampleOpen, submitting],
-  );
-
-  // Density sync: replace the SG param's entries with the selected valid
-  // Result-Density row (Density + T block; T set lives in provenance only).
-  const applyDensityRows = useCallback(
-    async (
-      petition: Petition,
-      item: PetitionItem,
-      param: ParameterItem,
-      docs: Record<string, unknown>[],
-    ) => {
-      if (pendingAdditionalSample(petition, 'qc') || additionalSampleOpen || submitting) return;
-      const k = resultKey(item.seq, param._id!);
-      const fetchedAt = new Date().toISOString();
-      const sgValueField = (param.valueFields ?? []).find((field) => field.label === SG_VALUE_LABEL || field.label.startsWith(`${SG_VALUE_LABEL} —`));
-      const sgValueKeys = sgValueField
-        ? expandFieldForItem(sgValueField, item.commonName, { category: petitionCategory }).map((unit) => unit.key)
-        : [SG_VALUE_LABEL];
-      const rows = docs.map((d) => densityRowToEntry(d, fetchedAt, sgValueKeys));
-      setEntriesByKey((prev) => ({ ...prev, [k]: rows.map((e) => ({ ...e })) }));
-      setEntryRowCounts((c) => ({ ...c, [k]: Math.max(rows.length, 1) }));
-      advanceToInProgress();
-      try {
-        await autosaves.run(k, async () => {
-          await api.saveQCEntries({
-            petitionId: petition._id!,
-            petitionNo: petition.petitionNo,
-            itemSeq: item.seq,
-            sampleRoundId: sampleRoundIdFor(petition, 'qc', item.seq),
-            sampleId: item.sampleId,
-            sampleName: item.sampleName,
-            commonName: item.commonName,
-            parameterId: param._id!,
-            parameterName: param.name,
-            entries: rows,
-            enteredBy: { name: user?.name ?? 'Unknown', email: user?.email ?? '' },
-            overrideReason: overrideReason || undefined,
-          });
-        });
-        if (id) await loadResults(id);
-      } catch {
-        toast.error('บันทึกค่าไม่สำเร็จ');
-      }
-    },
-    [user, advanceToInProgress, id, loadResults, petitionCategory, autosaves, additionalSampleOpen, submitting],
   );
 
   // หมายเหตุต่อ parameter ต่อตัวอย่าง → QCTestResult.remark
@@ -1437,8 +1393,8 @@ export default function QCTestingDetailPage() {
                       ? lastBatch?.values?.[unit.field.label]
                       : undefined;
 
-                    // Specific-gravity (ค่า ถพ.) value + temperature are filled only by
-                    // validated Result-Density rows, never typed by hand.
+                    // Specific-gravity (ค่า ถพ.): ค่าจากเครื่อง (Result-Density) เป็นตัวเลือกให้ผู้ใช้เลือกเอง
+                    // หรือกรอกค่าเอง — ระบบไม่เติม/ไม่ทับค่าให้เอง
                     const sgValueField = (param.valueFields ?? []).find((f) => f.label === SG_VALUE_LABEL || f.label.startsWith(`${SG_VALUE_LABEL} —`));
                     const isSgMachineField =
                       sgValueField?.requestValueSource?.mode === 'collection' &&
@@ -1454,15 +1410,24 @@ export default function QCTestingDetailPage() {
                     // อุณหภูมิล็อกเฉพาะตอนค่า ถพ. มาจากเครื่อง — กรอกค่า ถพ. เองต้องกรอกอุณหภูมิเองได้
                     const sgTemperatureLocked = isSgMachineField && !isSgValueUnit && !isSgTemperatureEditable(srcValues, sgManualSelected);
                     const unitDisabled = fieldDisabled || !!aiFieldKind || sgTemperatureLocked;
-                    const densityOptions = densityOptionsByKey[resultKey(item.seq, param._id!) ] ?? [];
+                    const densityDocs = densityDocsByKey[resultKey(item.seq, param._id!)] ?? [];
+                    const densityOptions = Array.from(new Set(densityDocs.map((doc) => formatDensity3(doc)).filter(Boolean)));
+                    const recommendedDensityRow = selectDensitySyncRow(densityDocs);
+                    const recommendedDensity = recommendedDensityRow ? formatDensity3(recommendedDensityRow) : '';
                     // Match by label too: legacy SG parameters may not carry requestValueSource.
                     const densityValue = srcValues[unit.key] == null ? '' : String(srcValues[unit.key]);
+                    const densityValueFromInstrument =
+                      (srcValues[sourceSiblingKey(unit.key)] as { source?: string } | undefined)?.source === 'instrument';
                     const densityControlKey = `${resultKey(item.seq, param._id!)}::${unit.key}`;
                     const densityChoices = densityValue && !densityOptions.includes(densityValue)
                       ? [...densityOptions, densityValue]
                       : densityOptions;
+                    // ค่าที่บันทึกไว้แต่ไม่ได้มาจากเครื่อง = ค่าที่ผู้ใช้กรอกเอง → เปิดช่องกรอกพร้อมค่าเดิม
                     const isManualDensity = isSgValueUnit &&
-                      (manualDensityKeys[densityControlKey] || (!!densityValue && densityOptions.length > 0 && !densityOptions.includes(densityValue)));
+                      (manualDensityKeys[densityControlKey] ?? (
+                        !!densityValue &&
+                        (!densityValueFromInstrument || (densityOptions.length > 0 && !densityOptions.includes(densityValue)))
+                      ));
 
                     if (isSgValueUnit) {
                       const densityControlDisabled = additionalSampleOpen || submitting;
@@ -1485,16 +1450,31 @@ export default function QCTestingDetailPage() {
                               if (srcValues[sourceSiblingKey(unit.key)] != null) onUnitChange(sourceSiblingKey(unit.key), null);
                             } else if (v !== '__none__') {
                               setManualDensityKeys((prev) => ({ ...prev, [densityControlKey]: false }));
-                              onUnitChange(unit.key, v);
+                              // ผู้ใช้เลือกค่าจากเครื่อง → เติมค่า ถพ. + อุณหภูมิ + ที่มาของค่าจากแถวที่เลือก
+                              const candidates = densityDocs.filter((doc) => formatDensity3(doc) === v);
+                              const row = selectDensitySyncRow(candidates) ?? candidates[0];
+                              if (row) {
+                                const entry = densityRowToEntry(row, new Date().toISOString(), [unit.key]);
+                                for (const [label, val] of Object.entries(entry)) onUnitChange(label, val);
+                              } else {
+                                onUnitChange(unit.key, v);
+                              }
                             }
                           }} disabled={densityControlDisabled}>
                             <SelectTrigger className={cn('h-8 text-sm', sgAbnormal && !isManualDensity && 'border-red-400 ring-1 ring-red-200')}><SelectValue placeholder="เลือกค่า ถพ. ..." /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__none__">— เลือก —</SelectItem>
-                              {densityChoices.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                              {densityChoices.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}{option === recommendedDensity ? ' (แนะนำ)' : ''}
+                                </SelectItem>
+                              ))}
                               <SelectItem value="__manual__">กรอกค่าเอง</SelectItem>
                             </SelectContent>
                           </Select>
+                          {!densityValue && !isManualDensity && densityOptions.length > 0 && (
+                            <p className="text-xs text-muted-foreground">มีค่าจากเครื่อง {densityOptions.length} ค่า — เลือกค่าที่ต้องการหรือกรอกค่าเอง</p>
+                          )}
                           {isManualDensity && <Input type="number" step="0.001" value={densityValue} onChange={(e) => onUnitChange(unit.key, e.target.value)} disabled={densityControlDisabled} className={cn('h-8 text-sm', sgAbnormal && 'border-red-400 ring-1 ring-red-200')} placeholder="กรอกค่า ถพ. 3 ตำแหน่ง" />}
                           {sgAbnormal && <p className="text-[11px] text-red-600">ค่าผิดปกติ — ไม่เข้าเกณฑ์ที่กำหนด</p>}
                           {unit.labelTolerance && densityValue && (() => {
@@ -1722,11 +1702,7 @@ export default function QCTestingDetailPage() {
                                 <div>
                                   <DensitySyncButton
                                     batchNo={item.batchNo?.trim() ?? ''}
-                                    onRows={(docs) => applyDensityRows(petition, item, param, docs)}
-                                    onOptions={(docs) => {
-                                      const options = Array.from(new Set(docs.map((doc) => formatDensity3(doc)).filter(Boolean)));
-                                      setDensityOptionsByKey((prev) => ({ ...prev, [k]: options }));
-                                    }}
+                                    onOptions={(docs) => setDensityDocsByKey((prev) => ({ ...prev, [k]: docs }))}
                                   />
                                 </div>
                               )}
