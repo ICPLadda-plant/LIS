@@ -143,4 +143,21 @@ describe("SampleLabelPrintTemplate", () => {
     expect(screen.getByTestId("sample-label-remark-value")).toHaveTextContent("ถังผสม 3,000 ลิตร , ถังเก่า 10 , ใช้ TECH ANF. LOT ใหม่");
   });
 
+  it("คำขอเดียวกันแต่คนละ batch ได้เลขป้ายคนละเลข และป้ายฝั่งเดียวกันใน batch เดียวกันใช้เลขเดียวกัน", () => {
+    const petition = {
+      ...petitionWith({}),
+      routeTargets: ["qc", "lab"],
+      items: [
+        { seq: 1, sampleName: "OMETHOATE", batchNo: "001", sampleQuantity: 3, labelQuantities: ["100 CC", "500 CC", "500 CC"], labelQuantitySides: ["qc", "qc", "lab"] },
+        { seq: 2, sampleName: "OMETHOATE", batchNo: "002", sampleQuantity: 1, labelQuantities: ["100 CC"], labelQuantitySides: ["qc"] },
+      ],
+      sampleLabelNumbers: { qc: "P01", lab: "L01", year: 2569, groups: [{ key: "001|", qc: "P01", lab: "L01" }, { key: "002|", qc: "P02" }] },
+    } as Petition;
+
+    render(<SampleLabelPrintTemplate petition={petition} />);
+
+    const numbers = screen.getAllByTestId("sample-label-document-number").map((node) => node.textContent);
+    expect(numbers).toEqual(["เลขที่P01/69", "เลขที่P01/69", "เลขที่L01/69", "เลขที่P02/69"]);
+  });
+
 });

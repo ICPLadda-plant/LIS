@@ -13,6 +13,16 @@ describe("serviceRequestSubmissionNo", () => {
     expect(serviceRequestSubmissionNo(petition, { submissionNo: "TA-999" })).toBe("TA-999");
   });
 
+  it("ใช้เลขของกลุ่ม batch + ส่วนของรายการนั้น", () => {
+    const grouped = {
+      petitionNo: "P-2611-0001",
+      sampleLabelNumbers: { qc: "P01", lab: "L01", year: 2569, groups: [{ key: "001|", qc: "P01", lab: "L01" }, { key: "002|ล่าง", qc: "P02" }, { key: "003|", lab: "L02" }] },
+    };
+    expect(serviceRequestSubmissionNo(grouped, { submissionNo: "P-2611-0001", batchNo: "001" })).toBe("P01/69");
+    expect(serviceRequestSubmissionNo(grouped, { submissionNo: "P-2611-0001", batchNo: "002", part: "ล่าง" })).toBe("P02/69");
+    expect(serviceRequestSubmissionNo(grouped, { submissionNo: "P-2611-0001", batchNo: "003" })).toBe("L02/69");
+  });
+
   it("คำร้องที่ส่ง LAB อย่างเดียวใช้เลข L และไม่แปลงเลขคำร้องรายเดือนเป็นเลขใบนำส่ง", () => {
     expect(serviceRequestSubmissionNo({ petitionNo: "P-2611-0003", sampleLabelNumbers: { lab: "L02", year: 2569 } }, { submissionNo: "P-2611-0003" })).toBe("L02/69");
     expect(serviceRequestSubmissionNo({ petitionNo: "P-2612-0001", sampleLabelNumbers: { qc: "P18", year: 2569 } }, { submissionNo: "P-2612-0001" })).toBe("P18/69");

@@ -6,7 +6,7 @@ const { normalizePetitionItems } = require('./petitionSubmissionRules');
 const SUFFIX_PREFIXES = ['Item: ', 'MF: ', 'Priority: '];
 
 function petitionReceived(petition) {
-  return Boolean(petition?.qcReceivedAt || petition?.labReceivedAt || petition?.receivedAt);
+  return Boolean(petition?.qcReceivedAt || petition?.labReceivedAt || petition?.receivedAt || petition?.labelReceipts?.length);
 }
 
 // ยังไม่มีใครรับตัวอย่าง = ฝ่ายผลิตแก้ได้ทั้งใบ

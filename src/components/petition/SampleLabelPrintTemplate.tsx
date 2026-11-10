@@ -220,7 +220,7 @@ function DocumentNumber({ petition, item, yearShort, copyIndex, additionalSample
   // เลขที่ __/__ : ป้ายที่ส่ง QC ใช้เลข P (P04/69) ป้ายที่ส่ง LAB ใช้เลข L (L02/69)
   // คำขอเก่าที่ยังไม่มีเลข P/L ใช้เลขจากเลขคำร้องแบบเดิม (P-2611-0002 → 2/69)
   const side = additionalSampleRequest?.side ?? sampleLabelCopySide(petition, item, copyIndex);
-  const documentNumber = sampleLabelSideNumber(petition, side) ?? sampleLabelDocumentNumber(petition.petitionNo);
+  const documentNumber = sampleLabelSideNumber(petition, side, item) ?? sampleLabelDocumentNumber(petition.petitionNo);
   return (
     <div
       data-testid="sample-label-document-number"

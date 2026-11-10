@@ -256,8 +256,11 @@ interface PetitionBase {
   sampledBy?: { employeeId?: string; name: string };
   items: PetitionItem[];
   routeTargets?: PetitionRouteTarget[];
-  /** เลขที่ป้ายนำส่งตัวอย่าง: qc = "P01", lab = "L01", year = ปี พ.ศ. เต็ม (server ออกเลขให้) */
-  sampleLabelNumbers?: { qc?: string; lab?: string; year?: number };
+  /**
+   * เลขที่ป้ายนำส่งตัวอย่าง: qc = "P01", lab = "L01", year = ปี พ.ศ. เต็ม (server ออกเลขให้)
+   * groups = เลขแยกตามกลุ่ม batch + ส่วน (key = "BATCH|ส่วน"); คำขอเก่าที่ไม่มี groups ใช้ qc/lab ระดับคำขอ
+   */
+  sampleLabelNumbers?: { qc?: string; lab?: string; year?: number; groups?: Array<{ key: string; qc?: string; lab?: string }> };
   additionalSampleRequests?: AdditionalSampleRequest[];
   scannedAdditionalSampleId?: string;
   scannedAdditionalSampleCode?: string;
@@ -275,6 +278,8 @@ interface PetitionBase {
   labReceivedBy?: string;
   qcReceivedAt?: string | null;
   qcReceivedBy?: string;
+  /** รับตัวอย่างทีละป้าย: key = กลุ่มใน sampleLabelNumbers.groups; ฝั่งนั้นนับว่ารับแล้วเมื่อครบทุกป้าย */
+  labelReceipts?: Array<{ key: string; side: 'qc' | 'lab'; receivedAt?: string; receivedBy?: string }>;
   labCompletedAt?: string | null;
   labCompletedBy?: string;
   qcCompletedAt?: string | null;
