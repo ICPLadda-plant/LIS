@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { formatSampleLabelDocumentNumber, labelManufacturerName, labelSampledByName, presetDelivererFor, serviceRequestSubmissionNo } from "./petitionSampler";
+import { formatSampleLabelDocumentNumber, itemSubmissionNoText, labelManufacturerName, labelSampledByName, presetDelivererFor, serviceRequestSubmissionNo } from "./petitionSampler";
+
+describe("itemSubmissionNoText", () => {
+  const grouped = {
+    petitionNo: "P-2611-0045",
+    sampleLabelNumbers: { qc: "P01", lab: "L01", year: 2569, groups: [{ key: "001|", qc: "P01", lab: "L01" }, { key: "002|", qc: "P02" }] },
+  };
+
+  it("แสดงเลขป้าย P/L แทนเลขคำร้อง", () => {
+    expect(itemSubmissionNoText(grouped, { submissionNo: "P-2611-0045", batchNo: "001" })).toBe("P01/69, L01/69");
+    expect(itemSubmissionNoText(grouped, { submissionNo: "P-2611-0045", batchNo: "002" })).toBe("P02/69");
+  });
+
+  it("รายงาน LAB ใช้เลข L ก่อน และคงเลขที่ผู้ใช้กรอกเอง", () => {
+    expect(itemSubmissionNoText(grouped, { submissionNo: "", batchNo: "001" }, "lab")).toBe("L01/69");
+    expect(itemSubmissionNoText(grouped, { submissionNo: "TA-999", batchNo: "001" }, "lab")).toBe("TA-999");
+  });
+});
 
 describe("serviceRequestSubmissionNo", () => {
   const petition = { petitionNo: "P-2611-0001", sampleLabelNumbers: { qc: "P01", lab: "L01", year: 2569 } };

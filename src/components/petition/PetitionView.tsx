@@ -19,6 +19,9 @@ import {
 } from '@/lib/parameterValidation';
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { SG_FIELD_LABEL } from '@/lib/formSpecificGravity';
+import { itemSubmissionNoText } from '@/lib/petitionSampler';
+import { MediaThumbnails } from '@/components/lis/MediaThumbnails';
+import { mediaUrlsFromValue } from '@/lib/mediaUrls';
 
 interface Props { petition: Petition; hideMissingStandardBadge?: boolean; }
 
@@ -27,6 +30,12 @@ function formatResultValue(value: unknown): string {
   if (typeof value === 'boolean') return value ? '✓' : '✗';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
+}
+
+function ResultValue({ value }: { value: unknown }) {
+  const mediaUrls = mediaUrlsFromValue(value);
+  if (mediaUrls.length) return <span className="mt-1 block"><MediaThumbnails urls={mediaUrls} /></span>;
+  return <>{formatResultValue(value)}</>;
 }
 
 function Field({ label, value }: { label: string; value?: React.ReactNode }) {
@@ -181,7 +190,7 @@ export default function PetitionView({ petition: p, hideMissingStandardBadge = f
                       ) : item.commonName
                     }
                   />
-                  <Field label="เลขที่ใบนำส่ง" value={item.submissionNo} />
+                  <Field label="เลขที่ใบนำส่ง" value={itemSubmissionNoText(p, item)} />
                 </div>
                 {item.note && <Field label="หมายเหตุ" value={item.note} />}
                 {canSeeTestItems && (
@@ -239,7 +248,7 @@ export default function PetitionView({ petition: p, hideMissingStandardBadge = f
                                           <span>
                                             ผล:{' '}
                                             <span className="text-black-500 font-medium">
-                                              {formatResultValue(entry.value)}
+                                              <ResultValue value={entry.value} />
                                             </span>
                                           </span>
                                           {!entry.hideStandard && (
