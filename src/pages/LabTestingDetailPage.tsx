@@ -1242,6 +1242,11 @@ export default function LabTestingDetailPage() {
                       Batch: {item.batchNo}
                     </Badge>
                   )}
+                  {item.part && (
+                    <Badge variant="blue-soft" className="font-normal">
+                      ส่วน: {item.part}
+                    </Badge>
+                  )}
                   {item.sampleId && (
                     <Badge variant="primary-soft" className="font-normal text-xs">
                       {item.sampleId}

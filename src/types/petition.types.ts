@@ -86,6 +86,10 @@ export interface PetitionItem {
   labelQuantities?: string[];
   /** ฝั่งของแต่ละตัวอย่างใน labelQuantities (ลำดับเดียวกัน) — ไม่มีค่า = ใช้กฎปริมาณน้อย QC / มาก LAB */
   labelQuantitySides?: Array<'qc' | 'lab'>;
+  /** ส่วนของ batch ที่เก็บตัวอย่าง (บน/กลาง/ล่าง/...) — ว่าง = ทั่วไป/รวม */
+  part?: string;
+  /** รหัสบรรทัดจาก Production — รหัสต่างกัน = คนละตัวอย่าง */
+  lineRef?: string;
   labelSampledBy?: string;
   labelSampledDate?: string;
   labelRemark?: string;

@@ -1306,6 +1306,11 @@ export default function QCTestingDetailPage() {
                     Batch: {item.batchNo}
                   </Badge>
                 )}
+                {item.part && (
+                  <Badge variant="gray-soft" className="font-normal">
+                    ส่วน: {item.part}
+                  </Badge>
+                )}
                 {item.sampleId && (
                   <Badge variant="primary-soft" className="font-normal text-xs">
                     {item.sampleId}

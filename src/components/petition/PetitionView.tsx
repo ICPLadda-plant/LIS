@@ -163,6 +163,7 @@ export default function PetitionView({ petition: p, hideMissingStandardBadge = f
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <Field label="Batch No." value={item.batchNo} />
+                  {item.part && <Field label="ส่วนตัวอย่าง" value={item.part} />}
                   <Field label="วันที่ผลิต" value={item.productionDate} />
                   <Field label="ขนาดบรรจุ" value={item.packageUnit} />
                   <Field label="จำนวนตัวอย่าง" value={String(item.sampleQuantity ?? 1)} />

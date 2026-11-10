@@ -2,6 +2,7 @@ import QRCode from 'qrcode';
 import FitToBox from '@/components/petition/FitToBox';
 import { expandItemsBySampleQuantity } from '@/lib/petitionPrintItems';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
+import { normalizeSamplePart } from '@/lib/samplePart';
 import {
   labelManufacturerName,
   labelSampledByName,
@@ -71,6 +72,19 @@ function labelQuantityForCopy(item: Petition['items'][number], copyIndex: number
   const split = splitLabelQuantity(item.labelQuantity);
   if (split.length > 1) return split[copyIndex] ?? '';
   return item.labelQuantity ?? '';
+}
+
+// Production ส่งหลายชิ้นต่อฝั่ง: ป้ายแต่ละใบบอกฝั่งของชิ้นนั้น เช่น "100 CC (QC)" (งานขอตัวอย่างเพิ่มใช้หัวป้ายบอกฝั่งอยู่แล้ว)
+function labelQuantityText(item: Petition['items'][number], copyIndex: number, additionalSampleRequest?: AdditionalSampleRequest): string {
+  const quantity = labelQuantityForCopy(item, copyIndex);
+  const side = additionalSampleRequest ? undefined : item.labelQuantitySides?.[copyIndex];
+  return quantity && (side === 'qc' || side === 'lab') ? `${quantity} (${side.toUpperCase()})` : quantity;
+}
+
+// Batch No. บนป้าย + ส่วนของ batch ที่เก็บตัวอย่าง (ถ้าระบุ)
+function labelBatchText(item: Petition['items'][number]): string {
+  const part = normalizeSamplePart(item.part);
+  return part ? `${item.batchNo ?? ''} · ส่วน: ${part}` : item.batchNo ?? '';
 }
 
 // หมายเหตุที่ผู้ส่งกรอกในฟอร์มคำร้องเก็บไว้ที่ item.note ส่วน labelRemark เป็นหมายเหตุเฉพาะป้าย
@@ -291,7 +305,7 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
             <Field label="วัน เดือน ปี ที่ผลิต/นำเข้า" value={toBuddhistShort(item.productionDate)} />
             <Field
               label="แบชนัมเบอร์"
-              value={item.batchNo}
+              value={labelBatchText(item)}
               valueClassName="text-[8px] leading-tight"
               valueTestId="sample-label-batch-number-value"
               multiline
@@ -302,7 +316,7 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
             <Field label="ผู้ขาย" value={item.labelSeller} />
           </div>
           <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-1.5">
-            <Field label="ปริมาณ" value={labelQuantityForCopy(item, copyIndex)} />
+            <Field label="ปริมาณ" value={labelQuantityText(item, copyIndex, additionalSampleRequest)} />
             <Field label="สุ่มโดย" value={labelSampledByName(petition, item)} valueClassName="leading-tight" multiline />
             <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
           </div>
@@ -329,7 +343,7 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
   }
   const sampledByName = labelSampledByName(petition, item);
   const qrValue = additionalSampleRequest?.qrCode || getQrValue(petition, item);
-  const labelQuantity = labelQuantityForCopy(item, copyIndex);
+  const labelQuantity = labelQuantityText(item, copyIndex, additionalSampleRequest);
   return (
     <div
       className="label-card overflow-hidden border border-black text-[9.5px] font-semibold leading-[1.15]"
@@ -358,7 +372,7 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
           <div>
             <Field
               label="Batch No."
-              value={item.batchNo}
+              value={labelBatchText(item)}
               valueClassName="text-[8px] leading-tight"
               valueTestId="sample-label-batch-number-value"
               multiline
