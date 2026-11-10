@@ -567,7 +567,8 @@ function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgPa
                 <td>{item.batchNo}</td>
                 <td className="pr-center">{buddhistShort(item.productionDate)}</td>
                 <td>{serviceRequestSubmissionNo(petition, item)}</td>
-                <td className="pr-center">{resolveSpecificGravity(qcResults, item.seq, sgParam) || String(requestValues[`${item.batchNo}\u0000${item.sampleName}`] ?? '')}</td>
+                {/* ค่า ถพ. ใช้เฉพาะค่าที่ QC เลือก/กรอกไว้ — ไม่ดึงค่าจากเครื่องมาเติมเอง */}
+                <td className="pr-center">{resolveSpecificGravity(qcResults, item.seq, sgParam)}</td>
                 <td>{item.packageUnit ?? ''}</td>
                 <td>{item.testUnit ?? ''}</td>
                 <td>

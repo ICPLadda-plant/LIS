@@ -14,7 +14,15 @@ vi.mock('react-router-dom', async (importOriginal) => ({
   Navigate: () => null,
 }));
 vi.mock('@tanstack/react-query', () => ({ useQueries: () => [] }));
-vi.mock('@/components/lis/DensitySyncButton', () => ({ default: () => null }));
+const machineDocs = vi.hoisted(() => ({ docs: [] as Record<string, unknown>[] }));
+vi.mock('@/components/lis/DensitySyncButton', async () => {
+  const { useEffect } = await import('react');
+  function MockDensitySyncButton({ onOptions }: { onOptions?: (docs: Record<string, unknown>[]) => void }) {
+    useEffect(() => { onOptions?.(machineDocs.docs); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    return null;
+  }
+  return { default: MockDensitySyncButton };
+});
 vi.mock('@/components/lis/AppLayout', () => ({ default: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock('@/components/lis/PageHeader', () => ({ default: () => <header>คำร้อง</header> }));
 vi.mock('@/hooks/usePetition', () => ({ usePetition: () => ({ data: state.petition, loading: false, error: null }), usePetitionList: () => ({ data: { items: [] } }) }));
@@ -72,5 +80,20 @@ describe('QC ค่า ถพ. typing while autosave reloads', () => {
     await waitFor(() => expect(api.getQCResults).toHaveBeenCalledTimes(2));
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.getByPlaceholderText('กรอกค่า ถพ. 3 ตำแหน่ง')).toHaveValue(1.15);
+  });
+
+  it('waits on "เลือก" until the user picks, even when the machine has readings', async () => {
+    state.results = [];
+    machineDocs.docs = [
+      { _id: 'a', 'Sample name': 'Batch 1231 A', 'Measurement status': 'valid', 'Density (3 ตำแหน่ง)': '1.156', 'T(block) [°C]': '30.00' },
+      { _id: 'b', 'Sample name': 'Batch 1231 B', 'Measurement status': 'valid', 'Density (3 ตำแหน่ง)': '1.156', 'T(block) [°C]': '30.10' },
+    ];
+    render(<QCTestingDetailPage />);
+    expect(await screen.findByText(/มีค่าจากเครื่อง 1 ค่า/)).toBeInTheDocument();
+    expect(screen.getByRole('combobox')).toHaveTextContent('— เลือก —');
+    expect(screen.queryByPlaceholderText('กรอกค่า ถพ. 3 ตำแหน่ง')).not.toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 1000));
+    expect(api.saveQCResult).not.toHaveBeenCalled();
+    expect(api.saveQCEntries).not.toHaveBeenCalled();
   });
 });
