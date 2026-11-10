@@ -372,6 +372,8 @@ export default function QCTestingDetailPage() {
   const resultsKey = id + ':' + roundsKey;
   const [loadedResultsKey, setLoadedResultsKey] = useState('');
   const resultLoad = useRef(0);
+  // นับทุกครั้งที่ผู้ใช้แก้ค่าในหน้า — ผลที่โหลดหลัง autosave ใช้เช็กว่ามีค่าที่พิมพ์ใหม่กว่าหรือไม่
+  const localEditVersion = useRef(0);
   const currentPetitionPhase = petition?.currentPhase ?? 1;
   const [selectedRoundPhases, setSelectedRoundPhases] = useState<Record<string, PetitionPhase>>({});
   const petitionCategory = getPetitionCategory(petition);
@@ -517,10 +519,13 @@ export default function QCTestingDetailPage() {
     setSelectedPhase(currentPetitionPhase);
   }, [id, currentPetitionPhase]);
 
-  const loadResults = useCallback((petitionId: string) => {
+  // editVersion: ส่งมาจาก autosave = เวอร์ชันการแก้ไขตอนเริ่มบันทึก ถ้าผู้ใช้พิมพ์ต่อระหว่างบันทึก
+  // ผลจาก server จะเก่ากว่าค่าบนจอ จึงไม่เขียนทับ (รอบบันทึกถัดไปจะโหลดค่าล่าสุดเอง)
+  const loadResults = useCallback((petitionId: string, editVersion?: number) => {
     const load = ++resultLoad.current;
     return api.getQCResults(petitionId).then((allResults) => {
       if (load !== resultLoad.current) return;
+      if (editVersion != null && editVersion !== localEditVersion.current) return;
       const results = currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters);
       setSavedResults(results);
       const v: Record<string, Record<string, unknown>> = {};
@@ -572,6 +577,7 @@ export default function QCTestingDetailPage() {
       if (pendingAdditionalSample(petition, 'qc') || additionalSampleOpen || submitting) return;
       if (phase === 2 && ((sampleRoundFor(petition, 'qc', item.seq) ?? petition).currentPhase ?? 1) === 1) return;
       const k = resultKey(item.seq, param._id!);
+      localEditVersion.current += 1;
       advanceToInProgress();
 
       const setValuesFn = phase === 2 ? setValuesPhase2 : setValues;
@@ -646,6 +652,7 @@ export default function QCTestingDetailPage() {
     ) => {
       if (pendingAdditionalSample(petition, 'qc') || additionalSampleOpen || submitting) return;
       const k = resultKey(item.seq, param._id!);
+      localEditVersion.current += 1;
       advanceToInProgress();
 
       setEntriesByKey((prev) => {
@@ -657,6 +664,7 @@ export default function QCTestingDetailPage() {
 
       const debounceKey = `${k}__entry${entryIndex}__${fieldLabel}`;
       autosaves.schedule(debounceKey, async () => {
+        const editVersion = localEditVersion.current;
         try {
           await api.saveQCResult({
             petitionId: petition._id!,
@@ -674,7 +682,7 @@ export default function QCTestingDetailPage() {
             enteredBy: { name: user?.name ?? 'Unknown', email: user?.email ?? '' },
             overrideReason: overrideReason || undefined,
           });
-          if (id) await loadResults(id);
+          if (id) await loadResults(id, editVersion);
         } catch (error) {
           toast.error('บันทึกค่าไม่สำเร็จ');
           throw error;
