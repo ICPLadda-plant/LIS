@@ -60,6 +60,10 @@ export interface ItemRowValues {
   labelQuantities?: string[];
   /** ฝั่งของแต่ละตัวอย่าง ('qc' | 'lab') ตามลำดับ labelQuantities — มาจาก Production ที่ส่งหลายชิ้นต่อฝั่ง */
   labelQuantitySides?: Array<'qc' | 'lab'>;
+  /** ส่วนของ batch ที่เก็บตัวอย่าง (บน/กลาง/ล่าง/...) — ว่าง = ทั่วไป/รวม */
+  part?: string;
+  /** รหัสบรรทัดจาก Production — รหัสต่างกัน = คนละตัวอย่าง (ไม่รวมแถวให้) */
+  lineRef?: string;
   labelSampledDate?: string;
   submittedQuantity?: string;
   submittedUnit?: string;
@@ -390,6 +394,7 @@ export default function ItemsStep({
                       disabled={itemsReadOnly}
                       placeholder="เช่น BN240601"
                     />
+                    {it.part && <p className="mt-1 text-xs font-medium text-muted-foreground">ส่วนตัวอย่าง: {it.part}</p>}
                   </div>
                 )}
                 {requireDeliveryAndBatch && showSendTargets && (

@@ -68,6 +68,23 @@ describe("SampleLabelPrintTemplate", () => {
     expect(screen.getAllByText("Batch No.")).toHaveLength(2);
   });
 
+  it("พิมพ์ 1 ป้ายต่อ 1 ชิ้น พร้อมฝั่ง QC/LAB และส่วนตัวอย่างต่อจาก Batch", () => {
+    render(<SampleLabelPrintTemplate petition={petitionWith({
+      sampleName: "PACLOBUTRAZOL 25% SC",
+      commonName: "PACLOBUTRAZOL 25% SC",
+      batchNo: "B-526",
+      part: "ล่าง",
+      sampleQuantity: 3,
+      labelQuantities: ["100 CC", "500 CC", "500 CC"],
+      labelQuantitySides: ["qc", "qc", "lab"],
+    })} />);
+
+    expect(screen.getByText("100 CC (QC)")).toBeInTheDocument();
+    expect(screen.getByText("500 CC (QC)")).toBeInTheDocument();
+    expect(screen.getByText("500 CC (LAB)")).toBeInTheDocument();
+    expect(screen.getAllByText("B-526 · ส่วน: ล่าง")).toHaveLength(3);
+  });
+
   it("พิมพ์ footer ฟอร์มใหม่ เลขที่จากเลขคำร้อง และสุ่มโดยจาก QC รายวัน", () => {
     const petition = {
       ...petitionWith({ sampleName: "OMETHOATE", batchNo: "B-001", sampleId: "S-9" }),

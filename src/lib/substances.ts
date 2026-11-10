@@ -61,6 +61,33 @@ export function substanceKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
+// คีย์เทียบชื่อสินค้าแบบยืดหยุ่น ใช้เมื่อชื่อเต็มไม่ตรงกันทุกตัวอักษร:
+// ไม่สนใจตัวพิมพ์/ช่องว่าง, ตัด "IMPORTED" ออกจากวงเล็บ, ตัด "W/V",
+// ตัดศูนย์ท้ายทศนิยม (12.50 → 12.5) และเรียงสารในยาผสมให้ลำดับไม่มีผล
+// "AZOXYSTROBIN 20%+DIFENOCONAZOLE 12.50% SC" กับ
+// "DIFENOCONAZOLE 12.5% + AZOXYSTROBIN 20% W/V SC" ได้คีย์เดียวกัน
+export function productMatchKey(value: string): string {
+  let text = String(value ?? "").toLowerCase();
+  text = text.replace(/\(([^()]*)\)/g, (_match, inner: string) => {
+    const kept = inner.split(",").map((part) => part.trim()).filter((part) => part && part !== "imported");
+    return kept.length ? ` (${kept.join(", ")}) ` : " ";
+  });
+  text = text
+    .replace(/(^|[^a-z0-9])w\/v(?=[^a-z0-9]|$)/g, "$1 ")
+    .replace(/(\d+\.\d*?)0+(?=\D|$)/g, "$1")
+    .replace(/(\d)\.(?=\D|$)/g, "$1")
+    .replace(/\s*%/g, "%")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parts = splitTopLevelPlus(text).map((part) => part.trim()).filter(Boolean);
+  if (parts.length <= 1) return parts[0] ?? "";
+  const last = parts.pop() ?? "";
+  const lastMatch = last.match(/^(.*?\d%)(.*)$/);
+  const actives = [...parts, lastMatch ? lastMatch[1].trim() : last].sort();
+  const tail = lastMatch ? lastMatch[2].trim() : "";
+  return [actives.join(" + "), tail].filter(Boolean).join(" ");
+}
+
 // Take the first whitespace-separated token. Used to reduce a product spec
 // like "ABAMECTIN 1.8% W/V EC (BROWN)" to its active substance "ABAMECTIN".
 // Used after parseSubstances() splits on "+".

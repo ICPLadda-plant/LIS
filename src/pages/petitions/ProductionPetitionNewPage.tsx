@@ -17,6 +17,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { resolveHrEmployeeName, useEmployeeOptions } from '@/hooks/useExternalLookups';
 import { api } from '@/lib/api';
 import { canPrintSampleLabel } from '@/lib/petitionPrintability';
+import { normalizeSamplePart, sameSampleLine } from '@/lib/samplePart';
 import {
   buildPetitionMasterItemOptions,
   findMatchingPetitionMasterItem,
@@ -401,7 +402,7 @@ function itemSides(item: ItemRowValues, side: 'qc' | 'lab'): Array<'qc' | 'lab'>
 export function mergeSplitQcLabRows(items: ItemRowValues[]): ItemRowValues[] {
   const key = (item: ItemRowValues) => {
     const batchNo = item.batchNo.trim().toUpperCase();
-    return batchNo ? `${item.sampleName.trim().toUpperCase()}|${batchNo}` : '';
+    return batchNo ? `${item.sampleName.trim().toUpperCase()}|${batchNo}|${normalizeSamplePart(item.part).toUpperCase()}` : '';
   };
   const isQcOnly = (item: ItemRowValues) => item.sendToQc !== false && !item.sendToLab;
   const isLabOnly = (item: ItemRowValues) => item.sendToQc === false && item.sendToLab === true;
@@ -411,7 +412,7 @@ export function mergeSplitQcLabRows(items: ItemRowValues[]): ItemRowValues[] {
     if (used.has(item)) continue;
     const itemKey = key(item);
     const partner = itemKey && (isQcOnly(item) || isLabOnly(item))
-      ? items.find((other) => other !== item && !used.has(other) && key(other) === itemKey
+      ? items.find((other) => other !== item && !used.has(other) && key(other) === itemKey && sameSampleLine(item, other)
         && (isQcOnly(item) ? isLabOnly(other) : isQcOnly(other)))
       : undefined;
     if (!partner) {
@@ -439,15 +440,16 @@ export function mergeSplitQcLabRows(items: ItemRowValues[]): ItemRowValues[] {
 // แต่ฟอร์มต้องการ 1 รายการต่อ batch ที่มีปริมาณ 2 ค่า จึงรวมแถวให้ก่อน
 export function mergeQcLabSameBatchItems(items: ItemRowValues[]): ItemRowValues[] {
   const merged: ItemRowValues[] = [];
-  const byKey = new Map<string, ItemRowValues>();
+  const byKey = new Map<string, ItemRowValues[]>();
   for (const item of items) {
     const batchNo = item.batchNo.trim();
-    const key = batchNo ? `${item.sampleName.trim().toLowerCase()}|${batchNo}` : '';
-    const existing = key ? byKey.get(key) : undefined;
+    // batch เดียวกันแต่คนละส่วน หรือ Production ยืนยันแยกรายการ (lineRef ต่างกัน) = คนละรายการ
+    const key = batchNo ? `${item.sampleName.trim().toLowerCase()}|${batchNo}|${normalizeSamplePart(item.part).toLowerCase()}` : '';
+    const existing = key ? byKey.get(key)?.find((candidate) => sameSampleLine(candidate, item)) : undefined;
     if (!existing) {
       const copy = { ...item };
       merged.push(copy);
-      if (key) byKey.set(key, copy);
+      if (key) byKey.set(key, [...(byKey.get(key) ?? []), copy]);
       continue;
     }
     const quantities = [...(existing.labelQuantities ?? []), ...(item.labelQuantities ?? [])].filter((entry) => entry.trim());
@@ -518,6 +520,13 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
   const sendToLabs = getSampleOrQueryValues(searchParams, ['sendToLab'], { splitComma: true });
   const sendToQcs = getSampleOrQueryValues(searchParams, ['sendToQc'], { splitComma: true });
   const labQtys = getSampleOrQueryValues(searchParams, ['labQty'], { splitComma: true });
+  const parts = getNestedSampleValues(searchParams, ['part']);
+  const lineRefs = getNestedSampleValues(searchParams, ['lineRef']);
+  const productionLineFields = (index: number) => {
+    const part = normalizeSamplePart(valueAt(parts, index, false));
+    const lineRef = valueAt(lineRefs, index, false).trim();
+    return { ...(part ? { part } : {}), ...(lineRef ? { lineRef } : {}) };
+  };
 
   const itemCount = Math.max(
     sampleNames.length,
@@ -545,6 +554,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     const labelQuantity = makeQuantityLabel(submittedQuantity, submittedUnit);
     return [withProductionSamples({
       ...singleItem,
+      ...productionLineFields(0),
       sendToLab: sendToLabFromDefault(singleItem, sendToLabs[0]),
       sendToQc: sendToQcFromQuery(sendToQcs[0]),
       productionDate: productionDate || null,
@@ -591,6 +601,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       labelSampledDate: labelSendDate(i, valueAt(productionDates, i)),
       submittedQuantity: valueAt(quantities, i, false),
       submittedUnit: valueAt(quantityUnits, i),
+      ...productionLineFields(i),
     };
 
     if ([

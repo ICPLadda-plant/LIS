@@ -1,6 +1,6 @@
 import type { ParameterItem, ParameterValueField, TimerUnit, SubstanceStandard, StandardCondition, StandardOperator, OptionOutput, LabelToleranceRule } from "./api";
 import type { QCTestResult } from "@/types/petition.types";
-import { parseSubstances, extractSubstanceName, matchSubstanceKey, substanceFieldKey, parseLabelPercent } from "./substances";
+import { parseSubstances, extractSubstanceName, matchSubstanceKey, substanceFieldKey, parseLabelPercent, productMatchKey } from "./substances";
 import { getClassification } from "./productClassification";
 import { getMasterItemRegulatoryTypes } from "./masterItemRegulatoryType";
 
@@ -155,10 +155,32 @@ function fullSubstanceKey(value: unknown): string {
   return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+type SubstanceSelector = { productType?: string; category?: string; regulatoryType?: string; regulatoryTypes?: string[] };
+
 export function findSubstanceStandard(
   field: ParameterValueField,
   substanceName: string,
-  selector: { productType?: string; category?: string; regulatoryType?: string; regulatoryTypes?: string[] } = {},
+  selector: SubstanceSelector = {},
+): SubstanceStandard | undefined {
+  return matchSubstanceStandard(field, substanceName, selector, true);
+}
+
+// หาเกณฑ์ที่ตั้งด้วยชื่อสินค้าเต็ม (ตรงตัว หรือเทียบแบบยืดหยุ่นด้วย productMatchKey)
+// ไม่ fallback ไปหาเกณฑ์รายสารจากคำแรก — ใช้ก่อนแตกยาผสมเป็นรายสาร
+// เช่น ค่า ถพ. ที่วัดจากตัวสินค้าทั้งตัว
+export function findWholeProductStandard(
+  field: ParameterValueField,
+  commonName: string,
+  selector: SubstanceSelector = {},
+): SubstanceStandard | undefined {
+  return matchSubstanceStandard(field, commonName, selector, false);
+}
+
+function matchSubstanceStandard(
+  field: ParameterValueField,
+  substanceName: string,
+  selector: SubstanceSelector,
+  allowSubstanceFallback: boolean,
 ): SubstanceStandard | undefined {
   const exactKey = fullSubstanceKey(substanceName);
   const substanceKey = matchSubstanceKey(substanceName);
@@ -204,7 +226,13 @@ export function findSubstanceStandard(
   const exact = pickBest(standards.filter((std) => fullSubstanceKey(std.substance) === exactKey));
   if (exact) return exact;
 
-  if (!substanceKey) return undefined;
+  const looseKey = productMatchKey(substanceName);
+  if (looseKey) {
+    const similar = pickBest(standards.filter((std) => productMatchKey(std.substance) === looseKey));
+    if (similar) return similar;
+  }
+
+  if (!allowSubstanceFallback || !substanceKey) return undefined;
   return pickBest(
     standards.filter((std) =>
       matchSubstanceKey(std.substance) === substanceKey &&
@@ -281,19 +309,11 @@ export function expandFieldForItem(
   if (substances.length === 0 || (substances.length === 1 && !substances[0])) {
     return [{ key: field.label, field }];
   }
-  return substances.map((raw) => {
-    const name = extractSubstanceName(raw) || raw;
-    const productType = (
-      options.productType?.trim() ||
-      getClassification(raw)?.group ||
-      getClassification(commonName ?? "")?.group ||
-      ""
-    );
-    const std = findSubstanceStandard(field, raw || name, { productType, category: options.category });
+  const buildUnit = (name: string, label: string, std: SubstanceStandard | undefined) => {
     const hiddenStandard = !!(std && (std as { headOnly?: boolean }).headOnly) && !includeRestrictedStandards;
     const vfield: ParameterValueField = {
       ...field,
-      label: `${field.label} — ${name}`,
+      label,
       substanceMode: false,
       standardOperator: hiddenStandard ? undefined : std?.operator,
       standardValue: hiddenStandard ? null : (std?.value ?? null),
@@ -305,6 +325,27 @@ export function expandFieldForItem(
       substanceName: name,
       hiddenStandard,
     };
+  };
+  // ยาผสมที่มีเกณฑ์ตั้งด้วยชื่อสินค้าเต็ม → ช่องเดียว (ใช้ key ของสารตัวแรก
+  // เพื่อให้ค่าที่บันทึกไว้เดิมยังแสดงอยู่)
+  if (substances.length > 1) {
+    const productType = options.productType?.trim() || getClassification(commonName ?? "")?.group || "";
+    const wholeStd = findWholeProductStandard(field, commonName ?? "", { productType, category: options.category });
+    if (wholeStd) {
+      const firstName = extractSubstanceName(substances[0]) || substances[0];
+      return [buildUnit(firstName, field.label, wholeStd)];
+    }
+  }
+  return substances.map((raw) => {
+    const name = extractSubstanceName(raw) || raw;
+    const productType = (
+      options.productType?.trim() ||
+      getClassification(raw)?.group ||
+      getClassification(commonName ?? "")?.group ||
+      ""
+    );
+    const std = findSubstanceStandard(field, raw || name, { productType, category: options.category });
+    return buildUnit(name, `${field.label} — ${name}`, std);
   });
 }
 
@@ -339,6 +380,12 @@ export function countAbnormalInResults(
           const substances = parseSubstances(r.commonName ?? "");
           const resultMeta = r as QCTestResult & { category?: string; itemCategory?: string; dept?: string };
           const category = resultMeta.category ?? resultMeta.itemCategory ?? categoryFromDept(resultMeta.dept);
+          const wholeStd = substances.length > 1
+            ? findWholeProductStandard(field, r.commonName ?? "", {
+                productType: getClassification(r.commonName ?? "")?.group ?? "",
+                category,
+              })
+            : undefined;
           for (const [vkey, vval] of Object.entries(values)) {
             if (!vkey.startsWith(prefix)) continue;
             const subKey = vkey.slice(prefix.length);
@@ -346,7 +393,7 @@ export function countAbnormalInResults(
               (s) => matchSubstanceKey(extractSubstanceName(s) || s) === subKey,
             ) ?? subKey;
             const productType = getClassification(raw)?.group ?? getClassification(r.commonName ?? "")?.group ?? "";
-            const std = findSubstanceStandard(field, raw, { productType, category });
+            const std = wholeStd ?? findSubstanceStandard(field, raw, { productType, category });
             if (isSubstanceAbnormal(field, std, vval)) count += 1;
           }
           continue;

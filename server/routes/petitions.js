@@ -48,7 +48,6 @@ const {
 const { canEditWholePetition } = require('../lib/productionPetitionEdit');
 const { assignMissingSampleLabelNumbers } = require('../lib/sampleLabelNumber');
 const { sendProductionCancel } = require('../lib/productionCallback');
-const { notifyFinalResultAwaiting } = require('../lib/finalResultEmail');
 const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
 
 function logAudit(petition, payload) {
@@ -884,7 +883,6 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
         note: `${sideLabel} บันทึกผลเสร็จ — ครบทุกส่วน ${finalWaitNote}`,
         metadata: { side },
       });
-      notifyFinalResultAwaiting(doc);
     } else {
       await doc.save();
       logAudit(doc, {
@@ -931,7 +929,6 @@ router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
         event: 'statusChanged', fromStatus: prevStatus, toStatus: 'success', actor,
         note: `หัวหน้า Lab ออกผล — ครบทุกส่วน ${finalWaitNote}`, metadata: { side: 'lab' },
       });
-      notifyFinalResultAwaiting(doc);
     } else {
       await doc.save();
       logAudit(doc, {

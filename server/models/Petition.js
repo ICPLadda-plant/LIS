@@ -24,6 +24,10 @@ const PetitionItemSchema = new mongoose.Schema(
     labelQuantities: [String],
     // ฝั่งของแต่ละตัวอย่างใน labelQuantities ('qc' | 'lab') — Production ส่งได้หลายชิ้นต่อฝั่ง
     labelQuantitySides: [String],
+    // ส่วนของ batch ที่เก็บตัวอย่าง (บน/กลาง/ล่าง/...) — ว่าง = ทั่วไป/รวม
+    part: String,
+    // รหัสบรรทัดจาก Production: รหัสต่างกัน = คนละตัวอย่าง (ไม่รวมแถวให้)
+    lineRef: String,
     labelSampledBy: String,
     labelSampledDate: String,
     labelRemark: String,
@@ -292,19 +296,9 @@ const PetitionSchema = new mongoose.Schema(
         note: String,
         by: String,
         at: Date,
-        source: { type: String, enum: ['qc-approval', 'lab-head-edit', 'email'], default: 'qc-approval' },
+        source: { type: String, enum: ['qc-approval', 'lab-head-edit'], default: 'qc-approval' },
       }, { _id: false })],
       default: [],
-    },
-    // เมลขอออก Final Report ถึง QC Head (ผ่าน n8n) — key = completedAt ของรอบที่ส่งแล้ว กันส่งซ้ำ
-    // ดู server/lib/finalResultEmail.js
-    finalResultEmail: {
-      type: new mongoose.Schema({
-        key: String,
-        sentAt: Date,
-        recipients: [String],
-      }, { _id: false }),
-      default: undefined,
     },
   },
   { timestamps: true, optimisticConcurrency: true },
