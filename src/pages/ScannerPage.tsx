@@ -39,6 +39,11 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select';
 }
 
+// มือถือ/แท็บเล็ต (จอสัมผัส) ใช้กล้องเป็นหลัก ส่วน PC ใช้เครื่องยิงบาร์โค้ด
+function prefersCamera(): boolean {
+  return typeof window !== 'undefined' && Boolean(window.matchMedia?.('(pointer: coarse)').matches);
+}
+
 
 async function deliverPetition(id: string, actor?: string, request?: AdditionalSampleRequest | null, deliveredBy?: SubmitterValues): Promise<Petition> {
   if (request) {
@@ -70,7 +75,7 @@ export default function ScannerPage() {
   const deliveryBusy = useRef(false);
   const deliveredRounds = useRef(new Set<string>());
   // จำว่าผู้ใช้สแกนด้วยกล้องหรือไม่ เพื่อเปิดกล้องให้เองในรอบถัดไป ไม่ต้องกดปุ่มซ้ำ
-  const usedCameraRef = useRef(false);
+  const usedCameraRef = useRef(prefersCamera());
   const [errorMsg, setErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -81,6 +86,11 @@ export default function ScannerPage() {
   const needsManualDeliverer = presetDeliverers.some((preset) => !preset);
   const presetDelivererNames = Array.from(new Set(presetDeliverers.filter(Boolean).map((preset) => preset.name)));
   const delivererReady = !needsManualDeliverer || Boolean(deliverer.name.trim());
+
+  // เข้าหน้าบนมือถือ → เปิดกล้องให้เลย ไม่ต้องกดปุ่ม "สแกน QR Code"
+  useEffect(() => {
+    if (usedCameraRef.current) setPhase('scanning');
+  }, []);
 
   useEffect(() => {
     if (phase !== 'scanning') return;
@@ -254,7 +264,7 @@ export default function ScannerPage() {
 
   useEffect(() => {
     // รับการยิงจากเครื่องสแกนเกือบทุกจังหวะ: หน้าแรก, หน้ายืนยัน (เพิ่มเข้าคิว), หน้าส่งสำเร็จ (เริ่มคิวใหม่)
-    const acceptingScan = phase === 'idle' || phase === 'no-camera' || phase === 'error' || phase === 'success'
+    const acceptingScan = phase === 'idle' || phase === 'scanning' || phase === 'no-camera' || phase === 'error' || phase === 'success'
       || (phase === 'confirming' && !addItemOpen);
 
     const clearHardwareScanBuffer = () => {
@@ -662,7 +672,7 @@ export default function ScannerPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center space-y-3">
             <AlertCircle className="w-12 h-12 text-red-400 mx-auto" />
             <p className="text-red-600 font-medium">{errorMsg || 'เกิดข้อผิดพลาด'}</p>
-            <Button variant="primary" className="w-full" onClick={reset}>
+            <Button variant="primary" className="w-full" onClick={scanNext}>
               ลองใหม่
             </Button>
           </div>

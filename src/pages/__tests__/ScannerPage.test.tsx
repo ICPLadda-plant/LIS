@@ -110,6 +110,18 @@ describe('ScannerPage camera failure fallback', () => {
     expect(screen.getByText('P-2506-0004')).toBeInTheDocument();
   });
 
+  it('เปิดบนมือถือ (จอสัมผัส) → เปิดกล้องให้ทันทีโดยไม่ต้องกดปุ่มสแกน', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(pointer: coarse)' })) as typeof window.matchMedia;
+    try {
+      renderPage();
+      expect(await screen.findByRole('button', { name: /ยกเลิกการสแกน/ })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^สแกน QR Code$/ })).not.toBeInTheDocument();
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
   it('สแกนด้วยเครื่องสแกนเนอร์ได้ทันทีโดยไม่ต้องโฟกัสช่องเลขคำร้อง', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: petition } });
     renderPage();
