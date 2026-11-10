@@ -3,6 +3,7 @@ import type { Petition, PetitionItem } from "@/types/petition.types";
 import type { ApprovalItemGroup } from "@/lib/qcApprovalRows";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { pesticideTestMethod } from "@/lib/pesticideTestMethods";
+import { itemSubmissionNoText } from "@/lib/petitionSampler";
 
 export interface LabReportRow {
   testItem: string;
@@ -167,7 +168,7 @@ export function buildLabReportPages(
         name: item.commonName || item.sampleName || DASH,
         batchNo: item.batchNo || item.lotNo || DASH,
         productionDate: buddhistDate(item.productionDate) || DASH,
-        submissionNo: item.submissionNo || lr?.labRequestNo || petition.petitionNo,
+        submissionNo: itemSubmissionNoText(petition, item, "lab") || lr?.labRequestNo || petition.petitionNo,
         manufacturer: item.labelManufacturer || item.labelSeller || DASH,
         sampleNo: item.sampleId || lr?.labRequestNo || DASH,
         receivedDate: buddhistDate(petition.labReceivedAt || petition.receivedAt || petition.sampleSentAt) || DASH,

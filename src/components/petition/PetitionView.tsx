@@ -19,6 +19,7 @@ import {
 } from '@/lib/parameterValidation';
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { SG_FIELD_LABEL } from '@/lib/formSpecificGravity';
+import { itemSubmissionNoText } from '@/lib/petitionSampler';
 
 interface Props { petition: Petition; hideMissingStandardBadge?: boolean; }
 
@@ -181,7 +182,7 @@ export default function PetitionView({ petition: p, hideMissingStandardBadge = f
                       ) : item.commonName
                     }
                   />
-                  <Field label="เลขที่ใบนำส่ง" value={item.submissionNo} />
+                  <Field label="เลขที่ใบนำส่ง" value={itemSubmissionNoText(p, item)} />
                 </div>
                 {item.note && <Field label="หมายเหตุ" value={item.note} />}
                 {canSeeTestItems && (
