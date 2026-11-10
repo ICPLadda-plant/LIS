@@ -157,13 +157,11 @@ function bestMfProductionDate(rows, targetDate, requestedBatch = '') {
       productionDate,
       productionTime,
       exactBatch: Boolean(normalizedRequestedBatch && normalizeBatch(batchNo) === normalizedRequestedBatch),
-      dateBucket: hasTarget && productionTime > targetTime ? 1 : 0,
       dateDistance: hasTarget ? Math.abs(targetTime - productionTime) : -productionTime,
     };
   }).filter((candidate) => candidate.productionDate && Number.isFinite(candidate.productionTime));
 
   candidates.sort((left, right) => Number(right.exactBatch) - Number(left.exactBatch)
-    || left.dateBucket - right.dateBucket
     || left.dateDistance - right.dateDistance
     || right.productionDate.localeCompare(left.productionDate)
     || left.index - right.index);
@@ -587,7 +585,6 @@ function findBestRequestItem(petitions, source, labRequests = []) {
         identityTier: itemNoMatch ? 3 : nameMatch ? 2 : 1,
         identityScore: Number(Boolean(sourceCommonName) && normalizeText(item.commonName) === sourceCommonName) * 2
           + Number(Boolean(sourceSampleName) && normalizeText(item.sampleName) === sourceSampleName),
-        dateBucket: hasTargetAndProduction ? (productionTime <= targetTime ? 0 : 1) : 2,
         dateDistance: hasTargetAndProduction
           ? Math.abs(targetTime - productionTime)
           : (Number.isFinite(productionTime) ? -productionTime : Number.POSITIVE_INFINITY),
@@ -597,7 +594,6 @@ function findBestRequestItem(petitions, source, labRequests = []) {
 
   candidates.sort((left, right) => right.identityTier - left.identityTier
     || right.identityScore - left.identityScore
-    || left.dateBucket - right.dateBucket
     || left.dateDistance - right.dateDistance
     || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
   return candidates[0] || null;
@@ -631,14 +627,12 @@ function findBestCoaHistorySample(coas, source) {
         coa,
         sample,
         identityTier: itemNoMatch ? 2 : 1,
-        dateBucket: hasDates ? (productionTime <= targetTime ? 0 : 1) : 2,
         dateDistance: hasDates ? Math.abs(targetTime - productionTime) : Number.POSITIVE_INFINITY,
       });
     }
   }
 
   candidates.sort((left, right) => right.identityTier - left.identityTier
-    || left.dateBucket - right.dateBucket
     || left.dateDistance - right.dateDistance
     || String(right.coa.updatedAt || '').localeCompare(String(left.coa.updatedAt || '')));
   return candidates[0] || null;

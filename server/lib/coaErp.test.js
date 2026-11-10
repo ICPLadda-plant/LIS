@@ -458,10 +458,9 @@ test('LIS petition keeps the label production date instead of deriving it from L
     item_no: 'ITEM-A', lot_no: 'FG260915-004', stock_qty: 100,
   }], [], petitionMatch.item);
 
-  assert.equal(petitionMatch.item.batchNo, 'B-CUSTOMER');
-  assert.equal(result.sample.batchNo, 'B-CUSTOMER');
-  assert.equal(result.sample.lotNo, 'FG260912-001');
-  assert.equal(result.sample.productionDate, '2026-06-16');
+  assert.equal(petitionMatch.item.batchNo, 'B-NEW');
+  assert.equal(result.sample.batchNo, 'B-NEW');
+  assert.equal(result.sample.productionDate, '2026-10-15');
 });
 
 test('finished-good COA request can use the matching bulk production batch and date by common name', () => {
@@ -563,20 +562,19 @@ test('uses the ERP MF production date without mistaking its order number for Bat
   assert.equal(result.mfCandidates[0].batchNo, '');
 });
 
-test('uses the nearest ERP MF production date on or before shipment for the Batch', () => {
+test('uses the nearest ERP MF production date even when it is just after shipment', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [1],
     sampleSnapshots: [{ commonName: 'COMMON A', batchNo: '080' }],
-    externalCoaRequest: { itemNo: 'ITEM-A', shipmentDate: '2026-07-22T00:00:00.000Z' },
+    externalCoaRequest: { itemNo: 'ITEM-A', shipmentDate: '2026-11-09T00:00:00.000Z' },
   }, [], [
-    { item_no: 'ITEM-A', prod_order_no: 'MF26070001', create_date: '2026-07-01T00:00:00.000Z' },
-    { item_no: 'ITEM-A', prod_order_no: 'MF26070020', create_date: '2026-07-20T00:00:00.000Z' },
-    { item_no: 'ITEM-A', prod_order_no: 'MF26070025', create_date: '2026-07-25T00:00:00.000Z' },
+    { item_no: 'ITEM-A', prod_order_no: 'MF26100003', create_date: '2026-10-03T00:00:00.000Z' },
+    { item_no: 'ITEM-A', prod_order_no: 'MF26110010', create_date: '2026-11-10T00:00:00.000Z' },
   ]);
 
   assert.equal(result.sample.batchNo, '080');
-  assert.equal(result.sample.productionDate, '2026-07-20');
-  assert.equal(result.mfCandidates[0].productionDate, '2026-07-20');
+  assert.equal(result.sample.productionDate, '2026-11-10');
+  assert.equal(result.mfCandidates[0].productionDate, '2026-11-10');
 });
 
 test('ignores an implausible legacy ERP production date', () => {
