@@ -3,7 +3,7 @@ import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT 
 import type { LabRequest } from '@/types/labRequest.types';
 import type { Petition, PetitionItem, QCTestResult } from '@/types/petition.types';
 import { formatDate } from '@/lib/dateTime';
-import { displayMediaUrl, isVideoUrl, mediaUrlsFromValue } from '@/lib/mediaUrls';
+import { PrintMediaValue } from '@/components/lis/PrintMediaValue';
 
 type ReportKind = 'pre' | 'final';
 
@@ -69,28 +69,10 @@ function rowsFor(item: PetitionItem, results: QCTestResult[]) {
               ? `${result.parameterName} - ${field}`
               : (result.parameterName || field),
             value: valueText(value),
-            mediaUrls: mediaUrlsFromValue(value),
             refSource: refSourceText(row[`${field}__source`]),
           })),
       );
     });
-}
-
-function fileNameFromUrl(url: string): string {
-  return decodeURIComponent(url.split(/[?#]/)[0].split('/').pop() || url);
-}
-
-function ResultValue({ value, mediaUrls }: { value: string; mediaUrls: string[] }) {
-  if (!mediaUrls.length) return <>{value}</>;
-  return (
-    <div className="rr-media">
-      {mediaUrls.map((url) => (
-        isVideoUrl(url)
-          ? <span key={url} className="rr-media-file">วิดีโอ: {fileNameFromUrl(url)}</span>
-          : <img key={url} src={displayMediaUrl(url)} alt="รูปผลการทดสอบ" />
-      ))}
-    </div>
-  );
 }
 
 export default function ResultReportPrintTemplate({
@@ -191,7 +173,7 @@ export default function ResultReportPrintTemplate({
                     {rows.length ? rows.map((row) => (
                       <tr key={row.key}>
                         <td>{row.testItem}</td>
-                        <td><ResultValue value={row.value} mediaUrls={row.mediaUrls} /></td>
+                        <td><PrintMediaValue value={row.value} /></td>
                         <td>{row.refSource}</td>
                       </tr>
                     )) : (
@@ -245,9 +227,6 @@ th { width: 25%; background: #f3f3f3; text-align: left; }
 .rr-results th { text-align: center; }
 .rr-results td:nth-child(3) { font-weight: 600; }
 .rr-empty { text-align: center; color: #555; font-weight: 400 !important; }
-.rr-media { display: flex; flex-wrap: wrap; gap: 2mm; }
-.rr-media img { display: block; max-width: 100%; width: 38mm; max-height: 38mm; object-fit: contain; border: 0.5pt solid #ccc; break-inside: avoid; page-break-inside: avoid; }
-.rr-media-file { font-size: 9pt; }
 .rr-footer { display: grid; grid-template-columns: 1fr 1fr; gap: 18mm; margin-top: 16mm; text-align: center; }
 .rr-line { border-bottom: 0.8pt dotted #000; height: 12mm; }
 .rr-note { margin-top: 8mm; font-size: 9.5pt; }
