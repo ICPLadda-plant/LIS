@@ -3,6 +3,7 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const MasterItemMeta = require('../models/MasterItemMeta');
 const ItemGroup = require('../models/ItemGroup');
+const { defaultClient: productMediaClient } = require('../lib/productMediaClient');
 
 const router = express.Router();
 
@@ -350,9 +351,12 @@ function buildMetaOnlyItem(meta) {
 
 async function getMergedMasterItems(req, res) {
   try {
+    // เริ่มดึงรูปจาก Product ID คู่ขนานกับ ERP (มี timeout/cache ของตัวเอง ไม่ throw)
+    const productMediaPromise = productMediaClient.getIndex();
     const items = await fetchMasterItems();
     const metas = await MasterItemMeta.find().lean();
     const groups = await ItemGroup.find({ status: 'active' }).sort({ sortOrder: 1, name: 1 }).lean();
+    const productMedia = await productMediaPromise;
     const merged = mergeItemsWithMeta(items, metas);
 
     // Match src/lib/itemGroups.ts: exclude > include > common/trade name.
@@ -373,7 +377,8 @@ async function getMergedMasterItems(req, res) {
           || (commonName && rule.common.has(commonName))
           || (tradeName && rule.trade.has(tradeName));
       }).map((rule) => rule.summary);
-      return { ...item, itemGroups };
+      // productMedia = รูปจากระบบ Product ID แยกจาก imageUrls ที่ผู้ใช้ LIS ตั้งเอง
+      return { ...item, itemGroups, productMedia: productMediaClient.mediaFor(productMedia, itemNo) };
     }));
   } catch (err) {
     return res.status(err.status || 502).json({
