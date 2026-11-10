@@ -3,6 +3,7 @@ import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT 
 import type { LabRequest } from '@/types/labRequest.types';
 import type { Petition, PetitionItem, QCTestResult } from '@/types/petition.types';
 import { formatDate } from '@/lib/dateTime';
+import { PrintMediaValue } from '@/components/lis/PrintMediaValue';
 
 type ReportKind = 'pre' | 'final';
 
@@ -172,7 +173,7 @@ export default function ResultReportPrintTemplate({
                     {rows.length ? rows.map((row) => (
                       <tr key={row.key}>
                         <td>{row.testItem}</td>
-                        <td>{row.value}</td>
+                        <td><PrintMediaValue value={row.value} /></td>
                         <td>{row.refSource}</td>
                       </tr>
                     )) : (

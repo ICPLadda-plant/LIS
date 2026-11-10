@@ -27,6 +27,47 @@ function fullSubstanceKeyJS(value) {
   return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function splitTopLevelPlusJS(value) {
+  const parts = [];
+  let current = "";
+  let depth = 0;
+  for (const ch of String(value ?? "")) {
+    if (ch === "(") depth += 1;
+    if (ch === ")") depth = Math.max(0, depth - 1);
+    if (ch === "+" && depth === 0) { parts.push(current); current = ""; continue; }
+    current += ch;
+  }
+  parts.push(current);
+  return parts;
+}
+
+// mirror of src/lib/substances.ts productMatchKey — keep in sync
+function productMatchKeyJS(value) {
+  let text = String(value ?? "").toLowerCase();
+  text = text.replace(/\(([^()]*)\)/g, (_match, inner) => {
+    const kept = inner.split(",").map((part) => part.trim()).filter((part) => part && part !== "imported");
+    return kept.length ? ` (${kept.join(", ")}) ` : " ";
+  });
+  text = text
+    .replace(/(^|[^a-z0-9])w\/v(?=[^a-z0-9]|$)/g, "$1 ")
+    .replace(/(\d+\.\d*?)0+(?=\D|$)/g, "$1")
+    .replace(/(\d)\.(?=\D|$)/g, "$1")
+    .replace(/\s*%/g, "%")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parts = splitTopLevelPlusJS(text).map((part) => part.trim()).filter(Boolean);
+  if (parts.length <= 1) return parts[0] || "";
+  const last = parts.pop() || "";
+  const lastMatch = last.match(/^(.*?\d%)(.*)$/);
+  const actives = [...parts, lastMatch ? lastMatch[1].trim() : last].sort();
+  const tail = lastMatch ? lastMatch[2].trim() : "";
+  return [actives.join(" + "), tail].filter(Boolean).join(" ");
+}
+
+function isMixtureJS(commonName) {
+  return splitTopLevelPlusJS(commonName).map((part) => part.trim()).filter(Boolean).length > 1;
+}
+
 function parseLabelPercentJS(raw) {
   const m = String(raw == null ? "" : raw).match(/(\d+(?:\.\d+)?)\s*%/);
   return m ? Number(m[1]) : null;
@@ -80,7 +121,7 @@ function isSubstanceAbnormalJS(field, std, value) {
   );
 }
 
-function findSubstanceStandardJS(field, rawSpec, productType, category) {
+function findSubstanceStandardJS(field, rawSpec, productType, category, allowSubstanceFallback = true) {
   const exactKey = fullSubstanceKeyJS(rawSpec);
   const subKey = matchSubstanceKeyJS(rawSpec);
   if (!exactKey && !subKey) return undefined;
@@ -109,6 +150,13 @@ function findSubstanceStandardJS(field, rawSpec, productType, category) {
   const exact = pickBest(standards.filter((std) => fullSubstanceKeyJS(std.substance) === exactKey));
   if (exact) return exact;
 
+  const looseKey = productMatchKeyJS(rawSpec);
+  if (looseKey) {
+    const similar = pickBest(standards.filter((std) => productMatchKeyJS(std.substance) === looseKey));
+    if (similar) return similar;
+  }
+
+  if (!allowSubstanceFallback) return undefined;
   return pickBest(
     standards.filter((std) =>
       matchSubstanceKeyJS(std.substance) === subKey &&
@@ -122,6 +170,15 @@ function visibleSubstanceStandardJS(field, rawSpec, includeRestricted, productTy
   if (!std) return undefined;
   if (!includeRestricted && std.headOnly) return undefined;
   return std;
+}
+
+// mirror of src/lib/parameterValidation.ts findWholeProductStandard — ยาผสมที่ตั้งเกณฑ์ด้วยชื่อสินค้าเต็ม
+// คืน { found, std }: found=true แม้เกณฑ์ถูกซ่อน (headOnly) เพื่อไม่ให้ fallback ไปใช้เกณฑ์รายสาร
+function wholeProductStandardJS(field, commonName, includeRestricted, category) {
+  if (!isMixtureJS(commonName)) return { found: false, std: undefined };
+  const std = findSubstanceStandardJS(field, commonName, productTypeFromSpecJS(commonName), category, false);
+  if (!std) return { found: false, std: undefined };
+  return { found: true, std: !includeRestricted && std.headOnly ? undefined : std };
 }
 
 function findLabelToleranceStandardJS(field, rawSpec, productType) {
@@ -265,13 +322,16 @@ function computeAbnormalFlags({ docs, params, petitions, includeRestricted = fal
           const isNumeric = field.type === 'number' || field.type === 'float';
           if (field.substanceMode && isNumeric) {
             const prefix = `${field.label}::`;
+            const category = categoryByItem[`${d.petitionId}__${d.itemSeq}`] || '';
+            const whole = wholeProductStandardJS(field, d.commonName, includeRestricted, category);
             for (const [vkey, vval] of Object.entries(values)) {
               if (!vkey.startsWith(prefix)) continue;
               const subKey = vkey.slice(prefix.length);
               const raw = rawSpecForSubKey(d.commonName, subKey) || subKey;
               const productType = productTypeFromSpecJS(raw) || productTypeFromSpecJS(d.commonName);
-              const category = categoryByItem[`${d.petitionId}__${d.itemSeq}`] || '';
-              const std = visibleSubstanceStandardJS(field, raw, includeRestricted, productType, category);
+              const std = whole.found
+                ? whole.std
+                : visibleSubstanceStandardJS(field, raw, includeRestricted, productType, category);
               if (isSubstanceAbnormalJS(field, std, vval)) { flagged = true; break; }
             }
             if (flagged) break;

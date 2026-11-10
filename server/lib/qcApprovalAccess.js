@@ -46,4 +46,10 @@ async function resolveApprovalTabs(user) {
   return approvalTabsFor({ roles, permissions, groups });
 }
 
-module.exports = { approvalTabsFor, resolveApprovalTabs, denyToken, QC_APPROVAL_TABS: TABS };
+// ออก Final Report ได้เฉพาะผู้ที่เห็นทั้งผลกายภาพและ AI (หัวหน้า QC / admin)
+// QC Approver (เห็นแค่กายภาพ) ออกได้แค่ Pre Result
+function canIssueFinalReport(tabs = []) {
+  return TABS.every((tab) => tabs.includes(tab));
+}
+
+module.exports = { approvalTabsFor, resolveApprovalTabs, canIssueFinalReport, denyToken, QC_APPROVAL_TABS: TABS };

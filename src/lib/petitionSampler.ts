@@ -1,5 +1,6 @@
 import type { Petition, PetitionDeliverer } from "@/types/petition.types";
 import { hasLabTrack, requiresQcTrack, shouldSendItemToLab, shouldSendItemToQc } from "@/lib/petitionRouting";
+import { normalizeSamplePart } from "@/lib/samplePart";
 
 export type SampleLabelSide = "qc" | "lab";
 
@@ -35,13 +36,27 @@ export function sampleLabelCopySide(
   return copyIndex === 0 ? "qc" : "lab";
 }
 
-/** เลขที่ป้ายของฝั่งนั้น เช่น { seq: "P04", year: "69" } — คำขอเก่าที่ยังไม่มีเลข P/L คืน null */
+/** กุญแจกลุ่มเลขป้าย batch + ส่วน (mirror server/lib/sampleLabelNumber.js sampleLabelGroupKey) */
+type SampleLabelGroupItem = Partial<Pick<Petition["items"][number], "batchNo" | "part">>;
+
+export function sampleLabelGroupKey(item: SampleLabelGroupItem | null | undefined): string {
+  const batch = String(item?.batchNo ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+  return `${batch}|${normalizeSamplePart(item?.part)}`;
+}
+
+/**
+ * เลขที่ป้ายของฝั่งนั้น เช่น { seq: "P04", year: "69" }
+ * ส่ง item มาด้วยเพื่อใช้เลขของกลุ่ม batch + ส่วนของรายการนั้น; คำขอเก่าที่ไม่มีกลุ่มใช้เลขระดับคำขอ
+ * คำขอเก่าที่ยังไม่มีเลข P/L คืน null
+ */
 export function sampleLabelSideNumber(
   petition: Pick<Petition, "sampleLabelNumbers">,
   side: SampleLabelSide,
+  item?: SampleLabelGroupItem,
 ): { seq: string; year: string } | null {
   const numbers = petition.sampleLabelNumbers;
-  const seq = numbers?.[side];
+  const group = item ? numbers?.groups?.find((entry) => entry.key === sampleLabelGroupKey(item)) : undefined;
+  const seq = group?.[side] || numbers?.[side];
   if (!seq || !numbers?.year) return null;
   return { seq, year: String(numbers.year % 100).padStart(2, "0") };
 }
@@ -71,13 +86,51 @@ export function formatSampleLabelDocumentNumber(petitionNo: string | null | unde
  */
 export function serviceRequestSubmissionNo(
   petition: Pick<Petition, "petitionNo" | "sampleLabelNumbers">,
-  item: Pick<Petition["items"][number], "submissionNo">,
+  item: Pick<Petition["items"][number], "submissionNo"> & Partial<Pick<Petition["items"][number], "batchNo" | "part">>,
 ): string {
   const entered = String(item.submissionNo ?? "").trim();
   if (entered && entered !== petition.petitionNo) return entered;
-  const number = sampleLabelSideNumber(petition, "qc") ?? sampleLabelSideNumber(petition, "lab");
+  const group = petition.sampleLabelNumbers?.groups?.find((entry) => entry.key === sampleLabelGroupKey(item));
+  const side: SampleLabelSide = group && !group.qc && group.lab ? "lab" : "qc";
+  const number = sampleLabelSideNumber(petition, side, item) ?? sampleLabelSideNumber(petition, "lab", item);
   if (number) return `${number.seq}/${number.year}`;
   return entered;
+}
+
+/**
+ * เลขป้ายนำส่งของรายการนี้ทุกฝั่ง เช่น ["P04/69", "L03/69"] ตามกลุ่ม batch + ส่วน
+ * ถ้ามีกลุ่มของรายการ ใช้เฉพาะฝั่งที่กลุ่มนั้นมีเลข (ไม่ดึงเลขระดับคำขอของอีกฝั่งมาปน)
+ */
+export function itemSampleLabelNumbers(
+  petition: Pick<Petition, "sampleLabelNumbers">,
+  item: SampleLabelGroupItem,
+  sides: SampleLabelSide[] = ["qc", "lab"],
+): string[] {
+  const numbers = petition.sampleLabelNumbers;
+  if (!numbers?.year) return [];
+  const year = String(numbers.year % 100).padStart(2, "0");
+  const group = numbers.groups?.find((entry) => entry.key === sampleLabelGroupKey(item));
+  const source = group ?? numbers;
+  return sides.map((side) => source[side]).filter(Boolean).map((seq) => `${seq}/${year}`);
+}
+
+/**
+ * เลขที่ใบนำส่งสำหรับแสดงบนหน้าจอ/รายงาน: เลขที่ผู้ใช้กรอกเอง (ที่ไม่ใช่เลขคำร้อง) ก่อน
+ * แล้วเลขป้าย P/L ของรายการ; preferSide ใช้เลขฝั่งนั้นก่อนถ้ามี เช่นรายงาน LAB ใช้ L
+ */
+export function itemSubmissionNoText(
+  petition: Pick<Petition, "petitionNo" | "sampleLabelNumbers">,
+  item: Pick<Petition["items"][number], "submissionNo"> & SampleLabelGroupItem,
+  preferSide?: SampleLabelSide,
+): string {
+  const entered = String(item.submissionNo ?? "").trim();
+  if (entered && entered !== petition.petitionNo) return entered;
+  if (preferSide) {
+    const [preferred] = itemSampleLabelNumbers(petition, item, [preferSide]);
+    if (preferred) return preferred;
+  }
+  const all = itemSampleLabelNumbers(petition, item);
+  return all.length ? all.join(", ") : entered;
 }
 
 /** ตัดวงเล็บท้ายชื่อ เช่น "นายสมชาย ใจดี (ชาย)" → "นายสมชาย ใจดี" */

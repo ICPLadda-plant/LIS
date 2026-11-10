@@ -7,8 +7,7 @@ import { selectDensitySyncRow } from '@/lib/densitySync';
 interface DensitySyncButtonProps {
   /** Petition item batch number to match against Result-Density. */
   batchNo: string;
-  /** Called with the selected matched rows. */
-  onRows: (docs: Record<string, unknown>[]) => void;
+  /** Called with every matched Result-Density row so the user can pick one. */
   onOptions?: (docs: Record<string, unknown>[]) => void;
   disabled?: boolean;
 }
@@ -16,13 +15,13 @@ interface DensitySyncButtonProps {
 const EMPTY_DENSITY_DOCS: Record<string, unknown>[] = [];
 
 /**
- * Pull DMA 501 density readings for `batchNo` from Result-Density. A single
- * valid row is used immediately; multiple rows use the repeat-selection rule.
+ * Pull DMA 501 density readings for `batchNo` from Result-Density and report
+ * them as choices. Never writes a value by itself — the user picks the value
+ * (or types one) so a saved hand-typed value is never overwritten on reload.
  */
 export default function DensitySyncButton({
-  batchNo, onRows, onOptions, disabled = false,
+  batchNo, onOptions, disabled = false,
 }: DensitySyncButtonProps) {
-  const appliedKeyRef = useRef('');
   const onOptionsRef = useRef(onOptions);
   onOptionsRef.current = onOptions;
 
@@ -38,22 +37,6 @@ export default function DensitySyncButton({
   useEffect(() => {
     onOptionsRef.current?.(docs);
   }, [docs]);
-
-  useEffect(() => {
-    appliedKeyRef.current = '';
-  }, [batchNo]);
-
-  useEffect(() => {
-    const selected = selectDensitySyncRow(docs);
-    if (selected) {
-      const selectedIndex = Math.max(docs.indexOf(selected), 0);
-      const selectedKey = `${batchNo}::${String(selected._id ?? selectedIndex)}`;
-      if (appliedKeyRef.current === selectedKey) return;
-      appliedKeyRef.current = selectedKey;
-      onRows([selected]);
-      toast.success('ใช้ค่า ถพ. จากเครื่องแล้ว (1 รายการ)');
-    }
-  }, [batchNo, docs, onRows]);
 
   useEffect(() => {
     if (isError) {

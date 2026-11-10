@@ -1,4 +1,5 @@
 import type { Petition, PetitionRouteTarget } from "@/types/petition.types";
+import { normalizeSamplePart } from "@/lib/samplePart";
 
 export function isResearchAndDevelopmentDepartment(department: unknown): boolean {
   return String(department ?? "").replace(/\s+/g, "").toLowerCase() === "r&d";
@@ -151,16 +152,18 @@ export function labSendOverrideNoteError(items: LabRouteItem[]): string | null {
 }
 
 export function duplicateBatchError(
-  items: Pick<LabRouteItem, "batchNo" | "sendToLab">[],
+  items: (Pick<LabRouteItem, "batchNo" | "sendToLab"> & { part?: string; lineRef?: string })[],
   options: { allowDuplicates?: boolean } = {},
 ): string | null {
   // Production samples can share a batch, including samples sent to Lab.
   if (options.allowDuplicates) return null;
   const seen = new Set<string>();
   for (const item of items) {
-    const key = String(item.batchNo ?? "").trim();
-    if (!key) continue;
-    if (seen.has(key)) return `พบ batch ซ้ำ: ${key}`;
+    const batchNo = String(item.batchNo ?? "").trim();
+    if (!batchNo) continue;
+    // batch เดียวกันแต่คนละส่วน หรือ Production ยืนยันแยกรายการ (lineRef ต่างกัน) ไม่นับว่าซ้ำ
+    const key = [batchNo, normalizeSamplePart(item.part).toUpperCase(), String(item.lineRef ?? "").trim()].join("\u0000");
+    if (seen.has(key)) return `พบ batch ซ้ำ: ${batchNo}`;
     seen.add(key);
   }
   return null;

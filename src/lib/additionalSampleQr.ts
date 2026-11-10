@@ -23,6 +23,16 @@ export function extractScannedCode(raw: string): string {
   }
 }
 
+/** ลำดับรายการจาก QR บนป้ายนำส่ง ({ id, petitionNo, sampleId, itemSeq }) — QR อื่น/พิมพ์เลขเองคืน null */
+export function extractScannedItemSeq(raw: string): number | null {
+  try {
+    const seq = Number(JSON.parse(raw.trim())?.itemSeq);
+    return Number.isInteger(seq) && seq > 0 ? seq : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchPetitionByScannedCode(code: string): Promise<Petition> {
   try {
     const response = await api.get<Petition>(`/petitions/scan/${encodeURIComponent(code)}`);

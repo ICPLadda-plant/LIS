@@ -32,6 +32,8 @@ export const petitionItemSchema = z.object({
   labelQuantity: z.string().optional().default(''),
   labelQuantities: z.array(z.string()).optional().default([]),
   labelQuantitySides: z.array(z.enum(['qc', 'lab'])).optional(),
+  part: z.string().optional(),
+  lineRef: z.string().optional(),
   labelSampledBy: z.string().optional().default(''),
   labelSampledDate: z.string().optional().default(''),
   labelRemark: z.string().optional().default(''),

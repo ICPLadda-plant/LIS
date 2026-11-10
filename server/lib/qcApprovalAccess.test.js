@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { approvalTabsFor } = require('./qcApprovalAccess');
+const { approvalTabsFor, canIssueFinalReport } = require('./qcApprovalAccess');
 const { buildBatchCallbackBody } = require('./productionCallback');
 
 const groups = [{ id: 'qc', paths: ['/physical-inspection', '/qc-approval'] }];
@@ -22,6 +22,12 @@ test('page access through a group grants both tabs unless denied', () => {
 
 test('no page access means no tabs', () => {
   assert.deepStrictEqual(approvalTabsFor({ roles: ['qc-staff'], permissions: ['/qc-testing'], groups }), []);
+});
+
+test('only users who see both physical and AI results can issue the Final Report', () => {
+  assert.strictEqual(canIssueFinalReport(['qc', 'lab']), true);
+  assert.strictEqual(canIssueFinalReport(['qc']), false);
+  assert.strictEqual(canIssueFinalReport([]), false);
 });
 
 test('batch callback targets one production batch of the request', () => {

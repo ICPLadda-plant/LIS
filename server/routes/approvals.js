@@ -7,7 +7,7 @@ const QCTestResult = require('../models/QCTestResult');
 const { notifyPetitionEvent } = require('../lib/lineNotify');
 const { serializePetitionWrite } = require('../lib/petitionWriteQueue');
 const { additionalSampleCompletionError } = require('../lib/additionalSamples');
-const { resolveApprovalTabs } = require('../lib/qcApprovalAccess');
+const { resolveApprovalTabs, canIssueFinalReport } = require('../lib/qcApprovalAccess');
 const { notifyProductionBatches } = require('../lib/productionCallback');
 const {
   itemRequiresSide,
@@ -143,7 +143,8 @@ router.post('/petitions/:id/items', serializePetitionWrite(async (req, res) => {
       petition.completedAt = null;
       petition.reviewHistory.push({ action: 'reject', reviewedBy: actor, reviewedAt: now, note: `รายการที่ ${seqLabel} (${sideLabel}): ${note}` });
     } else {
-      finalPayload = await finalizeIfComplete(petition, actor);
+      // QC Approver อนุมัติครบ = Pre Result; ปิดใบเป็น Final ได้เฉพาะผู้ที่ออก Final Report ได้
+      finalPayload = canIssueFinalReport(tabs) ? await finalizeIfComplete(petition, actor) : null;
     }
 
     await petition.save();
@@ -163,6 +164,35 @@ router.post('/petitions/:id/items', serializePetitionWrite(async (req, res) => {
     const batches = decision === 'approve' ? newlyApprovedBatches(petition, batchesBefore) : [];
     if (batches.length) notifyProductionBatches(petition, batches);
 
+    res.json(petition.toObject());
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
+// POST /api/approvals/petitions/:id/final
+// ออก Final Report ของคำร้องที่อนุมัติครบทุกรายการแล้ว (Pre Result) — เฉพาะหัวหน้า QC / admin
+router.post('/petitions/:id/final', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    const tabs = await resolveApprovalTabs(user);
+    if (!canIssueFinalReport(tabs)) {
+      return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์ออก Final Report' } });
+    }
+    const petition = await Petition.findById(req.params.id);
+    if (!petition) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (CLOSED.includes(petition.status)) return res.status(409).json({ error: { message: 'คำร้องนี้ปิดแล้ว' } });
+    if (!allItemsApproved(petition)) {
+      return res.status(409).json({ error: { message: 'ยังมีรายการที่รออนุมัติ' } });
+    }
+    const actor = user.name || user.email;
+    const finalPayload = await finalizeIfComplete(petition, actor);
+    if (!finalPayload) {
+      return res.status(409).json({ error: { message: 'ยังออก Final Report ไม่ได้ — ตัวอย่างเพิ่มยังบันทึกผลไม่ครบ' } });
+    }
+    await petition.save();
+    writeAudit(petition, finalPayload, true);
     res.json(petition.toObject());
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });

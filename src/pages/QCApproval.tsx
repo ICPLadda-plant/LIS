@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/lis/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShieldCheck, AlertTriangle, RotateCcw, Sparkles, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { ShieldCheck, AlertTriangle, RotateCcw, Sparkles, Loader2, Eye } from "lucide-react";
 import { usePetitionList } from "@/hooks/usePetition";
 import type { Petition } from "@/types/petition.types";
 import { formatDateTime } from "@/lib/dateTime";
@@ -12,13 +12,11 @@ import PageHeader from "@/components/lis/PageHeader";
 import { DataTable, type DataTableColumn } from "@/components/lis/DataTable";
 import { getAiStatus, streamDraftNote } from "@/lib/aiApi";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
 import { useAccessibleTabs } from "@/hooks/useAccessibleTabs";
-import { sideApprovalProgress, type ApprovalSide } from "@/lib/itemApprovals";
-
-const API_BASE = import.meta.env.BASE_URL + "api";
+import { awaitingFinalReport, sideApprovalState, type ApprovalSide } from "@/lib/itemApprovals";
+import SideApprovalBadge from "@/components/lis/approval/SideApprovalBadge";
 
 function priorityScore(
   petition: Petition,
@@ -46,7 +44,6 @@ const QCApproval = () => {
   const petitions = useMemo(() => petitionData?.items ?? [], [petitionData?.items]);
   const petitionIds = useMemo(() => petitions.map((petition) => petition._id).join(","), [petitions]);
 
-  const [testersMap, setTestersMap] = useState<Record<string, string[]>>({});
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
@@ -62,17 +59,25 @@ const QCApproval = () => {
       ),
     [petitions, abnormalMap, returnedMap],
   );
-  // แต่ละ tab แสดงเฉพาะคำร้องที่ฝั่งนั้นยืนยันผลแล้วและยังมีรายการรออนุมัติ
-  const hasPendingItems = (petition: Petition, side: ApprovalSide) => {
-    const progress = sideApprovalProgress(petition, side);
-    return progress.total > 0 && progress.pending > 0;
-  };
-  const qcPetitions = sortedPetitions.filter((petition) => !!petition.qcCompletedAt && hasPendingItems(petition, "qc"));
-  const labPetitions = sortedPetitions.filter((petition) => !!petition.labCompletedAt && hasPendingItems(petition, "lab"));
   const { isVisible } = useAccessibleTabs("/qc-approval");
   const showQcTab = isVisible("qc");
   const showLabTab = isVisible("lab");
-  const visibleCount = (showQcTab ? qcPetitions.length : 0) + (showLabTab ? labPetitions.length : 0);
+  // QC Approver เห็นแค่ฝั่งกายภาพ; หัวหน้า QC / admin เห็นทั้งกายภาพและ AI
+  const visibleSides = useMemo<ApprovalSide[]>(
+    () => [showQcTab && "qc", showLabTab && "lab"].filter(Boolean) as ApprovalSide[],
+    [showQcTab, showLabTab],
+  );
+  // หัวหน้า QC / admin ออก Final Report ได้ จึงเห็นคำร้องที่ออก Pre Result แล้วด้วย
+  const canIssueFinal = showQcTab && showLabTab;
+  // แสดงคำร้องที่มีอย่างน้อยหนึ่งฝั่ง (ที่ผู้ใช้เห็น) ยืนยันผลแล้วและรอตัดสิน หรือรอออก Final Report
+  const pendingPetitions = sortedPetitions.filter((petition) =>
+    visibleSides.some((side) => sideApprovalState(petition, side).kind === "pending") ||
+    (canIssueFinal && awaitingFinalReport(petition)),
+  );
+  const detailPath = (petition: Petition) => {
+    const side = visibleSides.find((s) => sideApprovalState(petition, s).kind === "pending") ?? visibleSides[0] ?? "qc";
+    return `/qc-approval/${petition._id}?tab=${side}`;
+  };
 
   useEffect(() => {
     getAiStatus().then((s) => setOllamaAvailable(s.available));
@@ -80,24 +85,12 @@ const QCApproval = () => {
 
   useEffect(() => {
     if (petitions.length === 0) {
-      setTestersMap({});
       setAbnormalMap({});
       setReturnedMap({});
       return;
     }
     const ids = petitions.map((p) => p._id);
-    const idsParam = ids.join(",");
     let alive = true;
-    fetch(`${API_BASE}/qc-results/testers?petitionIds=${encodeURIComponent(idsParam)}`, {
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((map: Record<string, string[]>) => {
-        if (alive) setTestersMap(map || {});
-      })
-      .catch(() => {
-        if (alive) setTestersMap({});
-      });
     api.getAbnormalFlags(ids, { includeRestricted: true })
       .then((map) => {
         if (alive) setAbnormalMap(map || {});
@@ -119,7 +112,7 @@ const QCApproval = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [petitionIds]);
 
-  const columns = (side: "qc" | "lab"): DataTableColumn<Petition>[] => [
+  const columns: DataTableColumn<Petition>[] = [
     {
       key: "no",
       header: "เลขที่คำร้อง",
@@ -137,6 +130,9 @@ const QCApproval = () => {
             )}
           </div>
           <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+            {canIssueFinal && awaitingFinalReport(p) && (
+              <Badge variant="blue-soft">Pre Result · รอออก Final Report</Badge>
+            )}
             {abnormalMap[p._id] && (
               <span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
                 ผิดปกติ
@@ -162,37 +158,20 @@ const QCApproval = () => {
       cell: (p) => <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge>,
     },
     { key: "submitter", header: "ผู้นำส่ง", cell: (p) => p.submittedBy?.name ?? "-" },
-    {
-      key: "testers",
-      header: "ผู้ทดสอบ",
-      className: "max-w-[200px] text-sm text-muted-foreground align-top",
-      cell: (p) => {
-        const testers = testersMap[p._id] ?? [];
-        return testers.length > 0 ? (
-          <div className="flex flex-col gap-0.5">
-            {testers.map((name) => (
-              <span key={name}>{name}</span>
-            ))}
-          </div>
-        ) : (
-          "-"
-        );
-      },
-    },
-    {
-      key: "count",
-      header: "อนุมัติแล้ว",
-      cell: (p) => {
-        const progress = sideApprovalProgress(p, side);
-        return `${progress.approved}/${progress.total} รายการ`;
-      },
-    },
+    ...visibleSides.map((side): DataTableColumn<Petition> => ({
+      key: `status-${side}`,
+      header: side === "qc" ? "กายภาพ" : "AI",
+      cell: (p) => <SideApprovalBadge state={sideApprovalState(p, side)} showApprover />,
+    })),
     {
       key: "submittedAt",
-      header: "ยืนยันผลเมื่อ",
+      header: "ยืนยันผลล่าสุด",
       cell: (p) => {
-        const value = side === "qc" ? p.qcCompletedAt : p.labCompletedAt;
-        return formatDateTime(value);
+        const times = visibleSides
+          .map((side) => (side === "qc" ? p.qcCompletedAt : p.labCompletedAt))
+          .filter((value): value is string => Boolean(value))
+          .sort();
+        return formatDateTime(times[times.length - 1]);
       },
     },
     {
@@ -201,32 +180,18 @@ const QCApproval = () => {
       className: "text-right",
       cell: (p) => (
         <div className="flex flex-col items-end gap-2">
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
-              size="sm"
-              variant="primary"
-              className="gap-1.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/qc-approval/${p._id}?tab=${side}&decision=approve`);
-              }}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              อนุมัติ
-            </Button>
-            <Button
-              size="sm"
-              variant="danger-outline"
-              className="gap-1.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/qc-approval/${p._id}?tab=${side}&decision=reject`);
-              }}
-            >
-              <XCircle className="h-4 w-4" />
-              ไม่อนุมัติ
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant="primary"
+            className="gap-1.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(detailPath(p));
+            }}
+          >
+            <Eye className="h-4 w-4" />
+            ดูรายละเอียด
+          </Button>
 
           {ollamaAvailable && (
             <div className="mt-1 space-y-2 w-full" onClick={(e) => e.stopPropagation()}>
@@ -283,37 +248,18 @@ const QCApproval = () => {
               ออก Final Result
             </span>
           }
-          description={`ตรวจสอบและอนุมัติผลทีละรายการ (batch × common name) · ${visibleCount} คำร้องรออนุมัติ`}
+          description={`เปิดดูรายละเอียดเพื่อให้ผล${showLabTab ? "กายภาพ / AI หรือออก Final Report" : "กายภาพ"} · ${pendingPetitions.length} คำร้องรอตัดสิน`}
         />
 
-        <Tabs defaultValue={showQcTab ? "qc" : "lab"} key={showQcTab ? "qc" : "lab"} className="space-y-4">
-          <TabsList>
-            {showQcTab && <TabsTrigger value="qc">ผล QC ({qcPetitions.length})</TabsTrigger>}
-            {showLabTab && <TabsTrigger value="lab">ผล Lab ({labPetitions.length})</TabsTrigger>}
-          </TabsList>
-          {showQcTab && <TabsContent value="qc">
-            <DataTable
-              columns={columns("qc")}
-              data={qcPetitions}
-              rowKey={(p) => p._id}
-              isLoading={petitionLoading}
-              onRowClick={(p) => navigate(`/qc-approval/${p._id}?tab=qc`)}
-              emptyTitle="ไม่มีผล QC ที่ยืนยันแล้ว"
-              tableClassName="min-w-[800px]"
-            />
-          </TabsContent>}
-          {showLabTab && <TabsContent value="lab">
-            <DataTable
-              columns={columns("lab")}
-              data={labPetitions}
-              rowKey={(p) => p._id}
-              isLoading={petitionLoading}
-              onRowClick={(p) => navigate(`/qc-approval/${p._id}?tab=lab`)}
-              emptyTitle="ไม่มีผล Lab ที่ยืนยันแล้ว"
-              tableClassName="min-w-[800px]"
-            />
-          </TabsContent>}
-        </Tabs>
+        <DataTable
+          columns={columns}
+          data={pendingPetitions}
+          rowKey={(p) => p._id}
+          isLoading={petitionLoading}
+          onRowClick={(p) => navigate(detailPath(p))}
+          emptyTitle="ไม่มีคำร้องที่รอตัดสินผล"
+          tableClassName="min-w-[800px]"
+        />
       </div>
     </AppLayout>
   );

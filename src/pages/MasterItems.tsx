@@ -415,6 +415,33 @@ function getImageUrls(item: MasterItem): string[] {
   return [];
 }
 
+// รูปจากระบบ Product ID (server เติมให้ใน field productMedia) แยกจาก imageUrls ที่ผู้ใช้ LIS ตั้งเอง
+type ProductMedia = {
+  label: string;
+  kind: "image" | "video";
+  url: string;
+  thumbUrl: string;
+  source: "packaging" | "spec";
+};
+
+function getProductMedia(item: MasterItem): ProductMedia[] {
+  const raw = item.productMedia;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const media = entry as Record<string, unknown>;
+    const url = typeof media.url === "string" ? media.url : "";
+    if (!url) return [];
+    return [{
+      label: typeof media.label === "string" ? media.label : "",
+      kind: media.kind === "video" ? "video" : "image",
+      url,
+      thumbUrl: typeof media.thumbUrl === "string" && media.thumbUrl ? media.thumbUrl : url,
+      source: media.source === "spec" ? "spec" : "packaging",
+    } satisfies ProductMedia];
+  });
+}
+
 // Escape regex-special chars so a method label/code can be matched literally.
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1363,7 +1390,8 @@ export default function MasterItems() {
                       const rowKey = getItemId(item) || originalItemNo || `row-${index}`;
                       const active = isItemActive(item);
                       const imageUrls = getImageUrls(item);
-                      const imageUrl = imageUrls[0] ?? "";
+                      const productThumb = getProductMedia(item).find((media) => media.kind === "image")?.thumbUrl ?? "";
+                      const imageUrl = imageUrls[0] ?? productThumb;
                       const itemName = displayValue(firstValue(item, nameKeys));
                       return (
                         <TableRow
@@ -2863,6 +2891,7 @@ function MasterItemDetailDrawer({
   const code = displayValue(originalItemNo || firstValue(item, codeKeys));
   const name = displayValue(firstValue(item, nameKeys));
   const imageUrls = getImageUrls(item);
+  const productMedia = getProductMedia(item);
   const hasExtra =
     extraColumns.length > 0 && extraColumns.some((key) => String(item[key] ?? "").trim() !== "");
 
@@ -2954,6 +2983,41 @@ function MasterItemDetailDrawer({
                     alt={`รูปสินค้า ${name} ${index + 1}`}
                     className="h-40 w-full rounded-lg border bg-muted object-contain"
                   />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {productMedia.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">รูปจาก Product ID</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {productMedia.map((media, index) => (
+                  <figure key={media.url + index} className="space-y-1">
+                    {media.kind === "video" ? (
+                      <video
+                        src={media.url}
+                        controls
+                        preload="metadata"
+                        className="h-40 w-full rounded-lg border bg-muted object-contain"
+                      />
+                    ) : (
+                      <a href={media.url} target="_blank" rel="noopener noreferrer" title="เปิดรูปขนาดเต็ม">
+                        <img
+                          src={media.thumbUrl}
+                          alt={(media.label || "รูปสินค้า") + " " + name}
+                          loading="lazy"
+                          className="h-40 w-full rounded-lg border bg-muted object-contain"
+                        />
+                      </a>
+                    )}
+                    <figcaption className="flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                      <span className="truncate">{media.label || "-"}</span>
+                      <Badge variant="secondary" className="shrink-0 text-[10px]">
+                        {media.source === "spec" ? "Spec" : "Packaging"}
+                      </Badge>
+                    </figcaption>
+                  </figure>
                 ))}
               </div>
             </section>

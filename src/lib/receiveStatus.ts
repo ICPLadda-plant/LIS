@@ -1,6 +1,7 @@
 import type { Petition, PetitionStatus } from '@/types/petition.types';
 import { statusBadge, toneBadge, type StatusBadge, type PetitionStatusStep } from './statusBadge';
 import { isLabAwaitingSgConfirmation, SG_PENDING_LABEL } from './sgConfirmation';
+import { labelReceiptProgress } from './labelReceipt';
 
 /**
  * Per-side receive status (Lab / QC), with legacy backward-compat.
@@ -48,6 +49,13 @@ export function qcReceivedBy(p: ReceiveFields): string | undefined {
   return p.qcReceivedBy ?? (isLegacyReceived(p) ? p.receivedBy : undefined);
 }
 
+/** ป้าย "รอรับ" — คำขอที่รับทีละป้ายแล้วบางส่วนแสดงความคืบหน้า เช่น "รับแล้ว 1/2 ป้าย" */
+function waitingReceiveBadge(p: ReceiveFields, side: 'qc' | 'lab'): StatusBadge {
+  // caller บางจุดส่งมาเฉพาะ field รับตัวอย่าง (ไม่มี items/เลขป้าย) — helper คืน null เอง
+  const progress = labelReceiptProgress(p as unknown as Petition, side);
+  return progress?.received ? toneBadge('warning', `รับแล้ว ${progress.received}/${progress.total} ป้าย`) : toneBadge('warning', 'รอรับ');
+}
+
 /**
  * สถานะที่โชว์ในลิสต์ "การทดสอบ Lab" — อิง track ของ Lab เอง ไม่ใช่ status รวม.
  *
@@ -68,7 +76,7 @@ export function labTrackStatusBadge(p: ReceiveFields & { status: PetitionStatus 
   if (p.labCompletedAt) return toneBadge('warning', 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ');
   // caller บางจุดส่งมาเฉพาะ field รับตัวอย่าง (ไม่มี items) — helper คืน false เองเมื่อไม่มี items
   if (isLabAwaitingSgConfirmation(p as unknown as Petition)) return toneBadge('warning', SG_PENDING_LABEL);
-  if (!labReceivedAt(p)) return toneBadge('warning', 'รอรับ');
+  if (!labReceivedAt(p)) return waitingReceiveBadge(p, 'lab');
   if (!p.assignedTo) return toneBadge('info', 'Lab รับงานแล้ว รอ assign');
   if (!isLabWorkAccepted(p)) return toneBadge('warning', 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ');
   return toneBadge('info', 'เจ้าหน้าที่กำลังดำเนินการวิเคราะห์');
@@ -105,7 +113,7 @@ export function labAssignBoardStatusBadge(
  * ควรเห็นเฉพาะความคืบหน้าของ track QC เอง ก่อน QC รับให้โชว์ "รอรับ" เสมอ
  */
 export function qcTrackStatusBadge(p: ReceiveFields & { status: PetitionStatus }): StatusBadge {
-  if (!qcReceivedAt(p)) return toneBadge('warning', 'รอรับ');
+  if (!qcReceivedAt(p)) return waitingReceiveBadge(p, 'qc');
   if (['success', 'approved', 'rejected'].includes(p.status)) return statusBadge(p.status);
   if (p.status === 'deliveringQC') return statusBadge('pendingReview');
   if (p.qcCompletedAt) return toneBadge('warning', 'รอ Final Result');

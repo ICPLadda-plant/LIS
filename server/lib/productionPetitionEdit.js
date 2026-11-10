@@ -6,7 +6,7 @@ const { normalizePetitionItems } = require('./petitionSubmissionRules');
 const SUFFIX_PREFIXES = ['Item: ', 'MF: ', 'Priority: '];
 
 function petitionReceived(petition) {
-  return Boolean(petition?.qcReceivedAt || petition?.labReceivedAt || petition?.receivedAt);
+  return Boolean(petition?.qcReceivedAt || petition?.labReceivedAt || petition?.receivedAt || petition?.labelReceipts?.length);
 }
 
 // ยังไม่มีใครรับตัวอย่าง = ฝ่ายผลิตแก้ได้ทั้งใบ
@@ -24,6 +24,12 @@ function quantityLabel(qty, unit) {
 
 function qtyList(value) {
   return (Array.isArray(value) ? value : []).map(text).filter((qty) => Number(qty) > 0);
+}
+
+// mirror src/lib/samplePart.ts normalizeSamplePart
+function samplePart(value) {
+  const part = text(value).replace(/\s+/g, ' ');
+  return ['ทั่วไป/รวม', 'ทั่วไป', 'รวม'].includes(part) ? '' : part;
 }
 
 function flag(value, fallback) {
@@ -78,6 +84,9 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
       lotNo: text(row.lotNo),
       productionDate,
       packageUnit: text(row.packsize),
+      // ส่วนตัวอย่าง + รหัสบรรทัดจาก Production (Production รุ่นเดิมไม่ส่งมา = คงค่าเดิมของรายการ)
+      part: row.part !== undefined ? samplePart(row.part) || undefined : old.part,
+      lineRef: row.lineRef !== undefined ? text(row.lineRef) || undefined : old.lineRef,
       sendToQc,
       sendToLab,
       sampleQuantity: portions.length || (split ? 2 : 1),
@@ -103,7 +112,7 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
 // (LIS อาจรวม QC/Lab ของ batch เดียวกันเป็นรายการเดียว จึงรวมหมายเหตุที่ไม่ซ้ำกัน)
 function applyItemNotes(items, itemNotes, fallbackNote) {
   const list = Array.isArray(itemNotes) ? itemNotes : [];
-  const key = (it) => `${text(it.batchNo).toLowerCase()}|${text(it.sampleName).toLowerCase()}`;
+  const key = (it) => `${text(it.batchNo).toLowerCase()}|${text(it.sampleName).toLowerCase()}|${samplePart(it.part).toLowerCase()}`;
   return (items || []).map((item, index) => {
     if (!list.length) return { ...item, note: replaceProductionNote(item.note, fallbackNote) };
     let matched = list.filter((n) => key(n) === key(item));

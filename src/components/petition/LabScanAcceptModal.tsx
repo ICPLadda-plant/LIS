@@ -12,8 +12,10 @@ import { isAssignedTo } from '@/lib/assignment';
 import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/petitionRouting';
 import { isLabAwaitingSgConfirmation, SG_PENDING_LABEL } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
-import { additionalSamplePayload, extractScannedCode, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
+import { additionalSamplePayload, extractScannedCode, extractScannedItemSeq, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
+import { labelReceiptStatus, pickScannedLabels, type SideLabel } from '@/lib/labelReceipt';
 import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
+import LabelReceiptPicker from '@/components/petition/LabelReceiptPicker';
 
 const READER_ID = 'lab-accept-qr-reader';
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
@@ -48,6 +50,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
   const [petition, setPetition] = useState<Petition | null>(null);
   const [pendingId, setPendingId] = useState('');
   const [additionalRequest, setAdditionalRequest] = useState<AdditionalSampleRequest | null>(null);
+  const [labelChoices, setLabelChoices] = useState<SideLabel[] | null>(null);
+  const [labelKeys, setLabelKeys] = useState<string[]>([]);
+  const [receiptText, setReceiptText] = useState('');
   const scanBusy = useRef(false);
   const receiveBusy = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -59,6 +64,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       scanBusy.current = false;
       receiveBusy.current = false;
       setAdditionalRequest(null);
+      setLabelChoices(null);
+      setLabelKeys([]);
+      setReceiptText('');
       setPhase('scanning');
       setPetition(null);
       setPendingId('');
@@ -80,6 +88,8 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
         throw new Error('คุณไม่มีสิทธิ์รับตัวอย่างฝั่ง LAB');
       }
       setAdditionalRequest(request ?? null);
+      setLabelChoices(null);
+      setLabelKeys([]);
 
       // Must have at least one lab item
       if (labReceivableItems(found).length === 0) {
@@ -113,6 +123,17 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       if (!request && found.labReceivedAt && !(claimOnReceive && !found.assignedTo)) {
         onAccepted();
         return;
+      }
+
+      const labelPick = request ? null : pickScannedLabels(found, 'lab', extractScannedItemSeq(rawCode));
+      if (labelPick && 'error' in labelPick) {
+        setErrorMsg(`${found.petitionNo}: ${labelPick.error}`);
+        setPhase('error');
+        return;
+      }
+      if (labelPick && 'labels' in labelPick) {
+        setLabelChoices(labelPick.labels);
+        setLabelKeys(labelPick.keys);
       }
 
       setPetition(found);
@@ -187,7 +208,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
 
   async function confirmAccept() {
     const id = petition?._id || pendingId;
-    if (!id || receiveBusy.current || phase !== 'confirming') return;
+    if (!id || receiveBusy.current || phase !== 'confirming' || (labelChoices && !labelKeys.length)) return;
     receiveBusy.current = true;
     setPhase('loading');
     try {
@@ -197,13 +218,19 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
           actor: user?.name || user?.email,
           side: 'lab',
           ...additionalSamplePayload(additionalRequest),
+          ...(labelChoices ? { labelKeys } : {}),
         });
         updated = received.data.data;
       }
-      if (claimOnReceive && !updated.assignedTo?.employeeId) {
+      // รับทีละป้าย: รอรับครบทุกป้ายก่อนจึงกดรับงาน (claim)
+      if (claimOnReceive && !updated.assignedTo?.employeeId && updated.labReceivedAt) {
         // server ใช้ตัวตนจาก session; employeeId ใช้เฉพาะ role จำลองตอน dev
         const claimed = await api.post<Petition>(`/petitions/${id}/claim`, { employeeId: user?.employeeId });
         updated = claimed.data.data;
+      }
+      if (labelChoices) {
+        const picked = labelChoices.filter((label) => labelKeys.includes(label.key)).map((label) => label.label).join(', ');
+        setReceiptText(`${picked} · ${labelReceiptStatus(labelChoices, labelKeys).text}`);
       }
       setPetition(updated);
       setPhase('success');
@@ -219,6 +246,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     scanBusy.current = false;
     receiveBusy.current = false;
     setAdditionalRequest(null);
+    setLabelChoices(null);
+    setLabelKeys([]);
+    setReceiptText('');
     setPetition(null);
     setPendingId('');
     setErrorMsg('');
@@ -228,6 +258,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
   if (!open) return null;
 
   const labItemCount = petition ? labReceivableItems(petition).length : 0;
+  const labelStatus = labelChoices ? labelReceiptStatus(labelChoices, labelKeys) : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -309,9 +340,13 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-lg font-bold text-primary">{petition.petitionNo}</span>
-                <Badge variant={PETITION_STATUS_CONFIG.pendingReview.variant}>
-                  → {PETITION_STATUS_CONFIG.pendingReview.label}
-                </Badge>
+                {labelStatus && !labelStatus.complete ? (
+                  <Badge variant="yellow-soft">{labelStatus.text}</Badge>
+                ) : (
+                  <Badge variant={PETITION_STATUS_CONFIG.pendingReview.variant}>
+                    → {PETITION_STATUS_CONFIG.pendingReview.label}
+                  </Badge>
+                )}
               </div>
               <div className="text-sm space-y-1 text-muted-foreground">
                 {additionalRequest && <p className="font-semibold text-foreground">ตัวอย่างเพิ่ม · LAB · {additionalRequest.reason}</p>}
@@ -321,11 +356,12 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
                   <p>มอบหมายให้: <span className="font-medium text-primary">{petition.assignedTo.name}</span></p>
                 )}
               </div>
+              {labelChoices && <LabelReceiptPicker labels={labelChoices} selected={labelKeys} onChange={setLabelKeys} />}
               <div className="flex gap-2 pt-2">
                 <Button variant="ghost" className="flex-1" onClick={rescan}>
                   {manualOnly ? 'กรอกใหม่' : 'สแกนใหม่'}
                 </Button>
-                <Button variant="primary" className="flex-1" onClick={confirmAccept}>
+                <Button variant="primary" className="flex-1" onClick={confirmAccept} disabled={!!labelChoices && !labelKeys.length}>
                   รับงาน
                 </Button>
               </div>
@@ -335,8 +371,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
           {phase === 'success' && petition && (
             <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-5 text-center space-y-2">
               <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto" />
-              <p className="text-base font-bold text-green-700 dark:text-green-300">รับงานแล้ว</p>
+              <p className="text-base font-bold text-green-700 dark:text-green-300">{receiptText ? 'รับตัวอย่างแล้ว' : 'รับงานแล้ว'}</p>
               <p className="text-sm text-muted-foreground">{petition.petitionNo}</p>
+              {receiptText && <p className="text-sm text-muted-foreground">{receiptText}</p>}
             </div>
           )}
 

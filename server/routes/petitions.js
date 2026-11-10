@@ -46,7 +46,7 @@ const {
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
 const { canEditWholePetition } = require('../lib/productionPetitionEdit');
-const { assignMissingSampleLabelNumbers } = require('../lib/sampleLabelNumber');
+const { assignMissingSampleLabelNumbers, planLabelReceipt } = require('../lib/sampleLabelNumber');
 const { sendProductionCancel } = require('../lib/productionCallback');
 const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
 
@@ -1320,6 +1320,26 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
       return res.status(409).json({ error: { message: 'รอ QC ยืนยันค่า ถพ. ก่อน Lab จึงรับตัวอย่างได้' } });
     }
     const now = new Date();
+    const sideLabel = side === 'lab' ? 'Lab' : 'QC';
+    const versionGuard = { ...q, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v };
+    // คำขอที่มีหลายเลขป้ายต่อฝั่ง: รับทีละป้าย และนับว่าฝั่งนี้รับแล้วเมื่อครบทุกป้าย
+    const labelPlan = planLabelReceipt(before, side, req.body || {});
+    if (labelPlan?.error) return res.status(409).json({ error: { message: labelPlan.error } });
+    const labelPush = labelPlan ? { $push: { labelReceipts: { $each: labelPlan.keys.map((key) => ({ key, side, receivedAt: now, receivedBy: actor })) } } } : {};
+    const labelNote = labelPlan ? ` ป้าย ${labelPlan.labels.join(', ')} (${labelPlan.receivedCount}/${labelPlan.total})` : '';
+    if (labelPlan && !labelPlan.complete) {
+      const doc = await Petition.findOneAndUpdate(versionGuard, { ...labelPush, $inc: { __v: 1 } }, { new: true });
+      if (!doc) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
+      logAudit(doc, {
+        event: 'received',
+        fromStatus: before.status,
+        toStatus: doc.status,
+        actor,
+        note: `${sideLabel} รับตัวอย่าง${labelNote}`,
+        metadata: { side, labelKeys: labelPlan.keys, partial: true },
+      });
+      return res.json(doc);
+    }
     const update = {
       [`${side}ReceivedBy`]: actor,
       [`${side}ReceivedAt`]: now,
@@ -1336,15 +1356,15 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
       update.receivedBy = actor;
       update.receivedAt = now;
     }
-    const doc = await Petition.findOneAndUpdate({ ...q, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v }, { $set: update, $inc: { __v: 1 } }, { new: true });
+    const doc = await Petition.findOneAndUpdate(versionGuard, { $set: update, ...labelPush, $inc: { __v: 1 } }, { new: true });
     if (!doc) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
     logAudit(doc, {
       event: 'received',
       fromStatus: before.status,
       toStatus: doc.status,
       actor,
-      note: side === 'lab' ? 'Lab รับตัวอย่าง' : 'QC รับตัวอย่าง',
-      metadata: { side },
+      note: `${sideLabel} รับตัวอย่าง${labelNote}`,
+      metadata: labelPlan ? { side, labelKeys: labelPlan.keys } : { side },
     });
     res.json(doc);
   } catch (err) {

@@ -27,3 +27,10 @@ export function mediaUrlsFromValue(raw: unknown): string[] {
     .filter((v) => /\/uploads\//.test(v) && MEDIA_EXT_RE.test(v));
   return urls.length > 0 && urls.length === list.length ? urls : [];
 }
+
+/** เหมือน mediaUrlsFromValue แต่รับข้อความที่ถูกแปลงจาก array แล้ว เช่น "a.jpg,b.jpg" หรือ "a.jpg, b.jpg" */
+export function mediaUrlsFromText(text: unknown): string[] {
+  if (Array.isArray(text)) return mediaUrlsFromValue(text);
+  if (typeof text !== "string") return [];
+  return mediaUrlsFromValue(text.split(/\s*,\s*/));
+}

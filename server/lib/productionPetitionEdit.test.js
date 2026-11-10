@@ -44,6 +44,31 @@ describe('productionPetitionEdit', () => {
     });
   });
 
+  test('stores the sample part and line ref, keeping old values when Production sends none', () => {
+    const items = buildEditedItems(
+      [{ seq: 1, sampleName: 'A', batchNo: 'B1', part: 'บน', lineRef: '7' }, { seq: 2, sampleName: 'A', batchNo: 'B1', part: 'กลาง', lineRef: '8' }],
+      [
+        { sampleName: 'A', batchNo: 'B1', qty: '10', unit: 'G', part: 'ล่าง', lineRef: '7' },
+        { sampleName: 'A', batchNo: 'B1', qty: '10', unit: 'G' },
+        { sampleName: 'A', batchNo: 'B1', qty: '10', unit: 'G', part: 'ทั่วไป/รวม', lineRef: '' },
+      ],
+      { petitionNo: 'P1' },
+    );
+    expect(items.map(({ part, lineRef }) => ({ part, lineRef }))).toEqual([
+      { part: 'ล่าง', lineRef: '7' },
+      { part: 'กลาง', lineRef: '8' },
+      { part: undefined, lineRef: undefined },
+    ]);
+  });
+
+  test('matches per-item notes by batch and sample part', () => {
+    const items = applyItemNotes(
+      [{ seq: 1, sampleName: 'A', batchNo: 'B1', part: 'บน', note: '' }, { seq: 2, sampleName: 'A', batchNo: 'B1', part: 'ล่าง', note: '' }],
+      [{ seq: 1, sampleName: 'A', batchNo: 'B1', part: 'บน', note: 'บน' }, { seq: 2, sampleName: 'A', batchNo: 'B1', part: 'ล่าง', note: 'ล่าง' }],
+    );
+    expect(items.map((it) => it.note)).toEqual(['บน', 'ล่าง']);
+  });
+
   test('replaces only the production note and keeps Item/MF/Priority', () => {
     expect(replaceProductionNote('MF: X | Item: A | MF: X | Priority: urgent', 'ใหม่'))
       .toBe('ใหม่ | Item: A | MF: X | Priority: urgent');

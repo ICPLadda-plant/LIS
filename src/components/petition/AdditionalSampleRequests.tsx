@@ -11,6 +11,8 @@ import { additionalSampleWeights } from '@/lib/additionalSamples';
 import { normalizeRoles } from '@/lib/roles';
 import type { Petition, QCTestResult } from '@/types/petition.types';
 import SampleLabelPrintTemplate from './SampleLabelPrintTemplate';
+import { MediaThumbnails } from '@/components/lis/MediaThumbnails';
+import { mediaUrlsFromValue } from '@/lib/mediaUrls';
 
 const statusLabels = { requested: 'รอนำส่ง', sent: 'นำส่งแล้ว รอรับ', received: 'รับแล้ว' };
 
@@ -23,6 +25,11 @@ function displayValue(value: unknown): string {
   if (Array.isArray(value)) return value.map(displayValue).join(', ');
   if (typeof value === 'object') return Object.entries(value).map(([label, entry]) => `${label}: ${displayValue(entry)}`).join(', ');
   return String(value);
+}
+
+function ResultValue({ value }: { value: unknown }) {
+  const mediaUrls = mediaUrlsFromValue(value);
+  return mediaUrls.length ? <MediaThumbnails urls={mediaUrls} /> : <>{displayValue(value)}</>;
 }
 
 export default function AdditionalSampleRequests({ petition }: { petition: Petition }) {
@@ -72,7 +79,7 @@ export default function AdditionalSampleRequests({ petition }: { petition: Petit
                       <p>{result.sampleName || petition.items.find((item) => item.seq === result.itemSeq)?.sampleName || `รายการ ${result.itemSeq}`}</p>
                       {[result.values, ...(result.entries ?? []), ...(result.valuesPhase2 ? [result.valuesPhase2] : [])].map((values, valueIndex) => (
                         <dl key={valueIndex} className="grid grid-cols-2 gap-x-3 gap-y-1">
-                          {Object.entries(values ?? {}).map(([field, value]) => <div key={field} className="contents"><dt className="break-words text-muted-foreground">{field}</dt><dd className="break-words">{displayValue(value)}</dd></div>)}
+                          {Object.entries(values ?? {}).map(([field, value]) => <div key={field} className="contents"><dt className="break-words text-muted-foreground">{field}</dt><dd className="break-words"><ResultValue value={value} /></dd></div>)}
                         </dl>
                       ))}
                       <p className="text-muted-foreground">บันทึกเมื่อ: {timestamp(result.enteredAt)}{result.enteredBy?.name && ` · ${result.enteredBy.name}`}</p>

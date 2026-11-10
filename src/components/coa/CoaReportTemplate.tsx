@@ -3,6 +3,7 @@ import SIRIPICH_SIGNATURE_URL from "@/assets/siripich-signature.png";
 import COA_FINAL_PAGE_TEMPLATE_URL from "@/assets/coa-final-page-template.png";
 import type { CoaReportPage, CoaReportSample } from "@/lib/coaReport";
 import { isAiContentTestItem } from "@/lib/aiToleranceCriteria";
+import { PrintMediaValue } from "@/components/lis/PrintMediaValue";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
 export const COA_REPORT_CSS = `
@@ -74,7 +75,7 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
       <tr key={`${row.testItem}-${index}`}>
         <td>{row.testItem}</td>
         <td>{row.criteria === "-" ? "" : row.criteria}</td>
-        <td>{result}</td>
+        <td><PrintMediaValue value={row.result}>{result}</PrintMediaValue></td>
       </tr>
     );
   });
@@ -318,7 +319,7 @@ function StandardCoaPage({ page, index }: { page: CoaReportPage; index: number }
             {sample.rows.length ? sample.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 <td>{row.testItem || "-"}</td>
-                <td className="coa-center">{row.result || "-"}{sample.selectedResultsOnly && !isAiContentTestItem(row.testItem) && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</td>
+                <td className="coa-center"><PrintMediaValue value={row.result}>{row.result || "-"}{sample.selectedResultsOnly && !isAiContentTestItem(row.testItem) && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</PrintMediaValue></td>
                 <td className="coa-center">{row.criteria || "-"}</td>
                 <td className="coa-center">{row.method || "-"}</td>
               </tr>

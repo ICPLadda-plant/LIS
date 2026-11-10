@@ -139,6 +139,21 @@ describe("petitionRouting", () => {
 
     expect(duplicateBatchError(items)).toBe("พบ batch ซ้ำ: BATCH002");
   });
+
+  it("allows the same batch for different sample parts or Production line refs", () => {
+    expect(duplicateBatchError([
+      { batchNo: "BATCH003", sendToLab: false, part: "บน" },
+      { batchNo: "BATCH003", sendToLab: false, part: "ล่าง" },
+    ])).toBeNull();
+    expect(duplicateBatchError([
+      { batchNo: "BATCH003", sendToLab: false, lineRef: "1" },
+      { batchNo: "BATCH003", sendToLab: false, lineRef: "2" },
+    ])).toBeNull();
+    expect(duplicateBatchError([
+      { batchNo: "BATCH003", sendToLab: false, part: "ทั่วไป/รวม" },
+      { batchNo: "BATCH003", sendToLab: false },
+    ])).toBe("พบ batch ซ้ำ: BATCH003");
+  });
 });
 
 describe("production send targets (QC / Lab (AI))", () => {

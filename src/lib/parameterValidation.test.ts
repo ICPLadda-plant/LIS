@@ -776,6 +776,47 @@ describe("expandFieldForItem", () => {
     expect(units).toHaveLength(1);
     expect(units[0].key).toBe("ปริมาณสารสำคัญ");
   });
+
+  describe("whole-product standards (ค่า ถพ.)", () => {
+    const sgField: ParameterValueField = {
+      label: "ค่าถพ.",
+      type: "float",
+      unit: "g/cm3",
+      substanceMode: true,
+      substanceStandards: [
+        { substance: "DIFENOCONAZOLE 12.5% + AZOXYSTROBIN 20% W/V SC", operator: "between", value: 1.1, value2: 1.12 },
+        { substance: "PROPANIL 36% W/V EC", operator: "between", value: 1.0, value2: 1.03 },
+        { substance: "ANILOFOS 18% + PROPANIL 36% W/V EC", operator: "between", value: 1.1, value2: 1.13 },
+        { substance: "ABAMECTIN 1.8% W/V EC", operator: "between", value: 0.9, value2: 0.95 },
+      ],
+    };
+
+    it("uses one unit with the whole-product standard for a mixture", () => {
+      const units = expandFieldForItem(sgField, "ANILOFOS 18% + PROPANIL 36% W/V EC");
+      expect(units).toHaveLength(1);
+      expect(units[0].key).toBe("ค่าถพ.::anilofos");
+      expect(units[0].field.label).toBe("ค่าถพ.");
+      expect(units[0].field.standardValue).toBe(1.1);
+      expect(units[0].field.standardValue2).toBe(1.13);
+    });
+
+    it("matches mixtures regardless of order, W/V, IMPORTED and trailing zeros", () => {
+      const units = expandFieldForItem(sgField, "AZOXYSTROBIN 20%+DIFENOCONAZOLE 12.50% SC (IMPORTED)");
+      expect(units).toHaveLength(1);
+      expect(units[0].field.standardValue).toBe(1.1);
+    });
+
+    it("matches an IMPORTED product to the standard set for the same product", () => {
+      const units = expandFieldForItem(sgField, "ABAMECTIN 1.8% W/V EC (IMPORTED)");
+      expect(units[0].field.standardValue).toBe(0.9);
+      expect(findSubstanceStandard(sgField, "ABAMECTIN 1.8% W/V EC (BROWN, IMPORTED)")).toBeUndefined();
+    });
+
+    it("still splits a mixture without a whole-product standard", () => {
+      const units = expandFieldForItem(subField, "ABAMECTIN 1.8% + IMIDACLOPRID 5% W/V EC");
+      expect(units.map((unit) => unit.key)).toEqual(["ปริมาณสารสำคัญ::abamectin", "ปริมาณสารสำคัญ::imidacloprid"]);
+    });
+  });
 });
 
 describe("expandFieldForItem — labelTolerance", () => {

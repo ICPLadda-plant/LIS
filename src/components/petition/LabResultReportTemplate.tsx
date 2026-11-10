@@ -1,5 +1,6 @@
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import type { LabReportPage } from "@/lib/labReport";
+import { PrintMediaValue } from "@/components/lis/PrintMediaValue";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
 export const LAB_REPORT_CSS = `
@@ -134,7 +135,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
                 page.rows.map((r, ri) => (
                   <tr key={ri}>
                     <td className="lr-center">{r.testItem}</td>
-                    <td className="lr-center">{r.result}</td>
+                    <td className="lr-center"><PrintMediaValue value={r.result} /></td>
                     <td className="lr-center">{r.criteria}</td>
                     <td className="lr-center lr-method">{r.method}</td>
                   </tr>
