@@ -1,6 +1,6 @@
 // รับเมลตอบกลับ "อนุมัติออก Final Report" ที่ n8n อ่านได้จากกล่องเมล (ดู lib/finalResultEmail.js)
-// POST /reply { from, subject, body } — ยืนยันด้วยรหัสอ้างอิง [FR:<petitionNo>:<token>] ในหัวเรื่อง
-// (HMAC ต่อใบ × อีเมลผู้อนุมัติ × รอบ) อีเมลผู้ส่งต้องเป็นคนเดียวกับที่ได้รับเมล
+// POST /reply { from, subject, body } — หาใบจากเลขคำขอในหัวเรื่อง "ขออนุมัติออก Final Report P-..."
+// ผู้ส่งต้องได้รับเมลขออนุมัติของรอบปัจจุบัน (finalResultEmail.recipients) และเป็น QC Head
 // และข้อความที่พิมพ์ตอบต้องมีคำว่า "อนุมัติ" (ไม่ใช่ "ไม่อนุมัติ")
 // - รายการที่ยังรออนุมัติ → อนุมัติเป็นผลปกติ (ถ้ามีผลผิดปกติ/มีรายการไม่อนุมัติ ต้องพิจารณาพร้อมเหตุผลในระบบ)
 // - รายการที่ QC Approver อนุมัติไว้แล้ว (Pre Result) คงไว้ตามเดิม
@@ -16,7 +16,7 @@ const { resolveApprovalTabs, canIssueFinalReport } = require('../lib/qcApprovalA
 const { notifyProductionBatches } = require('../lib/productionCallback');
 const { SIDES, itemSideStatus, upsertItemApproval, approvedBatchNos } = require('../lib/itemApprovals');
 const {
-  roundKey, isAwaitingFinal, normalizeEmail, verifyToken, isApprover, parseReplyRef, isApprovalReply, reviewUrl, viewUrl,
+  isAwaitingFinal, normalizeEmail, wasSentTo, isApprover, parseReplyRef, isApprovalReply, reviewUrl, viewUrl,
   notifyRequesterApproved,
 } = require('../lib/finalResultEmail');
 const { approverReplyEmail } = require('../lib/finalResultEmailTemplate');
@@ -40,15 +40,15 @@ async function hasAbnormalResult(petition) {
 const problem = (code, message, petition) => ({ problem: { code, message }, petition });
 
 // ตรวจทุกเงื่อนไขก่อนออกผล — ยังไม่แก้ข้อมูล
-async function evaluate(petitionId, approverEmail, token) {
+async function evaluate(petitionId, approverEmail) {
   const petition = petitionId ? await Petition.findById(petitionId).catch(() => null) : null;
   if (!petition) return problem('not-found', 'ไม่พบคำขอนี้ในระบบ');
   if (petition.status === 'approved') return problem('already-approved', 'คำขอนี้ออก Final Report ไปแล้ว', petition);
   if (!isAwaitingFinal(petition)) {
     return problem('not-awaiting', 'คำขอนี้ไม่ได้อยู่ในสถานะรอออก Final Report แล้ว (อาจถูกส่งกลับแก้ไข)', petition);
   }
-  if (!verifyToken({ petitionId: String(petition._id), approverEmail, key: roundKey(petition) }, token)) {
-    return problem('invalid-token', 'รหัสอ้างอิงไม่ตรงกับผู้ส่ง หรือผลถูกแก้ไขหลังส่งอีเมล กรุณาดำเนินการในระบบ LIS', petition);
+  if (!wasSentTo(petition, approverEmail)) {
+    return problem('not-recipient', 'อีเมลนี้ไม่ได้อยู่ในรายชื่อผู้รับเมลขออนุมัติรอบล่าสุดของคำขอนี้ (หรือผลถูกแก้ไขหลังส่งอีเมล) กรุณาดำเนินการในระบบ LIS', petition);
   }
   const user = await User.findOne({ email: approverEmail }).lean();
   if (!isApprover(user) || !canIssueFinalReport(await resolveApprovalTabs(user))) {
@@ -129,13 +129,13 @@ router.post('/reply', parseRef, serializePetitionWrite(async (req, res) => {
   };
   try {
     const from = normalizeEmail(req.body?.from);
-    if (!req.replyRef) return reply(false, 'no-ref', 'ไม่พบรหัสอ้างอิงในหัวเรื่อง กรุณากดปุ่มในอีเมลขออนุมัติแล้วส่งโดยไม่แก้หัวเรื่อง');
+    if (!req.replyRef) return reply(false, 'no-ref', 'ไม่พบเลขที่คำขอในหัวเรื่อง กรุณากดตอบกลับอีเมลขออนุมัติโดยไม่แก้หัวเรื่อง');
     if (!from) return reply(false, 'bad-request', 'ไม่พบอีเมลผู้ส่ง');
     if (!isApprovalReply(req.body?.body)) {
       const petition = req.body.petitionId ? await Petition.findById(req.body.petitionId) : null;
       return reply(false, 'not-approval', 'ยังไม่ได้ออก Final Report เพราะเมลตอบกลับไม่มีคำว่า "อนุมัติ" ถ้าต้องการอนุมัติ ให้ตอบกลับอีกครั้งโดยพิมพ์ว่า "อนุมัติ"', petition);
     }
-    let result = await evaluate(req.body.petitionId, from, req.replyRef.token);
+    let result = await evaluate(req.body.petitionId, from);
     if (!result.problem) result = await approve(result);
     if (result.problem) return reply(false, result.problem.code, result.problem.message, result.petition);
     const { petition, actor } = result;

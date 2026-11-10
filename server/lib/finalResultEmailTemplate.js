@@ -42,15 +42,24 @@ function infoRows(rows) {
     .join('');
 }
 
-function itemsTable(items = []) {
-  const head = ['#', 'ชื่อตัวอย่าง', 'Batch', 'ส่งตรวจ']
-    .map((h, i) => '<th align="' + (i === 0 ? 'center' : 'left') + '" style="padding:8px 10px;background:' + C.bg + ';color:' + C.muted + ';font-size:12px;font-weight:600;border-bottom:1px solid ' + C.border + '">' + h + '</th>')
-    .join('');
+// ตารางรายการตัวอย่าง + parameter ที่ตรวจและค่าที่ได้ (results = { [seq]: [{ name, values, phase2 }] })
+function paramCell(list) {
+  if (!list || !list.length) return '<span style="color:' + C.muted + '">ยังไม่มีผลบันทึก</span>';
+  return list.map((p) => '<div style="margin:0 0 6px">'
+    + '<div style="font-weight:600;color:' + C.text + '">' + esc(p.name) + (p.phase2 ? ' <span style="color:' + C.muted + ';font-weight:400">(ตรวจซ้ำ)</span>' : '') + '</div>'
+    + (p.values.length ? '<div style="color:' + C.muted + ';font-size:12px;line-height:1.6">' + p.values.map(esc).join('<br>') + '</div>' : '')
+    + '</div>').join('');
+}
+
+function itemsTable(items = [], results = {}) {
+  const th = (h, extra = '') => '<th align="left" style="padding:8px 10px;background:' + C.bg + ';color:' + C.muted + ';font-size:12px;font-weight:600;white-space:nowrap;border-bottom:1px solid ' + C.border + extra + '">' + h + '</th>';
+  const td = (html, extra = '') => '<td valign="top" style="padding:10px;border-bottom:1px solid ' + C.border + ';color:' + C.text + ';font-size:13px;line-height:1.5' + extra + '">' + html + '</td>';
+  const head = th('#', ';text-align:center') + th('ตัวอย่าง / Batch') + th('ส่งตรวจ') + th('Parameter ที่ตรวจ');
   const body = items.map((it) => '<tr>'
-    + '<td align="center" style="padding:8px 10px;border-bottom:1px solid ' + C.border + ';color:' + C.muted + ';font-size:13px">' + esc(it.seq) + '</td>'
-    + '<td style="padding:8px 10px;border-bottom:1px solid ' + C.border + ';color:' + C.text + ';font-size:13px">' + esc(it.sampleName || '-') + '</td>'
-    + '<td style="padding:8px 10px;border-bottom:1px solid ' + C.border + ';color:' + C.text + ';font-size:13px;white-space:nowrap">' + esc(it.batchNo || '-') + '</td>'
-    + '<td style="padding:8px 10px;border-bottom:1px solid ' + C.border + ';color:' + C.text + ';font-size:13px;white-space:nowrap">' + esc(sendTo(it)) + '</td>'
+    + td(esc(it.seq), ';text-align:center;color:' + C.muted)
+    + td(esc(it.sampleName || '-') + '<div style="color:' + C.muted + ';font-size:12px;white-space:nowrap">Batch ' + esc(it.batchNo || '-') + '</div>')
+    + td(esc(sendTo(it)), ';white-space:nowrap')
+    + td(paramCell(results[it.seq]))
     + '</tr>').join('');
   return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid ' + C.border + ';border-radius:6px">'
     + '<tr>' + head + '</tr>' + body + '</table>';
@@ -81,7 +90,7 @@ function layout({ preheader, badge, badgeColor, title, bodyHtml, footer = 'อ�
 }
 
 // เมลถึงหัวหน้า QC — ขอออก Final Report
-function approvalRequestEmail({ petition, approverName, approveUrl, reviewUrl, preview = false }) {
+function approvalRequestEmail({ petition, approverName, approveUrl, reviewUrl, results = {} }) {
   const items = petition.items || [];
   const sb = petition.submittedBy || {};
   const bodyHtml = '<p style="margin:0 0 16px">เรียน ' + esc(approverName) + '</p>'
@@ -93,7 +102,7 @@ function approvalRequestEmail({ petition, approverName, approveUrl, reviewUrl, p
       ['ทดสอบเสร็จเมื่อ', thaiDateTime(petition.completedAt)],
       ['จำนวนตัวอย่าง', items.length + ' รายการ'],
     ]) + '</table>'
-    + itemsTable(items)
+    + itemsTable(items, results)
     + '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 12px"><tr><td>' + button(approveUrl, 'ตอบกลับเพื่ออนุมัติ Final Report') + '</td></tr></table>'
     + '<p style="margin:0;color:' + C.muted + ';font-size:13px">กดปุ่มแล้ว Outlook จะเปิดอีเมลตอบกลับที่พิมพ์คำว่า "อนุมัติ" ไว้ให้ กด "ส่ง" ได้ทันที หรือกด "ตอบกลับ" อีเมลนี้แล้วพิมพ์ว่า "อนุมัติ" ก็ได้ ระบบจะออก Final Report แจ้งผลผู้ขอ และส่งอีเมลยืนยันกลับมา</p>'
     + '<p style="margin:12px 0 0;font-size:13px">ต้องการตรวจรายละเอียดหรือส่งกลับแก้ไข: <a href="' + esc(reviewUrl) + '" style="color:' + C.primary + '">เปิดคำขอในระบบ LIS</a></p>';
@@ -102,15 +111,15 @@ function approvalRequestEmail({ petition, approverName, approveUrl, reviewUrl, p
       preheader: petition.petitionNo + ' · ' + (sb.name || '') + ' · ' + items.length + ' รายการ รอออก Final Report',
       badge: 'รออนุมัติ Final Report',
       badgeColor: { bg: '#FEF6E7', fg: '#B45309' },
-      title: (preview ? '[ตัวอย่าง] ' : '') + 'ขออนุมัติออก Final Report ' + petition.petitionNo,
+      title: 'ขออนุมัติออก Final Report ' + petition.petitionNo,
       bodyHtml,
-      footer: 'อีเมลนี้ส่งอัตโนมัติจากระบบ LIS · ตอบกลับเพื่ออนุมัติได้ โปรดอย่าแก้รหัส [FR:...] ในหัวเรื่อง',
+      footer: 'อีเมลนี้ส่งอัตโนมัติจากระบบ LIS · ตอบกลับเพื่ออนุมัติได้ โปรดอย่าแก้หัวเรื่อง',
     }),
   };
 }
 
 // เมลถึงผู้ขอ — ออก Final Report แล้ว
-function requesterResultEmail({ petition, approverName, viewUrl }) {
+function requesterResultEmail({ petition, approverName, viewUrl, results = {} }) {
   const items = petition.items || [];
   const sb = petition.submittedBy || {};
   const oos = petition.conclusion === 'accepted-oos';
@@ -122,7 +131,7 @@ function requesterResultEmail({ petition, approverName, viewUrl }) {
       ['อนุมัติโดย', approverName],
       ['ออก Final Report เมื่อ', thaiDateTime(petition.approvedAt)],
     ]) + '</table>'
-    + itemsTable(items)
+    + itemsTable(items, results)
     + '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 0"><tr><td>' + button(viewUrl, 'ดูผลในระบบ LIS') + '</td></tr></table>';
   return {
     subject: '[LIS] ออก Final Report แล้ว ' + petition.petitionNo,

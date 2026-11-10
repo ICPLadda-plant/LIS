@@ -6,7 +6,7 @@
 //   node scripts/send-pending-final-result-emails.js --send                  # ส่งใบที่ยังไม่เคยส่งในรอบนี้
 //   node scripts/send-pending-final-result-emails.js --send --force          # ส่งใหม่ทุกใบ (เช่น เปลี่ยนรูปแบบเมล)
 //   node scripts/send-pending-final-result-emails.js --preview-to a@icpladda.com [--petition P-2611-0002]
-//        ส่งตัวอย่าง 1 ฉบับ (หัวเรื่องมี [ตัวอย่าง]) — ปุ่มตอบกลับผูกกับอีเมลนี้ จึงออก Final Report ไม่ได้ถ้าไม่ใช่ QC Head
+//        ส่งตัวอย่าง 1 ฉบับ หน้าตาเหมือนเมลจริง — ผู้รับตัวอย่างไม่อยู่ในรายชื่อผู้รับรอบจริง ตอบกลับแล้วจึงออก Final Report ไม่ได้
 'use strict';
 
 const path = require('path');
@@ -15,7 +15,7 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const mongoose = require('mongoose');
 const Petition = require('../models/Petition');
 const {
-  findApprovers, roundKey, isAwaitingFinal, requestFinalResultApproval, webhookUrl, replyInbox, buildApprovalMail, sendMail,
+  findApprovers, roundKey, isAwaitingFinal, requestFinalResultApproval, webhookUrl, replyInbox, buildApprovalMail, sendMail, loadResultSummary,
 } = require('../lib/finalResultEmail');
 
 const args = process.argv.slice(2);
@@ -35,7 +35,8 @@ async function main() {
       ? await Petition.findOne({ petitionNo: PETITION_NO })
       : await Petition.findOne({ status: 'success', completedAt: { $ne: null } }).sort({ completedAt: 1 });
     if (!p) throw new Error('ไม่พบคำขอสำหรับทำตัวอย่าง');
-    const mail = buildApprovalMail(p, { email: PREVIEW_TO, name: 'ผู้ทดสอบ (ตัวอย่าง)' }, { previewTo: PREVIEW_TO });
+    const [head] = await findApprovers();
+    const mail = buildApprovalMail(p, head || { email: PREVIEW_TO }, { previewTo: PREVIEW_TO, results: await loadResultSummary(p) });
     console.log('ส่งตัวอย่าง', p.petitionNo, '→', PREVIEW_TO, JSON.stringify(await sendMail(mail)));
     return;
   }

@@ -1,15 +1,17 @@
 // ขอออก Final Report ทางอีเมลแบบ "ตอบกลับเพื่ออนุมัติ"
 // 1) ใบที่ทุกฝั่งเสร็จแล้ว (status success) → LIS สร้างเมล HTML แล้วให้ n8n
 //    (workflow "LIS-send-email-report") ส่งผ่าน Outlook ถึง QC Head ทีละคน — ไม่มี execution ค้างรอ
-// 2) ปุ่มในเมลเป็น mailto: เปิดเมลตอบกลับถึงกล่อง FINAL_RESULT_EMAIL_INBOX โดยมีรหัสอ้างอิง
-//    [FR:<petitionNo>:<token>] ในหัวเรื่อง (หัวเรื่องเมลขอก็มีรหัสนี้ จึงกด Reply ปกติของ Outlook ได้เช่นกัน)
+//    หัวเรื่อง "[LIS] ขออนุมัติออก Final Report <petitionNo>" ตารางตัวอย่างแสดง parameter และค่าที่ตรวจ
+// 2) ปุ่มในเมลเป็น mailto: เปิดเมลตอบกลับถึงกล่อง FINAL_RESULT_EMAIL_INBOX (หรือกด Reply ปกติของ Outlook)
 //    → QC Head ส่งเมลตอบกลับที่มีคำว่า "อนุมัติ" = ยืนยันอนุมัติ
+//    ยืนยันตัวตน: ผู้ส่งต้องอยู่ใน finalResultEmail.recipients ของรอบปัจจุบัน (ได้รับเมลรอบนี้จริง)
 // 3) n8n (Outlook Trigger) อ่านเมลตอบกลับ → POST /api/final-result-email/reply → LIS ออก Final Report
 //    แจ้งผู้ขอ และคืนข้อความให้ n8n ตอบกลับหา QC Head
 // ดู route: server/routes/finalResultEmail.js, HTML: lib/finalResultEmailTemplate.js
-const crypto = require('crypto');
 const Petition = require('../models/Petition');
 const User = require('../models/User');
+const QCTestResult = require('../models/QCTestResult');
+const Parameter = require('../models/Parameter');
 const { normalizeRoles } = require('./roles');
 const { approvalRequestEmail, requesterResultEmail } = require('./finalResultEmailTemplate');
 
@@ -18,8 +20,9 @@ const DEFAULT_LIS_BASE = 'https://app-plant.icpladda.com/LIS';
 // บัญชี Outlook ของ credential "Microsoft Outlook account" ใน n8n (ส่งเมลและรับเมลตอบกลับ)
 const DEFAULT_INBOX = 'localservice.plant@icpladda.com';
 const APPROVER_ROLE = 'qc-head';
-const TOKEN_LENGTH = 16;
-const REF_PATTERN = /\[FR:(P-[A-Za-z0-9-]+):([a-f0-9]{16})\]/i;
+const SUBJECT_PREFIX = '[LIS] ขออนุมัติออก Final Report ';
+// เลขคำขอจากหัวเรื่องเมลตอบกลับ (Outlook เติม "RE:" / "ตอบกลับ:" ข้างหน้าได้)
+const SUBJECT_PATTERN = /ขออนุมัติออก Final Report\s+(P-[A-Za-z0-9-]+)/i;
 
 // ตั้งค่าว่าง (FINAL_RESULT_EMAIL_WEBHOOK_URL=) เพื่อปิดการส่งเมล
 function webhookUrl() {
@@ -37,11 +40,7 @@ function replyInbox() {
   return normalizeEmail(process.env.FINAL_RESULT_EMAIL_INBOX || DEFAULT_INBOX);
 }
 
-function emailSecret() {
-  return process.env.FINAL_RESULT_EMAIL_SECRET || process.env.LIS_SESSION_SECRET || process.env.LIS_SSO_SECRET || '';
-}
-
-// รอบ "รอ Final Report" ผูกกับ completedAt — ส่งกลับแก้แล้วครบใหม่ = รอบใหม่ ลิงก์ในเมลเก่าใช้ไม่ได้
+// รอบ "รอ Final Report" ผูกกับ completedAt — ส่งกลับแก้แล้วครบใหม่ = รอบใหม่ เมลรอบเก่าใช้อนุมัติไม่ได้
 function roundKey(petition) {
   const t = petition?.completedAt ? new Date(petition.completedAt).getTime() : 0;
   return Number.isFinite(t) && t > 0 ? String(t) : '';
@@ -53,21 +52,6 @@ function isAwaitingFinal(petition) {
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
-}
-
-function signToken({ petitionId, approverEmail, key }, secret = emailSecret()) {
-  return crypto
-    .createHmac('sha256', secret)
-    .update(String(petitionId) + '|' + normalizeEmail(approverEmail) + '|' + String(key))
-    .digest('hex')
-    .slice(0, TOKEN_LENGTH);
-}
-
-function verifyToken(args, token, secret = emailSecret()) {
-  if (!secret || !token || !args.key) return false;
-  const expected = Buffer.from(signToken(args, secret));
-  const given = Buffer.from(String(token));
-  return expected.length === given.length && crypto.timingSafeEqual(expected, given);
 }
 
 function isApprover(user) {
@@ -86,18 +70,15 @@ async function findApprovers() {
   });
 }
 
-function replyRef(petition, approverEmail, secret = emailSecret()) {
-  const id = String(petition._id);
-  return '[FR:' + petition.petitionNo + ':' + signToken({ petitionId: id, approverEmail, key: roundKey(petition) }, secret) + ']';
+function parseReplyRef(subject) {
+  const m = String(subject || '').match(SUBJECT_PATTERN);
+  return m ? { petitionNo: m[1].toUpperCase() } : null;
 }
 
-// อ่านรหัสอ้างอิงจากหัวเรื่องเมลตอบกลับ (Outlook เติม "RE:" / "ตอบกลับ:" ข้างหน้าได้)
-function parseReplyRef(...texts) {
-  for (const text of texts) {
-    const m = String(text || '').match(REF_PATTERN);
-    if (m) return { petitionNo: m[1].toUpperCase(), token: m[2].toLowerCase() };
-  }
-  return null;
+// ผู้ส่งได้รับเมลขออนุมัติของรอบปัจจุบันจริง (รอบใหม่หลังส่งกลับแก้ = ต้องรอเมลรอบใหม่)
+function wasSentTo(petition, email) {
+  const sent = petition?.finalResultEmail;
+  return Boolean(sent && sent.key === roundKey(petition) && (sent.recipients || []).includes(normalizeEmail(email)));
 }
 
 // ข้อความที่ผู้อนุมัติพิมพ์เอง (ตัดส่วนที่ Outlook ยกเมลเดิมมาต่อท้าย)
@@ -113,14 +94,79 @@ function isApprovalReply(body) {
   return /อนุมัติ|approve/i.test(own) && !/ไม่อนุมัติ|ไม่ให้อนุมัติ|ยังไม่|not\s+approve|reject/i.test(own);
 }
 
-function approvalSubject(petition, approverEmail) {
-  return '[LIS] ขออนุมัติออก Final Report ' + replyRef(petition, approverEmail);
+function approvalSubject(petition) {
+  return SUBJECT_PREFIX + petition.petitionNo;
 }
 
-function approveMailto(petition, approverEmail) {
-  const subject = 'RE: ' + approvalSubject(petition, approverEmail);
+function approveMailto(petition) {
+  const subject = 'RE: ' + approvalSubject(petition);
   const body = 'อนุมัติ ออก Final Report ' + petition.petitionNo;
   return 'mailto:' + replyInbox() + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+}
+
+// ---------- parameter และค่าที่ตรวจ ต่อรายการ ----------
+const isFileValue = (v) => typeof v === 'string' && /\/uploads\//.test(v);
+
+function formatValue(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (Array.isArray(v)) {
+    const files = v.filter(isFileValue).length;
+    const rest = v.filter((x) => !isFileValue(x)).map(formatValue).filter(Boolean);
+    return [...rest, files ? 'แนบรูป ' + files + ' รูป' : ''].filter(Boolean).join(', ');
+  }
+  if (typeof v === 'object') return '';
+  return isFileValue(v) ? 'แนบรูป 1 รูป' : String(v).trim();
+}
+
+// ค่าของ field ตาม valueFields (รองรับ key แบบ "<label>::<สาร>" ของงาน %AI หลายสาร)
+function fieldValues(values, field) {
+  const out = [];
+  const label = field.label;
+  const unit = field.unit ? ' ' + field.unit : '';
+  const direct = formatValue(values[label]);
+  if (direct) out.push(label + ' ' + direct + (/\d$/.test(direct) ? unit : ''));
+  for (const [k, v] of Object.entries(values)) {
+    if (!k.startsWith(label + '::')) continue;
+    const val = formatValue(v);
+    if (val) out.push(label + ' (' + k.slice(label.length + 2) + ') ' + val + (/\d$/.test(val) ? unit : ''));
+  }
+  return out;
+}
+
+function hasValues(v) {
+  return Boolean(v) && typeof v === 'object' && Object.values(v).some((x) => x !== '' && x !== null && x !== undefined);
+}
+
+// { [itemSeq]: [{ name, values: ['สี แดง', ...] }] } — ใช้ผลรอบตรวจซ้ำ (Phase 2) ถ้ามี
+function summarizeResults(docs = [], params = []) {
+  const byId = new Map(params.map((p) => [String(p._id), p]));
+  const out = {};
+  for (const d of docs) {
+    const param = byId.get(String(d.parameterId)) || {};
+    const name = param.name || d.parameterName || '-';
+    const sets = hasValues(d.valuesPhase2) ? [d.valuesPhase2]
+      : param.multiEntry && Array.isArray(d.entries) && d.entries.length ? d.entries : [d.values || {}];
+    const fields = Array.isArray(param.valueFields) && param.valueFields.length
+      ? param.valueFields
+      : Object.keys(sets[0] || {}).map((label) => ({ label }));
+    const values = sets.flatMap((set, i) => fields.flatMap((field) => fieldValues(set || {}, field))
+      .map((v) => (sets.length > 1 ? '#' + (i + 1) + ' ' : '') + v));
+    (out[d.itemSeq] ||= []).push({ name, values, phase2: hasValues(d.valuesPhase2) });
+  }
+  return out;
+}
+
+async function loadResultSummary(petition) {
+  const docs = await QCTestResult.find(
+    { petitionId: String(petition._id) },
+    { itemSeq: 1, parameterId: 1, parameterName: 1, values: 1, valuesPhase2: 1, entries: 1 },
+  ).lean();
+  if (!docs.length) return {};
+  const params = await Parameter.find(
+    { _id: { $in: [...new Set(docs.map((d) => String(d.parameterId)))] } },
+    { name: 1, valueFields: 1, multiEntry: 1 },
+  ).lean();
+  return summarizeResults(docs, params);
 }
 
 const reviewUrl = (petition, base = lisBase()) => base + '/qc-approval/' + String(petition._id);
@@ -143,21 +189,20 @@ async function sendMail(mail, { fetchImpl = fetch } = {}) {
   }
 }
 
-function buildApprovalMail(petition, approver, { previewTo } = {}) {
+function buildApprovalMail(petition, approver, { previewTo, results = {} } = {}) {
   const { html } = approvalRequestEmail({
     petition,
     approverName: approver.name || approver.email,
-    approveUrl: approveMailto(petition, approver.email),
+    approveUrl: approveMailto(petition),
     reviewUrl: reviewUrl(petition),
-    preview: Boolean(previewTo),
+    results,
   });
-  return { to: normalizeEmail(previewTo || approver.email), subject: (previewTo ? '[ตัวอย่าง] ' : '') + approvalSubject(petition, approver.email), html };
+  return { to: normalizeEmail(previewTo || approver.email), subject: approvalSubject(petition), html };
 }
 
 // ส่งคำขออนุมัติของใบนี้ถึง QC Head ทุกคน ครั้งเดียวต่อรอบ (force = ส่งซ้ำแม้เคยส่งรอบนี้แล้ว)
 async function requestFinalResultApproval(petition, { fetchImpl = fetch, force = false } = {}) {
   if (!webhookUrl()) return { skipped: 'disabled' };
-  if (!emailSecret()) return { skipped: 'no-secret' };
   if (!replyInbox().includes('@')) return { skipped: 'no-inbox' };
   if (!isAwaitingFinal(petition)) return { skipped: 'not-awaiting' };
   const approvers = await findApprovers();
@@ -172,9 +217,10 @@ async function requestFinalResultApproval(petition, { fetchImpl = fetch, force =
   });
   if (!claim.matchedCount) return { skipped: 'already-sent' };
 
+  const summary = await loadResultSummary(petition);
   const results = [];
   for (const approver of approvers) {
-    const r = await sendMail(buildApprovalMail(petition, approver), { fetchImpl });
+    const r = await sendMail(buildApprovalMail(petition, approver, { results: summary }), { fetchImpl });
     results.push({ email: normalizeEmail(approver.email), ...r });
   }
   if (!results.some((r) => r.ok)) {
@@ -195,15 +241,14 @@ function notifyFinalResultAwaiting(petition) {
 }
 
 // แจ้งผู้ขอหลังออก Final Report (ไม่มีอีเมลผู้ขอ = ข้าม)
-function notifyRequesterApproved(petition, approverName, { fetchImpl = fetch } = {}) {
+async function notifyRequesterApproved(petition, approverName, { fetchImpl = fetch } = {}) {
   const to = normalizeEmail(petition.submittedBy?.email);
-  if (!to) return Promise.resolve({ skipped: 'no-requester-email' });
-  const { subject, html } = requesterResultEmail({ petition, approverName, viewUrl: viewUrl(petition) });
-  return sendMail({ to, subject, html }, { fetchImpl })
-    .then((r) => {
-      if (!r.ok) console.error('[final-result-email] requester mail failed:', petition.petitionNo, r.error || r.status);
-      return r;
-    });
+  if (!to) return { skipped: 'no-requester-email' };
+  const results = await loadResultSummary(petition).catch(() => ({}));
+  const { subject, html } = requesterResultEmail({ petition, approverName, viewUrl: viewUrl(petition), results });
+  const r = await sendMail({ to, subject, html }, { fetchImpl });
+  if (!r.ok) console.error('[final-result-email] requester mail failed:', petition.petitionNo, r.error || r.status);
+  return r;
 }
 
 module.exports = {
@@ -214,12 +259,12 @@ module.exports = {
   roundKey,
   isAwaitingFinal,
   normalizeEmail,
-  signToken,
-  verifyToken,
   isApprover,
   findApprovers,
-  replyRef,
   parseReplyRef,
+  wasSentTo,
+  summarizeResults,
+  loadResultSummary,
   ownReplyText,
   isApprovalReply,
   approvalSubject,
