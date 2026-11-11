@@ -11,6 +11,7 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { ConfirmProvider } from "@/context/ConfirmDialog";
 import DailyCheckReminderWatcher from "@/components/lis/DailyCheckReminderWatcher";
 import PetitionFlowWatcher from "@/components/lis/PetitionFlowWatcher";
+import PushEnablePrompt from "@/components/lis/PushEnablePrompt";
 import UrgentPetitionReminder from "@/components/lis/UrgentPetitionReminder";
 import AdminSystemWatcher from "@/components/lis/AdminSystemWatcher";
 import PrivateRoute from "@/components/PrivateRoute";
@@ -122,6 +123,7 @@ const App = () => (
           <DevRoleSwitcher />
           <EmployeeLinkGate />
           <PwaInstallGate />
+          <PushEnablePrompt />
           <NotificationProvider>
             <DailyCheckReminderWatcher />
             <PetitionFlowWatcher />
