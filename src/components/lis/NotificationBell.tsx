@@ -1,31 +1,19 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Check, Pin, Trash2 } from "lucide-react";
+import { Bell, Check, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { useNotifications, type NotificationLevel } from "@/context/NotificationContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { useAuth } from "@/context/AuthContext";
 import { normalizeRoles } from "@/lib/roles";
 import { readSeeAll, writeSeeAll, SEE_ALL_EVENT } from "@/lib/petitionAudience";
-import { formatDateTime } from "@/lib/dateTime";
 import { api } from "@/lib/api";
+import NotificationList from "@/components/lis/NotificationList";
 
-const levelColor: Record<NotificationLevel, string> = {
-  info: "bg-blue-500",
-  warning: "bg-amber-500",
-  success: "bg-green-500",
-  error: "bg-red-500",
-};
-
-const formatTime = (ts: number) => {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return "เมื่อสักครู่";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} นาทีที่แล้ว`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} ชั่วโมงที่แล้ว`;
-  return formatDateTime(ts);
-};
+/** จำนวนแจ้งเตือนที่แสดงใน popover ต่อครั้ง — กด "ดูเพิ่มเติม" เพื่อโหลดเพิ่มทีละชุด */
+export const NOTIFICATION_POPOVER_PAGE_SIZE = 10;
 
 interface NotificationBellProps {
   className?: string;
@@ -34,10 +22,11 @@ interface NotificationBellProps {
 
 const NotificationBell = ({ className, iconClassName }: NotificationBellProps) => {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markRead, markAllRead, dismiss, clearAll } = useNotifications();
+  const { notifications, unreadCount, unseenCount, markRead, markAllRead, markAllSeen, dismiss, clearAll } = useNotifications();
   const { user } = useAuth();
   const isAdmin = normalizeRoles(user).includes("admin");
   const [seeAll, setSeeAll] = useState(() => readSeeAll());
+  const [open, setOpen] = useState(false);
 
   // สองอินสแตนซ์ของ bell (มือถือ + desktop) mount พร้อมกันเสมอ (แค่ CSS ซ่อน) — ต้อง
   // ฟัง SEE_ALL_EVENT เพื่อ sync สถานะสวิตช์ข้ามกันเมื่ออีกฝั่งกดสลับ
@@ -48,13 +37,14 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
   }, []);
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
           aria-label="การแจ้งเตือน"
           onClick={() => {
-            if (unreadCount > 0) markAllRead();
+            // เปิดกระดิ่ง = เห็นแล้ว (ตัวเลขหาย) แต่รายการยังคงเป็น "ยังไม่ได้อ่าน" จนกว่าจะกดดู
+            if (unseenCount > 0) markAllSeen();
           }}
           className={cn(
             "relative inline-flex items-center justify-center h-10 w-10 rounded-md hover:bg-accent transition-colors",
@@ -62,25 +52,24 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
           )}
         >
           <Bell className={cn("h-5 w-5 text-foreground", iconClassName)} />
-          {unreadCount > 0 && (
+          {unseenCount > 0 && (
             <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
-              {unreadCount > 9 ? "9+" : unreadCount}
+              {unseenCount > 9 ? "9+" : unseenCount}
             </span>
           )}
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-[340px] p-0">
-        <div className="flex items-center justify-between px-3 py-2 border-b">
-          <div className="text-sm font-semibold">การแจ้งเตือน</div>
+      <PopoverContent align="end" className="w-[360px] max-w-[calc(100vw-1rem)] p-0">
+        <div className="flex items-center justify-between px-3 pt-3">
+          <div className="text-base font-semibold">การแจ้งเตือน</div>
           <div className="flex items-center gap-1">
             {unreadCount > 0 && (
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={markAllRead}>
                 <Check className="w-3 h-3 mr-1" /> อ่านทั้งหมด
               </Button>
             )}
-            {notifications.length > 0 && (
-              notifications.some(n => !n.pinned) &&
+            {notifications.some(n => !n.pinned) && (
               <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={clearAll}>
                 <Trash2 className="w-3 h-3 mr-1" /> ล้าง
               </Button>
@@ -89,7 +78,7 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
         </div>
 
         {isAdmin && (
-          <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+          <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
             <label htmlFor="notify-see-all" className="text-xs text-muted-foreground">
               ดูแจ้งเตือนทั้งระบบ (ทุก role)
             </label>
@@ -106,60 +95,23 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
           </div>
         )}
 
-        {notifications.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            ยังไม่มีการแจ้งเตือน
-          </div>
-        ) : (
-          <div
-            data-testid="notification-scroll-list"
-            className="max-h-[calc(100vh-12rem)] overflow-y-auto overscroll-contain md:max-h-[400px]"
-          >
-            <ul className="divide-y">
-              {notifications.map(n => (
-                <li
-                  key={n.id}
-                  className={cn(
-                    "p-3 flex gap-2.5 cursor-pointer hover:bg-accent/50 transition-colors",
-                    !n.read && "bg-accent/30",
-                    n.pinned && "bg-destructive/5 hover:bg-destructive/10",
-                  )}
-                  onClick={() => {
-                    markRead(n.id);
-                    if (n.link) navigate(n.link);
-                  }}
-                >
-                  {n.pinned ? (
-                    <Pin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" aria-label="ปักไว้" />
-                  ) : (
-                    <span className={cn("mt-1.5 h-2 w-2 rounded-full shrink-0", levelColor[n.level])} />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">{n.title}</p>
-                      {!n.read && <span className="mt-1 h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0" />}
-                    </div>
-                    {n.message && (
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
-                    )}
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[11px] text-muted-foreground">
-                        {n.pinned ? "เตือนทุกต้นชั่วโมง" : formatTime(n.createdAt)}
-                      </span>
-                      <button
-                        type="button"
-                        className="text-[11px] text-muted-foreground hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); dismiss(n.id); }}
-                      >
-                        {n.pinned ? "ปิดชั่วคราว" : "ลบ"}
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <NotificationList
+          notifications={notifications}
+          pageSize={NOTIFICATION_POPOVER_PAGE_SIZE}
+          listClassName="max-h-[calc(100vh-14rem)] md:max-h-[480px]"
+          onSeeAll={() => {
+            setOpen(false);
+            navigate("/notifications");
+          }}
+          onOpen={(n) => {
+            markRead(n.id);
+            if (n.link) {
+              setOpen(false);
+              navigate(n.link);
+            }
+          }}
+          onDismiss={dismiss}
+        />
       </PopoverContent>
     </Popover>
   );
