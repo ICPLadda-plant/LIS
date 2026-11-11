@@ -188,8 +188,7 @@ async function resolveGroupIds(audiences) {
 // Fire-and-forget: push the event's message to every matching group. Swallows all
 // errors so a LINE outage never breaks the API request that triggered it.
 async function notifyPetitionEvent(petition, payload) {
-  // Web Push ไม่ขึ้นกับ LINE — require ตอนเรียกเพื่อเลี่ยง circular import กับ petitionNotifications
-  require('./webPush').notifyPushForPetitionEvent(petition, payload);
+  // Web Push ส่งจาก PetitionAuditLog post-save (lib/webPush.dispatchPetitionLogPush) ไม่ผ่านที่นี่
   require('./productionCallback').notifyProductionOnEvent(petition, payload);
   try {
     if (!line.isConfigured()) return;

@@ -16,6 +16,11 @@ import { additionalSamplePayload, extractScannedCode, extractScannedItemSeq, fet
 import { labelReceiptStatus, pickScannedLabels, type SideLabel } from '@/lib/labelReceipt';
 import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
 import LabelReceiptPicker from '@/components/petition/LabelReceiptPicker';
+import LabAgreementReviewDialog from '@/components/review/LabAgreementReviewDialog';
+import { fetchLabRequestsByPetition, saveLabAgreementReview } from '@/hooks/usePetition';
+import { isReadyToReceive } from '@/lib/labAgreementReview';
+import type { LabAgreementReview, LabRequest } from '@/types/labRequest.types';
+import { toast } from 'sonner';
 
 const READER_ID = 'lab-accept-qr-reader';
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
@@ -53,6 +58,10 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
   const [labelChoices, setLabelChoices] = useState<SideLabel[] | null>(null);
   const [labelKeys, setLabelKeys] = useState<string[]>([]);
   const [receiptText, setReceiptText] = useState('');
+  // ใบ L ของคำร้อง — ต้องทบทวนคำขอ (พร้อมรับงาน) ก่อนรับตัวอย่าง Lab
+  const [labRequests, setLabRequests] = useState<LabRequest[]>([]);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const reviewOutcomeRef = useRef<{ accept: boolean; reason?: string } | null>(null);
   const scanBusy = useRef(false);
   const receiveBusy = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -67,6 +76,8 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setLabelChoices(null);
       setLabelKeys([]);
       setReceiptText('');
+      setLabRequests([]);
+      setReviewOpen(false);
       setPhase('scanning');
       setPetition(null);
       setPendingId('');
@@ -136,6 +147,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
         setLabelKeys(labelPick.keys);
       }
 
+      setLabRequests(request || found.labReceivedAt ? [] : await fetchLabRequestsByPetition(found._id).catch(() => []));
       setPetition(found);
       setPendingId(found._id);
       setPhase('confirming');
@@ -236,10 +248,42 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setPhase('success');
       onAccepted();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'เกิดข้อผิดพลาด กรุณาลองใหม่';
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? (err instanceof Error && err.message ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่');
       setErrorMsg(msg);
       setPhase('error');
     }
+  }
+
+  const reviewRequired = !additionalRequest && !petition?.labReceivedAt && labRequests.length > 0 && !isReadyToReceive(labRequests);
+
+  function handleAcceptClick() {
+    if (!reviewRequired) { void confirmAccept(); return; }
+    reviewOutcomeRef.current = null;
+    setReviewOpen(true);
+  }
+
+  async function handleSaveReview(draft: Omit<LabAgreementReview, 'reviewedAt' | 'reviewedBy'>) {
+    if (!petition) return;
+    try {
+      const { review } = await saveLabAgreementReview(petition._id, draft, user?.name || user?.email || 'system');
+      setLabRequests((prev) => prev.map((request) => ({ ...request, labAgreementReview: review })));
+      reviewOutcomeRef.current = { accept: review.acceptable !== false, reason: review.notAcceptableReason };
+    } catch {
+      toast.error('บันทึกการทบทวนไม่สำเร็จ');
+      throw new Error('save review failed');
+    }
+  }
+
+  function handleReviewOpenChange(next: boolean) {
+    setReviewOpen(next);
+    if (next) return;
+    const outcome = reviewOutcomeRef.current;
+    reviewOutcomeRef.current = null;
+    if (!outcome) return; // ปิดฟอร์มโดยไม่บันทึก — ยังไม่รับงาน
+    if (outcome.accept) { void confirmAccept(); return; }
+    setErrorMsg(`ทบทวนคำขอแล้ว: ไม่พร้อมรับงาน${outcome.reason ? ` (${outcome.reason})` : ''} จึงยังไม่รับตัวอย่าง`);
+    setPhase('error');
   }
 
   function rescan() {
@@ -249,6 +293,8 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     setLabelChoices(null);
     setLabelKeys([]);
     setReceiptText('');
+    setLabRequests([]);
+    setReviewOpen(false);
     setPetition(null);
     setPendingId('');
     setErrorMsg('');
@@ -355,13 +401,16 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
                 {petition.assignedTo && (
                   <p>มอบหมายให้: <span className="font-medium text-primary">{petition.assignedTo.name}</span></p>
                 )}
+                {labRequests.length > 0 && (
+                  <p>ทบทวนคำขอ: <span className="text-foreground">{reviewRequired ? 'ต้องทบทวนก่อนรับงาน' : 'พร้อมรับงาน'}</span></p>
+                )}
               </div>
               {labelChoices && <LabelReceiptPicker labels={labelChoices} selected={labelKeys} onChange={setLabelKeys} />}
               <div className="flex gap-2 pt-2">
                 <Button variant="ghost" className="flex-1" onClick={rescan}>
                   {manualOnly ? 'กรอกใหม่' : 'สแกนใหม่'}
                 </Button>
-                <Button variant="primary" className="flex-1" onClick={confirmAccept} disabled={!!labelChoices && !labelKeys.length}>
+                <Button variant="primary" className="flex-1" onClick={handleAcceptClick} disabled={!!labelChoices && !labelKeys.length}>
                   รับงาน
                 </Button>
               </div>
@@ -393,6 +442,14 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
           )}
         </div>
       </div>
+
+      <LabAgreementReviewDialog
+        open={reviewOpen}
+        onOpenChange={handleReviewOpenChange}
+        initial={labRequests[0]?.labAgreementReview ?? null}
+        onSave={handleSaveReview}
+        testMethod={labRequests[0]?.serviceAgreement?.testMethod}
+      />
     </div>
   );
 }

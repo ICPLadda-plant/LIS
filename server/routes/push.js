@@ -17,6 +17,7 @@ function currentIdentity(req) {
       roles: normalizeRoles(user),
       department: String(user.department || ''),
       employeeId: String(user.employeeId || ''),
+      name: String(user.name || ''),
     };
   }
   const email = String(req.get('x-lis-user') || '').trim().toLowerCase();
@@ -26,7 +27,7 @@ function currentIdentity(req) {
   } catch {
     department = '';
   }
-  return { email, roles: syntheticDevRolesFromEmail(email), department, employeeId: '' };
+  return { email, roles: syntheticDevRolesFromEmail(email), department, employeeId: '', name: '' };
 }
 
 function deviceView(sub, currentEndpoint) {
@@ -80,6 +81,8 @@ router.post('/subscribe', async (req, res) => {
           deviceLabel: String(req.body?.deviceLabel || 'อุปกรณ์ไม่ทราบชื่อ').slice(0, 60),
           userAgent: String(req.get('user-agent') || '').slice(0, 300),
           paused: Boolean(existing?.paused),
+          // admin ที่เปิด "ดูแจ้งเตือนทั้งระบบ" ไว้ก่อนเปิดรับ PWA → เครื่องใหม่ได้ทุก role ด้วย
+          seeAll: identity.roles.includes('admin') && (req.body?.seeAll === true || Boolean(existing?.seeAll)),
         },
       },
       { upsert: true, new: true },
@@ -107,6 +110,18 @@ router.post('/pause', async (req, res) => {
     const { email } = currentIdentity(req);
     await PushSubscription.updateMany({ email }, { $set: { paused: Boolean(req.body?.paused) } });
     res.json(await listState(email, String(req.body?.endpoint || '')));
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
+// POST /api/push/see-all { seeAll: boolean } — admin เปิดดูแจ้งเตือนทั้งระบบ ให้ PWA ได้ทุก role ด้วย
+router.post('/see-all', async (req, res) => {
+  try {
+    const { email, roles } = currentIdentity(req);
+    const seeAll = Boolean(req.body?.seeAll) && roles.includes('admin');
+    await PushSubscription.updateMany({ email }, { $set: { seeAll } });
+    res.json({ seeAll });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });
   }
