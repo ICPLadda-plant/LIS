@@ -23,11 +23,11 @@ interface ScaleDraft {
 }
 
 const SCALES = [
-  { id: "scale-1", name: "เครื่องชั่ง 1", model: "Balance A" },
-  { id: "scale-2", name: "เครื่องชั่ง 2", model: "Balance B" },
-  { id: "scale-3", name: "เครื่องชั่ง 3", model: "Balance C" },
-  { id: "scale-4", name: "เครื่องชั่ง 4", model: "Balance D" },
-  { id: "scale-5", name: "เครื่องชั่ง 5", model: "Balance E" },
+  { id: "scale-1", name: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง", model: "Balance A" },
+  { id: "scale-2", name: "LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง", model: "Balance B" },
+  { id: "scale-3", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C" },
+  { id: "scale-4", name: "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance D" },
+  { id: "scale-5", name: "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance E" },
 ];
 
 const TOLERANCE = 0.05;
@@ -52,11 +52,6 @@ const BalanceRoomPage = () => {
   const todayLabel = formatDate(new Date());
   const currentPeriod = getCurrentDailyCheckPeriod();
   const currentPeriodLabel = getDailyCheckPeriodLabel(currentPeriod);
-  const currentPeriodHint = currentPeriod === "morning"
-    ? "08:00–12:00"
-    : currentPeriod === "afternoon"
-      ? "13:00–17:00"
-      : "เปิด 08:00–12:00 และ 13:00–17:00";
 
   const [drafts, setDrafts] = useState<Record<string, ScaleDraft>>({});
   const [consecutiveAlert, setConsecutiveAlert] = useState<DailyCheckTrend | null>(null);
@@ -76,10 +71,11 @@ const BalanceRoomPage = () => {
 
   const latestByScale = useMemo(() => {
     const map: Record<string, DailyCheckRecord> = {};
-    if (!currentPeriod) return map;
     for (const r of todayRecords) {
-      const recordPeriod = r.period ?? getDailyCheckPeriod(r.checkedAt);
-      if (recordPeriod !== currentPeriod) continue;
+      if (currentPeriod) {
+        const recordPeriod = r.period ?? getDailyCheckPeriod(r.checkedAt);
+        if (recordPeriod !== currentPeriod) continue;
+      }
       if (!map[r.scaleId]) map[r.scaleId] = r;
     }
     return map;
@@ -129,10 +125,6 @@ const BalanceRoomPage = () => {
     Math.abs(avg - target) <= TOLERANCE ? "pass" : "fail";
 
   const handleCheck = (id: string) => {
-    if (!currentPeriod) {
-      toast.error("Daily Check บันทึกได้เฉพาะช่วงเช้า 08:00-12:00 หรือบ่าย 13:00-17:00");
-      return;
-    }
     const r = getDraft(id);
     if (r.weights100.some(v => !v) || r.weights10.some(v => !v)) {
       toast.error("กรุณากรอกค่าน้ำหนักให้ครบทั้ง 6 ค่า");
@@ -181,12 +173,14 @@ const BalanceRoomPage = () => {
           <h2 className="text-lg font-semibold text-foreground">
             ห้องเครื่องชั่ง — Calibrate เครื่องชั่ง
           </h2>
-          <p className="text-sm text-muted-foreground">ประจำวัน — {todayLabel} · รอบ{currentPeriodLabel} ({currentPeriodHint})</p>
+          <p className="text-sm text-muted-foreground">ประจำวัน — {todayLabel} · บันทึกได้ทุกเวลา</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Badge variant="outline" className="text-sm gap-1 py-1 px-3">
-            รอบ{currentPeriodLabel}
-          </Badge>
+          {currentPeriod && (
+            <Badge variant="outline" className="text-sm gap-1 py-1 px-3">
+              รอบ{currentPeriodLabel}
+            </Badge>
+          )}
           <Badge variant="outline" className="text-sm gap-1 py-1 px-3">
             <Clock className="w-3.5 h-3.5" /> ตรวจแล้ว {checkedCount}/{SCALES.length}
           </Badge>
@@ -252,7 +246,7 @@ const BalanceRoomPage = () => {
                             placeholder={showResult && todayRec ? todayRec.weights100[i] : `ครั้งที่ ${i + 1}`}
                             value={r.weights100[i]}
                             onChange={e => updateWeight(scale.id, "100", i, e.target.value)}
-                            disabled={createMutation.isPending || !currentPeriod}
+                            disabled={createMutation.isPending}
                             className="text-xs h-8"
                           />
                         ))}
@@ -280,7 +274,7 @@ const BalanceRoomPage = () => {
                             placeholder={showResult && todayRec ? todayRec.weights10[i] : `ครั้งที่ ${i + 1}`}
                             value={r.weights10[i]}
                             onChange={e => updateWeight(scale.id, "10", i, e.target.value)}
-                            disabled={createMutation.isPending || !currentPeriod}
+                            disabled={createMutation.isPending}
                             className="text-xs h-8"
                           />
                         ))}
@@ -311,14 +305,12 @@ const BalanceRoomPage = () => {
                       <Button
                         className="w-full gap-2"
                         onClick={() => handleCheck(scale.id)}
-                        disabled={createMutation.isPending || !currentPeriod}
+                        disabled={createMutation.isPending}
                       >
                         <CheckCircle2 className="w-4 h-4" />
-                        {!currentPeriod
-                          ? "นอกเวลาบันทึก"
-                          : createMutation.isPending && createMutation.variables?.scaleId === scale.id
-                            ? "กำลังบันทึก..."
-                            : "บันทึกผล Calibrate"}
+                        {createMutation.isPending && createMutation.variables?.scaleId === scale.id
+                          ? "กำลังบันทึก..."
+                          : "บันทึกผล Calibrate"}
                       </Button>
                     )}
                   </CardContent>
