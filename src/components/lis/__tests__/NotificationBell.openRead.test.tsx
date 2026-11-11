@@ -47,7 +47,7 @@ describe("NotificationBell open behavior", () => {
     localStorage.clear();
   });
 
-  it("hides the unread badge when the bell is clicked", async () => {
+  it("hides the badge when the bell is clicked but keeps items unread until opened", async () => {
     renderBell();
 
     expect(await screen.findByText("2")).toBeInTheDocument();
@@ -57,6 +57,15 @@ describe("NotificationBell open behavior", () => {
     await waitFor(() => {
       expect(screen.queryByText("2")).not.toBeInTheDocument();
     });
+    expect(screen.getAllByLabelText("ยังไม่ได้อ่าน")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("tab", { name: "ยังไม่ได้อ่าน" }));
+    fireEvent.click(screen.getByText("แจ้งเตือนที่ 1"));
+
+    await waitFor(() => {
+      expect(screen.queryByText("แจ้งเตือนที่ 1")).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("แจ้งเตือนที่ 2")).toBeInTheDocument();
   });
 
   it("loads persisted notifications only for the current employee", async () => {
@@ -88,7 +97,7 @@ describe("NotificationBell open behavior", () => {
     expect(screen.getByText("ยังไม่มีการแจ้งเตือน")).toBeInTheDocument();
   });
 
-  it("keeps long notification history in a scrollable list", async () => {
+  it("shows the latest 10 first and loads more on demand", async () => {
     renderBell(12);
 
     expect(await screen.findByText("9+")).toBeInTheDocument();
@@ -96,8 +105,15 @@ describe("NotificationBell open behavior", () => {
     fireEvent.click(screen.getByRole("button", { name: "การแจ้งเตือน" }));
 
     const list = screen.getByTestId("notification-scroll-list");
-    expect(list).toHaveClass("overflow-y-auto", "max-h-[calc(100vh-12rem)]", "md:max-h-[400px]");
-    expect(screen.getByText("แจ้งเตือนที่ 1")).toBeInTheDocument();
+    expect(list).toHaveClass("overflow-y-auto");
     expect(screen.getByText("แจ้งเตือนที่ 12")).toBeInTheDocument();
+    expect(screen.getByText("แจ้งเตือนที่ 3")).toBeInTheDocument();
+    expect(screen.queryByText("แจ้งเตือนที่ 2")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "ดูเพิ่มเติม (2)" }));
+
+    expect(screen.getByText("แจ้งเตือนที่ 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ดูเพิ่มเติม/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ดูทั้งหมด" })).toBeInTheDocument();
   });
 });

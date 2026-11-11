@@ -10,6 +10,7 @@ import {
   isDesktopDevice,
   isStandalonePwa,
   promptPwaInstall,
+  subscribeStandalonePwa,
   subscribePwaInstallState,
   type PwaInstallBrowser,
 } from "@/lib/pwa";
@@ -67,7 +68,8 @@ const PwaInstallGate = () => {
   const { user, isProductionSession = false, logout } = useAuth();
   const { pathname } = useLocation();
   const install = useSyncExternalStore(subscribePwaInstallState, getPwaInstallState);
-  const [isStandalone] = useState(() => isStandalonePwa());
+  // อ่านสด — หลังติดตั้ง แท็บนี้กลายเป็นหน้าต่างแอปทันที ต้องปิด gate โดยไม่ต้อง refresh
+  const isStandalone = useSyncExternalStore(subscribeStandalonePwa, isStandalonePwa);
   const [isDesktop] = useState(() => isDesktopDevice());
   const [browser] = useState(() => detectPwaInstallBrowser());
   const [prompting, setPrompting] = useState(false);

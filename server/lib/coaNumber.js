@@ -11,10 +11,11 @@ function formatCoaNo(sequence, year) {
 async function nextCoaNumber(now = new Date()) {
   const CoaCounter = require('../models/CoaCounter');
   const year = now.getFullYear();
+  const sequenceFloor = year === 2026 ? 1347 : 0;
   const counter = await CoaCounter.findOneAndUpdate(
     { year },
-    { $inc: { sequence: 1 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true },
+    [{ $set: { sequence: { $add: [{ $max: [{ $ifNull: ['$sequence', 0] }, sequenceFloor] }, 1] } } }],
+    { upsert: true, new: true },
   ).lean();
   const sequence = counter.sequence;
   return { coaNo: formatCoaNo(sequence, year), sequence, year };

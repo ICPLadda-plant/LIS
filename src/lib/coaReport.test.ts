@@ -14,6 +14,15 @@ describe("buildCoaReportPages", () => {
     expect(page.samples[0].selectedResultsOnly).toBe(true);
     expect(page.samples[0].rows).toEqual(doc.resultSnapshots);
   });
+
+  it("prints a two-digit day after the English month on special COAs", () => {
+    const [page] = buildCoaReportPages({
+      sampleSnapshots: [{ itemSeq: 1, commonName: "BROMADIOLONE 0.005%" }],
+      approval: { approvedAt: "2026-11-07T00:00:00.000+07:00" },
+    } as CoaDocument);
+
+    expect(page.issueDate).toBe("November 07, 2026");
+  });
   it.each(["%AI", "% AI", "AI content", "active ingredient"])("reads the configured %s result", (testItem) => {
     const doc = {
       sampleSnapshots: [{ itemSeq: 1, commonName: "Glyphosate 48% SL" }],
@@ -274,13 +283,13 @@ describe("buildCoaReportPages", () => {
         itemSeq: 1,
         sampleName: "Red Wax Block",
         commonName: "BROMADIOLONE 0.005%",
-        batchNo: "B-008",
+        batchNo: "26S-BRM0.005-GMP(R)-240",
         lotNo: "LOT-008",
         productionDate: "2026-08-15",
       }],
       resultSnapshots: [
         { itemSeq: 1, testItem: "%AI content (W/W)", result: "0.0051%" },
-        { itemSeq: 1, testItem: "Wax block size", result: "5.90 gm" },
+        { itemSeq: 1, testItem: "Wax block size", result: "5.90 gm", criteria: "5.88 gm ± 5%" },
         { itemSeq: 1, testItem: "Date of analysis", result: "2026-08-20" },
       ],
       approval: { approvedBy: { name: "QC Head" }, approvedAt: "2026-08-20T00:00:00.000Z" },
@@ -291,10 +300,24 @@ describe("buildCoaReportPages", () => {
     expect(pages[0].template).toBe("bromadiolone0005");
     expect(pages[0].issueDate).toBe("August 20, 2026");
     expect(pages[0].samples[0].product).toBe("Red Wax Block (BROMADIOLONE 0.005%)");
-    expect(pages[0].samples[0].batchLabel).toBe("LOT-008 / B-008");
+    expect(pages[0].samples[0].batchLabel).toBe("240");
     expect(pages[0].samples[0].aiContentResult).toBe("0.0051%");
     expect(pages[0].samples[0].aiContentCriteria).toBe("0.005% ± 0.00125");
     expect(pages[0].samples[0].waxBlockSizeResult).toBe("5.90 gm");
+    expect(pages[0].samples[0].waxBlockSizeCriteria).toBe("5.88 gm ± 5%");
     expect(pages[0].samples[0].dateOfAnalysis).toBe("20/08/2026");
+  });
+
+  it("uses the large Bromadiolone wax block specification from the reference form", () => {
+    const pages = buildCoaReportPages({
+      sampleSnapshots: [{
+        itemSeq: 1,
+        sampleName: "ยาหนูก้อนใหญ่",
+        commonName: "BROMADIOLONE 0.005%",
+      }],
+      resultSnapshots: [{ itemSeq: 1, testItem: "Wax block size", result: "25.10 g" }],
+    } as CoaDocument);
+
+    expect(pages[0].samples[0].waxBlockSizeCriteria).toBe("23.50-26.00 g");
   });
 });

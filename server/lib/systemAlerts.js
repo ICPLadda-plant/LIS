@@ -16,6 +16,16 @@ function isWatchedStatus(status) {
   return status === 401 || status === 403 || status >= 500;
 }
 
+// 401 ที่เป็นพฤติกรรมปกติ: หน้าเว็บถาม /auth/session ตอนเปิดเว็บเพื่อดูว่ายังมี session อยู่ไหม
+// ถ้าไม่มี (ยังไม่ล็อกอิน/หมดอายุ) จะได้ 401 เสมอ ไม่ใช่เหตุผิดปกติ
+const EXPECTED_401_PATHS = new Set(['/api/auth/session']);
+
+function shouldAlert(status, path) {
+  if (!isWatchedStatus(status)) return false;
+  if (status === 401 && EXPECTED_401_PATHS.has(path)) return false;
+  return true;
+}
+
 // Pure: path ที่มี id ต่างกันรวมเป็นแถวเดียว
 function normalizeApiPath(rawPath) {
   return String(rawPath || '')
@@ -46,9 +56,8 @@ function systemNotificationFor({ status, method, path, user, at = Date.now() }) 
 function systemAlertMiddleware(req, res, next) {
   res.on('finish', () => {
     const status = res.statusCode;
-    if (!isWatchedStatus(status)) return;
     const path = normalizeApiPath(req.originalUrl || req.url);
-    if (!path.startsWith('/api/')) return;
+    if (!path.startsWith('/api/') || !shouldAlert(status, path)) return;
     const user = String(req.get?.('X-LIS-User') || '').trim().toLowerCase();
     const { publishAppNotification } = require('./appNotifications');
     publishAppNotification(systemNotificationFor({ status, method: req.method, path, user }))
@@ -57,4 +66,4 @@ function systemAlertMiddleware(req, res, next) {
   next();
 }
 
-module.exports = { systemAlertMiddleware, systemNotificationFor, normalizeApiPath, isWatchedStatus };
+module.exports = { systemAlertMiddleware, systemNotificationFor, normalizeApiPath, isWatchedStatus, shouldAlert };

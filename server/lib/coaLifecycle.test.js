@@ -1,7 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
-const { formatCoaNo } = require('./coaNumber');
+const { formatCoaNo, nextCoaNumber } = require('./coaNumber');
+const CoaCounter = require('../models/CoaCounter');
 const CoaDocument = require('../models/CoaDocument');
 const CoaAuditLog = require('../models/CoaAuditLog');
 const {
@@ -26,6 +27,24 @@ test('formatCoaNo pads sequence to four digits and appends Gregorian year', () =
   assert.equal(formatCoaNo(1, 2026), '00012026');
   assert.equal(formatCoaNo(22, 2026), '00222026');
   assert.equal(formatCoaNo(10000, 2026), '100002026');
+});
+
+test('the first allocated 2026 COA number starts at 13482026', async () => {
+  const original = CoaCounter.findOneAndUpdate;
+  let received;
+  CoaCounter.findOneAndUpdate = (filter, update, options) => {
+    received = { filter, update, options };
+    return { lean: async () => ({ sequence: 1348 }) };
+  };
+  try {
+    assert.deepEqual(await nextCoaNumber(new Date('2026-11-07T00:00:00.000Z')), {
+      coaNo: '13482026', sequence: 1348, year: 2026,
+    });
+    assert.deepEqual(received.filter, { year: 2026 });
+    assert.equal(received.update[0].$set.sequence.$add[0].$max[1], 1347);
+  } finally {
+    CoaCounter.findOneAndUpdate = original;
+  }
 });
 
 test('QC Head role detection accepts role, activeRole, permission, and position signals', () => {

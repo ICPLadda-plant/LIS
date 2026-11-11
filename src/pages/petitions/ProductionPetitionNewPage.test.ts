@@ -269,6 +269,21 @@ describe('R&D integration request rules', () => {
       { productionDate: '2026-11-02', labelSampledDate: '2026-11-03' },
     ]);
   });
+
+  it('reads the six-digit production date appended to each batch and keeps same-product batches in one request', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      requestDate: '2026-10-10',
+      samples: [
+        { sampleName: 'OMETHOATE', batchNo: '26S-OMT50-001091069', productionDate: '2025-07-21' },
+        { sampleName: 'OMETHOATE', batchNo: '26S-OMT50-002091069', productionDate: '2025-07-21' },
+      ],
+    }));
+
+    expect(items.map(({ batchNo, productionDate }) => ({ batchNo, productionDate }))).toEqual([
+      { batchNo: '26S-OMT50-001091069', productionDate: '2026-10-09' },
+      { batchNo: '26S-OMT50-002091069', productionDate: '2026-10-09' },
+    ]);
+  });
 });
 
 describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {

@@ -118,6 +118,25 @@ export function isStandalonePwa() {
   return displayModeStandalone || displayModeFullscreen || iosStandalone;
 }
 
+/**
+ * ตอนกดติดตั้ง Chrome/Edge จะย้ายแท็บเดิมไปเป็นหน้าต่างแอปโดยไม่โหลดหน้าใหม่
+ * display mode จึงเปลี่ยนกลางทาง — ต้องฟัง change ไม่ใช่อ่านครั้งเดียวตอนโหลด
+ */
+export function subscribeStandalonePwa(listener: () => void) {
+  if (typeof window === "undefined" || !window.matchMedia) return () => {};
+  const queries = ["(display-mode: standalone)", "(display-mode: fullscreen)"].map((query) => window.matchMedia(query));
+  queries.forEach((query) => {
+    if (query.addEventListener) query.addEventListener("change", listener);
+    else query.addListener?.(listener);
+  });
+  return () => {
+    queries.forEach((query) => {
+      if (query.removeEventListener) query.removeEventListener("change", listener);
+      else query.removeListener?.(listener);
+    });
+  };
+}
+
 export async function registerPwaServiceWorker(options: RegisterPwaServiceWorkerOptions = {}) {
   const {
     enabled = import.meta.env.PROD,

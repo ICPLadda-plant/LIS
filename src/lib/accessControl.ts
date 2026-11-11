@@ -37,8 +37,8 @@ const IMPLIED_CHILD_PATHS: Record<string, string[]> = {
 };
 
 // Pages open to every signed-in user — no group/permission needed (shared
-// scanner station and the lab/QC queue TV displays).
-const PUBLIC_PATHS = ["/scanner", "/queue/lab", "/queue/qc"];
+// scanner station, the lab/QC queue TV displays and the personal notification page).
+const PUBLIC_PATHS = ["/scanner", "/queue/lab", "/queue/qc", "/notifications"];
 
 function normalizePath(path: string) {
   if (!path || path === "/") return "/";
