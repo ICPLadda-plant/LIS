@@ -86,6 +86,9 @@ test('offers only selected, configured AI, physical and density values with safe
   assert.equal(options.length, 5);
   assert.ok(options.every((option) => option.itemSeq === 1));
   assert.equal(options.find((option) => option.kind === 'appearance').suggestedEnglish, 'Clear liquid, Orange');
+  const powder = structuredClone(source);
+  powder.qcResults[1].values = { 'ลักษณะ': 'ผงละเอียด', 'สี': 'สีขาวนวล' };
+  assert.equal(buildCoaFormOptions(powder).find((option) => option.kind === 'appearance').suggestedEnglish, 'Off white powder');
   assert.equal(JSON.stringify(options).includes('private'), false);
   assert.equal(JSON.stringify(options).includes('อุณหภูมิ'), false);
   const changed = structuredClone(source);

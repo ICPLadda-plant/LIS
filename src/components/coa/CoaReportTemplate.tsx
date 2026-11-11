@@ -1,7 +1,9 @@
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import SIRIPICH_SIGNATURE_URL from "@/assets/siripich-signature.png";
+import COA_FINAL_PAGE_TEMPLATE_URL from "@/assets/coa-final-page-template.png";
 import type { CoaReportPage, CoaReportSample } from "@/lib/coaReport";
 import { PrintMediaValue } from "@/components/lis/PrintMediaValue";
+import { isAiContentTestItem } from "@/lib/aiToleranceCriteria";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
 export const COA_REPORT_CSS = `
@@ -41,12 +43,13 @@ export const COA_REPORT_CSS = `
 .coa-brom-table th:nth-child(2), .coa-brom-table td:nth-child(2) { width: 34%; }
 .coa-brom-table th:nth-child(3), .coa-brom-table td:nth-child(3) { width: 24%; }
 .coa-brom-sign { margin-top: 30mm; margin-left: auto; width: 78mm; text-align: center; line-height: 1.55; }
+.coa-page:last-child { padding-top: 42mm; padding-bottom: 40mm; background: #fff url("${COA_FINAL_PAGE_TEMPLATE_URL}") center / 100% 100% no-repeat; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 @media screen { .coa-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 .coa-root h1, .coa-root th, .coa-title, .print-heading { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT} !important; }
 `;
 
 function dayMonthYear(value: string) {
-  return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3-$2-$1");
+  return value.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "$3/$2/$1");
 }
 
 function ApprovalSignature({ page, fallbackUrl }: { page: CoaReportPage; fallbackUrl?: string }) {
@@ -65,7 +68,7 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
 
   const renderRows = (selectedRows: typeof rows) => selectedRows.map((row, index) => {
     const hasUnit = row.unit === "%" ? row.result?.includes("%") : row.result?.endsWith(row.unit || "");
-    const result = `${row.result}${row.unit && !hasUnit ? ` ${row.unit}` : ""}`;
+    const result = `${row.result}${!isAiContentTestItem(row.testItem) && row.unit && !hasUnit ? ` ${row.unit}` : ""}`;
     return /date\s*of\s*analysis/i.test(row.testItem || "") ? (
       <tr key={`${row.testItem}-${index}`}><td colSpan={2}>{row.testItem}</td><td>{dayMonthYear(result)}</td></tr>
     ) : (
@@ -257,7 +260,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
           </tr>
           <tr>
             <td>Wax block size</td>
-            <td>5.88 gm ± 5%</td>
+            <td>{sample?.waxBlockSizeCriteria || "5.88 gm ± 5%"}</td>
             <td>{sample?.waxBlockSizeResult === "-" ? "" : sample?.waxBlockSizeResult}</td>
           </tr>
           <tr>
@@ -316,7 +319,7 @@ function StandardCoaPage({ page, index }: { page: CoaReportPage; index: number }
             {sample.rows.length ? sample.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 <td>{row.testItem || "-"}</td>
-                <td className="coa-center"><PrintMediaValue value={row.result}>{row.result || "-"}{sample.selectedResultsOnly && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</PrintMediaValue></td>
+                <td className="coa-center"><PrintMediaValue value={row.result}>{row.result || "-"}{sample.selectedResultsOnly && !isAiContentTestItem(row.testItem) && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</PrintMediaValue></td>
                 <td className="coa-center">{row.criteria || "-"}</td>
                 <td className="coa-center">{row.method || "-"}</td>
               </tr>

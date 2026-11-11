@@ -178,8 +178,7 @@ export async function openPrintPdf(
   el: HTMLElement | null,
   opts?: { css?: string; fileName?: string },
 ): Promise<void> {
-  const html = documentHtml(docType, el, opts?.css);
-  const blob = await api.downloadPrintPdf({ docType, html });
+  const blob = await createPrintPdfBlob(docType, el, opts?.css);
   const url = URL.createObjectURL(blob);
   if (opts?.fileName) {
     const link = document.createElement("a");
@@ -200,4 +199,8 @@ export async function openPrintPdf(
     }
   }
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+export function createPrintPdfBlob(docType: PrintDocType, el: HTMLElement | null, css?: string): Promise<Blob> {
+  return api.downloadPrintPdf({ docType, html: documentHtml(docType, el, css) });
 }

@@ -16,6 +16,7 @@ export type CoaReportSample = CoaSampleSnapshot & {
   aiContentCriteria: string;
   densityResult: string;
   waxBlockSizeResult: string;
+  waxBlockSizeCriteria?: string;
   dateOfAnalysis: string;
 };
 
@@ -46,11 +47,11 @@ function formatGregorianDate(value?: string): string {
   return date.toLocaleDateString("en-GB");
 }
 
-function formatEnglishDate(value?: string): string {
+function formatEnglishIssueDate(value?: string): string {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return date.toLocaleDateString("en-US", { month: "long", day: "2-digit", year: "numeric", timeZone: "Asia/Bangkok" });
 }
 
 function addYears(value: string | undefined, years: number): string {
@@ -81,6 +82,11 @@ function productLabel(sample: CoaSampleSnapshot): string {
 }
 
 function batchLabel(sample: CoaSampleSnapshot): string {
+  if (isBromadiolone0005CommonName(sample.commonName)) {
+    const batchNo = sample.batchNo?.trim();
+    if (!batchNo) return "-";
+    return batchNo.match(/(\d+)$/)?.[1] || batchNo;
+  }
   return [sample.lotNo?.trim(), sample.batchNo?.trim()].filter(Boolean).join(" / ") || "-";
 }
 
@@ -97,6 +103,16 @@ function aiContentCriteria(rows: CoaResultSnapshot[], sample: CoaSampleSnapshot)
 
 function waxBlockSizeResult(rows: CoaResultSnapshot[]): string {
   return rows.find((row) => /wax\s*block\s*size/i.test(row.testItem ?? ""))?.result || "-";
+}
+
+function waxBlockSizeCriteria(rows: CoaResultSnapshot[], sample: CoaSampleSnapshot): string {
+  const row = rows.find((item) => /wax\s*block\s*size/i.test(item.testItem ?? ""));
+  if (row?.criteria && row.criteria !== "-") return row.criteria;
+  const result = Number(row?.result?.match(/\d+(?:\.\d+)?/)?.[0]);
+  const product = [sample.sampleName, sample.condition].filter(Boolean).join(" ");
+  return /ก้อนใหญ่|large\s*(?:wax\s*)?block/i.test(product) || result > 10
+    ? "23.50-26.00 g"
+    : "5.88 gm ± 5%";
 }
 
 function densityResult(rows: CoaResultSnapshot[]): string {
@@ -144,6 +160,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       aiContentCriteria: resolvedAiContentCriteria,
       densityResult: densityResult(rows),
       waxBlockSizeResult: waxBlockSizeResult(rows),
+      waxBlockSizeCriteria: waxBlockSizeCriteria(rows, sample),
       dateOfAnalysis: dateOfAnalysis(rows),
     };
   });
@@ -156,7 +173,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       template,
       coaNo: doc.coaNo || "-",
       revision: doc.revision || 0,
-      issueDate: template === "standard" ? formatDate(doc.approval?.approvedAt) : formatEnglishDate(doc.approval?.approvedAt),
+      issueDate: template === "standard" ? formatDate(doc.approval?.approvedAt) : formatEnglishIssueDate(doc.approval?.approvedAt),
       petitionNo: doc.petitionNoSnapshot || "-",
       customer: doc.customerSnapshot || {},
       samples: group,

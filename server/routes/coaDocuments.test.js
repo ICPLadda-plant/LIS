@@ -484,7 +484,7 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   ]));
 
   assert.equal(docs.length, 1);
-  assert.equal(docs[0]._id, 'external-coa-request-SO26040020-10000');
+  assert.equal(docs[0]._id, 'external-coa-request-SO26040020-10000-outstanding-100');
   assert.equal(docs[0].status, 'requested');
   assert.equal(docs[0].petitionNoSnapshot, 'SO26040020');
   assert.equal(docs[0].customerSnapshot.name, 'Customer A');
@@ -494,7 +494,7 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
     commonName: 'SPIRODICLOFEN 24 % W/V SC',
     batchNo: 'B-CUSTOMER-001',
     lotNo: 'L-CUSTOMER-001',
-    productionDate: '2026-04-18',
+    productionDate: '2026-04-01',
     sampleId: 'FC-CAVAL-1X16',
     condition: '16*1 L',
   });
@@ -502,7 +502,7 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   assert.equal(docs[0].externalCoaRequest.appearance, 'เม็ดยาสีแดง');
 });
 
-test('externalCoaRowsToDocuments keeps the latest ERP update before checking the COA mark', () => {
+test('externalCoaRowsToDocuments keeps separate requests when the outstanding quantity changes', () => {
   const base = { SaleOrderNo: 'SO-LATEST', Line: 10000, ItemNo: 'F-1' };
   const removed = router.externalCoaRowsToDocuments([
     { ...base, UpdateDate: '2026-10-01T08:00:00.000Z', remark: 'ส่งพร้อม COA' },
@@ -516,6 +516,24 @@ test('externalCoaRowsToDocuments keeps the latest ERP update before checking the
   ]);
   assert.equal(latest.sampleSnapshots[0].sampleName, 'Updated name');
   assert.equal(latest.updatedAt, '2026-10-03T08:00:00.000Z');
+
+  const repeated = router.externalCoaRowsToDocuments([
+    { ...base, OutstandingQty: 100, remark: 'COA' },
+    { ...base, OutstandingQty: 40, remark: 'COA' },
+  ]);
+  assert.equal(repeated.length, 2);
+  assert.notEqual(repeated[0]._id, repeated[1]._id);
+});
+
+test('externalCoaRowsToDocuments groups different Batch lines for the same customer and shipment', () => {
+  const docs = router.externalCoaRowsToDocuments([
+    { CompanySource: 'ICPL', CustomerName: 'Customer A', SaleOrderNo: 'SO-MULTI', Line: 10000, BatchNo: '026', ShipmentDate: '2026-11-10', remark: 'COA' },
+    { CompanySource: 'ICPL', CustomerName: 'Customer A', SaleOrderNo: 'SO-MULTI', Line: 20000, BatchNo: '029', ShipmentDate: '2026-11-10', remark: 'COA' },
+  ]);
+
+  assert.equal(docs.length, 1);
+  assert.deepEqual(docs[0].selectedItemSeqs, [10000, 20000]);
+  assert.deepEqual(docs[0].sampleSnapshots.map((sample) => sample.batchNo), ['026', '029']);
 });
 
 test('attachDensityToExternalCoaDocuments adds averaged valid Density for the resolved Batch', () => {
@@ -538,7 +556,7 @@ test('attachDensityToExternalCoaDocuments adds averaged valid Density for the re
   }]);
 });
 
-test('enrichExternalCoaDocumentsWithHistory resolves the current Batch before Density lookup', () => {
+test('enrichExternalCoaDocumentsWithHistory does not replace a Batch resolved from ERP Stock', () => {
   const [source] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO-HISTORY', Line: 10000, ItemNo: 'F-1', TradeName: 'Trade A', CommonName: 'COMMON A', remark: 'COA',
   }]);
@@ -546,15 +564,37 @@ test('enrichExternalCoaDocumentsWithHistory resolves the current Batch before De
     ...source,
     sampleSnapshots: [{ ...source.sampleSnapshots[0], batchNo: 'FG261029-021', lotNo: 'FG261029-021' }],
   };
-  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withErpLot], [source], [{
+  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withErpLot], [{
     _id: 'coa-history',
     status: 'approved',
     updatedAt: '2026-10-29T08:00:00.000Z',
     sampleSnapshots: [{ sampleId: 'F-1', sampleName: 'Trade A', commonName: 'COMMON A', batchNo: '013' }],
   }]);
 
-  assert.equal(enriched.sampleSnapshots[0].batchNo, '013');
+  assert.equal(enriched.sampleSnapshots[0].batchNo, 'FG261029-021');
   assert.equal(enriched.sampleSnapshots[0].lotNo, 'FG261029-021');
+});
+
+test('enrichExternalCoaDocumentsWithHistory keeps the production date paired with the historical Batch', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-HISTORY-DATE', Line: 10000, ItemNo: 'F-1', TradeName: 'Trade A', CommonName: 'COMMON A', remark: 'COA',
+  }]);
+  const withMfDate = {
+    ...source,
+    sampleSnapshots: [{ ...source.sampleSnapshots[0], productionDate: '2026-10-02' }],
+  };
+  const [enriched] = router.enrichExternalCoaDocumentsWithHistory([withMfDate], [{
+    _id: 'coa-history',
+    status: 'approved',
+    updatedAt: '2026-10-03T08:00:00.000Z',
+    sampleSnapshots: [{
+      sampleId: 'F-1', sampleName: 'Trade A', commonName: 'COMMON A',
+      batchNo: '013', productionDate: '2026-09-23',
+    }],
+  }]);
+
+  assert.equal(enriched.sampleSnapshots[0].batchNo, '013');
+  assert.equal(enriched.sampleSnapshots[0].productionDate, '2026-09-23');
 });
 
 test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', () => {
@@ -570,6 +610,18 @@ test('externalCoaRowsToDocuments reads the production date from ERP Lot No.', ()
 
   assert.equal(doc.sampleSnapshots[0].lotNo, 'NEW-26S-BRM0.005-GR(ER)-176-110869');
   assert.equal(doc.sampleSnapshots[0].productionDate, '2026-08-11');
+});
+
+test('externalCoaRowsToDocuments prefers the explicit ERP production date over a date encoded in the lot', () => {
+  const [doc] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26040024',
+    Line: 10000,
+    LotNo: '26S-BRM0.005-GR-176-110869',
+    ProductionDate: '2026-08-12',
+    remark: 'COA',
+  }]);
+
+  assert.equal(doc.sampleSnapshots[0].productionDate, '2026-08-12');
 });
 
 test('enrichExternalCoaDocumentsWithErpLots adds the ERP Lot to a COA request row', () => {
@@ -1282,7 +1334,7 @@ test('revision approval aborts without activating the revision when supersession
   }
 });
 
-test('ERP autofill excludes AI from another batch and averages matching density readings', async () => {
+test('ERP autofill falls back to nearby AI and averages matching density readings', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1329,8 +1381,7 @@ test('ERP autofill excludes AI from another batch and averages matching density 
     assert.equal(res.body.sample.lotNo, '26S-ACT50-095-171069');
     assert.equal(res.body.sample.productionDate, '2026-10-17');
     assert.equal(res.body.match, null);
-    assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
-    assert.match(res.body.warnings.join(' '), /Batch No\./);
+    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '48.35%');
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '1.158');
     assert.equal(res.body.results.find((row) => row.testItem === 'Appearance'), undefined);
   } finally {
@@ -1491,7 +1542,7 @@ test('ERP autofill averages duplicate legacy Lab results and excludes the named 
   }
 });
 
-test('ERP autofill keeps the production date paired with the matching LIS Lot', async () => {
+test('ERP autofill keeps the LIS label production date instead of deriving it from Lot', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1534,7 +1585,7 @@ test('ERP autofill keeps the production date paired with the matching LIS Lot', 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'FG260912-001');
-    assert.equal(res.body.sample.productionDate, '2026-09-12');
+    assert.equal(res.body.sample.productionDate, '2026-06-16');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
@@ -1546,7 +1597,7 @@ test('ERP autofill keeps the production date paired with the matching LIS Lot', 
   }
 });
 
-test('ERP autofill fills the production date from MF after resolving the Batch from LIS', async () => {
+test('ERP autofill keeps the LIS production date paired with its resolved Batch', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1595,7 +1646,7 @@ test('ERP autofill fills the production date from MF after resolving the Batch f
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'LOT-CUSTOMER');
-    assert.equal(res.body.sample.productionDate, '2026-09-18');
+    assert.equal(res.body.sample.productionDate, '2026-06-16');
     assert.equal(res.body.dataSources.mf, true);
   } finally {
     global.fetch = originals.fetch;
@@ -1858,4 +1909,69 @@ test('real-time Lab AI lookup falls back to the nearest previous batch', async (
     LegacyLabResult.find = originals.legacyFind;
     QCTestResult.find = originals.qcFind;
   }
+});
+
+test('real-time Lab AI lookup falls back to the nearest available batch when no previous batch exists', async () => {
+  const originals = {
+    petitionFind: Petition.find,
+    legacyFind: LegacyLabResult.find,
+    qcFind: QCTestResult.find,
+  };
+  const petition = {
+    _id: 'petition-ai-nearest', petitionNo: 'P-AI-NEAREST', updatedAt: '2026-10-08T00:00:00.000Z',
+    approvedAt: '2026-10-08T00:00:00.000Z', submittedBy: { department: 'QC' },
+    items: [{ seq: 1, sampleName: 'Product A', commonName: 'FENOBUCARB 50% EC', batchNo: '030' }],
+  };
+  try {
+    Petition.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [petition] }) }) });
+    LegacyLabResult.find = () => ({ lean: async () => [] });
+    QCTestResult.find = () => ({ sort: () => ({ lean: async () => [
+      { petitionId: 'petition-ai-nearest', itemSeq: 1, parameterName: '%AI', values: { '%AI::fenobucarb': '50.12' }, updatedAt: '2026-10-08T00:00:00.000Z' },
+    ] }) });
+
+    const res = await invoke('/lab-ai-lookup', 'get', {
+      query: { batchNo: '029', commonName: 'FENOBUCARB 50% EC', sampleName: 'Product A' },
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.ai.result, '50.12%');
+    assert.equal(res.body.match.batchNo, '030');
+  } finally {
+    Petition.find = originals.petitionFind;
+    LegacyLabResult.find = originals.legacyFind;
+    QCTestResult.find = originals.qcFind;
+  }
+});
+
+test('requested COA groups batches only when company and production date match', () => {
+  const rows = router.requestedCoaRowsFromPetition({
+    _id: 'petition-group',
+    petitionNo: 'P-GROUP',
+    submittedBy: { name: 'Requester' },
+    items: [
+      { seq: 1, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '028', productionDate: '2026-10-14' },
+      { seq: 2, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '029', productionDate: '2026-10-14' },
+      { seq: 3, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '030', productionDate: '2026-10-15' },
+      { seq: 4, sampleName: 'Product', commonName: 'FENOBUCARB 50% EC', batchNo: '031', productionDate: '2026-10-14' },
+    ],
+  }, [
+    { sampleSeq: 1, reportCustomerName: 'Company A' },
+    { sampleSeq: 2, reportCustomerName: 'Company A' },
+    { sampleSeq: 3, reportCustomerName: 'Company A' },
+    { sampleSeq: 4, reportCustomerName: 'Company B' },
+  ]);
+
+  assert.deepEqual(rows.map((row) => row.selectedItemSeqs), [[1, 2], [3], [4]]);
+  assert.deepEqual(rows.map((row) => row.customerSnapshot.company), ['Company A', 'Company A', 'Company B']);
+  assert.equal(new Set(rows.map((row) => row._id)).size, 3);
+});
+
+test('COA requests are ordered by nearest shipment date first', () => {
+  const rows = router.sortCoaRows([
+    { _id: 'later', externalCoaRequest: { shipmentDate: '2026-11-15' }, updatedAt: '2026-11-09' },
+    { _id: 'no-shipment', updatedAt: '2026-11-10' },
+    { _id: 'first', externalCoaRequest: { shipmentDate: '2026-11-10' }, updatedAt: '2026-11-08' },
+  ]);
+
+  assert.deepEqual(rows.map((row) => row._id), ['first', 'later', 'no-shipment']);
 });

@@ -382,6 +382,31 @@ test('request Batch keeps its matching request production date instead of an unr
   assert.equal(result.sample.productionDate, '2026-06-16');
 });
 
+test('LIS request production date stays paired with its Batch before a newer MF date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'แจ๊ส 50 อีซี',
+      commonName: 'FENOBUCARB 50% EC',
+      batchNo: '029',
+      sampleId: 'F-JAZ50-200',
+      productionDate: '2026-11-09',
+    }],
+    externalCoaRequest: { itemNo: 'F-JAZ50-200', shipmentDate: '2026-11-10T00:00:00.000Z' },
+  }, [], [{
+    item_no: 'F-JAZ50-200',
+    prod_descript: 'แจ๊ส 50 อีซี',
+    create_date: '2026-11-09T00:00:00.000Z',
+  }], {
+    itemNo: 'F-JAZ50-200',
+    batchNo: '029',
+    productionDate: '2026-11-07',
+  });
+
+  assert.equal(result.sample.batchNo, '029');
+  assert.equal(result.sample.productionDate, '2026-11-07');
+});
+
 test('customer COA request batch, lot and production date take precedence over ERP references', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
@@ -409,7 +434,7 @@ test('customer COA request batch, lot and production date take precedence over E
   assert.equal(result.sample.productionDate, '2026-04-18');
 });
 
-test('LIS petition Lot supplies the production date paired with its Batch', () => {
+test('LIS petition keeps the label production date instead of deriving it from Lot', () => {
   const source = {
     selectedItemSeqs: [10000],
     sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'COMMON A' }],
@@ -436,7 +461,63 @@ test('LIS petition Lot supplies the production date paired with its Batch', () =
   assert.equal(petitionMatch.item.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.batchNo, 'B-CUSTOMER');
   assert.equal(result.sample.lotNo, 'FG260912-001');
-  assert.equal(result.sample.productionDate, '2026-09-12');
+  assert.equal(result.sample.productionDate, '2026-06-16');
+});
+
+test('finished-good COA request can use the matching bulk production batch and date by common name', () => {
+  const source = {
+    sampleSnapshots: [{ sampleName: 'กะรัต 35', commonName: 'CYPERMETHRIN 35% W/V EC' }],
+    externalCoaRequest: {
+      itemNo: 'F-KRT35-200',
+      shipmentDate: '2026-11-05',
+    },
+  };
+  const requestMatch = findBestRequestItem([{
+    updatedAt: '2026-11-04',
+    items: [{
+      itemNo: 'RS-CY35-V',
+      sampleName: 'CYPERMETHRIN 35% W/V EC',
+      commonName: 'CYPERMETHRIN 35% W/V EC',
+      batchNo: '074-079',
+      productionDate: '2026-11-04',
+    }],
+  }], source);
+  const result = sampleFromSources(source, [{
+    item_no: 'F-KRT35-200',
+    loca_code: 'DAMAGE',
+    lot_no: 'FG250721-012',
+    registering_date: '2026-02-10',
+  }], [], requestMatch.item);
+
+  assert.equal(requestMatch.item.batchNo, '074-079');
+  assert.equal(result.sample.batchNo, '074-079');
+  assert.equal(result.sample.productionDate, '2026-11-04');
+});
+
+test('bulk RM lot date overrides a stale production request date for a finished-good COA', () => {
+  const source = {
+    sampleSnapshots: [{ sampleName: 'โบรมาดิโอการ์ด - อ.ย.', commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)' }],
+    externalCoaRequest: { itemNo: 'FPH-BROMD-1X20', shipmentDate: '2026-11-05' },
+  };
+  const requestMatch = findBestRequestItem([{
+    updatedAt: '2026-11-05',
+    items: [{
+      itemNo: 'RSPH-BML0_005-RD',
+      sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)',
+      commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)',
+      batchNo: '26S-BRM0.005-GMP(R)-240',
+      productionDate: '2026-11-05',
+    }],
+  }], source);
+  const result = sampleFromSources(source, [{
+    item_no: 'RSPH-BML0_005-RD',
+    lot_no: 'RM261106-001',
+    registering_date: '2026-11-05',
+    stock_qty_base: 921,
+  }], [], requestMatch.item);
+
+  assert.equal(result.sample.batchNo, '26S-BRM0.005-GMP(R)-240');
+  assert.equal(result.sample.productionDate, '2026-11-06');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {
@@ -498,6 +579,21 @@ test('uses the nearest ERP MF production date on or before shipment for the Batc
   assert.equal(result.mfCandidates[0].productionDate, '2026-07-20');
 });
 
+test('ignores an implausible legacy ERP production date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [1],
+    sampleSnapshots: [{ commonName: 'CARBENDAZIM 50% W/V SC', productionDate: '2026-04-26' }],
+    externalCoaRequest: { itemNo: 'ITEM-A' },
+  }, [], [{
+    item_no: 'ITEM-A',
+    prod_descript: 'CARBENDAZIM 50% W/V SC',
+    create_date: '1977-04-26T00:00:00.000Z',
+  }]);
+
+  assert.equal(result.sample.productionDate, '2026-04-26');
+  assert.equal(result.mfCandidates[0].productionDate, '');
+});
+
 test('reads positional Batch values after the product name and before production date', () => {
   const source = {
     selectedItemSeqs: [1],
@@ -531,6 +627,7 @@ test('physical QC values are translated to English and preserve unknown values f
     english: 'Clear liquid, Orange',
     complete: true,
   });
+  assert.equal(physicalFromQc({ values: { 'ลักษณะ': 'ผงละเอียด', 'สี': 'สีขาวนวล' } }).english, 'Off white powder');
   assert.equal(physicalFromQc({ values: { 'ลักษณะ': 'ของเหลวใส', 'สี': 'สีที่ยังไม่ได้แปล' } }).complete, false);
 });
 
@@ -569,6 +666,21 @@ test('Lab result selection excludes the named submitter before using LIS density
   ], sample);
 
   assert.equal(selection.best.petition._id, 'eligible');
+});
+
+test('Lab result selection falls back to the nearest previous Batch and never a future Batch', () => {
+  const commonName = 'GLYPHOSATE 48% W/V SL';
+  const selection = findBestLabItem([{
+    _id: 'history', updatedAt: '2026-10-20T00:00:00.000Z',
+    items: [
+      { seq: 1, sampleName: 'Product A', commonName, batchNo: '079' },
+      { seq: 2, sampleName: 'Product A', commonName, batchNo: '080' },
+      { seq: 3, sampleName: 'Product A', commonName, batchNo: '082' },
+    ],
+  }], { sampleName: 'Product A', commonName, batchNo: '081' });
+
+  assert.equal(selection.best.item.batchNo, '080');
+  assert.equal(selection.best.matchKind, 'previous');
 });
 
 test('common names with multiple AI percentages receive every plus-minus criterion', () => {

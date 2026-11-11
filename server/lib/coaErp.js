@@ -26,7 +26,7 @@ const PHYSICAL_ENGLISH = {
   'ใส': 'Clear', 'ไม่มีสี': 'Colorless', 'ใสไม่มีสี': 'Colorless', 'ขาว': 'White',
   'ดำ': 'Black', 'แดง': 'Red', 'ส้ม': 'Orange', 'เหลือง': 'Yellow', 'เขียว': 'Green',
   'ฟ้า': 'Light blue', 'น้ำเงิน': 'Blue', 'ม่วง': 'Purple', 'ชมพู': 'Pink',
-  'น้ำตาล': 'Brown', 'เทา': 'Gray', 'เหลืองอ่อน': 'Pale yellow',
+  'น้ำตาล': 'Brown', 'เทา': 'Gray', 'เหลืองอ่อน': 'Pale yellow', 'ขาวนวล': 'Off white',
 };
 
 function text(value) {
@@ -138,7 +138,9 @@ function productionDateFromRow(row, fallback = '') {
     'create_date', 'createDate', 'production_date', 'productionDate',
     'mfg_date', 'manufacture_date', 'registering_date', 'registeringDate',
   ]);
-  return normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
+  const productionDate = normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
+  // ponytail: LIS production data is modern; widen this if pre-2000 records are imported intentionally.
+  return productionDate && Number(productionDate.slice(0, 4)) >= 2000 ? productionDate : '';
 }
 
 function bestMfProductionDate(rows, targetDate, requestedBatch = '') {
@@ -215,7 +217,7 @@ function normalizeIsoDate(value) {
 
 function lotDate(lotNo) {
   const value = text(lotNo);
-  const fgDate = value.match(/^(?:FG)?(\d{2})(\d{2})(\d{2})(?:-|$)/i);
+  const fgDate = value.match(/^(?:[A-Z]{2})?(\d{2})(\d{2})(\d{2})(?:-|$)/i);
   if (fgDate) {
     const year = 2000 + Number(fgDate[1]);
     const month = Number(fgDate[2]);
@@ -364,6 +366,10 @@ function physicalFromQc(result) {
     }
   }
   const unique = [...new Set(values)];
+  const sources = unique.map((value) => value.replace(/^สี/, ''));
+  if (sources.includes('ผงละเอียด') && sources.includes('ขาวนวล')) {
+    return { raw: unique.join(' '), english: 'Off white powder', complete: true };
+  }
   const english = unique.map(translatePhysicalValue).filter(Boolean);
   return {
     raw: unique.join(' '),
@@ -453,21 +459,25 @@ function findBestLabItem(petitions, sample) {
       if (!commonName || itemCommonName !== commonName) continue;
       const candidateBatch = item.batchNo || item.lotNo;
       const batchScore = batchSimilarity(batchNo, candidateBatch);
+      const previousDistance = previousBatchDistance(batchNo, candidateBatch);
       const tradeScore = tradeName && normalizeText(item.sampleName) === tradeName ? 0.15 : 0;
       const approvedScore = petition.labApprovedAt ? 0.1 : 0;
       candidates.push({
         petition,
         item,
         batchScore,
+        previousDistance,
         score: batchScore * 0.75 + tradeScore + approvedScore,
-        matchKind: batchScore === 1 ? 'exact' : batchScore >= 0.45 ? 'close' : 'none',
+        matchKind: batchScore === 1 ? 'exact' : previousDistance !== null ? 'previous' : batchScore >= 0.45 ? 'close' : 'none',
       });
     }
   }
-  candidates.sort((left, right) => right.score - left.score || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
-  // A Lab result is safe to autofill only when both common name and batch match.
-  // Keep near candidates for diagnostics, but never use them as the selected result.
-  return { best: candidates.find((candidate) => candidate.matchKind === 'exact') || null, candidates };
+  const matchRank = { exact: 3, previous: 2, close: 1, none: 0 };
+  candidates.sort((left, right) => matchRank[right.matchKind] - matchRank[left.matchKind]
+    || (left.previousDistance ?? Number.POSITIVE_INFINITY) - (right.previousDistance ?? Number.POSITIVE_INFINITY)
+    || right.score - left.score
+    || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
+  return { best: candidates.find((candidate) => ['exact', 'previous'].includes(candidate.matchKind)) || null, candidates };
 }
 
 function isAfterDryingLabItem(item) {
@@ -560,10 +570,11 @@ function findBestRequestItem(petitions, source, labRequests = []) {
   for (const petition of petitions || []) {
     for (const item of petition.items || []) {
       const itemNoMatch = Boolean(sourceItemNo) && itemCode(item.itemNo) === sourceItemNo;
-      const nameMatch = Boolean(sourceSampleName && sourceCommonName)
-        && normalizeText(item.sampleName) === sourceSampleName
+      const commonNameMatch = Boolean(sourceCommonName)
         && normalizeText(item.commonName) === sourceCommonName;
-      if (!itemNoMatch && !nameMatch) continue;
+      const nameMatch = commonNameMatch && Boolean(sourceSampleName)
+        && normalizeText(item.sampleName) === sourceSampleName;
+      if (!itemNoMatch && !commonNameMatch) continue;
       const batchNo = text(item.batchNo || item.lotNo || labRequestBatch(labRequests, petition, item));
       if (!batchNo) continue;
       const productionDate = normalizeIsoDate(item.productionDate)
@@ -573,7 +584,7 @@ function findBestRequestItem(petitions, source, labRequests = []) {
       candidates.push({
         petition,
         item: item.batchNo || item.lotNo ? item : { ...item, batchNo },
-        identityTier: itemNoMatch ? 2 : 1,
+        identityTier: itemNoMatch ? 3 : nameMatch ? 2 : 1,
         identityScore: Number(Boolean(sourceCommonName) && normalizeText(item.commonName) === sourceCommonName) * 2
           + Number(Boolean(sourceSampleName) && normalizeText(item.sampleName) === sourceSampleName),
         dateBucket: hasTargetAndProduction ? (productionTime <= targetTime ? 0 : 1) : 2,
@@ -951,7 +962,11 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const itemNo = text(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
   const commonName = text(source?.sampleSnapshots?.[0]?.commonName);
   const normalizedItemNo = itemCode(itemNo);
-  const productRows = stockRows.filter((row) => rowMatchesItem(row, normalizedItemNo));
+  const normalizedPetitionItemNo = itemCode(petitionItem?.itemNo);
+  const productRows = stockRows.filter((row) => (
+    rowMatchesItem(row, normalizedItemNo)
+    || rowMatchesItem(row, normalizedPetitionItemNo)
+  ));
   const commonRows = stockRows.filter((row) => !normalizedItemNo && normalizeText(row.common_name || row.commonName) === normalizeText(commonName));
   const stockCandidates = [...productRows, ...commonRows]
     .filter((row) => lotFromRow(row))
@@ -982,8 +997,9 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const mf = mfBatchRows.find((row) => (
     requestedBatch && normalizeBatch(batchFromRow(row)) === normalizeBatch(requestedBatch)
   )) || mfBatchRows[0];
-  const erpRequestProductionDate = lotSnapshot(requestedLot || requestedBatch).productionDate
-    || normalizeIsoDate(sourceSample.productionDate);
+  const erpRequestProductionDate = normalizeIsoDate(petitionItem?.productionDate)
+    || normalizeIsoDate(sourceSample.productionDate)
+    || lotSnapshot(requestedLot || requestedBatch).productionDate;
   const mfBatch = batchFromRow(mf);
   const mfDate = mfDateMatch?.productionDate || productionDateFromRow(mf);
   const matchingStock = stockCandidates.find((row) => {
@@ -1010,9 +1026,16 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const erpStockProductionDate = stock
     ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock)).productionDate
     : '';
+  const petitionStock = normalizedPetitionItemNo && normalizedPetitionItemNo !== normalizedItemNo
+    ? stockCandidates.find((row) => rowMatchesItem(row, normalizedPetitionItemNo))
+    : null;
+  const petitionStockProductionDate = petitionStock
+    ? lotSnapshot(lotFromRow(petitionStock), productionDateFromRow(petitionStock)).productionDate
+    : '';
   const erpProductionDate = erpRequestLot
     ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
-    : authoritativeErpLot?.productionDate
+    : petitionStockProductionDate
+      || authoritativeErpLot?.productionDate
       || erpRequestProductionDate
       || matchingStockLot?.productionDate
       || normalizeIsoDate(mfDate)
