@@ -10,7 +10,7 @@ function page(rows: ReturnType<typeof row>[]): LabReportPage {
     reportNo: "L-2610-0001",
     reportDate: "28/10/2569",
     customer: { name: "", company: "", department: "", email: "", phone: "" },
-    sample: { name: "OMETHOATE 50% SL", batchNo: "", productionDate: "", submissionNo: "P-2610-0001", manufacturer: "", sampleNo: "L-2610-0001", receivedDate: "", testedDate: "", reportedDate: "", condition: "" },
+    sample: { name: "OMETHOATE 50% SL", batchNo: "", productionDate: "", submissionNo: "S-2610-0007", manufacturer: "", sampleNo: "L-2610-0001", receivedDate: "", testedDate: "", reportedDate: "", condition: "" },
     rows,
     analystName: "",
     labHeadName: "",
@@ -21,6 +21,11 @@ function page(rows: ReturnType<typeof row>[]): LabReportPage {
 describe("LabCalculationForm", () => {
   it("splits the sample name into common name, strength and form", () => {
     expect(parseSampleName("OMETHOATE 50% SL")).toEqual({ commonName: "OMETHOATE", strength: "50", form: "SL" });
+  });
+
+  it("uses the submission number as the sample number", () => {
+    const { container } = render(<LabCalculationForm page={page([])} />);
+    expect(container.querySelector(".brom-form-heading .brom-form-field")?.textContent).toBe("S-2610-0007");
   });
 
   it("prints Control Sample and its acceptance range saved from Lab testing", () => {

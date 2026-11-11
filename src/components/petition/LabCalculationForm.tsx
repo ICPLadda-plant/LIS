@@ -95,7 +95,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
       <section className="brom-form-page">
         <div className="brom-form-top"><img className="brom-form-logo" src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" /><div className="brom-form-title">ใบคำนวณผลวิเคราะห์</div></div>
         <div className="brom-form-heading">
-          <div>ตัวอย่างเลขที่ <span className="brom-form-field">{page.reportNo}</span></div><div>ชื่อสามัญ <span className="brom-form-field brom-form-field-wide">{commonName}</span></div><div>สูตร <span className="brom-form-field brom-form-field-small">{strength}</span></div><div>% <span className="brom-form-field brom-form-field-small">{form}</span></div>
+          <div>ตัวอย่างเลขที่ <span className="brom-form-field">{page.sample.submissionNo || "-"}</span></div><div>ชื่อสามัญ <span className="brom-form-field brom-form-field-wide">{commonName}</span></div><div>สูตร <span className="brom-form-field brom-form-field-small">{strength}</span></div><div>% <span className="brom-form-field brom-form-field-small">{form}</span></div>
         </div>
         <div className="brom-form-heading" style={{ marginTop: "4mm", gridTemplateColumns: "42% 58%" }}><div>เลขที่ Standard <span className="brom-form-field">{standardNo}</span></div><div>เลขที่ Solvent number <span className="brom-form-field">{solventNo}</span></div></div>
         <div className="brom-form-section">System suitability</div>
