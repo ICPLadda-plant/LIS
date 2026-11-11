@@ -10,12 +10,6 @@ const PetitionAuditLog = require('../models/PetitionAuditLog');
 const { buildSearchRankingStages } = require('../lib/searchRanking');
 const { PRODUCTION_PREFIX_RX, productionLineLabel, productionLineQueryRegex } = require('../lib/productionDepartment');
 const { labResultDocs, snapshotOf, clearLabResults, restoreLabResults } = require('../lib/labResultActions');
-const {
-  bellDescribe,
-  isCollapsibleDuplicate,
-  isRelevant,
-  toNotification,
-} = require('../lib/petitionNotifications');
 const { maybeAdvancePhase } = require('../lib/phaseAdvance');
 const QCTestResult = require('../models/QCTestResult');
 const Parameter = require('../models/Parameter');
@@ -49,6 +43,7 @@ const { canEditWholePetition } = require('../lib/productionPetitionEdit');
 const { assignMissingSampleLabelNumbers, planLabelReceipt } = require('../lib/sampleLabelNumber');
 const { sendProductionCancel } = require('../lib/productionCallback');
 const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
+const { recordQcHandlerFromRequest } = require('../lib/qcHandlers');
 
 function logAudit(petition, payload) {
   if (!petition) return;
@@ -61,6 +56,34 @@ function logAudit(petition, payload) {
   });
   // Fan out to LINE groups (fire-and-forget; no-op unless configured + groups bound).
   notifyPetitionEvent(petition, payload);
+}
+
+// ผล %AI ต่อรายการ ณ ตอนหัวหน้า Lab ออกผล — แนบไปกับแจ้งเตือนให้ผู้ยื่นดูคร่าว ๆ
+async function labAiResults(doc) {
+  try {
+    const { aiFromQcResults } = require('../lib/coaErp');
+    const results = await QCTestResult.find({ petitionId: String(doc._id) }).lean();
+    return (doc.items || [])
+      .filter((item) => itemRequiresSide(doc, item, 'lab'))
+      .map((item) => {
+        const found = aiFromQcResults(results.filter((r) => Number(r.itemSeq) === Number(item.seq)), item.commonName);
+        return found?.result ? { itemSeq: item.seq, result: found.result } : null;
+      })
+      .filter(Boolean);
+  } catch (err) {
+    console.error('[lab-approve] read %AI failed:', err.message);
+    return [];
+  }
+}
+
+// งานที่ถูกสั่ง Re-check แล้วกำลังมอบหมายใหม่ — ใช้บอกผู้รับงานเดิมว่างานไปอยู่กับใคร
+async function recheckAssignmentContext(doc) {
+  if (!(doc.labRecheckCount > 0) || !doc.labRecheckRequestedAt || doc.labApprovedAt) return {};
+  const log = await PetitionAuditLog.findOne({ petitionId: doc._id, event: 'recheck', 'metadata.round': { $exists: true } })
+    .sort({ createdAt: -1 })
+    .lean();
+  if (!log) return {};
+  return { recheckRound: log.metadata.round, recheckPreviousAssignee: log.metadata.previousAssignee || null };
 }
 
 // เลขรายการ (itemSeq) ที่ผล Lab เปลี่ยนระหว่าง snapshot ก่อน/หลังแก้ไข
@@ -551,70 +574,8 @@ router.get('/audit-logs', async (req, res) => {
   }
 });
 
-// GET /api/petitions/notifications?since=<ISO>&audiences=qc,lab&employeeId=E1&all=0&limit=30
-// In-app bell feed: audit log + petition → notifications this viewer should see.
-// Unauthenticated like the rest of this API — the client states who it is, same as
-// the `actor` field other routes accept.
-const NOTIFY_LOOKBACK_MS = 24 * 60 * 60 * 1000;
-
-router.get('/notifications', async (req, res) => {
-  try {
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 30));
-    const audiences = String(req.query.audiences || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const viewer = {
-      audiences,
-      roles: String(req.query.roles || '').split(',').map((s) => s.trim()).filter(Boolean),
-      employeeId: String(req.query.employeeId || '').trim(),
-      seeAll: String(req.query.all || '') === '1',
-    };
-
-    // Hard 24h ceiling no matter how stale the client's cursor is.
-    const floor = new Date(Date.now() - NOTIFY_LOOKBACK_MS);
-    const since = new Date(String(req.query.since || ''));
-    const window = !Number.isNaN(since.getTime()) && since > floor ? since : floor;
-
-    const logs = await PetitionAuditLog.find({ createdAt: { $gte: window } })
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .lean();
-
-    const petitionIds = [...new Set(logs.filter((l) => l.petitionId).map((l) => String(l.petitionId)))];
-    const petitions = petitionIds.length
-      ? await Petition.find({ _id: { $in: petitionIds } })
-          .select(
-            'petitionNo dept status items.batchNo items.sampleName items.commonName ' +
-            'submittedBy assignedTo qcCompletedAt labCompletedAt labApprovedAt',
-          )
-          .lean()
-      : [];
-    const byId = new Map(petitions.map((p) => [String(p._id), p]));
-
-    const items = [];
-    // resultEntered fires once per form field, so a burst for one petition must
-    // collapse to its single newest row BEFORE the limit cap below — otherwise the
-    // burst alone can fill the cap and crowd out older, more important events
-    // (e.g. ⛔ ถูกส่งกลับ) that never get re-fetched once the cursor moves past them.
-    const seenResultEntered = new Set();
-    for (const log of logs) {
-      if (items.length >= limit) break;
-      const petition = byId.get(String(log.petitionId));
-      if (!petition) continue; // ถูกลบ/soft delete แล้ว
-      if (isCollapsibleDuplicate(log, seenResultEntered)) continue;
-      const desc = bellDescribe(petition, log);
-      if (!desc) continue;
-      if (!isRelevant(desc, petition, viewer)) continue;
-      items.push(toNotification(petition, log, desc, viewer));
-    }
-
-    // Client uses serverTime as its next cursor — avoids client/server clock skew.
-    res.json({ items, serverTime: new Date().toISOString() });
-  } catch (err) {
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
+// GET /api/petitions/notifications — ชื่อเดิมของฟีดกระดิ่ง (ใช้ routes/notifications.js ตัวเดียวกัน)
+router.get('/notifications', (req, res) => require('./notifications').feedHandler(req, res));
 
 // GET /api/petitions/returned-flags?petitionIds=id1,id2,...
 // Returns map of petitionId → boolean (true if petition is a revision of another
@@ -881,7 +842,7 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
         toStatus: 'success',
         actor,
         note: `${sideLabel} บันทึกผลเสร็จ — ครบทุกส่วน ${finalWaitNote}`,
-        metadata: { side },
+        metadata: { side, kind: 'trackCompleted' },
       });
     } else {
       await doc.save();
@@ -890,9 +851,10 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
         toStatus: doc.status,
         actor,
         note: `${sideLabel} บันทึกผลเสร็จ — รออีกฝั่งตรวจให้ครบ`,
-        metadata: { side },
+        metadata: { side, kind: 'trackCompleted' },
       });
     }
+    if (side === 'qc') recordQcHandlerFromRequest(req, doc._id, actor);
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
@@ -918,6 +880,7 @@ router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
     doc.labApprovedAt = now;
     doc.labApprovedBy = actor;
     doc.reviewHistory.push({ action: 'lab-approve', reviewedBy: actor, reviewedAt: now });
+    const aiResults = await labAiResults(doc);
 
     const prevStatus = doc.status;
     const finalWaitNote = requiresQcTrack(doc) ? 'รอหัวหน้า QC ออก Final Result' : 'รอ Final Result';
@@ -927,13 +890,13 @@ router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
       await doc.save();
       logAudit(doc, {
         event: 'statusChanged', fromStatus: prevStatus, toStatus: 'success', actor,
-        note: `หัวหน้า Lab ออกผล — ครบทุกส่วน ${finalWaitNote}`, metadata: { side: 'lab' },
+        note: `หัวหน้า Lab ออกผล — ครบทุกส่วน ${finalWaitNote}`, metadata: { side: 'lab', kind: 'labApproved', aiResults },
       });
     } else {
       await doc.save();
       logAudit(doc, {
         event: 'updated', toStatus: doc.status, actor,
-        note: 'หัวหน้า Lab ออกผล — รอ QC ตรวจให้ครบ', metadata: { side: 'lab' },
+        note: 'หัวหน้า Lab ออกผล — รอ QC ตรวจให้ครบ', metadata: { side: 'lab', kind: 'labApproved', aiResults },
       });
     }
     res.json(doc);
@@ -1342,6 +1305,7 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
         note: `${sideLabel} รับตัวอย่าง${labelNote}`,
         metadata: { side, labelKeys: labelPlan.keys, partial: true },
       });
+      if (side === 'qc') recordQcHandlerFromRequest(req, doc._id, actor);
       return res.json(doc);
     }
     const update = {
@@ -1370,6 +1334,7 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
       note: `${sideLabel} รับตัวอย่าง${labelNote}`,
       metadata: labelPlan ? { side, labelKeys: labelPlan.keys } : { side },
     });
+    if (side === 'qc') recordQcHandlerFromRequest(req, doc._id, actor);
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
@@ -1442,6 +1407,12 @@ async function normalizeAssignedMachines(machines) {
 async function applyLabAssignment(doc, assignee, machines, { actor, note, claimed = false }) {
   const prevStatus = doc.status;
   const now = new Date();
+  const current = doc.assignedTo?.employeeId ? doc.assignedTo : null;
+  const { recheckRound, recheckPreviousAssignee } = await recheckAssignmentContext(doc);
+  const previousSource = current || recheckPreviousAssignee;
+  const previousAssignee = previousSource
+    ? { employeeId: previousSource.employeeId, name: previousSource.name, department: previousSource.department, position: previousSource.position }
+    : null;
   doc.assignedTo = {
     employeeId: String(assignee.employeeId).trim(),
     name: String(assignee.name).trim(),
@@ -1466,7 +1437,7 @@ async function applyLabAssignment(doc, assignee, machines, { actor, note, claime
     toStatus: doc.status,
     actor: actor || 'system',
     note: `${note}${machineNote}`,
-    metadata: { assignee: doc.assignedTo, machines: doc.assignedMachines, claimed },
+    metadata: { assignee: doc.assignedTo, machines: doc.assignedMachines, claimed, previousAssignee: previousAssignee || undefined, recheckRound: recheckRound || undefined },
   });
   return doc;
 }
