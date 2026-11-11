@@ -440,7 +440,7 @@ export default function PetitionTimelineDetailPage() {
     ...(canShowPreReport ? [{ key: "preReport" as const, label: "Pre Report", icon: FileText, availableAt: preReportAt, open: setPreReportOpen }] : []),
     ...(canPrintLabResult(petition) && labReportPages.length > 0 ? [{ key: "labResult" as const, label: "พิมพ์ผลวิเคราะห์ Lab", icon: FlaskConical, availableAt: petition.labApprovedAt || petition.approvedAt, open: setLabResultOpen }] : []),
     ...(petition.status === "approved" ? [{ key: "finalReport" as const, label: "Final Report", icon: FileCheck2, availableAt: petition.approvedAt, open: setFinalReportOpen }] : []),
-    ...(canPrintChemAnalysisReport(petition) ? [{ key: "chemReport" as const, label: "ใบรายงานผลการวิเคราะห์", icon: FileCheck2, availableAt: petition.approvedAt, open: setChemReportOpen }] : []),
+    ...(canPrintChemAnalysisReport(petition) ? [{ key: "chemReport" as const, label: "ใบรายงานผลการวิเคราะห์", icon: FileCheck2, availableAt: petition.labApprovedAt || petition.approvedAt, open: setChemReportOpen }] : []),
   ]);
   const activeItem = model.items.find((item) => item.seq === selectedItemSeq) ?? null;
   const responsibleName = petition.assignedTo?.name || "ยังไม่มอบหมาย";
