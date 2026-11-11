@@ -138,6 +138,8 @@ const fs = require('fs');
 const distPath = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use('/LIS', express.static(distPath));
+  // ไฟล์ build ที่ไม่มีอยู่ต้องตอบ 404 ห้ามส่ง index.html แทน JS/CSS (PWA จะ cache หน้า HTML ไว้แทน)
+  app.use('/LIS/assets', (req, res) => res.status(404).end());
   // SPA fallback: serve index.html for all /LIS routes (handles browser refresh)
   app.get(['/LIS/*'], (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
