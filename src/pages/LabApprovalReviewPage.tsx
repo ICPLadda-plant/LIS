@@ -84,8 +84,8 @@ export default function LabApprovalReviewPage() {
       await api.labApprovePetition(petition._id, user?.name ?? "system");
       toast.success("ออกผล Lab เรียบร้อย");
       navigate("/lab-approval");
-    } catch {
-      toast.error("ออกผลไม่สำเร็จ");
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "ออกผลไม่สำเร็จ");
     } finally {
       setSubmitting(false);
     }
@@ -151,6 +151,12 @@ export default function LabApprovalReviewPage() {
     includeResultOnlyFields: true,
     showAutoPassRange: false,
   });
+  // ผู้วิเคราะห์ห้ามออกผลงานตัวเอง — ต้องให้หัวหน้า Lab อีกคนออกผล (server ตรวจซ้ำ)
+  const analystName = petition.labCompletedBy?.trim().toLowerCase();
+  const isOwnAnalysis = Boolean(
+    analystName &&
+      [user?.name, user?.email].some((name) => name?.trim().toLowerCase() === analystName),
+  );
 
   return (
     <AppLayout title={petition.petitionNo}>
@@ -228,6 +234,11 @@ export default function LabApprovalReviewPage() {
         {canApproveLab && abnormalLoaded && (
           <div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
             <div className="flex flex-wrap items-center justify-end gap-3">
+              {isOwnAnalysis && (
+                <span className="mr-auto text-sm text-muted-foreground">
+                  คุณเป็นผู้วิเคราะห์งานนี้ ต้องให้หัวหน้า Lab ท่านอื่นออกผล
+                </span>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -247,7 +258,7 @@ export default function LabApprovalReviewPage() {
                   pendingApproveRef.current = true;
                   setReviewDialogOpen(true);
                 }}
-                disabled={submitting}
+                disabled={submitting || isOwnAnalysis}
                 className="gap-2"
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}

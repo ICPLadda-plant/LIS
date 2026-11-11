@@ -189,6 +189,18 @@ async function additionalCompletionError(petition, sides) {
   return null;
 }
 
+// ผู้วิเคราะห์ (labCompletedBy) ห้ามเป็นผู้ออกผล Lab ของงานตัวเอง — ต้องให้หัวหน้า Lab อีกคนออกผล
+function normalizeActorName(name) {
+  const value = String(name || '').trim().toLowerCase();
+  return value && value !== 'system' ? value : '';
+}
+
+function isSameActor(names, other) {
+  const target = normalizeActorName(other);
+  if (!target) return false;
+  return names.some((name) => normalizeActorName(name) === target);
+}
+
 async function additionalActor(req, res, petition, side, headOnly = false) {
   if (!petition.additionalSampleRequests?.length) return req.body?.actor || 'system';
   const user = await currentUser(req);
@@ -873,6 +885,10 @@ router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
     }
     if (!doc.labCompletedAt) return badRequest(res, 'ผู้ทดสอบ Lab ยังไม่ได้บันทึกผล');
     if (doc.labApprovedAt) return badRequest(res, 'ออกผล Lab ไปแล้ว');
+    const approver = await currentUser(req).catch(() => null);
+    if (isSameActor([actor, approver?.name, approver?.email], doc.labCompletedBy)) {
+      return res.status(409).json({ error: { message: 'ผู้วิเคราะห์ไม่สามารถออกผล Lab ของงานตัวเองได้ กรุณาให้หัวหน้า Lab ท่านอื่นออกผล' } });
+    }
     const additionalError = await additionalCompletionError(doc, ['lab']);
     if (additionalError) return res.status(409).json({ error: { message: additionalError } });
 
