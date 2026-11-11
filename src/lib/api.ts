@@ -298,8 +298,8 @@ export const api = {
   // แจ้งเตือน PWA (Web Push) — server/routes/push.js
   getPushDevices: (endpoint?: string) =>
     request<PushDevicesState>(`/push/devices${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ""}`),
-  subscribePush: (subscription: PushSubscriptionPayload, deviceLabel: string) =>
-    request<PushDevicesState>("/push/subscribe", { method: "POST", body: JSON.stringify({ subscription, deviceLabel }) }),
+  subscribePush: (subscription: PushSubscriptionPayload, deviceLabel: string, seeAll = false) =>
+    request<PushDevicesState>("/push/subscribe", { method: "POST", body: JSON.stringify({ subscription, deviceLabel, seeAll }) }),
   unsubscribePush: (endpoint: string) =>
     request<PushDevicesState>("/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }),
   setPushPaused: (paused: boolean, endpoint?: string) =>

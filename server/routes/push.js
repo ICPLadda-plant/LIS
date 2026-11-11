@@ -81,6 +81,8 @@ router.post('/subscribe', async (req, res) => {
           deviceLabel: String(req.body?.deviceLabel || 'อุปกรณ์ไม่ทราบชื่อ').slice(0, 60),
           userAgent: String(req.get('user-agent') || '').slice(0, 300),
           paused: Boolean(existing?.paused),
+          // admin ที่เปิด "ดูแจ้งเตือนทั้งระบบ" ไว้ก่อนเปิดรับ PWA → เครื่องใหม่ได้ทุก role ด้วย
+          seeAll: identity.roles.includes('admin') && (req.body?.seeAll === true || Boolean(existing?.seeAll)),
         },
       },
       { upsert: true, new: true },

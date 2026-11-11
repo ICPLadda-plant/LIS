@@ -12,6 +12,7 @@ import {
   subscribeThisDevice,
   toSubscriptionPayload,
 } from "@/lib/pwaPush";
+import { readSeeAll } from "@/lib/petitionAudience";
 
 type Busy = "toggle" | "test" | "pause" | null;
 
@@ -54,7 +55,8 @@ const PwaPushSettings = () => {
       if (checked) {
         if (!state?.publicKey) throw new Error("เซิร์ฟเวอร์ยังไม่ได้ตั้งค่าการแจ้งเตือน PWA");
         const subscription = await subscribeThisDevice(state.publicKey);
-        const next = await api.subscribePush(toSubscriptionPayload(subscription), describeDevice());
+        // สวิตช์ "ดูแจ้งเตือนทั้งระบบ" ในกระดิ่ง (admin) ใช้กับเครื่องที่เพิ่งเปิดรับด้วย — server ตรวจสิทธิ์ admin เอง
+        const next = await api.subscribePush(toSubscriptionPayload(subscription), describeDevice(), readSeeAll());
         setEndpoint(subscription.endpoint);
         setState(next);
         setPermissionDenied(false);
