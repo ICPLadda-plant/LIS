@@ -14,7 +14,10 @@ const PushSubscriptionSchema = new mongoose.Schema({
   roles: { type: [String], default: [] },
   department: { type: String, default: '' },
   employeeId: { type: String, default: '' },
+  name: { type: String, default: '' },
   paused: { type: Boolean, default: false },
+  // admin เปิด "ดูแจ้งเตือนทั้งระบบ" ในกระดิ่ง → PWA ได้รับทุก role ด้วย (role อื่นไม่มีผล)
+  seeAll: { type: Boolean, default: false },
   lastSuccessAt: Date,
   lastErrorAt: Date,
 }, { timestamps: true });

@@ -35,7 +35,10 @@ const EmployeeLinkGate = () => {
   const isAdmin = (user?.roles ?? (user?.role ? [user.role] : [])).includes("admin");
   const isLogout = location.pathname === "/logout";
   const isPublicStockView = location.pathname === "/stock/view";
-  const needsLink = !!user?.id && !user.employeeId && !isAdmin && !isLogout && !isPublicStockView;
+  // บัญชีที่ยังรออนุมัติ/ถูกปฏิเสธ ใช้ API ไม่ได้ — ให้หน้าสถานะใน PrivateRoute แสดงแทน
+  const awaitingApproval = !!user?.approvalStatus && user.approvalStatus !== "approved";
+  const needsLink =
+    !!user?.id && !user.employeeId && !isAdmin && !isLogout && !isPublicStockView && !awaitingApproval;
 
   const [state, setState] = useState<LinkState>("linking");
   const attemptedFor = useRef<string | null>(null);

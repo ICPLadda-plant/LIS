@@ -4,10 +4,38 @@ import {
   hasRequiredLabRequestStep,
   isResearchAndDevelopmentDepartment,
   makeInitialItemsFromQuery,
+  integrationPayloadToSearchParams,
   objectToSearchParams,
   requiresMasterItemSelection,
   requiresDeliveryAndBatch,
 } from './ProductionPetitionNewPage';
+
+describe('integrationPayloadToSearchParams', () => {
+  it('reads the query string Production posted exactly as if it came from the URL', () => {
+    const query = new URLSearchParams({
+      requestNo: 'SA261106000001',
+      'samples[0][sampleName]': 'A',
+      'samples[0][batchNo]': 'B-1',
+      'samples[0][note]': 'หมายเหตุตัวแรก',
+      'samples[1][sampleName]': 'A',
+      'samples[1][batchNo]': 'B-2',
+      'samples[1][note]': '',
+    }).toString();
+
+    const params = integrationPayloadToSearchParams({ query });
+
+    expect(params.toString()).toBe(query);
+    // ช่องว่างของตัวสุดท้ายต้องคงไว้ ไม่งั้น LIS เอาค่าของตัวแรกมาเติมแทน
+    expect(makeInitialItemsFromQuery(params).map((item) => item.note)).toEqual(['หมายเหตุตัวแรก', '']);
+  });
+
+  it('still accepts the object payload of older callers', () => {
+    const params = integrationPayloadToSearchParams({ requestNo: 'SA1', samples: [{ sampleName: 'A', batchNo: 'B-1' }] });
+
+    expect(params.get('requestNo')).toBe('SA1');
+    expect(params.get('samples[0][batchNo]')).toBe('B-1');
+  });
+});
 
 describe('buildProductionReturnUrl', () => {
   it('returns production list with original request number and LIS petition number', () => {
@@ -226,9 +254,41 @@ describe('R&D integration request rules', () => {
       submittedUnit: 'Kg/L',
     });
   });
+
+  it('uses the production send date for the label date and keeps the production date separate', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      requestDate: '2026-11-03',
+      samples: [
+        { sampleName: 'A', batchNo: 'B-1', productionDate: '2026-11-01', requestDate: '2026-11-03' },
+        { sampleName: 'A', batchNo: 'B-2', productionDate: '2026-11-02', requestDate: '' },
+      ],
+    }));
+
+    expect(items.map(({ productionDate, labelSampledDate }) => ({ productionDate, labelSampledDate }))).toEqual([
+      { productionDate: '2026-11-01', labelSampledDate: '2026-11-03' },
+      { productionDate: '2026-11-02', labelSampledDate: '2026-11-03' },
+    ]);
+  });
 });
 
 describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
+  it('merges a QC-only row and a Lab-only row of the same batch even without routeTargets', () => {
+    const sample = { sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)', unit: 'G', mfNo: 'MF1' };
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samples: [
+        { ...sample, batchNo: 'B-240', qty: 300, sendToQc: '1', sendToLab: '0' },
+        { ...sample, batchNo: 'B-240', qty: 500, sendToQc: '0', sendToLab: '1' },
+        { ...sample, batchNo: 'B-241', qty: 300, sendToQc: '1', sendToLab: '0' },
+        { ...sample, batchNo: 'B-241', qty: 500, sendToQc: '0', sendToLab: '1' },
+      ],
+    }));
+
+    expect(items.map(({ seq, batchNo, sendToQc, sendToLab, labelQuantities, labelQuantitySides }) => ({ seq, batchNo, sendToQc, sendToLab, labelQuantities, labelQuantitySides }))).toEqual([
+      { seq: 1, batchNo: 'B-240', sendToQc: true, sendToLab: true, labelQuantities: ['300 G', '500 G'], labelQuantitySides: ['qc', 'lab'] },
+      { seq: 2, batchNo: 'B-241', sendToQc: true, sendToLab: true, labelQuantities: ['300 G', '500 G'], labelQuantitySides: ['qc', 'lab'] },
+    ]);
+  });
+
   it('merges two rows of the same batch into one item with two quantities', () => {
     const items = makeInitialItemsFromQuery(new URLSearchParams(
       'routeTargets=qc,lab&sampleName=Foo,Foo&batchNo=B1,B1&qty=50,200&unit=ml',
@@ -243,4 +303,82 @@ describe('makeInitialItemsFromQuery — QC+LAB same batch', () => {
     ));
     expect(items.map((item) => item.batchNo)).toEqual(['B1', 'B2']);
   });
+
+  it('keeps the same batch as separate items when Production sends different parts', () => {
+    const sample = { sampleName: 'PACLOBUTRAZOL 25% SC', unit: 'CC', batchNo: 'B-526', sendToQc: '1', sendToLab: '0' };
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      samples: [
+        { ...sample, qty: 100, qcQtys: '100', part: 'บน', lineRef: '11' },
+        { ...sample, qty: 100, qcQtys: '100', part: 'ล่าง', lineRef: '12' },
+      ],
+    }));
+
+    expect(items.map(({ batchNo, part, lineRef }) => ({ batchNo, part, lineRef }))).toEqual([
+      { batchNo: 'B-526', part: 'บน', lineRef: '11' },
+      { batchNo: 'B-526', part: 'ล่าง', lineRef: '12' },
+    ]);
+  });
+
+  it('does not merge rows Production confirmed as separate samples (different lineRef)', () => {
+    const sample = { sampleName: 'PACLOBUTRAZOL 25% SC', unit: 'CC', batchNo: 'B-526' };
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      routeTargets: 'qc,lab',
+      samples: [
+        { ...sample, qty: 100, sendToQc: '1', sendToLab: '0', qcQtys: '100', lineRef: 'a' },
+        { ...sample, qty: 500, sendToQc: '0', sendToLab: '1', labQtys: '500', lineRef: 'b' },
+      ],
+    }));
+
+    expect(items.map(({ seq, labelQuantities, labelQuantitySides }) => ({ seq, labelQuantities, labelQuantitySides }))).toEqual([
+      { seq: 1, labelQuantities: ['100 CC'], labelQuantitySides: ['qc'] },
+      { seq: 2, labelQuantities: ['500 CC'], labelQuantitySides: ['lab'] },
+    ]);
+  });
+
+  it('keeps one item with QC 100, 500 and Lab 500 portions sent as a single Production row', () => {
+    const items = makeInitialItemsFromQuery(objectToSearchParams({
+      sampleName: 'PACLOBUTRAZOL 25% SC',
+      batchNo: 'B-526',
+      samples: [
+        { sampleName: 'PACLOBUTRAZOL 25% SC', batchNo: 'B-526', qty: 100, unit: 'CC', sendToQc: '1', sendToLab: '1', labQty: 500, qcQtys: '100,500', labQtys: '500', lineRef: 'k1' },
+      ],
+    }));
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ sampleQuantity: 3, labelQuantities: ['100 CC', '500 CC', '500 CC'], labelQuantitySides: ['qc', 'qc', 'lab'], lineRef: 'k1' });
+    expect(items[0].part).toBeUndefined();
+  });
 });
+
+describe('makeInitialItemsFromQuery — nested samples with commas in the name', () => {
+  // ชื่อสาร "2,4-D-BUTYL" มีจุลภาคในชื่อ เคยถูกตัดเป็น 2 ตัวอย่าง ("2" กับ "4-D-BUTYL ...")
+  it('keeps one sample per samples[i] entry', () => {
+    const params = new URLSearchParams();
+    params.set('sampleName', '2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+    params.set('samples[0][sampleName]', '2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+    params.set('samples[0][commonName]', '2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+    params.set('samples[0][batchNo]', '102');
+    params.set('samples[0][mfNo]', 'MF26110047');
+    params.set('samples[0][qty]', '210');
+    params.set('samples[0][unit]', 'G');
+
+    const items = makeInitialItemsFromQuery(params);
+    expect(items).toHaveLength(1);
+    expect(items[0].sampleName).toBe('2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR');
+  });
+
+  it('keeps blank fields aligned to their own sample', () => {
+    const params = new URLSearchParams();
+    params.set('samples[0][sampleName]', '2,4-D AMINE');
+    params.set('samples[0][lotNo]', '');
+    params.set('samples[1][sampleName]', 'GLYPHOSATE');
+    params.set('samples[1][lotNo]', 'L2');
+
+    const items = makeInitialItemsFromQuery(params);
+    expect(items.map((item) => [item.sampleName, item.lotNo])).toEqual([
+      ['2,4-D AMINE', ''],
+      ['GLYPHOSATE', 'L2'],
+    ]);
+  });
+});
+

@@ -3,6 +3,7 @@ import { FileVideo, Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { uploadQcPhoto, deleteQcPhoto, type ParameterValueField } from '@/lib/api';
+import { displayMediaUrl, isVideoUrl } from '@/lib/mediaUrls';
 import {
   Dialog,
   DialogContent,
@@ -17,24 +18,6 @@ interface PhotoFieldProps {
 }
 
 const ACCEPTED_MEDIA = 'image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime';
-const MEDIA_CACHE_BUSTER = 'lis_media=1';
-const VIDEO_EXT_RE = /\.(mp4|webm|mov)(?:$|[?#])/i;
-
-function publicMediaUrl(url: string) {
-  return url
-    .replace(/^\/LIS\/api\/uploads\//, '/LIS/uploads/')
-    .replace(/^\/api\/uploads\//, '/uploads/');
-}
-
-function displayMediaUrl(url: string) {
-  const publicUrl = publicMediaUrl(url);
-  const separator = publicUrl.includes('?') ? '&' : '?';
-  return `${publicUrl}${separator}${MEDIA_CACHE_BUSTER}`;
-}
-
-function isVideoUrl(url: string) {
-  return VIDEO_EXT_RE.test(url);
-}
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error && error.message ? error.message : fallback;

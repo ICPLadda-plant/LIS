@@ -12,11 +12,13 @@ import { ConfirmProvider } from "@/context/ConfirmDialog";
 import DailyCheckReminderWatcher from "@/components/lis/DailyCheckReminderWatcher";
 import PetitionFlowWatcher from "@/components/lis/PetitionFlowWatcher";
 import UrgentPetitionReminder from "@/components/lis/UrgentPetitionReminder";
+import AdminSystemWatcher from "@/components/lis/AdminSystemWatcher";
 import PrivateRoute from "@/components/PrivateRoute";
 import LabHeadRoute from "@/components/LabHeadRoute";
 import RoutePointerLockGuard from "@/components/RoutePointerLockGuard";
 import { DevRoleSwitcher } from "@/components/DevRoleSwitcher";
 import EmployeeLinkGate from "@/components/lis/EmployeeLinkGate";
+import PwaInstallGate from "@/components/lis/PwaInstallGate";
 import GlobalStockQrScanListener from "@/components/lis/GlobalStockQrScanListener";
 import { RouteLoading } from "@/components/RouteLoading";
 import { StartupLoadingGate } from "@/components/StartupLoadingGate";
@@ -119,10 +121,12 @@ const App = () => (
         <AuthProvider>
           <DevRoleSwitcher />
           <EmployeeLinkGate />
+          <PwaInstallGate />
           <NotificationProvider>
             <DailyCheckReminderWatcher />
             <PetitionFlowWatcher />
             <UrgentPetitionReminder />
+            <AdminSystemWatcher />
             <SampleProvider>
               <StartupLoadingGate minimumDurationMs={1500}>
               <Suspense fallback={<RouteLoading />}>

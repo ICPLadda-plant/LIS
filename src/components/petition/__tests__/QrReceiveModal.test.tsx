@@ -128,3 +128,63 @@ describe('QrReceiveModal manualOnly mode', () => {
   });
 });
 
+describe('QrReceiveModal รับทีละป้าย', () => {
+  const twoBatch = {
+    ...qcPetition,
+    routeTargets: ['qc'],
+    items: [
+      { seq: 1, sampleName: 'A', batchNo: '001', sampleQuantity: 2, labelQuantitySides: ['qc', 'qc'] },
+      { seq: 2, sampleName: 'A', batchNo: '002', sampleQuantity: 1, labelQuantitySides: ['qc'] },
+    ],
+    sampleLabelNumbers: { year: 2569, qc: 'P01', groups: [{ key: '001|', qc: 'P01' }, { key: '002|', qc: 'P02' }] },
+  };
+
+  function renderManual() {
+    return render(
+      <MemoryRouter>
+        <QrReceiveModal open manualOnly onClose={() => {}} onReceived={() => {}} />
+      </MemoryRouter>,
+    );
+  }
+
+  function scan(value: string) {
+    fireEvent.change(screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'รับตัวอย่าง' }));
+  }
+
+  it('สแกน QR ป้ายรายการที่ 2 → เลือกเฉพาะ P02/69 และส่ง labelKeys ของป้ายนั้น', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: twoBatch } });
+    (api.patch as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: { ...twoBatch, labelReceipts: [{ key: '002|', side: 'qc' }] } } });
+    renderManual();
+
+    scan(JSON.stringify({ id: 'pet1', petitionNo: 'P-2506-0002', sampleId: '', itemSeq: 2 }));
+
+    const p02 = await screen.findByRole('checkbox', { name: /P02\/69/ });
+    expect(p02).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /P01\/69/ })).not.toBeChecked();
+    expect(screen.getByText('รับแล้ว 1/2 ป้าย · รอป้ายที่เหลือ')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ยืนยันรับตัวอย่าง' }));
+    await waitFor(() => expect(api.patch).toHaveBeenCalledWith('/petitions/pet1/receive', expect.objectContaining({ side: 'qc', labelKeys: ['002|'] })));
+  });
+
+  it('สแกนป้ายที่รับไปแล้ว → แจ้งว่ารับเลขนั้นแล้ว', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: { ...twoBatch, labelReceipts: [{ key: '002|', side: 'qc' }] } } });
+    renderManual();
+
+    scan(JSON.stringify({ id: 'pet1', itemSeq: 2 }));
+
+    expect(await screen.findByText('P-2506-0002: ป้าย P02/69 รับฝั่ง QC แล้ว')).toBeInTheDocument();
+  });
+
+  it('กรอกเลขคำขอเอง → เลือกทุกป้ายที่ยังไม่รับไว้ก่อน', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: twoBatch } });
+    renderManual();
+
+    scan('P-2506-0002');
+
+    expect(await screen.findByRole('checkbox', { name: /P01\/69/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /P02\/69/ })).toBeChecked();
+  });
+});
+

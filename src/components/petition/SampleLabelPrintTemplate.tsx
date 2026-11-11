@@ -2,7 +2,14 @@ import QRCode from 'qrcode';
 import FitToBox from '@/components/petition/FitToBox';
 import { expandItemsBySampleQuantity } from '@/lib/petitionPrintItems';
 import { additionalSampleWeights } from '@/lib/additionalSamples';
-import { labelSampledByName, sampleLabelDocumentNumber } from '@/lib/petitionSampler';
+import { normalizeSamplePart } from '@/lib/samplePart';
+import {
+  labelManufacturerName,
+  labelSampledByName,
+  sampleLabelCopySide,
+  sampleLabelDocumentNumber,
+  sampleLabelSideNumber,
+} from '@/lib/petitionSampler';
 import { requiresHazardSampleLabel } from '@/lib/masterItemRegulatoryType';
 import type { AdditionalSampleRequest, Petition } from '@/types/petition.types';
 import ghsEnvironment from '@/assets/ghs/environment.png?inline';
@@ -67,6 +74,19 @@ function labelQuantityForCopy(item: Petition['items'][number], copyIndex: number
   return item.labelQuantity ?? '';
 }
 
+// Production ส่งหลายชิ้นต่อฝั่ง: ป้ายแต่ละใบบอกฝั่งของชิ้นนั้น เช่น "100 CC (QC)" (งานขอตัวอย่างเพิ่มใช้หัวป้ายบอกฝั่งอยู่แล้ว)
+function labelQuantityText(item: Petition['items'][number], copyIndex: number, additionalSampleRequest?: AdditionalSampleRequest): string {
+  const quantity = labelQuantityForCopy(item, copyIndex);
+  const side = additionalSampleRequest ? undefined : item.labelQuantitySides?.[copyIndex];
+  return quantity && (side === 'qc' || side === 'lab') ? `${quantity} (${side.toUpperCase()})` : quantity;
+}
+
+// Batch No. บนป้าย + ส่วนของ batch ที่เก็บตัวอย่าง (ถ้าระบุ)
+function labelBatchText(item: Petition['items'][number]): string {
+  const part = normalizeSamplePart(item.part);
+  return part ? `${item.batchNo ?? ''} · ส่วน: ${part}` : item.batchNo ?? '';
+}
+
 // หมายเหตุที่ผู้ส่งกรอกในฟอร์มคำร้องเก็บไว้ที่ item.note ส่วน labelRemark เป็นหมายเหตุเฉพาะป้าย
 // ป้ายต้องแสดงทั้งสองค่า (ไม่ซ้ำกัน); งานขอตัวอย่างเพิ่มใช้เหตุผลของรอบนั้นแทน
 function labelRemarkText(item: Petition['items'][number], additionalSampleRequest?: AdditionalSampleRequest): string {
@@ -82,7 +102,7 @@ const LABEL_HEADER_LINE_2 = 'ลัดดา จำกัด';
 const LABEL_HEADER_TEXT = `${LABEL_HEADER_LINE_1} ${LABEL_HEADER_LINE_2}`;
 const DOCUMENT_NUMBER_LABEL = 'เลขที่';
 const LABEL_FOOTER_TEXT = 'F-LAB-01-12 Rev : 00 02/11/69';
-// สินค้า อย. / ปศุสัตว์ ต้องใช้ป้ายแบบมีสัญลักษณ์อันตราย (ให้ผู้ส่งวงกลมสัญลักษณ์ที่ตรงกับสาร)
+// สินค้า อย. ต้องใช้ป้ายแบบมีสัญลักษณ์อันตราย (ให้ผู้ส่งวงกลมสัญลักษณ์ที่ตรงกับสาร); สินค้าปศุสัตว์ใช้ป้ายแบบปกติ
 const HAZARD_LABEL_FOOTER_TEXT = 'F-LAB-01-10 Rev : 02 11/07/69';
 const HAZARD_PICTOGRAMS = [
   { src: ghsEnvironment, label: 'อันตรายต่อสิ่งแวดล้อม' },
@@ -196,9 +216,11 @@ function LabelQrColumn({ petition, item, qrValue }: { petition: Petition; item: 
   );
 }
 
-function DocumentNumber({ petition, item, yearShort }: { petition: Petition; item: Petition['items'][number]; yearShort: string }) {
-  // เลขที่ __/__ มาจากเลขคำร้อง (P-2611-0002 → 2/69); รูปแบบอื่นคงแบบเดิม
-  const documentNumber = sampleLabelDocumentNumber(petition.petitionNo);
+function DocumentNumber({ petition, item, yearShort, copyIndex, additionalSampleRequest }: LabelCardProps) {
+  // เลขที่ __/__ : ป้ายที่ส่ง QC ใช้เลข P (P04/69) ป้ายที่ส่ง LAB ใช้เลข L (L02/69)
+  // คำขอเก่าที่ยังไม่มีเลข P/L ใช้เลขจากเลขคำร้องแบบเดิม (P-2611-0002 → 2/69)
+  const side = additionalSampleRequest?.side ?? sampleLabelCopySide(petition, item, copyIndex);
+  const documentNumber = sampleLabelSideNumber(petition, side, item) ?? sampleLabelDocumentNumber(petition.petitionNo);
   return (
     <div
       data-testid="sample-label-document-number"
@@ -219,7 +241,10 @@ function DocumentNumber({ petition, item, yearShort }: { petition: Petition; ite
 const LABEL_CARD_STYLE = {
   width: '100mm',
   height: '50mm',
-  padding: '2mm 3mm',
+  // เครื่องพิมพ์ฉลากเริ่มพิมพ์สูงกว่าขอบบนของดวงฉลากราว 2-3 มม. (ท้ายดวงเหลือที่ว่าง ~2 มม.)
+  // ถ้าเว้นขอบบนแค่ 2 มม. หัวป้าย/เลขที่จะตกไปอยู่ในช่องว่างระหว่างดวงแล้วถูกตัดครึ่ง
+  // จึงเว้นขอบบนมากกว่าขอบล่าง ให้เนื้อหาทั้งหมดขยับลงมาอยู่บนตัวฉลาก
+  padding: '4.5mm 3mm 1mm',
   boxSizing: 'border-box',
   fontFamily: 'Tahoma, Arial, sans-serif',
   textRendering: 'geometricPrecision',
@@ -260,7 +285,7 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
                 {LABEL_HEADER_TEXT}
               </span>
             </div>
-            <DocumentNumber petition={petition} item={item} yearShort={yearShort} />
+            <DocumentNumber petition={petition} item={item} yearShort={yearShort} copyIndex={copyIndex} additionalSampleRequest={additionalSampleRequest} />
           </div>
           <div className="border-y border-black py-0.5">
             <div className="grid grid-cols-9 gap-0.5">
@@ -280,19 +305,19 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
             <Field label="วัน เดือน ปี ที่ผลิต/นำเข้า" value={toBuddhistShort(item.productionDate)} />
             <Field
               label="แบชนัมเบอร์"
-              value={item.batchNo}
+              value={labelBatchText(item)}
               valueClassName="text-[8px] leading-tight"
               valueTestId="sample-label-batch-number-value"
               multiline
             />
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            <Field label="ผู้ผลิต" value={item.labelManufacturer} />
+            <Field label="ผู้ผลิต" value={labelManufacturerName(petition, item)} />
             <Field label="ผู้ขาย" value={item.labelSeller} />
           </div>
           <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-1.5">
-            <Field label="ปริมาณ" value={labelQuantityForCopy(item, copyIndex)} />
-            <Field label="สุ่มโดย" value={labelSampledByName(petition, item)} />
+            <Field label="ปริมาณ" value={labelQuantityText(item, copyIndex, additionalSampleRequest)} />
+            <Field label="สุ่มโดย" value={labelSampledByName(petition, item)} valueClassName="leading-tight" multiline />
             <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
           </div>
           <Field label="วันที่หมดอายุ" value="" />
@@ -318,7 +343,7 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
   }
   const sampledByName = labelSampledByName(petition, item);
   const qrValue = additionalSampleRequest?.qrCode || getQrValue(petition, item);
-  const labelQuantity = labelQuantityForCopy(item, copyIndex);
+  const labelQuantity = labelQuantityText(item, copyIndex, additionalSampleRequest);
   return (
     <div
       className="label-card overflow-hidden border border-black text-[9.5px] font-semibold leading-[1.15]"
@@ -338,7 +363,7 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
                 {LABEL_HEADER_TEXT}
               </span>
             </div>
-            <DocumentNumber petition={petition} item={item} yearShort={yearShort} />
+            <DocumentNumber petition={petition} item={item} yearShort={yearShort} copyIndex={copyIndex} additionalSampleRequest={additionalSampleRequest} />
           </div>
           <StackedField label="ชื่อผลิตภัณฑ์ และสารสำคัญ" value={productLine(item)} />
           <div>
@@ -347,21 +372,21 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
           <div>
             <Field
               label="Batch No."
-              value={item.batchNo}
+              value={labelBatchText(item)}
               valueClassName="text-[8px] leading-tight"
               valueTestId="sample-label-batch-number-value"
               multiline
             />
           </div>
           <div className="grid grid-cols-2 gap-1.5">
-            <Field label="ผู้ผลิต" value={item.labelManufacturer} />
+            <Field label="ผู้ผลิต" value={labelManufacturerName(petition, item)} />
             <Field label="ผู้ขาย" value={item.labelSeller} />
           </div>
           <div>
             <Field label="ปริมาณ" value={labelQuantity} />
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-1.5">
-            <Field label="สุ่มโดย" value={sampledByName} />
+            <Field label="สุ่มโดย" value={sampledByName} valueClassName="leading-tight" multiline />
             <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
           </div>
         </div>

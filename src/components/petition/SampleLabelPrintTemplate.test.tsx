@@ -68,6 +68,23 @@ describe("SampleLabelPrintTemplate", () => {
     expect(screen.getAllByText("Batch No.")).toHaveLength(2);
   });
 
+  it("พิมพ์ 1 ป้ายต่อ 1 ชิ้น พร้อมฝั่ง QC/LAB และส่วนตัวอย่างต่อจาก Batch", () => {
+    render(<SampleLabelPrintTemplate petition={petitionWith({
+      sampleName: "PACLOBUTRAZOL 25% SC",
+      commonName: "PACLOBUTRAZOL 25% SC",
+      batchNo: "B-526",
+      part: "ล่าง",
+      sampleQuantity: 3,
+      labelQuantities: ["100 CC", "500 CC", "500 CC"],
+      labelQuantitySides: ["qc", "qc", "lab"],
+    })} />);
+
+    expect(screen.getByText("100 CC (QC)")).toBeInTheDocument();
+    expect(screen.getByText("500 CC (QC)")).toBeInTheDocument();
+    expect(screen.getByText("500 CC (LAB)")).toBeInTheDocument();
+    expect(screen.getAllByText("B-526 · ส่วน: ล่าง")).toHaveLength(3);
+  });
+
   it("พิมพ์ footer ฟอร์มใหม่ เลขที่จากเลขคำร้อง และสุ่มโดยจาก QC รายวัน", () => {
     const petition = {
       ...petitionWith({ sampleName: "OMETHOATE", batchNo: "B-001", sampleId: "S-9" }),
@@ -84,6 +101,39 @@ describe("SampleLabelPrintTemplate", () => {
     expect(screen.queryByText("ทดสอบระบบ")).not.toBeInTheDocument();
   });
 
+  it("คำขอส่งทั้ง QC และ LAB พิมพ์เลข P บนป้าย QC และเลข L บนป้าย LAB", () => {
+    const petition = {
+      ...petitionWith({
+        sampleName: "OMETHOATE",
+        batchNo: "B-001",
+        sendToQc: true,
+        sendToLab: true,
+        sampleQuantity: 2,
+        labelQuantities: ["250 G", "30 G"],
+      }),
+      routeTargets: ["qc", "lab"],
+      sampleLabelNumbers: { qc: "P04", lab: "L02", year: 2569 },
+    } as Petition;
+
+    render(<SampleLabelPrintTemplate petition={petition} />);
+
+    const numbers = screen.getAllByTestId("sample-label-document-number").map((node) => node.textContent);
+    expect(numbers).toEqual(["เลขที่L02/69", "เลขที่P04/69"]);
+  });
+
+  it("คำขอส่ง QC อย่างเดียวพิมพ์เลข P ทุกป้าย", () => {
+    const petition = {
+      ...petitionWith({ sampleName: "OMETHOATE", batchNo: "B-002", sampleQuantity: 2, labelQuantities: ["5 g", "6 g"] }),
+      routeTargets: ["qc"],
+      sampleLabelNumbers: { qc: "P03", year: 2569 },
+    } as Petition;
+
+    render(<SampleLabelPrintTemplate petition={petition} />);
+
+    const numbers = screen.getAllByTestId("sample-label-document-number").map((node) => node.textContent);
+    expect(numbers).toEqual(["เลขที่P03/69", "เลขที่P03/69"]);
+  });
+
   it("พิมพ์หมายเหตุจากฟอร์มคำร้องลงป้ายนำส่ง", () => {
     render(<SampleLabelPrintTemplate petition={petitionWith({
       sampleName: "OMETHOATE",
@@ -91,6 +141,23 @@ describe("SampleLabelPrintTemplate", () => {
     })} />);
 
     expect(screen.getByTestId("sample-label-remark-value")).toHaveTextContent("ถังผสม 3,000 ลิตร , ถังเก่า 10 , ใช้ TECH ANF. LOT ใหม่");
+  });
+
+  it("คำขอเดียวกันแต่คนละ batch ได้เลขป้ายคนละเลข และป้ายฝั่งเดียวกันใน batch เดียวกันใช้เลขเดียวกัน", () => {
+    const petition = {
+      ...petitionWith({}),
+      routeTargets: ["qc", "lab"],
+      items: [
+        { seq: 1, sampleName: "OMETHOATE", batchNo: "001", sampleQuantity: 3, labelQuantities: ["100 CC", "500 CC", "500 CC"], labelQuantitySides: ["qc", "qc", "lab"] },
+        { seq: 2, sampleName: "OMETHOATE", batchNo: "002", sampleQuantity: 1, labelQuantities: ["100 CC"], labelQuantitySides: ["qc"] },
+      ],
+      sampleLabelNumbers: { qc: "P01", lab: "L01", year: 2569, groups: [{ key: "001|", qc: "P01", lab: "L01" }, { key: "002|", qc: "P02" }] },
+    } as Petition;
+
+    render(<SampleLabelPrintTemplate petition={petition} />);
+
+    const numbers = screen.getAllByTestId("sample-label-document-number").map((node) => node.textContent);
+    expect(numbers).toEqual(["เลขที่P01/69", "เลขที่P01/69", "เลขที่L01/69", "เลขที่P02/69"]);
   });
 
 });

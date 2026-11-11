@@ -121,6 +121,8 @@ export default function PetitionEditPage() {
       labelQuantity: it.labelQuantity ?? '',
       labelQuantities: it.labelQuantities ?? [],
       labelQuantitySides: it.labelQuantitySides,
+      part: it.part,
+      lineRef: it.lineRef,
       note: it.note ?? '',
     }));
     setItems(mappedItems);

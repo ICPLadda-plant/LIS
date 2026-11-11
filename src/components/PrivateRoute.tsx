@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useIsAuthenticated, useMsal } from "@azure/msal-react";
 import { InteractionStatus } from "@azure/msal-browser";
 import { useEffect, useState } from "react";
@@ -6,6 +6,8 @@ import { useAuth } from "@/context/AuthContext";
 import { userCanAccessPath } from "@/lib/accessControl";
 import { DEV_MODE } from "@/config/dev";
 import { normalizeRoles, unionPermissions } from "@/lib/roles";
+import { RouteLoading } from "@/components/RouteLoading";
+import AccountAccessScreen, { accessVariantForError } from "@/components/lis/AccountAccessScreen";
 import {
   loadAccessControl,
   invalidateAccessControl,
@@ -22,8 +24,9 @@ function requesterEmailFromSearch(search: string): string | null {
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useIsAuthenticated();
   const { inProgress } = useMsal();
-  const { user } = useAuth();
+  const { user, accessError } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [accessControl, setAccessControl] = useState<AccessControlState | null>(null);
   const [mappingLoaded, setMappingLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -68,7 +71,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (inProgress !== InteractionStatus.None) {
-    return null;
+    return <RouteLoading />;
   }
 
   if (!isAuthenticated && !user) {
@@ -80,12 +83,29 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // ซิงก์บัญชีไม่สำเร็จ (ถูกระงับ / ไม่ใช่อีเมลองค์กร / server ล่ม) → บอกเหตุผลแทนหน้าขาว
+  if (accessError) {
+    return <AccountAccessScreen variant={accessVariantForError(accessError.code, accessError.status)} />;
+  }
+
+  if (user?.approvalStatus === "pending") {
+    return <AccountAccessScreen variant="pending" />;
+  }
+
+  if (user?.approvalStatus === "rejected") {
+    return <AccountAccessScreen variant="rejected" />;
+  }
+
+  if (user?.status === "inactive") {
+    return <AccountAccessScreen variant="inactive" />;
+  }
+
   if (normalizeRoles(user).length === 0 || user?.status === undefined) {
-    return null;
+    return <RouteLoading />;
   }
 
   if (!mappingLoaded) {
-    return null;
+    return <RouteLoading />;
   }
 
   const roles = normalizeRoles(user);
@@ -96,13 +116,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const isRedirectOnlyRoute = location.pathname === "/";
 
   if (!loadFailed && !isRedirectOnlyRoute && !userCanAccessPath(currentUser, location.pathname, accessControl?.groups ?? [])) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-6">
-        <div className="max-w-md rounded-lg border bg-card p-6 text-center shadow-sm">
-          <h1 className="text-lg font-semibold text-foreground">คุณไม่สิทธิ์เข้าถึงหน้านี้ โปรดติดต่อผู้ดูแลระบบ</h1>
-        </div>
-      </div>
-    );
+    return <AccountAccessScreen variant="forbidden" onBack={() => navigate("/", { replace: true })} />;
   }
 
   return <>{children}</>;

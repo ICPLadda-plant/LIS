@@ -1,0 +1,28 @@
+{
+  "requestNo": "DEMO-20261106-001",
+  "requestDate": "2026-11-06",
+  "requesterName": "ผู้ขอทดสอบ",
+  "requesterEmail": "requester@example.com",
+  "department": "ผลิต 03",
+  "samplerName": "ผู้ขอทดสอบ",
+  "priority": "normal",
+  "sampleCount": 1,
+  "samples": [
+    {
+      "sampleName": "PACLOBUTRAZOL 25% SC",
+      "commonName": "PACLOBUTRAZOL 25% SC",
+      "mfNo": "MF-DEMO",
+      "itemNo": "RS-PCB25-SC",
+      "lotNo": "LOT-DEMO",
+      "batchNo": "LOT-DEMO",
+      "productionDate": "2026-11-04",
+      "note": "ทดสอบ",
+      "qty": 100,
+      "unit": "CC",
+      "sendToQc": 1,
+      "sendToLab": 0,
+      "qcQtys": "100",
+      "labQtys": ""
+    }
+  ]
+}

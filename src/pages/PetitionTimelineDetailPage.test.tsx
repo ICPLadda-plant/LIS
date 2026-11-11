@@ -595,9 +595,33 @@ describe("PetitionTimelineDetailPage", () => {
     await screen.findByRole("button", { name: "Final Report" });
     const documentButtons = Array.from(screen.getByLabelText("Documents").querySelectorAll("button"));
     expect(documentButtons).toHaveLength(3);
-    expect(documentButtons[0]).toHaveClass("border-primary-500");
+    expect(documentButtons[0]).toHaveClass("border-red-500");
     expect(documentButtons[1]).toHaveClass("border-yellow-500");
-    expect(documentButtons[2]).toHaveClass("border-red-500");
+    expect(documentButtons[2]).toHaveClass("border-primary-500");
+  });
+
+  it("shows the 3 newest documents first and reveals earlier documents with ดูทั้งหมด", async () => {
+    Object.assign(mocks.petition, {
+      status: "approved",
+      qcReceivedBy: "QC Staff",
+      qcCompletedAt: "2026-07-13T06:00:00.000Z",
+      labCompletedAt: "2026-07-13T07:00:00.000Z",
+      labApprovedAt: "2026-07-13T08:00:00.000Z",
+      approvedAt: "2026-07-13T09:00:00.000Z",
+    });
+    mocks.labRequests = [{ _id: "lab-request-1" }];
+    renderDetail();
+
+    await screen.findByRole("button", { name: "Final Report" });
+    const documentsCard = screen.getByLabelText("Documents");
+    const documentLabels = () => Array.from(documentsCard.querySelectorAll("button")).map((button) => button.textContent ?? "").filter((label) => !/ดูทั้งหมด|ย่อ/.test(label));
+    expect(documentLabels()).toEqual(["Final Report", "พิมพ์ผลวิเคราะห์ Lab", "Pre Report"]);
+
+    fireEvent.click(within(documentsCard).getByRole("button", { name: /ดูทั้งหมด \(5\)/ }));
+    expect(documentLabels()).toEqual(["Final Report", "พิมพ์ผลวิเคราะห์ Lab", "Pre Report", "ใบคำขอรับบริการ", "ป้ายนำส่งตัวอย่าง"]);
+
+    fireEvent.click(within(documentsCard).getByRole("button", { name: "ย่อ" }));
+    expect(documentLabels()).toHaveLength(3);
   });
 
   it("shows the lab-result print button once Lab approves results, before QC Final Result", async () => {
@@ -632,19 +656,19 @@ describe("PetitionTimelineDetailPage", () => {
     expect(screen.getByRole("button", { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeInTheDocument();
   });
 
-  it("เรียงปุ่มพิมพ์ผลวิเคราะห์ Lab ไว้ก่อน Final Report (Lab ออกผลก่อน แล้วหัวหน้า QC ค่อยออก Final)", async () => {
+  it("เรียง Final Report ไว้เหนือผลวิเคราะห์ Lab เมื่อหัวหน้า QC ออก Final หลัง Lab อนุมัติ", async () => {
     Object.assign(mocks.petition, {
       status: "approved",
-      approvedAt: "2026-07-13T08:00:00.000Z",
-      labApprovedAt: "2026-07-14T00:00:00.000Z",
+      labApprovedAt: "2026-07-13T08:00:00.000Z",
+      approvedAt: "2026-07-14T00:00:00.000Z",
     });
     renderDetail();
     await screen.findByRole("button", { name: "Final Report" });
     const buttons = Array.from(screen.getByLabelText("Documents").querySelectorAll("button"));
     const labIndex = buttons.findIndex((button) => /พิมพ์ผลวิเคราะห์ Lab/.test(button.textContent ?? ""));
     const finalIndex = buttons.findIndex((button) => button.textContent === "Final Report");
-    expect(labIndex).toBeGreaterThanOrEqual(0);
-    expect(finalIndex).toBeGreaterThan(labIndex);
+    expect(finalIndex).toBeGreaterThanOrEqual(0);
+    expect(labIndex).toBeGreaterThan(finalIndex);
   });
 
   it("hides the lab-result print button when Lab is not finished", async () => {
@@ -685,11 +709,11 @@ describe("PetitionTimelineDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Pre Report" })).not.toBeInTheDocument();
   });
 
-  it('hides the sample-label button once QC has received the sample', async () => {
+  it('keeps the sample-label button after QC has received the sample', async () => {
     mocks.petition.qcReceivedBy = 'QC Staff';
     renderDetail();
     await screen.findByRole('heading', { name: 'P-2607-001' });
-    expect(screen.queryByRole('button', { name: /ป้ายนำส่งตัวอย่าง/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /ป้ายนำส่งตัวอย่าง/ })).toBeInTheDocument();
   });
 
   it('shows the sample-label button when not yet received', async () => {

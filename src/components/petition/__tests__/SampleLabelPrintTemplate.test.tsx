@@ -37,6 +37,16 @@ describe('SampleLabelPrintTemplate', () => {
     expect(screen.getByTestId('sample-label-batch-qr-text')).toHaveTextContent('26S-PCB25SC-HI-026');
   });
 
+  it.each([
+    ['PUBLIC HEALTH name', { sampleName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)', commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)' }],
+    ['GMP batch', { sampleName: 'BROMADIOLONE 0.005% W/W', batchNo: '26S-BRM0.005-GMP(R)-237' }],
+  ])('uses the F-LAB-01-10 hazard label for อย. products identified by %s', (_case, override) => {
+    const hazardPetition = { ...petition, items: [{ ...petition.items[0], ...override }] };
+    render(<SampleLabelPrintTemplate petition={hazardPetition} />);
+
+    expect(screen.getByTestId('sample-label-hazard-form')).toBeInTheDocument();
+  });
+
   it('prints both QR codes at the same scannable size', () => {
     const { container } = render(<SampleLabelPrintTemplate petition={petition} />);
     const qrs = container.querySelectorAll('svg[aria-label^="QR "]');
@@ -73,7 +83,7 @@ describe('SampleLabelPrintTemplate', () => {
     expect(batchNumber).not.toHaveClass('overflow-hidden');
   });
 
-  it('keeps the plain F-LAB-01-12 label for products that are not อย. or ปศุสัตว์', () => {
+  it('keeps the plain F-LAB-01-12 label for products that are not อย.', () => {
     render(<SampleLabelPrintTemplate petition={petition} />);
 
     expect(screen.queryByTestId('sample-label-hazard-form')).not.toBeInTheDocument();
@@ -81,10 +91,20 @@ describe('SampleLabelPrintTemplate', () => {
   });
 
   it.each([
-    ['อย.', 'โบรมาดิโอการ์ด - อ.ย.'],
-    ['ปศุสัตว์', 'ไซเปอร์เมทริน ปศุสัตว์'],
-  ])('uses the F-LAB-01-10 hazard label for %s products', (_type, sampleName) => {
-    const hazardPetition = { ...petition, items: [{ ...petition.items[0], sampleName }] };
+    ['Thai name', { sampleName: 'ไซเปอร์เมทริน ปศุสัตว์' }],
+    ['LIVE STOCK name', { sampleName: 'BIFENTHRIN 10% W/V EC (LIVE STOCK)' }],
+    ['name that also says อย.', { sampleName: 'ยาปศุสัตว์ อย.' }],
+    ['GMP batch', { sampleName: 'CYPERMETHRIN LIVESTOCK', batchNo: '26S-CYP-GMP-001' }],
+  ])('uses the plain F-LAB-01-12 label for ปศุสัตว์ products identified by %s', (_case, override) => {
+    const livestockPetition = { ...petition, items: [{ ...petition.items[0], ...override }] };
+    render(<SampleLabelPrintTemplate petition={livestockPetition} />);
+
+    expect(screen.queryByTestId('sample-label-hazard-form')).not.toBeInTheDocument();
+    expect(screen.getByText('F-LAB-01-12 Rev : 00 02/11/69')).toBeInTheDocument();
+  });
+
+  it('uses the F-LAB-01-10 hazard label for อย. products', () => {
+    const hazardPetition = { ...petition, items: [{ ...petition.items[0], sampleName: 'โบรมาดิโอการ์ด - อ.ย.' }] };
     render(<SampleLabelPrintTemplate petition={hazardPetition} />);
 
     expect(screen.getByTestId('sample-label-hazard-form')).toBeInTheDocument();

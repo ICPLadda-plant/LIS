@@ -16,6 +16,8 @@ import {
 import { unionPermissions } from "@/lib/roles";
 import { isStandalonePwa, PWA_ACTIVE_ACCOUNT_STORAGE_KEY } from "@/lib/pwa";
 
+export type ApprovalStatus = "pending" | "approved" | "rejected";
+
 export interface AuthUser {
   id?: string;
   email: string;
@@ -29,6 +31,25 @@ export interface AuthUser {
   position?: string;
   employeeId?: string;
   status?: "active" | "inactive";
+  // ไม่มีค่า = ผู้ใช้เดิมก่อนมีระบบอนุมัติ ถือว่า approved
+  approvalStatus?: ApprovalStatus;
+}
+
+// เหตุผลที่ซิงก์บัญชี Microsoft กับ LIS ไม่สำเร็จ ใช้แสดงหน้าสถานะแทนหน้าขาว
+export interface AccountAccessError {
+  status?: number;
+  code?: string;
+  message: string;
+}
+
+function toAccountAccessError(err: unknown): AccountAccessError {
+  const e = err as { status?: number; message?: string; response?: { data?: unknown } } | null;
+  const body = e?.response?.data as { code?: unknown } | undefined;
+  return {
+    status: e?.status,
+    code: typeof body?.code === "string" ? body.code : undefined,
+    message: e?.message || "เชื่อมต่อระบบไม่สำเร็จ",
+  };
 }
 
 export interface AuthAccount {
@@ -87,6 +108,8 @@ function setActiveMsalAccount(instance: MsalAccountControls, account: AccountInf
 
 interface AuthContextType {
   user: AuthUser | null;
+  // ตั้งค่าเมื่อซิงก์บัญชี Microsoft ไม่สำเร็จ (เช่น ถูกระงับ, ไม่ใช่อีเมลองค์กร, server ล่ม)
+  accessError: AccountAccessError | null;
   login: (redirectTo?: string, loginHint?: string) => Promise<void>;
   // Seamless SSO when another system forwards ?login_hint=<email>: try a silent
   // sign-in against any existing Microsoft session first, falling back to a full
@@ -95,6 +118,8 @@ interface AuthContextType {
   loginWithProductionToken: (token: string) => Promise<AuthUser>;
   logout: () => void;
   isPwa: boolean;
+  // เข้าระบบผ่าน SSO ของฝ่ายผลิต (ไม่ใช่บัญชี Microsoft ของ LIS)
+  isProductionSession?: boolean;
   accounts: AuthAccount[];
   activeAccountId?: string;
   switchAccount: (accountId: string) => void;
@@ -139,6 +164,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [activeAccountId, instance, isPwa, msalAccounts]);
   const selectedAccountId = account ? msalAccountId(account) : undefined;
   const [syncedUser, setSyncedUser] = useState<AuthUser | null>(null);
+  const [accessError, setAccessError] = useState<AccountAccessError | null>(null);
   const [productionUser, setProductionUser] = useState<AuthUser | null>(() => readStoredProductionUser());
   const productionSessionCheckedRef = useRef(false);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | undefined>();
@@ -275,6 +301,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         employeeId: syncedUserForAccount?.employeeId,
         signatureUrl: syncedUserForAccount?.signatureUrl,
         status: syncedUserForAccount?.status,
+        approvalStatus: syncedUserForAccount?.approvalStatus,
       }
     : null;
 
@@ -315,12 +342,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!account) {
       setSyncedUser(null);
+      setAccessError(null);
       return;
     }
 
     setSyncedUser((prev) =>
       prev?.email.toLowerCase() === account.username.toLowerCase() ? prev : null,
     );
+    setAccessError(null);
 
     let active = true;
     const claims = account.idTokenClaims as { tid?: string; oid?: string } | undefined;
@@ -359,6 +388,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         employeeId: string;
         signatureUrl?: string;
         status: "active" | "inactive";
+        approvalStatus?: ApprovalStatus;
       }>("/access-control/users/microsoft", {
         email: account.username,
         name: account.name ?? account.username,
@@ -379,7 +409,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         employeeId: res.data.data.employeeId,
         signatureUrl: res.data.data.signatureUrl,
         status: res.data.data.status,
+        approvalStatus: res.data.data.approvalStatus,
       });
+      setAccessError(null);
     };
 
     (async () => {
@@ -394,6 +426,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await syncUser({});
       } catch (err) {
         console.error("Failed to sync Microsoft user", err);
+        if (active) setAccessError(toAccountAccessError(err));
+        return;
       }
       const { department, position } = await fetchGraphProfile();
       if (!active || (!department && !position)) return;
@@ -595,11 +629,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{
         user,
+        accessError: DEV_MODE || productionUser ? null : accessError,
         login,
         loginWithHint,
         loginWithProductionToken,
         logout,
         isPwa,
+        isProductionSession: !DEV_MODE && !!productionUser,
         accounts: authAccounts,
         activeAccountId: selectedAccountId,
         switchAccount,

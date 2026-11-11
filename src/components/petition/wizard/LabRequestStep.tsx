@@ -35,6 +35,13 @@ export default function LabRequestStep({ items, request, onChange }: Props) {
   ) {
     onChange({ ...req, serviceAgreement: { ...req.serviceAgreement, [key]: value } });
   }
+  function setDuration(value: LabRequestRowValues['serviceAgreement']['testDuration']) {
+    if (req.serviceAgreement.testDuration === value) return;
+    onChange({
+      ...req,
+      serviceAgreement: { ...req.serviceAgreement, testDuration: value, testDurationDays: null },
+    });
+  }
   function setRequester<K extends keyof LabRequestRowValues['requester']>(
     key: K,
     value: LabRequestRowValues['requester'][K],
@@ -199,56 +206,48 @@ export default function LabRequestStep({ items, request, onChange }: Props) {
         <div className="rounded-[10px] border border-grey-200 p-4 space-y-2">
           <p className="text-sm font-medium">3. ระยะเวลาดำเนินการทดสอบ</p>
           <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="radio"
-                name="testDuration"
-                value="normal"
-                checked={req.serviceAgreement.testDuration === 'normal'}
-                onChange={() => setSA('testDuration', 'normal')}
-                className="accent-primary-500"
-              />
-              3.1  ปกติ
-            </label>
-            <div className="space-y-1">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="radio"
-                  name="testDuration"
-                  value="extended"
-                  checked={req.serviceAgreement.testDuration === 'extended'}
-                  onChange={() => setSA('testDuration', 'extended')}
-                  className="accent-primary-500"
-                />
-                3.2  ช้ากว่าปกติได้
-              </label>
-              {req.serviceAgreement.testDuration === 'extended' && (
-                <div className="ml-6 flex items-center gap-2">
-                  <span className="text-sm">(ภายใน</span>
-                  <Input
-                    type="number"
-                    className="w-20"
-                    value={req.serviceAgreement.testDurationDays ?? ''}
-                    onChange={(e) =>
-                      setSA('testDurationDays', e.target.value ? Number(e.target.value) : null)
-                    }
-                    placeholder="0"
-                  />
-                  <span className="text-sm">วัน)</span>
+            {([
+              { value: 'normal', label: '3.1  ปกติ', hasDays: false },
+              { value: 'extended', label: '3.2  ช้ากว่าปกติได้', hasDays: true },
+              { value: 'urgent', label: '3.3  เร็วกว่าปกติได้', hasDays: true },
+            ] as const).map((opt) => {
+              const selected = req.serviceAgreement.testDuration === opt.value;
+              return (
+                <div key={opt.value} className="flex flex-wrap items-center gap-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="testDuration"
+                      value={opt.value}
+                      checked={selected}
+                      onChange={() => setDuration(opt.value)}
+                      className="accent-primary-500"
+                    />
+                    {opt.label}
+                  </label>
+                  {opt.hasDays && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">(ภายใน</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        aria-label={`จำนวนวันสำหรับข้อ ${opt.label.trim()}`}
+                        className="h-8 w-20"
+                        disabled={!selected}
+                        value={selected ? req.serviceAgreement.testDurationDays ?? '' : ''}
+                        onChange={(e) =>
+                          setSA('testDurationDays', e.target.value ? Number(e.target.value) : null)
+                        }
+                        placeholder="0"
+                      />
+                      <span className="text-sm">วัน)</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input
-                type="radio"
-                name="testDuration"
-                value="urgent"
-                checked={req.serviceAgreement.testDuration === 'urgent'}
-                onChange={() => setSA('testDuration', 'urgent')}
-                className="accent-primary-500"
-              />
-              3.3  เร็วกว่าปกติ
-            </label>
+              );
+            })}
           </div>
         </div>
 

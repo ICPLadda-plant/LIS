@@ -14,6 +14,10 @@ const UserSchema = new mongoose.Schema({
   employeeId: { type: String, default: '' },
   signatureUrl: { type: String, default: '' },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+  // ผู้ใช้เดิม/ผู้ใช้ที่ admin เพิ่มเอง = approved; Microsoft login ครั้งแรก = pending
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved' },
+  approvedAt: Date,
+  approvedBy: String,
   lastActive: { type: String, default: 'Never' },
   authProvider: { type: String, enum: ['local', 'microsoft', 'production'], default: 'local' },
   microsoftId: String,

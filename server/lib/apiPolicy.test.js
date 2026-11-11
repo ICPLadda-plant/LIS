@@ -87,6 +87,13 @@ describe('policyPublicPath', () => {
 
   test('policy แบบ prefix มี /* ต่อท้าย เพื่อสื่อว่าคุมทุก sub-path', () => {
     const p = API_POLICIES.find((x) => x.id === 'production-integration');
-    expect(policyPublicPath(p)).toBe('POST /LIS/api/production-integration/*');
+    expect(policyPublicPath(p)).toBe('POST/PUT /LIS/api/production-integration/*');
+  });
+});
+
+describe('production-integration PUT', () => {
+  test('PUT แก้ไขคำขอผ่าน guard เพื่อให้ X-API-Key ใช้ได้ ส่วน GET ของหน้าเว็บไม่ถูกคุม', () => {
+    expect(matchPolicy(API_POLICIES, 'PUT', '/LIS/api/production-integration/petitions/P-2611-0001')?.id).toBe('production-integration');
+    expect(matchPolicy(API_POLICIES, 'GET', '/LIS/api/production-integration/petitions/abcdefghijklmnop')).toBeNull();
   });
 });

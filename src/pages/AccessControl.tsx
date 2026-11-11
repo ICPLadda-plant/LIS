@@ -27,10 +27,12 @@ import {
   Plus,
   ShieldCheck,
   Trash2,
+  UserCheck,
   UsersRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import UsersTab from "@/components/lis/access/UsersTab";
+import PendingUsersTab from "@/components/lis/access/PendingUsersTab";
 import RolesTab from "@/components/lis/access/RolesTab";
 import PageAccessTab from "@/components/lis/access/PageAccessTab";
 import type { AppUser, Role, AccessGroup, EmployeeDirectoryEntry, RoleFamily } from "@/components/lis/access/types";
@@ -270,6 +272,43 @@ const AccessControl = () => {
 
   const permissionsForRole = (roleId: string) =>
     roleId === ADMIN_ROLE_ID ? adminEffectivePermissions : permissions[roleId] ?? [];
+
+  const pendingUsers = useMemo(
+    () => users.filter((user) => user.approvalStatus === "pending"),
+    [users],
+  );
+  const activeDirectoryUsers = useMemo(
+    () => users.filter((user) => user.approvalStatus !== "pending"),
+    [users],
+  );
+
+  const normalizeUser = (user: AppUser): AppUser => ({
+    ...user,
+    employeeId: user.employeeId ?? "",
+    roleIds: user.roleIds && user.roleIds.length > 0 ? user.roleIds : [user.roleId],
+  });
+
+  const approveUser = async (id: string, roleId: string) => {
+    try {
+      const res = await api.post<AppUser>(`/access-control/users/${id}/approve`, { roleIds: [roleId] });
+      const updated = normalizeUser(res.data.data);
+      setUsers((current) => current.map((user) => (user.id === id ? updated : user)));
+      toast.success(`ยืนยันการเข้าระบบของ ${updated.name || updated.email} แล้ว`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ยืนยันผู้ใช้ไม่สำเร็จ");
+    }
+  };
+
+  const rejectUser = async (id: string) => {
+    try {
+      const res = await api.post<AppUser>(`/access-control/users/${id}/reject`, {});
+      const updated = normalizeUser(res.data.data);
+      setUsers((current) => current.map((user) => (user.id === id ? updated : user)));
+      toast.success(`ปฏิเสธการเข้าระบบของ ${updated.name || updated.email} แล้ว`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "ปฏิเสธผู้ใช้ไม่สำเร็จ");
+    }
+  };
 
   const updateUser = async (id: string, patch: Partial<AppUser>) => {
     const previous = users;
@@ -783,6 +822,15 @@ const AccessControl = () => {
                 <UsersRound className="h-4 w-4" />
                 Users
               </TabsTrigger>
+              <TabsTrigger value="pending-users" className="gap-1.5">
+                <UserCheck className="h-4 w-4" />
+                รอเข้าระบบ
+                {pendingUsers.length > 0 && (
+                  <Badge variant="destructive" className="h-5 min-w-5 justify-center px-1.5 text-[11px]">
+                    {pendingUsers.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="roles" className="gap-1.5">
                 <ShieldCheck className="h-4 w-4" />
                 Roles
@@ -804,7 +852,7 @@ const AccessControl = () => {
 
           <TabsContent value="users">
             <UsersTab
-              users={users}
+              users={activeDirectoryUsers}
               roles={roles}
               directory={directory}
               syncing={syncing}
@@ -813,6 +861,15 @@ const AccessControl = () => {
               onDelete={deleteUser}
               onLinkEmployee={linkEmployee}
               onSync={syncEmployees}
+            />
+          </TabsContent>
+
+          <TabsContent value="pending-users">
+            <PendingUsersTab
+              users={pendingUsers}
+              roles={roles}
+              onApprove={approveUser}
+              onReject={rejectUser}
             />
           </TabsContent>
 

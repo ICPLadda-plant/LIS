@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Activity, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, FileCheck2, FileText, FlaskConical, ImageIcon, ListTodo, Printer, RefreshCw, UserRound } from "lucide-react";
+import { Activity, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileCheck2, FileText, FlaskConical, ImageIcon, ListTodo, Printer, RefreshCw, UserRound } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
@@ -28,7 +28,7 @@ import { buildTimelineDetailModel, type TimelineDetailActivity, type TimelineDet
 import { timelineBarClass, timelineDotClass } from "@/lib/petitionTimelineColors";
 import { crosshairAt, formatCrosshairTime } from "@/lib/petitionTimelineCrosshair";
 import { estimateMetric, formatDateTime, type TimelineMetricTone } from "@/lib/petitionTimelineMetric";
-import { canPrintPreReport, canPrintSampleLabel, canPrintLabResult } from "@/lib/petitionPrintability";
+import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
 import { isResearchAndDevelopmentPetition } from "@/lib/petitionRouting";
 import { canSeePetition, isLabRole, petitionHasLabReadableItem } from "@/lib/petitionVisibility";
@@ -169,6 +169,7 @@ function ActivityEntries({ activities }: { activities: TimelineDetailActivity[] 
 const documentButtonClass = "w-full justify-start";
 const activityPreviewLimit = 5;
 const activityPageSize = 6;
+const documentPreviewLimit = 3;
 const documentButtonColors = {
   sampleLabel: "border-primary-500 text-primary-500 hover:bg-primary-50",
   serviceRequest: "border-yellow-500 text-yellow-500 hover:bg-yellow-50",
@@ -177,6 +178,27 @@ const documentButtonColors = {
   labResult: "border-sky-500 text-sky-500 hover:bg-sky-50",
   chemReport: "border-primary-500 text-primary-500 hover:bg-primary-50",
 } as const;
+
+type DocumentAction = {
+  key: keyof typeof documentButtonColors;
+  label: string;
+  icon: typeof FileText;
+  availableAt: string | null | undefined;
+  open: (open: boolean) => void;
+};
+
+function documentTime(value: string | null | undefined): number {
+  const time = value ? new Date(value).getTime() : Number.NaN;
+  return Number.isFinite(time) ? time : 0;
+}
+
+/** เรียงเอกสารที่พร้อมล่าสุดไว้บนสุด ถ้าเวลาเท่ากันให้เอกสารที่เกิดทีหลังใน flow อยู่บน */
+function sortDocumentsNewestFirst(documents: DocumentAction[]): DocumentAction[] {
+  return documents
+    .map((document, order) => ({ document, order, time: documentTime(document.availableAt) }))
+    .sort((a, b) => b.time - a.time || b.order - a.order)
+    .map(({ document }) => document);
+}
 
 export default function PetitionTimelineDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -204,6 +226,7 @@ export default function PetitionTimelineDetailPage() {
   const [finalReportOpen, setFinalReportOpen] = useState(false);
   const [labResultOpen, setLabResultOpen] = useState(false);
   const [chemReportOpen, setChemReportOpen] = useState(false);
+  const [documentsExpanded, setDocumentsExpanded] = useState(false);
   const [grPrintOpen, setGrPrintOpen] = useState(false);
   const [activeTimelineDayKey, setActiveTimelineDayKey] = useState<string | null>(null);
   const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
@@ -404,9 +427,21 @@ export default function PetitionTimelineDetailPage() {
   // - มี Lab track: ต้องมีทั้ง qcCompletedAt และ labCompletedAt
   // - ไม่มี Lab track: labCompletedAt ไม่มีวันถูกเขียน (server เขียนเฉพาะตอน Lab บันทึกผล) —
   //   สัญญาณ "ครบ" ของคำร้องแบบนี้คือ qcCompletedAt แล้ว server flip status เป็น success ทันที (isPetitionComplete)
-  const canShowPreReport = canPrintPreReport(petition)
-    && Boolean(petition.qcCompletedAt)
+  // เอกสารที่เคยพร้อมแล้วต้องเปิดดูย้อนหลังได้เสมอ จึงไม่ซ่อน Pre Report หลังออก Final Result
+  const canShowPreReport = Boolean(petition.qcCompletedAt)
     && (hasLabTrack(petition) ? Boolean(petition.labCompletedAt) : petition.status === "success");
+  const preReportAt = [petition.qcCompletedAt, petition.labCompletedAt]
+    .reduce<string | null | undefined>((latest, value) => (documentTime(value) > documentTime(latest) ? value : latest), null);
+  const requestedAt = petition.submittedBy?.submittedAt || petition.createdAt;
+  const documentActions = sortDocumentsNewestFirst([
+    // ป้ายนำส่งตัวอย่างพิมพ์ซ้ำได้แม้ QC/Lab รับตัวอย่างแล้ว
+    { key: "sampleLabel", label: "ป้ายนำส่งตัวอย่าง", icon: Printer, availableAt: requestedAt, open: setLabelPrintOpen },
+    ...(serviceLabRequest ? [{ key: "serviceRequest" as const, label: "ใบคำขอรับบริการ", icon: FileText, availableAt: requestedAt, open: setServicePrintOpen }] : []),
+    ...(canShowPreReport ? [{ key: "preReport" as const, label: "Pre Report", icon: FileText, availableAt: preReportAt, open: setPreReportOpen }] : []),
+    ...(canPrintLabResult(petition) && labReportPages.length > 0 ? [{ key: "labResult" as const, label: "พิมพ์ผลวิเคราะห์ Lab", icon: FlaskConical, availableAt: petition.labApprovedAt || petition.approvedAt, open: setLabResultOpen }] : []),
+    ...(petition.status === "approved" ? [{ key: "finalReport" as const, label: "Final Report", icon: FileCheck2, availableAt: petition.approvedAt, open: setFinalReportOpen }] : []),
+    ...(canPrintChemAnalysisReport(petition) ? [{ key: "chemReport" as const, label: "ใบรายงานผลการวิเคราะห์", icon: FileCheck2, availableAt: petition.approvedAt, open: setChemReportOpen }] : []),
+  ]);
   const activeItem = model.items.find((item) => item.seq === selectedItemSeq) ?? null;
   const responsibleName = petition.assignedTo?.name || "ยังไม่มอบหมาย";
   const timelineDays = model.timeline.days.length
@@ -625,19 +660,15 @@ export default function PetitionTimelineDetailPage() {
       </Dialog>
 
       <Card aria-label="Documents" className="border-black-50 shadow-none"><CardHeader className="pb-3"><CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4 text-primary-500" />Documents</CardTitle></CardHeader><CardContent className="space-y-2">
-        {canPrintSampleLabel(petition) && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.sampleLabel)} disabled={documentLoading} onClick={() => { void openDocument(setLabelPrintOpen); }}><Printer className="h-4 w-4" />ป้ายนำส่งตัวอย่าง</Button>}
-        {serviceLabRequest && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.serviceRequest)} disabled={documentLoading} onClick={() => { void openDocument(setServicePrintOpen); }}><FileText className="h-4 w-4" />ใบคำขอรับบริการ</Button>}
-        {canShowPreReport && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.preReport)} disabled={documentLoading} onClick={() => { void openDocument(setPreReportOpen); }}><FileText className="h-4 w-4" />Pre Report</Button>}
-        {canPrintLabResult(petition) && labReportPages.length > 0 && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.labResult)} disabled={documentLoading} onClick={() => { void openDocument(setLabResultOpen); }}><FlaskConical className="h-4 w-4" />พิมพ์ผลวิเคราะห์ Lab</Button>}
-        {petition.status === "approved" && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.finalReport)} disabled={documentLoading} onClick={() => { void openDocument(setFinalReportOpen); }}><FileCheck2 className="h-4 w-4" />Final Report</Button>}
-        {canPrintChemAnalysisReport(petition) && <Button variant="primary-outline" className={cn(documentButtonClass, documentButtonColors.chemReport)} disabled={documentLoading} onClick={() => { void openDocument(setChemReportOpen); }}><FileCheck2 className="h-4 w-4" />ใบรายงานผลการวิเคราะห์</Button>}
+        {(documentsExpanded ? documentActions : documentActions.slice(0, documentPreviewLimit)).map(({ key, label, icon: Icon, open }) => <Button key={key} variant="primary-outline" className={cn(documentButtonClass, documentButtonColors[key])} disabled={documentLoading} onClick={() => { void openDocument(open); }}><Icon className="h-4 w-4" />{label}</Button>)}
+        {documentActions.length > documentPreviewLimit && <Button variant="ghost" size="sm" className="w-full" aria-expanded={documentsExpanded} onClick={() => setDocumentsExpanded((expanded) => !expanded)}>{documentsExpanded ? <><ChevronUp className="h-4 w-4" />ย่อ</> : <><ChevronDown className="h-4 w-4" />ดูทั้งหมด ({documentActions.length})</>}</Button>}
         {documentLoading && <p className="text-xs text-grey-500">กำลังโหลดข้อมูลเอกสาร...</p>}
         {documentError && <p className="text-xs text-red-600">โหลดข้อมูลเอกสารไม่สำเร็จ: {documentError}</p>}
       </CardContent></Card>
       </div>
     </div>
 
-    {labelPrintOpen && <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label"><SampleLabelPrintTemplate petition={petition} /></PrintPreviewDialog>}
+    {labelPrintOpen && <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label" department={petition.submittedBy?.department}><SampleLabelPrintTemplate petition={petition} /></PrintPreviewDialog>}
     {servicePrintOpen && serviceLabRequest && <PrintPreviewDialog open={servicePrintOpen} onOpenChange={setServicePrintOpen} docType="service-request"><PetitionPrintTemplate labRequest={serviceLabRequest} petition={petition} qcResults={qcResults} sgParam={sgParameter} requestValues={requestValues} labReportPages={labReportPages} /></PrintPreviewDialog>}
     {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}

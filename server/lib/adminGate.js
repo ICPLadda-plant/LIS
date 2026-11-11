@@ -1,6 +1,7 @@
 const { normalizeRoles } = require('./roles');
 const User = require('../models/User');
 const { getLisSessionUserId } = require('./lisSessionCookie');
+const { approvalStatusOf } = require('./userApproval');
 
 // ⚠️ ข้อจำกัดที่รู้ตัว: backend ยังไม่ verify token ของ Azure AD ฉะนั้น header
 // X-LIS-User ปลอมได้ถ้าอยู่ในเน็ตเวิร์กและรู้อีเมล admin — ระดับความเชื่อถือ
@@ -26,7 +27,12 @@ function createAdminGate({ findUserByEmail, findUserById, isDevBypass, warn = co
         warn('[adminGate] session lookup failed:', err.message);
         return res.status(500).json({ error: { message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' } });
       }
-      if (!sessionUser || sessionUser.status === 'inactive' || !normalizeRoles(sessionUser).includes('admin')) {
+      if (
+        !sessionUser ||
+        sessionUser.status === 'inactive' ||
+        approvalStatusOf(sessionUser) !== 'approved' ||
+        !normalizeRoles(sessionUser).includes('admin')
+      ) {
         return res.status(403).json({ error: { message: 'เฉพาะผู้ดูแลระบบเท่านั้น' } });
       }
       req.adminUser = { email: sessionUser.email, name: sessionUser.name };
@@ -42,7 +48,12 @@ function createAdminGate({ findUserByEmail, findUserById, isDevBypass, warn = co
       warn('[adminGate] user lookup failed:', err.message);
       return res.status(500).json({ error: { message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' } });
     }
-    if (!user || user.status === 'inactive' || !normalizeRoles(user).includes('admin')) {
+    if (
+      !user ||
+      user.status === 'inactive' ||
+      approvalStatusOf(user) !== 'approved' ||
+      !normalizeRoles(user).includes('admin')
+    ) {
       return res.status(403).json({ error: { message: 'เฉพาะผู้ดูแลระบบเท่านั้น' } });
     }
     req.adminUser = { email, name: user.name };
@@ -62,6 +73,12 @@ function createAuthenticatedGate({ findUserByEmail, findUserById, isDevBypass, w
           ? await findUserByEmail(email)
           : null;
       if (!user) return res.status(401).json({ error: { message: 'ต้องระบุผู้ใช้' } });
+      if (approvalStatusOf(user) === 'pending') {
+        return res.status(403).json({ error: { message: 'บัญชีรอผู้ดูแลยืนยันการเข้าระบบ' }, code: 'ACCOUNT_PENDING_APPROVAL' });
+      }
+      if (approvalStatusOf(user) === 'rejected') {
+        return res.status(403).json({ error: { message: 'บัญชีไม่ได้รับอนุญาตให้เข้าระบบ' }, code: 'ACCOUNT_REJECTED' });
+      }
       if (user.status === 'inactive') return res.status(403).json({ error: { message: 'ผู้ใช้ถูกระงับ' } });
       req.authenticatedUser = user;
       return next();

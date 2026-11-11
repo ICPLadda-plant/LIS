@@ -24,6 +24,10 @@ const PetitionItemSchema = new mongoose.Schema(
     labelQuantities: [String],
     // ฝั่งของแต่ละตัวอย่างใน labelQuantities ('qc' | 'lab') — Production ส่งได้หลายชิ้นต่อฝั่ง
     labelQuantitySides: [String],
+    // ส่วนของ batch ที่เก็บตัวอย่าง (บน/กลาง/ล่าง/...) — ว่าง = ทั่วไป/รวม
+    part: String,
+    // รหัสบรรทัดจาก Production: รหัสต่างกัน = คนละตัวอย่าง (ไม่รวมแถวให้)
+    lineRef: String,
     labelSampledBy: String,
     labelSampledDate: String,
     labelRemark: String,
@@ -140,6 +144,20 @@ const PetitionSchema = new mongoose.Schema(
       index: true,
     },
     routeTargets: [{ type: String, enum: ['qc', 'lab'] }],
+    // เลขที่บนป้ายนำส่งตัวอย่าง (server/lib/sampleLabelNumber.js): qc = P01, lab = L01, year = ปี พ.ศ. เต็ม
+    // groups = เลขแยกตามกลุ่ม batch + ส่วน (key = "BATCH|ส่วน"); qc/lab ระดับคำขอ = เลขแรกของคำขอ (คำขอเก่าใช้ค่านี้)
+    sampleLabelNumbers: {
+      type: new mongoose.Schema({
+        qc: String,
+        lab: String,
+        year: Number,
+        groups: {
+          type: [new mongoose.Schema({ key: String, qc: String, lab: String }, { _id: false })],
+          default: undefined,
+        },
+      }, { _id: false }),
+      default: undefined,
+    },
     status: {
       type: String,
       enum: ['deliveringQC', 'sampleSent', 'pendingReview', 'inProgress', 'success', 'approved', 'rejected'],
@@ -156,12 +174,23 @@ const PetitionSchema = new mongoose.Schema(
     labReceivedBy: String,
     qcReceivedAt: Date,
     qcReceivedBy: String,
+    // รับตัวอย่างทีละป้าย (คำขอที่มีหลายเลขป้ายต่อฝั่ง): key = กลุ่มใน sampleLabelNumbers.groups
+    // qcReceivedAt/labReceivedAt ตั้งเมื่อรับครบทุกป้ายของฝั่งนั้น
+    labelReceipts: {
+      type: [new mongoose.Schema({ key: String, side: { type: String, enum: ['qc', 'lab'] }, receivedAt: Date, receivedBy: String }, { _id: false })],
+      default: undefined,
+    },
     // Per-track completion ("บันทึกผล" pressed). Petition → success only when every
     // required track is done (QC always; Lab when there is a lab-batch item).
     labCompletedAt: Date,
     labCompletedBy: String,
     qcCompletedAt: Date,
     qcCompletedBy: String,
+    // คนที่ทำงานฝั่ง QC ของคำขอนี้ (รับตัวอย่าง/บันทึกผล/ยืนยันผล) — ใช้แจ้งเตือน "งานของตัวเอง"
+    qcHandlers: {
+      type: [new mongoose.Schema({ employeeId: String, email: String, name: String }, { _id: false })],
+      default: undefined,
+    },
     // Lab supervisor approval (ด่านหลังผู้ทดสอบ Lab บันทึกผล — success เกิดหลังขั้นนี้)
     labApprovedAt: Date,
     labApprovedBy: String,
@@ -208,6 +237,12 @@ const PetitionSchema = new mongoose.Schema(
     labExpected: { type: mongoose.Schema.Types.Mixed, default: null },
     prodOrderNos: { type: [String], default: [], index: true },
     productionWorkflow: ProductionWorkflowSchema,
+    // LIS ยกเลิกคำขอ (routes/petitions.js POST /:id/cancel) — เอกสารถูก soft delete ต่อทันที
+    cancellation: {
+      reason: String,
+      by: String,
+      at: Date,
+    },
     additionalSampleRequests: {
       type: [new mongoose.Schema({
         qrCode: { type: String, required: true },

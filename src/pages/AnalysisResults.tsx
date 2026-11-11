@@ -15,6 +15,12 @@ function resolveConclusion(p: Petition): ConclusionKey {
   return p.status === "rejected" ? "returned-to-requester" : "pass";
 }
 
+// ชื่อสามัญของสารทุกรายการในคำร้อง (ตัดชื่อซ้ำ/ว่างออก)
+function petitionCommonNames(p: Petition): string[] {
+  const names = (p.items ?? []).map((item) => item.commonName?.trim() ?? "").filter(Boolean);
+  return [...new Set(names)];
+}
+
 const CONCLUSION_META: Record<ConclusionKey, { label: string; cls: string }> = {
   "pass": { label: "ผ่าน", cls: "border-green-200 bg-green-50 text-green-700 dark:border-green-500/30 dark:bg-green-500/15 dark:text-green-300" },
   "accepted-oos": { label: "ยอมรับผลไม่ปกติ", cls: "border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/15 dark:text-yellow-300" },
@@ -36,14 +42,14 @@ export default function AnalysisResults() {
       .filter((r) => (filter === "all" ? true : r.conclusion === filter))
       .filter((r) =>
         search.trim()
-          ? `${r.p.petitionNo} ${r.p.submittedBy?.name ?? ""}`.toLowerCase().includes(search.trim().toLowerCase())
+          ? `${r.p.petitionNo} ${petitionCommonNames(r.p).join(" ")}`.toLowerCase().includes(search.trim().toLowerCase())
           : true,
       );
     return rankSearchResults(matches, search, ({ p }) => {
       const itemNos = (p.items ?? []).map((item) => item.itemNo).filter((itemNo) => itemNo?.trim());
       return {
         primary: itemNos.length ? itemNos : [p.petitionNo],
-        secondary: [p.petitionNo, p.submittedBy?.name],
+        secondary: [p.petitionNo, ...petitionCommonNames(p)],
       };
     });
   }, [data, filter, search]);
@@ -60,7 +66,7 @@ export default function AnalysisResults() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาเลขคำร้อง / ผู้ส่ง"
+            placeholder="ค้นหาเลขคำร้อง / ชื่อสามัญ"
             className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           {(["all", "pass", "accepted-oos", "returned-to-requester"] as const).map((k) => (
@@ -80,7 +86,7 @@ export default function AnalysisResults() {
               <tr>
                 <th className="px-3 py-2">เลขคำร้อง</th>
                 <th className="px-3 py-2">แผนก</th>
-                <th className="px-3 py-2">ผู้ส่ง</th>
+                <th className="px-3 py-2">ชื่อสามัญ</th>
                 <th className="px-3 py-2">วันที่จบ</th>
                 <th className="px-3 py-2">ผลสรุป</th>
               </tr>
@@ -95,6 +101,7 @@ export default function AnalysisResults() {
               {rows.map(({ p, conclusion }) => {
                 const meta = CONCLUSION_META[conclusion];
                 const doneAt = p.approvedAt || p.rejectedAt || p.completedAt;
+                const commonNames = petitionCommonNames(p);
                 return (
                   <tr
                     key={p._id}
@@ -103,7 +110,7 @@ export default function AnalysisResults() {
                   >
                     <td className="px-3 py-2 font-medium">{p.petitionNo}</td>
                     <td className="px-3 py-2">{petitionDepartmentLabel(p)}</td>
-                    <td className="px-3 py-2">{p.submittedBy?.name ?? "-"}</td>
+                    <td className="px-3 py-2">{commonNames.length ? commonNames.join(", ") : "-"}</td>
                     <td className="px-3 py-2">{formatDate(doneAt)}</td>
                     <td className="px-3 py-2">
                       <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${meta.cls}`}>{meta.label}</span>

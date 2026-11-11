@@ -510,7 +510,7 @@ function itemSnapshot(item, condition) {
     commonName: item.commonName || '',
     batchNo: item.batchNo || '',
     lotNo: item.lotNo || '',
-    productionDate: item.labelSampledDate || item.productionDate || '',
+    productionDate: item.productionDate || item.labelSampledDate || '',
     sampleId: item.sampleId || '',
     condition: condition || item.condition || '',
     manufacturer: item.labelManufacturer || item.labelSeller || '',

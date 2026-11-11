@@ -134,3 +134,36 @@ describe('LabScanAcceptModal manualOnly mode', () => {
     expect(screen.queryByText('คำร้องนี้ไม่มีรายการ Lab')).not.toBeInTheDocument();
   });
 });
+
+describe('LabScanAcceptModal pending dropdown', () => {
+  it('เลือกคำร้องจาก Dropdown → เข้าจอยืนยันเหมือนพิมพ์เลข', async () => {
+    (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: labPetition } });
+    render(
+      <MemoryRouter>
+        <LabScanAcceptModal
+          open
+          manualOnly
+          pendingPetitions={[labPetition as never]}
+          onClose={() => {}}
+          onAccepted={() => {}}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'เลือกคำร้องที่รอรับ' }));
+    fireEvent.click(await screen.findByRole('option', { name: /P-2506-0001/ }));
+    await waitFor(() =>
+      expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/petitions/scan/P-2506-0001')),
+    );
+    expect(await screen.findByRole('button', { name: 'กรอกใหม่' })).toBeInTheDocument();
+  });
+
+  it('ไม่มีคำร้องรอรับ → Dropdown ถูกปิดและบอกว่าไม่มีคำร้อง', () => {
+    render(
+      <MemoryRouter>
+        <LabScanAcceptModal open manualOnly pendingPetitions={[]} onClose={() => {}} onAccepted={() => {}} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('combobox', { name: 'เลือกคำร้องที่รอรับ' })).toBeDisabled();
+    expect(screen.getByText('ไม่มีคำร้องที่รอรับ')).toBeInTheDocument();
+  });
+});

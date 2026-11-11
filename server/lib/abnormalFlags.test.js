@@ -69,6 +69,33 @@ describe('computeAbnormalFlags', () => {
       .toEqual({ p1: false });
   });
 
+  it('checks a mixture against its whole-product density standard (any order, IMPORTED ignored)', () => {
+    const densityParam = {
+      _id: 'density',
+      multiEntry: true,
+      valueFields: [{
+        label: 'ค่าถพ.',
+        type: 'float',
+        substanceMode: true,
+        substanceStandards: [
+          { substance: 'DIFENOCONAZOLE 12.5% + AZOXYSTROBIN 20% W/V SC', operator: 'between', value: 1.1, value2: 1.12 },
+          { substance: 'PROPANIL 36% W/V EC', operator: 'between', value: 1.0, value2: 1.03 },
+          { substance: 'ANILOFOS 18% + PROPANIL 36% W/V EC', operator: 'between', value: 1.1, value2: 1.13 },
+        ],
+      }],
+    };
+    const run = (commonName, entry) => computeAbnormalFlags({
+      docs: [{ petitionId: 'p1', parameterId: 'density', itemSeq: 1, commonName, entries: [entry] }],
+      params: [densityParam],
+      petitions: [petition],
+    });
+
+    expect(run('AZOXYSTROBIN 20%+DIFENOCONAZOLE 12.50% SC (IMPORTED)', { 'ค่าถพ.::azoxystrobin': 1.2 })).toEqual({ p1: true });
+    expect(run('AZOXYSTROBIN 20%+DIFENOCONAZOLE 12.50% SC (IMPORTED)', { 'ค่าถพ.::azoxystrobin': 1.11 })).toEqual({ p1: false });
+    // ไม่ยืมเกณฑ์ของ PROPANIL เดี่ยวมาใช้กับยาผสม
+    expect(run('ANILOFOS 18% + PROPANIL 36% W/V EC', { 'ค่าถพ.::anilofos': 1.12 })).toEqual({ p1: false });
+  });
+
   it('reports false for a petition that has no results yet', () => {
     expect(computeAbnormalFlags({ docs: [], params: [], petitions: [petition] }))
       .toEqual({ p1: false });

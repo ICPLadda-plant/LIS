@@ -38,12 +38,14 @@ describe("urgent reminder", () => {
     expect(urgentReminderSidesForRoles(["admin"])).toEqual([]);
     expect(urgentReminderSidesForRoles(["qc-staff"])).toEqual(["qc"]);
     expect(urgentReminderSidesForRoles(["lab-head", "qc-head"])).toEqual(["qc", "lab"]);
+    expect(urgentReminderSidesForRoles(["qc-data-config", "lab-inventory"])).toEqual(["qc", "lab"]);
   });
 
   it("หยุดเตือนเฉพาะฝั่งที่บันทึกผลแล้ว และไม่เตือนงานปฏิเสธ/งานปกติ", () => {
     const list = [
-      petition({ _id: "u1", priority: 1, qcCompletedAt: "2026-10-22T03:00:00Z" }),
-      petition({ _id: "u2", priority: "1" }),
+      petition({ _id: "u1", priority: 1, qcReceivedAt: "2026-10-22T02:00:00Z", qcCompletedAt: "2026-10-22T03:00:00Z" }),
+      petition({ _id: "u2", priority: "1", qcReceivedAt: "2026-10-22T02:00:00Z" }),
+      petition({ _id: "u3", priority: 1 }),
       petition({ _id: "r", priority: 1, status: "rejected" }),
       petition({ _id: "n", priority: 0 }),
     ];
@@ -51,7 +53,9 @@ describe("urgent reminder", () => {
       "urgent:u1:lab",
       "urgent:u2:qc",
       "urgent:u2:lab",
+      "urgent:u3:lab",
     ]);
+    // QC เตือนเฉพาะงานที่ QC รับตัวอย่างแล้ว (u3 ยังไม่รับ)
     expect(pendingUrgentReminders(list, ["qc"]).map((x) => x.id)).toEqual(["urgent:u2:qc"]);
   });
 

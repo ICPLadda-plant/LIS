@@ -5,6 +5,10 @@ RewriteBase /LIS/
 # Proxy /LIS/api/* → Express server on port 3001
 <IfModule mod_proxy.c>
   RewriteRule ^api/(.*)$ http://localhost:3001/api/$1 [P,L]
+  # Uploaded QC photos/files live in server/uploads and are served by Express.
+  # Without this rule /LIS/uploads/* falls through to the SPA fallback and
+  # returns app.html, so every attached image renders as a broken <img>.
+  RewriteRule ^uploads/(.*)$ http://localhost:3001/LIS/uploads/$1 [P,L]
 </IfModule>
 
 # Production entry is app.html (built, hashed assets). index.html is the Vite dev

@@ -1,4 +1,5 @@
 export type UserStatus = "active" | "inactive";
+export type UserApprovalStatus = "pending" | "approved" | "rejected";
 
 export type AppUser = {
   id: string;
@@ -10,6 +11,8 @@ export type AppUser = {
   position: string;
   employeeId: string;
   status: UserStatus;
+  approvalStatus?: UserApprovalStatus;
+  createdAt?: string | null;
   lastActive: string;
 };
 

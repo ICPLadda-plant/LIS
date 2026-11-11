@@ -70,7 +70,7 @@ export interface StockTransactionParams {
 export interface PetitionFlowNotification {
   id: string;
   petitionId?: string;
-  petitionNo: string;
+  petitionNo?: string;
   event?: PetitionAuditEvent;
   fromStatus?: PetitionStatus;
   toStatus?: PetitionStatus;
@@ -81,6 +81,8 @@ export interface PetitionFlowNotification {
   createdAt: string;
   playSound?: boolean;
   sound?: "sampleArrival" | "labAssigned";
+  /** petition = งานคำขอ, stock = สต็อก, system = ระบบ (admin) */
+  group?: string;
 }
 
 export type UserFavorites = { email: string; paths: string[] };
@@ -135,16 +137,30 @@ function identityHeaders(): Record<string, string> {
   return headers;
 }
 
+/** แจ้ง AdminSystemWatcher ว่าเรียก server ไม่ได้หรือ server ตอบ 5xx (กรณีที่ server บันทึกเองไม่ได้ เช่น server ล่ม) */
+export const API_ERROR_EVENT = "lis:api-error";
+
+function reportApiError(status: number, path: string) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(API_ERROR_EVENT, { detail: { status, path: path.split("?")[0] } }));
+}
+
 async function fetchApi(path: string, options?: RequestInit): Promise<unknown> {
   let lastError: Error | null = null;
 
   for (let i = 0; i < API_BASES.length; i += 1) {
     const base = API_BASES[i];
-    const res = await fetch(`${base}${path}`, {
-      ...options,
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...identityHeaders(), ...options?.headers },
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${base}${path}`, {
+        ...options,
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...identityHeaders(), ...options?.headers },
+      });
+    } catch (err) {
+      if (i === API_BASES.length - 1) reportApiError(0, path);
+      throw err;
+    }
     const contentType = res.headers.get("content-type") || "";
 
     if (res.ok) {
@@ -159,6 +175,7 @@ async function fetchApi(path: string, options?: RequestInit): Promise<unknown> {
       continue;
     }
 
+    if (res.status >= 500) reportApiError(res.status, path);
     const body = await res.json().catch(() => ({ error: res.statusText }));
     const message =
       typeof body === "object" && body
@@ -281,13 +298,15 @@ export const api = {
   // แจ้งเตือน PWA (Web Push) — server/routes/push.js
   getPushDevices: (endpoint?: string) =>
     request<PushDevicesState>(`/push/devices${endpoint ? `?endpoint=${encodeURIComponent(endpoint)}` : ""}`),
-  subscribePush: (subscription: PushSubscriptionPayload, deviceLabel: string) =>
-    request<PushDevicesState>("/push/subscribe", { method: "POST", body: JSON.stringify({ subscription, deviceLabel }) }),
+  subscribePush: (subscription: PushSubscriptionPayload, deviceLabel: string, seeAll = false) =>
+    request<PushDevicesState>("/push/subscribe", { method: "POST", body: JSON.stringify({ subscription, deviceLabel, seeAll }) }),
   unsubscribePush: (endpoint: string) =>
     request<PushDevicesState>("/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }),
   setPushPaused: (paused: boolean, endpoint?: string) =>
     request<PushDevicesState>("/push/pause", { method: "POST", body: JSON.stringify({ paused, endpoint }) }),
   sendTestPush: () => request<PushTestResult>("/push/test", { method: "POST", body: "{}" }),
+  setPushSeeAll: (seeAll: boolean) =>
+    request<{ seeAll: boolean }>("/push/see-all", { method: "POST", body: JSON.stringify({ seeAll }) }),
 
   getSamples: () => request<SampleItem[]>("/samples"),
   createSample: (data: Partial<SampleItem>) =>
@@ -611,23 +630,26 @@ export const api = {
   getDailyCheckTodaySummary: () =>
     request<{ data: DailyCheckTodaySummary }>("/daily-checks/summary/today").then(r => r.data),
 
-  // แจ้งเตือน petition flow สำหรับกระดิ่ง — server กรอง audience ให้แล้ว
+  // ฟีดกระดิ่งรวม (คำขอ + สต็อก + ระบบ) — server เลือกผู้รับจาก role และงานของตัวเอง (server/routes/notifications.js)
+  // roles/employeeId/email/name ใช้เฉพาะตอน server หาผู้ใช้จาก session ไม่เจอ (dev mode)
   getPetitionNotifications: (params: {
     since: string;
-    audiences: string[];
     roles?: string[];
     employeeId?: string;
+    email?: string;
+    name?: string;
     all?: boolean;
     limit?: number;
   }) => {
     const qs = new URLSearchParams({ since: params.since });
-    if (params.audiences.length) qs.set("audiences", params.audiences.join(","));
     if (params.roles?.length) qs.set("roles", params.roles.join(","));
     if (params.employeeId) qs.set("employeeId", params.employeeId);
+    if (params.email) qs.set("email", params.email);
+    if (params.name) qs.set("name", params.name);
     if (params.all) qs.set("all", "1");
     if (params.limit) qs.set("limit", String(params.limit));
     return request<{ items: PetitionFlowNotification[]; serverTime: string }>(
-      `/petitions/notifications?${qs.toString()}`,
+      `/notifications?${qs.toString()}`,
     );
   },
 
@@ -928,6 +950,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ actor, note }),
     }),
+  cancelPetition: (petitionId: string, reason: string) =>
+    request<{ success: true; petitionNo: string }>(`/petitions/${petitionId}/cancel`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
   approvePetition: (
     petitionId: string,
     actor: string,
@@ -962,6 +989,11 @@ export const api = {
     request<import("@/types/petition.types").Petition>(`/approvals/petitions/${petitionId}/items`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+  // ออก Final Report ของคำร้องที่ผ่านครบทุกรายการแล้ว (Pre Result) — เฉพาะหัวหน้า QC / admin
+  issueFinalReport: (petitionId: string) =>
+    request<import("@/types/petition.types").Petition>(`/approvals/petitions/${petitionId}/final`, {
+      method: "POST",
     }),
   // Dev-only: raw-set petition.status via the gated backend dev endpoint
   // (bypasses business guards; companion fields are NOT touched).

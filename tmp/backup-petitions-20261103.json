@@ -1,0 +1,719 @@
+{
+  "petitions": [
+    {
+      "_id": {
+        "$oid": "6ae834da7b827ff240e635a7"
+      },
+      "petitionNo": "P-2611-0001",
+      "dept": "production",
+      "routeTargets": [],
+      "status": "deliveringQC",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "SA26110206462032",
+        "name": "Nattawut Saetung",
+        "department": "ผลิต 03",
+        "submittedAt": {
+          "$date": "2026-11-02T06:59:38.156Z"
+        }
+      },
+      "sampledBy": {
+        "employeeId": "3",
+        "name": "นายพีรเดช อรุณสันติโรจน์ (ไฟฟ์)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "PROPANIL 36% + ANILOFOS 18% W/V EC",
+          "commonName": "PROPANIL 36% + ANILOFOS 18% W/V EC",
+          "batchNo": "26S-ANF18+PPN36-021",
+          "lotNo": "26S-ANF18+PPN36-021",
+          "productionDate": "2026-11-02",
+          "submissionNo": "P-2611-0001",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "ถังผสม 3,000 ลิตร , ถังเก่า 10 , ใช้ TECH ANF. LOT ใหม่ | Item: RS-PPN36-ANF18 | MF: MF26110018 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "100 CC",
+          "labelQuantities": [
+            "100 CC"
+          ],
+          "labelSampledDate": "2026-11-02",
+          "itemNo": "RS-PPN36-ANF18"
+        },
+        {
+          "seq": 2,
+          "sampleName": "PROPANIL 36% + ANILOFOS 18% W/V EC",
+          "commonName": "PROPANIL 36% + ANILOFOS 18% W/V EC",
+          "batchNo": "26S-ANF18+PPN36-021",
+          "lotNo": "26S-ANF18+PPN36-021",
+          "productionDate": "2026-11-02",
+          "submissionNo": "P-2611-0001",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": false,
+          "note": "ถังผสม 3,000 ลิตร , ถังเก่า 10 , ใช้ TECH ANF. LOT ใหม่ | Item: RS-PPN36-ANF18 | MF: MF26110018 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "500 CC",
+          "labelQuantities": [
+            "500 CC"
+          ],
+          "labelSampledDate": "2026-11-02",
+          "itemNo": "RS-PPN36-ANF18"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110018"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110206462032",
+        "lisPetitionNo": "P-2611-0001",
+        "petitionNo": "P-2611-0001",
+        "lisStatus": "sent",
+        "lisSent": true,
+        "sentAt": {
+          "$date": "2026-11-02T06:59:38.153Z"
+        },
+        "lastSyncAt": {
+          "$date": "2026-11-02T06:59:40.331Z"
+        },
+        "lastSyncKey": "sent|"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": {
+        "$date": "2026-11-02T06:59:38.164Z"
+      },
+      "updatedAt": {
+        "$date": "2026-11-02T06:59:40.331Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae865629a43dea772e12fa7"
+      },
+      "petitionNo": "P-2611-0002",
+      "dept": "production",
+      "routeTargets": [],
+      "status": "deliveringQC",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "SA26110204383037",
+        "name": "Achara Boonthai",
+        "department": "ผลิต 04",
+        "submittedAt": {
+          "$date": "2026-11-02T10:26:42.488Z"
+        }
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "commonName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "batchNo": "26S-BRM0.005-GMP(R)-237",
+          "lotNo": "26S-BRM0.005-GMP(R)-237",
+          "productionDate": "2026-11-02",
+          "submissionNo": "P-2611-0002",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "- | Item: RSPH-BML0_005-RD | MF: MFPH26110010 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-02",
+          "itemNo": "RSPH-BML0_005-RD"
+        },
+        {
+          "seq": 2,
+          "sampleName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "commonName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "batchNo": "26S-BRM0.005-GMP(R)-238",
+          "lotNo": "26S-BRM0.005-GMP(R)-238",
+          "productionDate": "2026-11-02",
+          "submissionNo": "P-2611-0002",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "- | Item: RSPH-BML0_005-RD | MF: MFPH26110013 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-02",
+          "itemNo": "RSPH-BML0_005-RD"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MFPH26110010",
+        "MFPH26110013"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110204383037",
+        "lisPetitionNo": "P-2611-0002",
+        "petitionNo": "P-2611-0002",
+        "lisStatus": "sent",
+        "lisSent": true,
+        "sentAt": {
+          "$date": "2026-11-02T10:26:42.486Z"
+        },
+        "lastSyncAt": {
+          "$date": "2026-11-02T10:26:44.595Z"
+        },
+        "lastSyncKey": "sent|"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": {
+        "$date": "2026-11-02T10:26:42.496Z"
+      },
+      "updatedAt": {
+        "$date": "2026-11-02T10:26:44.596Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae866d69a43dea772e1350a"
+      },
+      "petitionNo": "P-2611-0003",
+      "dept": "production",
+      "routeTargets": [],
+      "status": "deliveringQC",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11650",
+        "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+        "email": "prompiriya.t@icpladda.com",
+        "department": "IT",
+        "submittedAt": {
+          "$date": "2026-11-02T10:32:54.535Z"
+        }
+      },
+      "sampledBy": {
+        "employeeId": "3",
+        "name": "นายพีรเดช อรุณสันติโรจน์ (ไฟฟ์)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "ทะวาย 25 เอสซี",
+          "commonName": "PACLOBUTRAZOL 25% SC",
+          "batchNo": "25S-PCB25-621",
+          "lotNo": "25S-PCB25-621",
+          "productionDate": "2026-11-02",
+          "submissionNo": "P-2611-0003",
+          "packageUnit": "12*1 L",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: F-TWI25-1000X12 | MF: MF26110029 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 CC, 500 CC",
+          "labelQuantities": [
+            "300 CC",
+            "500 CC"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-02",
+          "itemNo": "F-TWI25-1000X12"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110029"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110210324073",
+        "requesterEmail": "prompiriya.t@icpladda.com",
+        "lisPetitionNo": "P-2611-0003",
+        "petitionNo": "P-2611-0003",
+        "lisStatus": "sent",
+        "lisSent": true,
+        "sentAt": {
+          "$date": "2026-11-02T10:32:54.534Z"
+        },
+        "lastSyncAt": {
+          "$date": "2026-11-02T10:32:56.559Z"
+        },
+        "lastSyncKey": "sent|"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": {
+        "$date": "2026-11-02T10:32:54.540Z"
+      },
+      "updatedAt": {
+        "$date": "2026-11-02T10:32:56.560Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae8679c9a43dea772e13780"
+      },
+      "petitionNo": "P-2611-0004",
+      "dept": "production",
+      "routeTargets": [],
+      "status": "deliveringQC",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "SA26110210352794",
+        "name": "Achara Boonthai",
+        "department": "ผลิต 04",
+        "submittedAt": {
+          "$date": "2026-11-02T10:36:12.420Z"
+        }
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "commonName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "batchNo": "26S-BRM0.005-GMP(R)-237",
+          "lotNo": "26S-BRM0.005-GMP(R)-237",
+          "productionDate": "2026-11-02",
+          "submissionNo": "P-2611-0004",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "MF: EXTRA-20261102-1793432037691 | Item: RSPH-BML0_005-RD | MF: MFPH26110010 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-02",
+          "itemNo": "RSPH-BML0_005-RD"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MFPH26110010"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110210352794",
+        "lisPetitionNo": "P-2611-0004",
+        "petitionNo": "P-2611-0004",
+        "lisStatus": "sent",
+        "lisSent": true,
+        "sentAt": {
+          "$date": "2026-11-02T10:36:12.419Z"
+        },
+        "lastSyncAt": {
+          "$date": "2026-11-02T10:36:14.443Z"
+        },
+        "lastSyncKey": "sent|"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": {
+        "$date": "2026-11-02T10:36:12.423Z"
+      },
+      "updatedAt": {
+        "$date": "2026-11-02T10:36:14.443Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae86b2d88f02c45ee98e1d2"
+      },
+      "petitionNo": "P-2611-0005",
+      "dept": "production",
+      "routeTargets": [],
+      "status": "deliveringQC",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "SA26110210352794",
+        "name": "Achara Boonthai",
+        "department": "ผลิต 04",
+        "submittedAt": {
+          "$date": "2026-11-02T10:51:25.127Z"
+        }
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "commonName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "batchNo": "26S-BRM0.005-GMP(R)-237",
+          "lotNo": "26S-BRM0.005-GMP(R)-237",
+          "productionDate": "2026-11-02",
+          "submissionNo": "P-2611-0005",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "MF: EXTRA-20261102-1793432037691 | Item: RSPH-BML0_005-RD | MF: MFPH26110010 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-02",
+          "itemNo": "RSPH-BML0_005-RD"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MFPH26110010"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110210352794",
+        "lisPetitionNo": "P-2611-0005",
+        "petitionNo": "P-2611-0005",
+        "lisStatus": "sent",
+        "lisSent": true,
+        "sentAt": {
+          "$date": "2026-11-02T10:51:25.125Z"
+        },
+        "lastSyncAt": {
+          "$date": "2026-11-02T10:51:27.491Z"
+        },
+        "lastSyncKey": "sent|"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": {
+        "$date": "2026-11-02T10:51:25.135Z"
+      },
+      "updatedAt": {
+        "$date": "2026-11-02T10:51:27.491Z"
+      },
+      "__v": 0
+    }
+  ],
+  "petitionauditlogs": [
+    {
+      "_id": {
+        "$oid": "6ae834da7b827ff240e635a9"
+      },
+      "petitionId": {
+        "$oid": "6ae834da7b827ff240e635a7"
+      },
+      "petitionNo": "P-2611-0001",
+      "event": "created",
+      "toStatus": "deliveringQC",
+      "actor": "Nattawut Saetung",
+      "note": "สร้างคำร้องใหม่",
+      "createdAt": {
+        "$date": "2026-11-02T06:59:38.271Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae865629a43dea772e12fa9"
+      },
+      "petitionId": {
+        "$oid": "6ae865629a43dea772e12fa7"
+      },
+      "petitionNo": "P-2611-0002",
+      "event": "created",
+      "toStatus": "deliveringQC",
+      "actor": "Achara Boonthai",
+      "note": "สร้างคำร้องใหม่",
+      "createdAt": {
+        "$date": "2026-11-02T10:26:42.511Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae866d69a43dea772e1350c"
+      },
+      "petitionId": {
+        "$oid": "6ae866d69a43dea772e1350a"
+      },
+      "petitionNo": "P-2611-0003",
+      "event": "created",
+      "toStatus": "deliveringQC",
+      "actor": "Prompiriya Thongroongrattanakul",
+      "note": "สร้างคำร้องใหม่",
+      "createdAt": {
+        "$date": "2026-11-02T10:32:54.547Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae8679c9a43dea772e13782"
+      },
+      "petitionId": {
+        "$oid": "6ae8679c9a43dea772e13780"
+      },
+      "petitionNo": "P-2611-0004",
+      "event": "created",
+      "toStatus": "deliveringQC",
+      "actor": "Achara Boonthai",
+      "note": "สร้างคำร้องใหม่",
+      "createdAt": {
+        "$date": "2026-11-02T10:36:12.431Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae86b2d88f02c45ee98e1d4"
+      },
+      "petitionId": {
+        "$oid": "6ae86b2d88f02c45ee98e1d2"
+      },
+      "petitionNo": "P-2611-0005",
+      "event": "created",
+      "toStatus": "deliveringQC",
+      "actor": "Achara Boonthai",
+      "note": "สร้างคำร้องใหม่",
+      "createdAt": {
+        "$date": "2026-11-02T10:51:25.150Z"
+      },
+      "__v": 0
+    }
+  ],
+  "labrequests": [
+    {
+      "_id": {
+        "$oid": "6ae834da7b827ff240e635b0"
+      },
+      "labRequestNo": "L-2611-0001",
+      "petitionId": {
+        "$oid": "6ae834da7b827ff240e635a7"
+      },
+      "petitionNo": "P-2611-0001",
+      "batchNo": "26S-ANF18+PPN36-021",
+      "sampleSeq": 1,
+      "requester": {
+        "fullName": "Nattawut Saetung",
+        "department": "ผลิต 03",
+        "address": "151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000",
+        "phone": "034-305281-2",
+        "fax": "",
+        "email": "",
+        "contactName": "Nattawut Saetung",
+        "position": ""
+      },
+      "serviceAgreement": {
+        "sampleDelivery": "self",
+        "testMethod": "standard",
+        "testMethodDoneBefore": null,
+        "testMethodDetail": "",
+        "testDuration": "urgent",
+        "testDurationDays": null,
+        "requireUncertainty": false,
+        "uncertaintyValue": ""
+      },
+      "reportCustomerName": "ICP Ladda Co., LTD.",
+      "reportAddressType": "default",
+      "reportAddressOther": "",
+      "invoiceAddressType": "default",
+      "invoiceAddressOther": "",
+      "testDelivery": [
+        "email"
+      ],
+      "storageCondition": [
+        "room"
+      ],
+      "packageType": [
+        "glassBottle"
+      ],
+      "packageTypeOther": "",
+      "sampleReturn": "return",
+      "deletedAt": null,
+      "deletedBy": "",
+      "createdAt": {
+        "$date": "2026-11-02T06:59:38.473Z"
+      },
+      "updatedAt": {
+        "$date": "2026-11-02T06:59:38.473Z"
+      },
+      "__v": 0
+    },
+    {
+      "_id": {
+        "$oid": "6ae866d69a43dea772e13513"
+      },
+      "labRequestNo": "L-2611-0002",
+      "petitionId": {
+        "$oid": "6ae866d69a43dea772e1350a"
+      },
+      "petitionNo": "P-2611-0003",
+      "batchNo": "25S-PCB25-621",
+      "sampleSeq": 1,
+      "requester": {
+        "fullName": "Prompiriya Thongroongrattanakul",
+        "department": "ผลิต 03",
+        "address": "151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000",
+        "phone": "034-305281-2",
+        "fax": "",
+        "email": "prompiriya.t@icpladda.com",
+        "contactName": "Prompiriya Thongroongrattanakul",
+        "position": ""
+      },
+      "serviceAgreement": {
+        "sampleDelivery": "self",
+        "testMethod": "standard",
+        "testMethodDoneBefore": null,
+        "testMethodDetail": "",
+        "testDuration": "normal",
+        "testDurationDays": null,
+        "requireUncertainty": false,
+        "uncertaintyValue": ""
+      },
+      "reportCustomerName": "ICP Ladda Co., LTD.",
+      "reportAddressType": "default",
+      "reportAddressOther": "",
+      "invoiceAddressType": "default",
+      "invoiceAddressOther": "",
+      "testDelivery": [
+        "email"
+      ],
+      "storageCondition": [
+        "room"
+      ],
+      "packageType": [
+        "plasticBag"
+      ],
+      "packageTypeOther": "",
+      "sampleReturn": "return",
+      "deletedAt": null,
+      "deletedBy": "",
+      "createdAt": {
+        "$date": "2026-11-02T10:32:54.713Z"
+      },
+      "updatedAt": {
+        "$date": "2026-11-02T10:32:54.713Z"
+      },
+      "__v": 0
+    }
+  ]
+}

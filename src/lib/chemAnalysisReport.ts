@@ -2,6 +2,7 @@ import type { Petition, PetitionItem, PetitionItemApproval } from "@/types/petit
 import type { LabReportPage, LabReportRow } from "@/lib/labReport";
 import { buddhistDate } from "@/lib/labReport";
 import { itemRequiresSide } from "@/lib/itemApprovals";
+import { mediaUrlsFromText } from "@/lib/mediaUrls";
 
 /** ฟอร์ม F-CHM-01-01 Rev 04 มีช่องตัวอย่าง 7 ช่องต่อหนึ่งใบ */
 export const CHEM_REPORT_SAMPLES_PER_SHEET = 7;
@@ -76,7 +77,7 @@ function aiRow(rows: LabReportRow[], item: PetitionItem): LabReportRow | undefin
   return (
     findRow(rows, AI_PATTERN)
     ?? (common ? rows.find((row) => row.testItem.toLowerCase().includes(common)) : undefined)
-    ?? rows.find((row) => !SG_PATTERN.test(row.testItem) && /\d/.test(row.result))
+    ?? rows.find((row) => !SG_PATTERN.test(row.testItem) && /\d/.test(row.result) && !mediaUrlsFromText(row.result).length)
   );
 }
 

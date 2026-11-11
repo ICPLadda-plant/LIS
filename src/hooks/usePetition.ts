@@ -140,6 +140,10 @@ interface PetitionListParams {
   labPending?: boolean;
   /** เฉพาะงานด่วน (priority = 1) ที่ยังไม่อนุมัติ/ปฏิเสธ */
   urgent?: boolean;
+  /** เฉพาะคำร้องที่ผู้ยื่นอยู่แผนกผลิต */
+  submitterGroup?: 'production';
+  /** เฉพาะสายผลิตที่เลือก เช่น "ผลิต 3" */
+  submitterDepartment?: string;
 }
 interface PetitionListResponse {
   items: Petition[];
@@ -148,6 +152,8 @@ interface PetitionListResponse {
   limit: number;
   summaryTotal?: number;
   statusCounts?: Partial<Record<Petition['status'], number>>;
+  /** สายผลิตที่มีคำร้องในระบบ (ส่งมาเมื่อขอ submitterGroup=production) */
+  submitterDepartments?: string[];
 }
 
 export function usePetitionList(params: PetitionListParams, options: PetitionRefreshOptions = {}) {
@@ -175,6 +181,8 @@ export function usePetitionList(params: PetitionListParams, options: PetitionRef
     if (params.labRecheckPending) sp.set('labRecheckPending', 'true');
     if (params.labPending) sp.set('labPending', 'true');
     if (params.urgent) sp.set('urgent', 'true');
+    if (params.submitterGroup) sp.set('submitterGroup', params.submitterGroup);
+    if (params.submitterDepartment) sp.set('submitterDepartment', params.submitterDepartment);
     return sp.toString();
   })();
 
@@ -363,6 +371,11 @@ interface LabRequestListResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export async function fetchLabRequestsByPetition(petitionId: string): Promise<LabRequest[]> {
+  const res = await apiFetch<LabRequestListResponse>(`/lab-requests?petitionId=${encodeURIComponent(petitionId)}&limit=100`);
+  return res.items ?? [];
 }
 
 export function useLabRequestsByPetition(petitionId: string | undefined) {

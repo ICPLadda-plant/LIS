@@ -146,7 +146,8 @@ export function defaultPrinterFor(
 }
 
 export function normalizeDepartment(value: unknown): string {
-  const raw = String(value ?? "").trim();
+  // "ผลิต 03" กับ "ผลิต 3" คือแผนกเดียวกัน — ข้อมูลพนักงานใช้เลข 0 นำหน้า แต่การผูกเครื่องพิมพ์ไม่ใช้
+  const raw = String(value ?? "").trim().replace(/\s+/g, " ").replace(/\d+/g, (digits) => digits.replace(/^0+(?=\d)/, ""));
   if (!raw || raw === "all" || raw === "ทุกแผนก") return "";
   return raw;
 }

@@ -22,6 +22,7 @@ const Parameter = require("../models/Parameter");
 const Petition = require("../models/Petition");
 const { scheduleOrUnlockPhase2 } = require("../lib/phaseAdvance");
 const PetitionAuditLog = require('../models/PetitionAuditLog');
+const { recordQcHandler } = require('../lib/qcHandlers');
 const { qcResultAuditEvent, qcResultNote } = require('../lib/auditEvents');
 const { pendingAdditionalSamples, requiredSampleRoundId } = require('../lib/additionalSamples');
 const { currentUser, canTestSide } = require('./additionalSamples');
@@ -394,11 +395,13 @@ router.put("/", serializePetitionWrite(async (req, res) => {
         event: isClosed ? 'updated' : auditEvent,
         actor: enteredBy?.name || enteredBy?.email || 'system',
         note: isClosed ? `แก้ไขผลหลังปิดงาน: ${String(overrideReason).trim()} · ${qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName })}` : qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName }),
-        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
+        metadata: { side: paramForCheck?.scope === 'lab' ? 'lab' : 'qc', itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
       }).catch((err) => {
         console.error('[audit-log] qc-result write failed:', err.message);
       });
     }
+
+    if (!isClosed && paramForCheck?.scope !== 'lab') recordQcHandler(petitionId, existingUser || enteredBy);
 
     if (isClosed) {
       notifyPetitionEvent(petitionForEdit, {
@@ -419,6 +422,8 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       actor: enteredBy?.name || enteredBy?.email,
       sampleName,
     });
+    // ค่า ถพ. เปลี่ยน → ส่งผลราย batch ให้ Production (ข้ามเองถ้าค่าไม่เปลี่ยน)
+    if (isSgParameter(paramForCheck)) require('../lib/productionCallback').notifyProductionOnEvent(petitionForEdit);
 
     // If this field has triggersPhase2 and was filled in Phase 1, schedule advance
     if (phaseNum === 1 && fieldDef?.triggersPhase2 && paramForCheck) {
@@ -514,6 +519,7 @@ router.put("/entries", serializePetitionWrite(async (req, res) => {
       const actor = enteredBy?.name || enteredBy?.email;
       logSgEditAfterConfirm({ petition: petitionForEdit, parameter, itemSeq, fieldLabel: 'ค่าถพ.', before: before.value, after: after.value, actor, sampleName });
       logSgEditAfterConfirm({ petition: petitionForEdit, parameter, itemSeq, fieldLabel: SG_TEMP_LABEL, before: before.temperature, after: after.temperature, actor, sampleName });
+      require('../lib/productionCallback').notifyProductionOnEvent(petitionForEdit);
     }
 
     res.json(doc);

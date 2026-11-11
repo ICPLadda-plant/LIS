@@ -8,13 +8,8 @@ const Approval = require('../models/Approval');
 const RealtimeDensity = require('../models/RealtimeDensity');
 const PetitionAuditLog = require('../models/PetitionAuditLog');
 const { buildSearchRankingStages } = require('../lib/searchRanking');
+const { PRODUCTION_PREFIX_RX, productionLineLabel, productionLineQueryRegex } = require('../lib/productionDepartment');
 const { labResultDocs, snapshotOf, clearLabResults, restoreLabResults } = require('../lib/labResultActions');
-const {
-  bellDescribe,
-  isCollapsibleDuplicate,
-  isRelevant,
-  toNotification,
-} = require('../lib/petitionNotifications');
 const { maybeAdvancePhase } = require('../lib/phaseAdvance');
 const QCTestResult = require('../models/QCTestResult');
 const Parameter = require('../models/Parameter');
@@ -44,13 +39,11 @@ const {
   routeTargetsForSubmission,
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
-
-function sampleIdsFromPetition(petition) {
-  if (!petition || !Array.isArray(petition.items)) return [];
-  return petition.items
-    .map((item) => item.sampleId || `${petition.petitionNo}-${item.seq}`)
-    .filter(Boolean);
-}
+const { canEditWholePetition } = require('../lib/productionPetitionEdit');
+const { assignMissingSampleLabelNumbers, planLabelReceipt } = require('../lib/sampleLabelNumber');
+const { sendProductionCancel } = require('../lib/productionCallback');
+const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
+const { recordQcHandlerFromRequest } = require('../lib/qcHandlers');
 
 function logAudit(petition, payload) {
   if (!petition) return;
@@ -63,6 +56,34 @@ function logAudit(petition, payload) {
   });
   // Fan out to LINE groups (fire-and-forget; no-op unless configured + groups bound).
   notifyPetitionEvent(petition, payload);
+}
+
+// ผล %AI ต่อรายการ ณ ตอนหัวหน้า Lab ออกผล — แนบไปกับแจ้งเตือนให้ผู้ยื่นดูคร่าว ๆ
+async function labAiResults(doc) {
+  try {
+    const { aiFromQcResults } = require('../lib/coaErp');
+    const results = await QCTestResult.find({ petitionId: String(doc._id) }).lean();
+    return (doc.items || [])
+      .filter((item) => itemRequiresSide(doc, item, 'lab'))
+      .map((item) => {
+        const found = aiFromQcResults(results.filter((r) => Number(r.itemSeq) === Number(item.seq)), item.commonName);
+        return found?.result ? { itemSeq: item.seq, result: found.result } : null;
+      })
+      .filter(Boolean);
+  } catch (err) {
+    console.error('[lab-approve] read %AI failed:', err.message);
+    return [];
+  }
+}
+
+// งานที่ถูกสั่ง Re-check แล้วกำลังมอบหมายใหม่ — ใช้บอกผู้รับงานเดิมว่างานไปอยู่กับใคร
+async function recheckAssignmentContext(doc) {
+  if (!(doc.labRecheckCount > 0) || !doc.labRecheckRequestedAt || doc.labApprovedAt) return {};
+  const log = await PetitionAuditLog.findOne({ petitionId: doc._id, event: 'recheck', 'metadata.round': { $exists: true } })
+    .sort({ createdAt: -1 })
+    .lean();
+  if (!log) return {};
+  return { recheckRound: log.metadata.round, recheckPreviousAssignee: log.metadata.previousAssignee || null };
 }
 
 // เลขรายการ (itemSeq) ที่ผล Lab เปลี่ยนระหว่าง snapshot ก่อน/หลังแก้ไข
@@ -88,6 +109,54 @@ function changedLabResultSeqs(before, after) {
 const { nextDocumentNumber } = require('../lib/documentNumber');
 function nextPetitionNo() {
   return nextDocumentNumber('petition', Petition, 'petitionNo');
+}
+
+// Production แก้คำขอที่ส่งเข้า LIS แล้วแบบเพิ่ม/ลดรายการ → ผู้ใช้ตรวจซ้ำในหน้าคำขอแผนกผลิต
+// แล้วบันทึกทับใบเดิม (เลขคำขอเดิม) เพื่อพิมพ์สติกเกอร์ใหม่ ไม่สร้างใบที่สองซ้อน
+async function replaceProductionPetition(body, res) {
+  const petitionNo = String(body.replacePetitionNo || '').trim();
+  const requestNo = String(body.productionWorkflow?.requestNo || '').trim();
+  const petition = await Petition.findOne({ petitionNo, deletedAt: null });
+  if (!petition) return res.status(404).json({ error: { message: `ไม่พบคำขอ ${petitionNo}` } });
+  if (!requestNo || petition.productionWorkflow?.requestNo !== requestNo) {
+    return res.status(403).json({ error: { message: 'requestNo ไม่ตรงกับคำขอ' } });
+  }
+  if (!canEditWholePetition(petition)) {
+    return res.status(409).json({ error: { message: 'รับตัวอย่างแล้ว แก้ไขรายการไม่ได้' } });
+  }
+  const previous = petition.toObject().items || [];
+  const items = normalizePetitionItems(body.items, { department: petition.submittedBy?.department, petitionNo })
+    .map((item, index) => {
+      const old = previous[index];
+      return old?.sampleId && Number(old.seq) === Number(item.seq) ? { ...item, sampleId: old.sampleId } : item;
+    });
+  const update = { items, routeTargets: routeTargetsForSubmission(body, items) ?? [] };
+  if (Array.isArray(body.prodOrderNos)) update.prodOrderNos = body.prodOrderNos;
+  const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ ...petition.toObject(), ...update });
+  if (sampleLabelNumbers) update.sampleLabelNumbers = sampleLabelNumbers;
+  const sampledBy = normalizeSampledBy(body.sampledBy);
+  if (sampledBy) update.sampledBy = sampledBy;
+  const submittedBy = body.submittedBy ? await resolveEmployeeActor(body.submittedBy) : null;
+  const saved = await Petition.findOneAndUpdate(
+    { _id: petition._id, status: petition.status, __v: petition.__v == null ? { $exists: false } : petition.__v },
+    { $set: update, $inc: { __v: 1 } },
+    { new: true, runValidators: true },
+  );
+  if (!saved) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
+  // ใบคำขอรับบริการ Lab ผูกกับรายการ Lab ตัวแรก — ย้ายตามรายการที่แก้ (หน้าเว็บอัปเดตรายละเอียดต่อ)
+  const labRequest = await LabRequest.findOne({ petitionId: saved._id, deletedAt: null }).sort({ createdAt: 1 }).lean();
+  const firstLab = saved.items.find((item) => item.sendToLab === true);
+  if (labRequest && firstLab) {
+    await LabRequest.updateOne({ _id: labRequest._id }, { $set: { batchNo: firstLab.batchNo, sampleSeq: firstLab.seq } });
+  }
+  logAudit(saved, {
+    event: 'updated',
+    toStatus: saved.status,
+    actor: body.actor || submittedBy?.name || 'Production System',
+    note: 'Production แก้ไขรายการและตรวจใบคำขออีกครั้ง: ' + saved.items.map((it) => `#${it.seq} ${it.batchNo || '-'}`).join(', '),
+    metadata: { type: 'productionEdit', mode: 'review' },
+  });
+  return res.json({ ...saved.toObject(), existingLabRequestId: labRequest ? String(labRequest._id) : null });
 }
 
 function badRequest(res, message) {
@@ -170,6 +239,8 @@ async function matchStandardTime(machine) {
 }
 
 // GET /api/petitions?page=1&limit=20&status=&search=
+// ?submitterGroup=production → เฉพาะคำร้องที่ผู้ยื่นอยู่แผนกผลิต (มุมมองของฝ่ายผลิต)
+// ?submitterDepartment=ผลิต 3 → เฉพาะสายผลิตนั้น ("ผลิต 03" นับเป็นสายเดียวกัน)
 router.get('/', async (req, res) => {
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
@@ -179,10 +250,14 @@ router.get('/', async (req, res) => {
     const search = (req.query.search || '').trim();
     const assignedToEmployeeId = String(req.query.assignedToEmployeeId || '').trim();
     const assignedToNames = queryStringList(req.query.assignedToName);
+    const productionOnly = req.query.submitterGroup === 'production';
+    const submitterDepartment = String(req.query.submitterDepartment || '').trim();
 
     const q = {};
     if (dept && ['production', 'rm', 'fg'].includes(String(dept))) q.dept = dept;
     const andConditions = [];
+    if (productionOnly) andConditions.push({ 'submittedBy.department': PRODUCTION_PREFIX_RX });
+    if (submitterDepartment) andConditions.push({ 'submittedBy.department': productionLineQueryRegex(submitterDepartment) });
     const assigneeConditions = [];
     if (assignedToEmployeeId) assigneeConditions.push({ 'assignedTo.employeeId': assignedToEmployeeId });
     assignedToNames.forEach((name) => assigneeConditions.push({ 'assignedTo.name': name }));
@@ -270,7 +345,7 @@ router.get('/', async (req, res) => {
       delete q.$or;
     }
 
-    const [docs, total, summaryTotal, statusCountRows] = await Promise.all([
+    const [docs, total, summaryTotal, statusCountRows, productionDepartmentRows] = await Promise.all([
       search
         ? Petition.aggregate([
           { $match: { ...q, deletedAt: null } },
@@ -289,8 +364,15 @@ router.get('/', async (req, res) => {
         { $match: summaryQ },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
+      productionOnly
+        ? Petition.distinct('submittedBy.department', { 'submittedBy.department': PRODUCTION_PREFIX_RX, deletedAt: null })
+        : Promise.resolve(null),
     ]);
     const statusCounts = Object.fromEntries(statusCountRows.map((row) => [row._id, row.count]));
+    const submitterDepartments = productionDepartmentRows
+      ? [...new Set(productionDepartmentRows.map(productionLineLabel).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'th', { numeric: true }))
+      : undefined;
     // Lazy phase advance for petitions whose phase2DueAt has elapsed
     const now = new Date();
     const items = [];
@@ -300,7 +382,7 @@ router.get('/', async (req, res) => {
       }
       items.push(doc.toObject());
     }
-    res.json({ items, total, page, limit, summaryTotal, statusCounts });
+    res.json({ items, total, page, limit, summaryTotal, statusCounts, submitterDepartments });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });
   }
@@ -492,70 +574,8 @@ router.get('/audit-logs', async (req, res) => {
   }
 });
 
-// GET /api/petitions/notifications?since=<ISO>&audiences=qc,lab&employeeId=E1&all=0&limit=30
-// In-app bell feed: audit log + petition → notifications this viewer should see.
-// Unauthenticated like the rest of this API — the client states who it is, same as
-// the `actor` field other routes accept.
-const NOTIFY_LOOKBACK_MS = 24 * 60 * 60 * 1000;
-
-router.get('/notifications', async (req, res) => {
-  try {
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 30));
-    const audiences = String(req.query.audiences || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const viewer = {
-      audiences,
-      roles: String(req.query.roles || '').split(',').map((s) => s.trim()).filter(Boolean),
-      employeeId: String(req.query.employeeId || '').trim(),
-      seeAll: String(req.query.all || '') === '1',
-    };
-
-    // Hard 24h ceiling no matter how stale the client's cursor is.
-    const floor = new Date(Date.now() - NOTIFY_LOOKBACK_MS);
-    const since = new Date(String(req.query.since || ''));
-    const window = !Number.isNaN(since.getTime()) && since > floor ? since : floor;
-
-    const logs = await PetitionAuditLog.find({ createdAt: { $gte: window } })
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .lean();
-
-    const petitionIds = [...new Set(logs.filter((l) => l.petitionId).map((l) => String(l.petitionId)))];
-    const petitions = petitionIds.length
-      ? await Petition.find({ _id: { $in: petitionIds } })
-          .select(
-            'petitionNo dept status items.batchNo items.sampleName items.commonName ' +
-            'submittedBy assignedTo qcCompletedAt labCompletedAt labApprovedAt',
-          )
-          .lean()
-      : [];
-    const byId = new Map(petitions.map((p) => [String(p._id), p]));
-
-    const items = [];
-    // resultEntered fires once per form field, so a burst for one petition must
-    // collapse to its single newest row BEFORE the limit cap below — otherwise the
-    // burst alone can fill the cap and crowd out older, more important events
-    // (e.g. ⛔ ถูกส่งกลับ) that never get re-fetched once the cursor moves past them.
-    const seenResultEntered = new Set();
-    for (const log of logs) {
-      if (items.length >= limit) break;
-      const petition = byId.get(String(log.petitionId));
-      if (!petition) continue; // ถูกลบ/soft delete แล้ว
-      if (isCollapsibleDuplicate(log, seenResultEntered)) continue;
-      const desc = bellDescribe(petition, log);
-      if (!desc) continue;
-      if (!isRelevant(desc, petition, viewer)) continue;
-      items.push(toNotification(petition, log, desc, viewer));
-    }
-
-    // Client uses serverTime as its next cursor — avoids client/server clock skew.
-    res.json({ items, serverTime: new Date().toISOString() });
-  } catch (err) {
-    res.status(500).json({ error: { message: err.message } });
-  }
-});
+// GET /api/petitions/notifications — ชื่อเดิมของฟีดกระดิ่ง (ใช้ routes/notifications.js ตัวเดียวกัน)
+router.get('/notifications', (req, res) => require('./notifications').feedHandler(req, res));
 
 // GET /api/petitions/returned-flags?petitionIds=id1,id2,...
 // Returns map of petitionId → boolean (true if petition is a revision of another
@@ -822,7 +842,7 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
         toStatus: 'success',
         actor,
         note: `${sideLabel} บันทึกผลเสร็จ — ครบทุกส่วน ${finalWaitNote}`,
-        metadata: { side },
+        metadata: { side, kind: 'trackCompleted' },
       });
     } else {
       await doc.save();
@@ -831,9 +851,10 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
         toStatus: doc.status,
         actor,
         note: `${sideLabel} บันทึกผลเสร็จ — รออีกฝั่งตรวจให้ครบ`,
-        metadata: { side },
+        metadata: { side, kind: 'trackCompleted' },
       });
     }
+    if (side === 'qc') recordQcHandlerFromRequest(req, doc._id, actor);
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
@@ -859,6 +880,7 @@ router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
     doc.labApprovedAt = now;
     doc.labApprovedBy = actor;
     doc.reviewHistory.push({ action: 'lab-approve', reviewedBy: actor, reviewedAt: now });
+    const aiResults = await labAiResults(doc);
 
     const prevStatus = doc.status;
     const finalWaitNote = requiresQcTrack(doc) ? 'รอหัวหน้า QC ออก Final Result' : 'รอ Final Result';
@@ -868,13 +890,13 @@ router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
       await doc.save();
       logAudit(doc, {
         event: 'statusChanged', fromStatus: prevStatus, toStatus: 'success', actor,
-        note: `หัวหน้า Lab ออกผล — ครบทุกส่วน ${finalWaitNote}`, metadata: { side: 'lab' },
+        note: `หัวหน้า Lab ออกผล — ครบทุกส่วน ${finalWaitNote}`, metadata: { side: 'lab', kind: 'labApproved', aiResults },
       });
     } else {
       await doc.save();
       logAudit(doc, {
         event: 'updated', toStatus: doc.status, actor,
-        note: 'หัวหน้า Lab ออกผล — รอ QC ตรวจให้ครบ', metadata: { side: 'lab' },
+        note: 'หัวหน้า Lab ออกผล — รอ QC ตรวจให้ครบ', metadata: { side: 'lab', kind: 'labApproved', aiResults },
       });
     }
     res.json(doc);
@@ -1150,6 +1172,7 @@ router.post('/', async (req, res) => {
     if (Object.keys(body).some(key => key.startsWith('additionalSampleRequests') || key.startsWith('$'))) return badRequest(res, 'รอบตัวอย่างเพิ่มต้องสร้างหลังรับและบันทึกผลตรวจเท่านั้น');
     const submissionError = validatePetitionSubmission(body);
     if (submissionError) return badRequest(res, submissionError);
+    if (body.replacePetitionNo) return await replaceProductionPetition(body, res);
     let revisionOf = null;
     if (body.revisionOf) {
       if (!mongoose.Types.ObjectId.isValid(body.revisionOf)) {
@@ -1179,14 +1202,18 @@ router.post('/', async (req, res) => {
       petitionNo,
     });
     const submittedBy = await resolveEmployeeActor(body.submittedBy);
+    const deliveredBy = body.deliveredBy?.name ? await resolveEmployeeActor(body.deliveredBy) : body.deliveredBy;
     const sampledBy = normalizeSampledBy(body.sampledBy);
     const routeTargets = routeTargetsForSubmission(body, items);
+    const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ submittedBy, items, routeTargets });
     const doc = await Petition.create({
       ...body,
       submittedBy,
+      deliveredBy,
       items,
       sampledBy,
       routeTargets,
+      sampleLabelNumbers: sampleLabelNumbers ?? undefined,
       petitionNo,
       status: 'deliveringQC',
       revisionOf,
@@ -1195,7 +1222,7 @@ router.post('/', async (req, res) => {
     logAudit(doc, {
       event: 'created',
       toStatus: doc.status,
-      actor: body.actor || body.submittedBy?.name || 'system',
+      actor: body.actor || submittedBy?.name || 'system',
       note: revisionOf ? `สร้างคำร้องใหม่ (แก้ไขจาก ${body.revisionOf})` : 'สร้างคำร้องใหม่',
       metadata: revisionOf ? { revisionOf: String(revisionOf) } : undefined,
     });
@@ -1255,13 +1282,39 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
     if (side === 'lab' && isLabAwaitingSgConfirmation(before)) {
       return res.status(409).json({ error: { message: 'รอ QC ยืนยันค่า ถพ. ก่อน Lab จึงรับตัวอย่างได้' } });
     }
+    if (side === 'lab') {
+      const reviewError = await labAgreementReviewError(before);
+      if (reviewError) return res.status(409).json({ error: { message: reviewError, code: 'LAB_AGREEMENT_REVIEW_REQUIRED' } });
+    }
     const now = new Date();
+    const sideLabel = side === 'lab' ? 'Lab' : 'QC';
+    const versionGuard = { ...q, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v };
+    // คำขอที่มีหลายเลขป้ายต่อฝั่ง: รับทีละป้าย และนับว่าฝั่งนี้รับแล้วเมื่อครบทุกป้าย
+    const labelPlan = planLabelReceipt(before, side, req.body || {});
+    if (labelPlan?.error) return res.status(409).json({ error: { message: labelPlan.error } });
+    const labelPush = labelPlan ? { $push: { labelReceipts: { $each: labelPlan.keys.map((key) => ({ key, side, receivedAt: now, receivedBy: actor })) } } } : {};
+    const labelNote = labelPlan ? ` ป้าย ${labelPlan.labels.join(', ')} (${labelPlan.receivedCount}/${labelPlan.total})` : '';
+    if (labelPlan && !labelPlan.complete) {
+      const doc = await Petition.findOneAndUpdate(versionGuard, { ...labelPush, $inc: { __v: 1 } }, { new: true });
+      if (!doc) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
+      logAudit(doc, {
+        event: 'received',
+        fromStatus: before.status,
+        toStatus: doc.status,
+        actor,
+        note: `${sideLabel} รับตัวอย่าง${labelNote}`,
+        metadata: { side, labelKeys: labelPlan.keys, partial: true },
+      });
+      if (side === 'qc') recordQcHandlerFromRequest(req, doc._id, actor);
+      return res.json(doc);
+    }
     const update = {
       [`${side}ReceivedBy`]: actor,
       [`${side}ReceivedAt`]: now,
     };
     if (before.status === 'sampleSent' || before.status === 'deliveringQC') {
-      update.status = 'pendingReview';
+      // Lab assign ได้ก่อนตัวอย่างมาถึง — ใบที่มีผู้รับงานแล้วถือว่ากำลังดำเนินการทันทีที่รับตัวอย่าง
+      update.status = before.assignedTo?.employeeId ? 'inProgress' : 'pendingReview';
     }
     if (!before.sampleSentAt && (before.status === 'sampleSent' || before.status === 'deliveringQC')) {
       update.sampleSentAt = now;
@@ -1271,16 +1324,17 @@ router.patch('/:id/receive', serializePetitionWrite(async (req, res) => {
       update.receivedBy = actor;
       update.receivedAt = now;
     }
-    const doc = await Petition.findOneAndUpdate({ ...q, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v }, { $set: update, $inc: { __v: 1 } }, { new: true });
+    const doc = await Petition.findOneAndUpdate(versionGuard, { $set: update, ...labelPush, $inc: { __v: 1 } }, { new: true });
     if (!doc) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
     logAudit(doc, {
       event: 'received',
       fromStatus: before.status,
       toStatus: doc.status,
       actor,
-      note: side === 'lab' ? 'Lab รับตัวอย่าง' : 'QC รับตัวอย่าง',
-      metadata: { side },
+      note: `${sideLabel} รับตัวอย่าง${labelNote}`,
+      metadata: labelPlan ? { side, labelKeys: labelPlan.keys } : { side },
     });
+    if (side === 'qc') recordQcHandlerFromRequest(req, doc._id, actor);
     res.json(doc);
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
@@ -1314,10 +1368,51 @@ function labNotReceived(doc) {
   return !doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt);
 }
 
-// ตั้ง assignedTo + เครื่องที่เลือก แล้วบันทึก audit — ใช้ร่วมกันทั้งหัวหน้ามอบหมายและเจ้าหน้าที่รับงานเอง
+// ISO 17025 ข้อ 7.1: Lab ต้องทบทวนคำขอ (ใบ L) และสรุปว่า "พร้อมรับงาน" ก่อนรับตัวอย่าง
+// คำร้องที่ไม่มีใบ L (เช่น QC อย่างเดียว / ข้อมูลเก่า) ไม่ต้องทบทวน
+async function labAgreementReviewError(petition) {
+  const requests = await LabRequest.find({ petitionId: petition._id, deletedAt: null }, { labAgreementReview: 1 }).lean();
+  if (!requests?.length) return null;
+  if (requests.some((request) => !request.labAgreementReview?.reviewedAt)) return 'กรุณาทบทวนคำขอก่อนรับงาน Lab';
+  if (requests.some((request) => request.labAgreementReview.acceptable === false)) {
+    return 'ผลทบทวนคำขอคือ "ไม่พร้อมรับงาน" จึงรับตัวอย่างไม่ได้';
+  }
+  return null;
+}
+
+// ทำความสะอาดรายการเครื่องจาก client แล้วผูก Standard Time ของแต่ละเครื่อง
+async function normalizeAssignedMachines(machines) {
+  const cleaned = machines
+    .filter((m) => m && m.machineId && m.code && m.name)
+    .map((m) => ({
+      machineId: String(m.machineId).trim(),
+      code: String(m.code).trim(),
+      name: String(m.name).trim(),
+      location: m.location ? String(m.location).trim() : undefined,
+      sampleName: m.sampleName ? String(m.sampleName).trim() : undefined,
+      commonName: m.commonName ? String(m.commonName).trim() : undefined,
+    }));
+  for (const machine of cleaned) {
+    const standard = await matchStandardTime(machine);
+    if (!standard) continue;
+    machine.standardTimeId = String(standard._id);
+    machine.estimatedMinutes = standard.standardTimeMin;
+    machine.estimatedSource = `${standard.instrument} / ${standard.analysisName}`;
+  }
+  return cleaned;
+}
+
+// ตั้ง assignedTo แล้วบันทึก audit — ใช้ร่วมกันทั้งหัวหน้ามอบหมายและเจ้าหน้าที่รับงานเอง
+// assign ได้ก่อน Lab รับตัวอย่าง; ผู้รับงานเลือกเครื่องตอนกด "เริ่มงาน" (POST /:id/accept)
 async function applyLabAssignment(doc, assignee, machines, { actor, note, claimed = false }) {
   const prevStatus = doc.status;
   const now = new Date();
+  const current = doc.assignedTo?.employeeId ? doc.assignedTo : null;
+  const { recheckRound, recheckPreviousAssignee } = await recheckAssignmentContext(doc);
+  const previousSource = current || recheckPreviousAssignee;
+  const previousAssignee = previousSource
+    ? { employeeId: previousSource.employeeId, name: previousSource.name, department: previousSource.department, position: previousSource.position }
+    : null;
   doc.assignedTo = {
     employeeId: String(assignee.employeeId).trim(),
     name: String(assignee.name).trim(),
@@ -1325,29 +1420,10 @@ async function applyLabAssignment(doc, assignee, machines, { actor, note, claime
     position: assignee.position ? String(assignee.position).trim() : undefined,
     assignedAt: now,
     assignedBy: actor ? String(actor).trim() : undefined,
-    // รับงานเอง (มอบหมายอิสระ) = รับงานทันที; หัวหน้า assign → รอเจ้าหน้าที่กดรับ
-    ...(claimed ? { acceptedAt: now, acceptedBy: String(assignee.name).trim() } : {}),
   };
 
   if (Array.isArray(machines)) {
-    const cleaned = machines
-      .filter((m) => m && m.machineId && m.code && m.name)
-      .map((m) => ({
-        machineId: String(m.machineId).trim(),
-        code: String(m.code).trim(),
-        name: String(m.name).trim(),
-        location: m.location ? String(m.location).trim() : undefined,
-        sampleName: m.sampleName ? String(m.sampleName).trim() : undefined,
-        commonName: m.commonName ? String(m.commonName).trim() : undefined,
-      }));
-    for (const machine of cleaned) {
-      const standard = await matchStandardTime(machine);
-      if (!standard) continue;
-      machine.standardTimeId = String(standard._id);
-      machine.estimatedMinutes = standard.standardTimeMin;
-      machine.estimatedSource = `${standard.instrument} / ${standard.analysisName}`;
-    }
-    doc.assignedMachines = cleaned;
+    doc.assignedMachines = await normalizeAssignedMachines(machines);
   }
   refreshLabExpected(doc);
 
@@ -1361,7 +1437,7 @@ async function applyLabAssignment(doc, assignee, machines, { actor, note, claime
     toStatus: doc.status,
     actor: actor || 'system',
     note: `${note}${machineNote}`,
-    metadata: { assignee: doc.assignedTo, machines: doc.assignedMachines, claimed },
+    metadata: { assignee: doc.assignedTo, machines: doc.assignedMachines, claimed, previousAssignee: previousAssignee || undefined, recheckRound: recheckRound || undefined },
   });
   return doc;
 }
@@ -1403,9 +1479,6 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(petitionQuery(req.params.id));
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
-    if (labNotReceived(doc)) {
-      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะ assign ได้' } });
-    }
 
     await applyLabAssignment(doc, { employeeId, name, department, position }, machines, {
       actor: user.name || user.email,
@@ -1449,7 +1522,7 @@ router.delete('/:id/assign', serializePetitionWrite(async (req, res) => {
   }
 }));
 
-// POST /api/petitions/:id/accept → เจ้าหน้าที่ที่ถูก assign กดรับงาน (เริ่มนับเวลาวิเคราะห์)
+// POST /api/petitions/:id/accept { machines } → เจ้าหน้าที่ที่ถูก assign กดเริ่มงาน + เลือกเครื่อง (เริ่มนับเวลาวิเคราะห์)
 router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
   try {
     const user = await currentUser(req);
@@ -1460,6 +1533,9 @@ router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
     if (!assignee?.employeeId) return res.status(409).json({ error: { message: 'งานนี้ยังไม่ได้มอบหมาย' } });
     if (['success', 'approved', 'rejected'].includes(doc.status)) return badRequest(res, 'งานนี้ปิดแล้ว');
     if (assignee.acceptedAt) return res.json(doc);
+    if (labNotReceived(doc)) {
+      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะเริ่มงานได้' } });
+    }
     const name = user.name || user.email;
     const employeeId = user.employeeId || (!user._id ? String(req.body?.employeeId || '').trim() : '');
     const isAssignee = (employeeId && employeeId === assignee.employeeId)
@@ -1470,15 +1546,19 @@ router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
     doc.assignedTo.acceptedAt = new Date();
     doc.assignedTo.acceptedBy = name;
     doc.markModified('assignedTo');
+    if (Array.isArray(req.body?.machines)) {
+      doc.assignedMachines = await normalizeAssignedMachines(req.body.machines);
+    }
     refreshLabExpected(doc);
     await doc.save();
+    const machineNote = doc.assignedMachines?.length ? ` (เครื่อง: ${doc.assignedMachines.map((m) => m.code).join(', ')})` : '';
     logAudit(doc, {
       event: 'accepted',
       fromStatus: doc.status,
       toStatus: doc.status,
       actor: name,
-      note: `${assignee.name} รับงาน`,
-      metadata: { side: 'lab', assignee: doc.assignedTo },
+      note: `${assignee.name} เริ่มงาน${machineNote}`,
+      metadata: { side: 'lab', assignee: doc.assignedTo, machines: doc.assignedMachines },
     });
     res.json(doc);
   } catch (err) {
@@ -1501,9 +1581,6 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(petitionQuery(req.params.id));
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
-    if (labNotReceived(doc)) {
-      return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะรับงานได้' } });
-    }
     if (doc.assignedTo?.employeeId) {
       return res.status(409).json({ error: { message: `มีผู้รับงานนี้แล้ว (${doc.assignedTo.name})` } });
     }
@@ -1535,6 +1612,7 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
     delete updates.target;          // routing hint for reject only
     delete updates.approvedAt;     // server-managed
     delete updates.rejectedAt;     // server-managed
+    delete updates.sampleLabelNumbers; // server-managed (ออกเลขตอนสร้าง/แก้รายการ)
 
     const before = await Petition.findById(req.params.id);
     if (!before) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
@@ -1677,6 +1755,10 @@ router.patch('/:id', serializePetitionWrite(async (req, res) => {
       const submissionError = validatePetitionSubmission(nextBody);
       if (submissionError) return badRequest(res, submissionError);
     }
+    if (Array.isArray(updates.items) || Array.isArray(updates.routeTargets)) {
+      const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ ...(before.toObject ? before.toObject() : before), ...updates });
+      if (sampleLabelNumbers) updates.sampleLabelNumbers = sampleLabelNumbers;
+    }
     const doc = await Petition.findOneAndUpdate({ _id: before._id, status: before.status, __v: before.__v == null ? { $exists: false } : before.__v }, { $set: updates, $inc: { __v: 1 } }, { new: true });
     if (!doc) return res.status(409).json({ error: { message: 'คำขอเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่' } });
     if (before.status !== doc.status) {
@@ -1743,28 +1825,72 @@ router.post('/:id/review', serializePetitionWrite(async (req, res) => {
   }
 }));
 
+// คำขอจาก Production: แจ้ง Production ก่อน ถ้าแจ้งไม่สำเร็จจะไม่ยกเลิก/ลบ เพื่อให้สองระบบตรงกัน
+async function notifyProductionCancelled(res, doc, info) {
+  if (!doc.productionWorkflow?.requestNo) return true;
+  try {
+    await sendProductionCancel(doc, info);
+    return true;
+  } catch (err) {
+    res.status(502).json({ error: { message: `แจ้งยกเลิกไปที่ Production ไม่สำเร็จ: ${err.message}` } });
+    return false;
+  }
+}
+
+function canCancelPetition(user, petition) {
+  const roles = normalizeRoles(user);
+  if (roles.some((role) => ['admin', 'qc-head', 'lab-head'].includes(role))) return true;
+  if (petition.status !== 'deliveringQC') return false;
+  if (user.employeeId && user.employeeId === petition.submittedBy?.employeeId) return true;
+  const email = String(user.email || '').toLowerCase();
+  return !!email && email === String(petition.productionWorkflow?.requesterEmail || '').toLowerCase();
+}
+
+// POST /api/petitions/:id/cancel  { reason } — LIS ยกเลิกคำขอ แจ้ง Production แล้วนำออกจากคิวงาน
+router.post('/:id/cancel', serializePetitionWrite(async (req, res) => {
+  try {
+    const reason = String(req.body?.reason || '').trim();
+    if (!reason) return badRequest(res, 'กรุณาระบุเหตุผลที่ยกเลิกคำขอ');
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    const doc = await Petition.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (!canCancelPetition(user, doc)) {
+      return res.status(403).json({ error: { message: 'เฉพาะ Admin, หัวหน้า QC หรือหัวหน้า Lab ที่ยกเลิกคำขอได้' } });
+    }
+    if (doc.status === 'approved') return res.status(409).json({ error: { message: 'คำขอนี้ออกผลแล้ว ยกเลิกไม่ได้' } });
+    const actor = user.name || user.email;
+    const at = new Date();
+    if (!(await notifyProductionCancelled(res, doc, { reason, actor, at }))) return;
+    doc.cancellation = { reason, by: actor, at };
+    logAudit(doc, {
+      event: 'deleted',
+      fromStatus: doc.status,
+      actor,
+      note: `ยกเลิกคำขอ: ${reason}`,
+      metadata: { type: 'cancelled', reason, productionRequestNo: doc.productionWorkflow?.requestNo },
+    });
+    await softDeletePetitionTree(doc, actor);
+    res.json({ success: true, petitionNo: doc.petitionNo, cancellation: doc.cancellation });
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+}));
+
 // DELETE /api/petitions/:id
 router.delete('/:id', async (req, res) => {
   try {
     const actor = req.query.actor || (req.body && req.body.actor) || 'system';
     const doc = await Petition.findById(req.params.id);
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (!(await notifyProductionCancelled(res, doc, { reason: 'ลบคำร้องใน LIS', actor }))) return;
     logAudit(doc, {
       event: 'deleted',
       fromStatus: doc.status,
       actor,
       note: 'ลบคำร้อง',
     });
-    await doc.softDelete(actor);
-    const sampleIds = sampleIdsFromPetition(doc);
-    if (sampleIds.length > 0) {
-      await Promise.all([
-        Sample.softDeleteMany({ id: { $in: sampleIds } }, actor),
-        PhysicalResult.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-        Approval.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-        RealtimeDensity.softDeleteMany({ sampleId: { $in: sampleIds } }, actor),
-      ]);
-    }
+    await softDeletePetitionTree(doc, actor);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });

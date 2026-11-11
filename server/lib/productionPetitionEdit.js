@@ -6,7 +6,7 @@ const { normalizePetitionItems } = require('./petitionSubmissionRules');
 const SUFFIX_PREFIXES = ['Item: ', 'MF: ', 'Priority: '];
 
 function petitionReceived(petition) {
-  return Boolean(petition?.qcReceivedAt || petition?.labReceivedAt || petition?.receivedAt);
+  return Boolean(petition?.qcReceivedAt || petition?.labReceivedAt || petition?.receivedAt || petition?.labelReceipts?.length);
 }
 
 // ยังไม่มีใครรับตัวอย่าง = ฝ่ายผลิตแก้ได้ทั้งใบ
@@ -24,6 +24,12 @@ function quantityLabel(qty, unit) {
 
 function qtyList(value) {
   return (Array.isArray(value) ? value : []).map(text).filter((qty) => Number(qty) > 0);
+}
+
+// mirror src/lib/samplePart.ts normalizeSamplePart
+function samplePart(value) {
+  const part = text(value).replace(/\s+/g, ' ');
+  return ['ทั่วไป/รวม', 'ทั่วไป', 'รวม'].includes(part) ? '' : part;
 }
 
 function flag(value, fallback) {
@@ -78,14 +84,19 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
       lotNo: text(row.lotNo),
       productionDate,
       packageUnit: text(row.packsize),
+      // ส่วนตัวอย่าง + รหัสบรรทัดจาก Production (Production รุ่นเดิมไม่ส่งมา = คงค่าเดิมของรายการ)
+      part: row.part !== undefined ? samplePart(row.part) || undefined : old.part,
+      lineRef: row.lineRef !== undefined ? text(row.lineRef) || undefined : old.lineRef,
       sendToQc,
       sendToLab,
       sampleQuantity: portions.length || (split ? 2 : 1),
       labelQuantity: labelQuantities.join(', '),
       labelQuantities,
       labelQuantitySides,
-      labelSampledDate: productionDate || '',
-      note: itemNoteWith(note, [
+      // ว/ด/ป บนป้าย = วันที่ส่งของ Production; ไม่มีค่า (เวอร์ชันเดิม) ใช้วันที่ผลิต
+      labelSampledDate: text(row.requestDate) || productionDate || '',
+      // หมายเหตุแยกตามรายการ; Production รุ่นเดิมไม่ส่ง row.note จึงใช้หมายเหตุของคำขอ
+      note: itemNoteWith(row.note !== undefined && row.note !== null ? row.note : note, [
         text(row.itemNo) ? `Item: ${text(row.itemNo)}` : '',
         text(row.mfNo) ? `MF: ${text(row.mfNo)}` : '',
         text(priority) ? `Priority: ${text(priority)}` : '',
@@ -97,12 +108,28 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
 }
 
 // mirror src/lib/petitionRouting.ts routeTargetsFromSendTargets
+// แก้หมายเหตุอย่างเดียว: itemNotes = [{ seq, sampleName, batchNo, note }] จับคู่ตาม Batch + ชื่อตัวอย่าง แล้วจึงลำดับ
+// (LIS อาจรวม QC/Lab ของ batch เดียวกันเป็นรายการเดียว จึงรวมหมายเหตุที่ไม่ซ้ำกัน)
+function applyItemNotes(items, itemNotes, fallbackNote) {
+  const list = Array.isArray(itemNotes) ? itemNotes : [];
+  const key = (it) => `${text(it.batchNo).toLowerCase()}|${text(it.sampleName).toLowerCase()}|${samplePart(it.part).toLowerCase()}`;
+  return (items || []).map((item, index) => {
+    if (!list.length) return { ...item, note: replaceProductionNote(item.note, fallbackNote) };
+    let matched = list.filter((n) => key(n) === key(item));
+    if (!matched.length) matched = list.filter((n) => Number(n.seq) === Number(item.seq ?? index + 1));
+    if (!matched.length) return item;
+    const note = Array.from(new Set(matched.map((n) => text(n.note)).filter(Boolean))).join(' / ');
+    return { ...item, note: replaceProductionNote(item.note, note) };
+  });
+}
+
 function routeTargetsForItems(items) {
   if (!items.length || items.some((item) => item.sendToQc !== false)) return [];
   return items.some((item) => item.sendToLab === true) ? ['lab'] : [];
 }
 
 module.exports = {
+  applyItemNotes,
   buildEditedItems,
   canEditWholePetition,
   petitionReceived,

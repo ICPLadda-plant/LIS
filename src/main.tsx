@@ -4,8 +4,9 @@ import { msalInstance } from "./lib/msalConfig";
 import App from "./App.tsx";
 import "./index.css";
 import { loadAccessControl } from "./lib/accessControlSource";
-import { registerPwaServiceWorker } from "./lib/pwa";
+import { registerPwaServiceWorker, startPwaInstallPromptCapture } from "./lib/pwa";
 import { startBuildRefreshWatcher } from "./lib/buildRefresh";
+import { startOutageRecoveryWatcher } from "./lib/outageRecovery";
 import { applyAppPreferences, readAppPreferences } from "./lib/appPreferences";
 
 // Resolving the sign-in redirect must never be able to abort the render.
@@ -16,6 +17,8 @@ import { applyAppPreferences, readAppPreferences } from "./lib/appPreferences";
 // in-progress flag and caching the request. MSAL clears the stale entries and
 // rethrows, so the condition is recoverable; letting the rejection escape used
 // to skip createRoot() entirely and leave the user on a blank page.
+startPwaInstallPromptCapture();
+
 function appBasePath() {
   return (import.meta.env.BASE_URL || "/").replace(new RegExp("/+$"), "");
 }
@@ -101,5 +104,6 @@ resolveActiveAccount().then((account) => {
 
   void registerPwaServiceWorker();
   startBuildRefreshWatcher();
+  startOutageRecoveryWatcher();
 });
 

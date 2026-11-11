@@ -11,7 +11,10 @@ import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { normalizeRoles } from '@/lib/roles';
-import { additionalSamplePayload, extractScannedCode, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
+import { additionalSamplePayload, extractScannedCode, extractScannedItemSeq, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
+import { labelReceiptStatus, pickScannedLabels, type SideLabel } from '@/lib/labelReceipt';
+import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
+import LabelReceiptPicker from '@/components/petition/LabelReceiptPicker';
 
 const READER_ID = 'qc-receive-qr-reader';
 type Phase = 'scanning' | 'confirming' | 'loading' | 'success' | 'error' | 'no-camera';
@@ -23,11 +26,15 @@ interface ReceivedRow {
   dept: Petition['dept'];
   submittedBy?: Petition['submittedBy'];
   itemCount: number;
+  /** เลขป้ายที่รับรอบนี้ (คำขอที่รับทีละป้าย) */
+  labels?: string;
+  /** QC รับครบทั้งคำขอแล้ว */
+  complete: boolean;
 }
 
 
-async function receivePetition(id: string, actor?: string, request?: AdditionalSampleRequest | null): Promise<Petition> {
-  const res = await api.patch<Petition>(`/petitions/${id}/receive`, { actor, side: 'qc', ...additionalSamplePayload(request) });
+async function receivePetition(id: string, actor?: string, request?: AdditionalSampleRequest | null, labelKeys?: string[]): Promise<Petition> {
+  const res = await api.patch<Petition>(`/petitions/${id}/receive`, { actor, side: 'qc', ...additionalSamplePayload(request), ...(labelKeys?.length ? { labelKeys } : {}) });
   return res.data.data;
 }
 
@@ -49,15 +56,20 @@ interface Props {
   onReceived: () => void;
   /** โหมดกรอกเลขคำร้องอย่างเดียว (ไม่เปิดกล้อง) — ใช้กับปุ่ม "กรอกเลขรับตัวอย่าง" */
   manualOnly?: boolean;
+  /** คำร้องที่รอรับ — ถ้าส่งมาจะแสดง Dropdown ให้เลือกแทนการพิมพ์/สแกน */
+  pendingPetitions?: Petition[];
 }
 
-export default function QrReceiveModal({ open, onClose, onReceived, manualOnly = false }: Props) {
+export default function QrReceiveModal({ open, onClose, onReceived, manualOnly = false, pendingPetitions }: Props) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [phase, setPhase] = useState<Phase>('scanning');
   const [petition, setPetition] = useState<Petition | null>(null);
   const [pendingId, setPendingId] = useState('');
   const [additionalRequest, setAdditionalRequest] = useState<AdditionalSampleRequest | null>(null);
+  const [labelChoices, setLabelChoices] = useState<SideLabel[] | null>(null);
+  const [labelKeys, setLabelKeys] = useState<string[]>([]);
+  const [receiptText, setReceiptText] = useState('');
   const scanBusy = useRef(false);
   const receiveBusy = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -74,6 +86,9 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
       scanBusy.current = false;
       receiveBusy.current = false;
       setAdditionalRequest(null);
+      setLabelChoices(null);
+      setLabelKeys([]);
+      setReceiptText('');
       setPhase('scanning');
       setPetition(null);
       setPendingId('');
@@ -163,8 +178,17 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
         throw new Error('คุณไม่มีสิทธิ์รับตัวอย่างฝั่ง QC');
       }
       setAdditionalRequest(request ?? null);
+      setLabelChoices(null);
+      setLabelKeys([]);
+      const labelPick = request ? null : pickScannedLabels(found, 'qc', extractScannedItemSeq(rawCode));
+      if (labelPick && 'error' in labelPick) {
+        setPetition(found);
+        setErrorMsg(`${found.petitionNo}: ${labelPick.error}`);
+        setPhase('error');
+        return;
+      }
       // Dedup: skip if already received in this session
-      if (receivedList.some((row) => row.scanKey === (request?._id || found._id))) {
+      if (!labelPick && receivedList.some((row) => row.scanKey === (request?._id || found._id))) {
         setPetition(found);
         setErrorMsg(`คำร้อง ${found.petitionNo} รับไปแล้วใน session นี้`);
         setPhase('error');
@@ -184,6 +208,10 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
         setPhase('error');
         return;
       }
+      if (labelPick && 'labels' in labelPick) {
+        setLabelChoices(labelPick.labels);
+        setLabelKeys(labelPick.keys);
+      }
       setPhase('confirming');
     } catch (err: unknown) {
       setErrorMsg(apiErrorMessage(err, 'ไม่พบข้อมูลคำร้อง'));
@@ -202,25 +230,29 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
 
   async function confirmReceive() {
     const id = petition?._id || pendingId;
-    if (!id || receiveBusy.current || phase !== 'confirming') return;
+    if (!id || receiveBusy.current || phase !== 'confirming' || (labelChoices && !labelKeys.length)) return;
     receiveBusy.current = true;
     setPhase('loading');
     try {
-      const received = await receivePetition(id, user?.name || user?.email, additionalRequest);
+      const received = await receivePetition(id, user?.name || user?.email, additionalRequest, labelChoices ? labelKeys : undefined);
+      const pickedLabels = labelChoices?.filter((label) => labelKeys.includes(label.key)).map((label) => label.label).join(', ');
+      const status = labelChoices ? labelReceiptStatus(labelChoices, labelKeys) : null;
       onReceived();
       if (continuousMode) {
         setReceivedList((prev) => [
           {
-            scanKey: additionalRequest?._id || received._id,
+            scanKey: additionalRequest?._id || (labelChoices ? `${received._id}:${labelKeys.join(',')}` : received._id),
             _id: received._id,
             petitionNo: received.petitionNo,
             dept: received.dept,
             submittedBy: received.submittedBy,
             itemCount: received.items?.length ?? 0,
+            labels: pickedLabels,
+            complete: !!received.qcReceivedAt,
           },
           ...prev,
         ]);
-        showFlash(`รับแล้ว: ${received.petitionNo}`);
+        showFlash(`รับแล้ว: ${received.petitionNo}${pickedLabels ? ` · ${pickedLabels}` : ''}${status && !status.complete ? ` (${status.text})` : ''}`);
         // Reset back to scanning so camera re-engages
         setPetition(null);
         setPendingId('');
@@ -228,12 +260,15 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
         scanBusy.current = false;
         receiveBusy.current = false;
         setAdditionalRequest(null);
+        setLabelChoices(null);
+        setLabelKeys([]);
         setPhase('scanning');
       } else {
         setPetition(received);
+        setReceiptText(status ? `${pickedLabels} · ${status.text}` : '');
         setPhase('success');
-        // Navigate to detail page so QC can start entering values
-        navigate(`/qc-testing/${received._id}`);
+        // Navigate to detail page so QC can start entering values (รับครบทุกป้ายแล้วเท่านั้น)
+        if (received.qcReceivedAt) navigate(`/qc-testing/${received._id}`);
       }
     } catch (err: unknown) {
       setErrorMsg(apiErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่'));
@@ -245,6 +280,9 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
     scanBusy.current = false;
     receiveBusy.current = false;
     setAdditionalRequest(null);
+    setLabelChoices(null);
+    setLabelKeys([]);
+    setReceiptText('');
     setPetition(null);
     setPendingId('');
     setErrorMsg('');
@@ -254,6 +292,9 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
   if (!open) return null;
 
   const targetStatusCfg = PETITION_STATUS_CONFIG.pendingReview;
+  const receivedKeys = new Set(receivedList.filter((row) => row.complete).map((row) => row._id));
+  const selectablePetitions = pendingPetitions?.filter((p) => !receivedKeys.has(p._id));
+  const labelStatus = labelChoices ? labelReceiptStatus(labelChoices, labelKeys) : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -318,6 +359,9 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
               }}
               className="space-y-2"
             >
+              {selectablePetitions && (
+                <PendingPetitionSelect petitions={selectablePetitions} onPick={(code) => { void fetchAndConfirm(code); }} />
+              )}
               {!manualOnly && (
                 <div className="flex items-center gap-2 text-xs text-grey-400">
                   <div className="h-px flex-1 bg-grey-200" />
@@ -345,7 +389,9 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-lg font-bold">{petition.petitionNo}</span>
-                <Badge variant={targetStatusCfg.variant}>→ {targetStatusCfg.label}</Badge>
+                {labelStatus && !labelStatus.complete
+                  ? <Badge variant="yellow-soft">{labelStatus.text}</Badge>
+                  : <Badge variant={targetStatusCfg.variant}>→ {targetStatusCfg.label}</Badge>}
               </div>
               <div className="text-sm space-y-1 text-grey-600">
                 {additionalRequest && <p className="font-semibold text-foreground">ตัวอย่างเพิ่ม · QC · {additionalRequest.reason}</p>}
@@ -353,11 +399,12 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
                 <p>แผนก: <span className="text-black-500">{petitionDepartmentLabel(petition)}</span></p>
                 <p>จำนวน: <span className="text-black-500">{petition.items.length} รายการ</span></p>
               </div>
+              {labelChoices && <LabelReceiptPicker labels={labelChoices} selected={labelKeys} onChange={setLabelKeys} />}
               <div className="flex gap-2 pt-2">
                 <Button variant="ghost" className="flex-1" onClick={rescan}>
                   {manualOnly ? 'กรอกใหม่' : 'สแกนใหม่'}
                 </Button>
-                <Button variant="primary" className="flex-1" onClick={confirmReceive}>
+                <Button variant="primary" className="flex-1" onClick={confirmReceive} disabled={!!labelChoices && !labelKeys.length}>
                   ยืนยันรับตัวอย่าง
                 </Button>
               </div>
@@ -371,6 +418,7 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
               <p className="text-sm text-grey-600">
                 <span className="font-semibold">{petition.petitionNo}</span>
               </p>
+              {receiptText && <p className="text-sm text-grey-600">{receiptText}</p>}
               <div className="flex gap-2 pt-1">
                 <Button variant="ghost" className="flex-1" onClick={rescan}>
                   {manualOnly ? 'รับต่อ' : 'สแกนต่อ'}
@@ -409,6 +457,7 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
                     <div className="flex items-center gap-2 min-w-0">
                       <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
                       <span className="font-semibold text-primary-500">{r.petitionNo}</span>
+                      {r.labels && <span className="text-xs font-semibold">{r.labels}</span>}
                       <span className="text-xs text-grey-500 truncate">
                         {petitionDepartmentLabel(r)} · {r.itemCount} รายการ
                       </span>

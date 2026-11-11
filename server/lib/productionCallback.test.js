@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { deriveProductionStatus, buildCallbackBody } = require('./productionCallback');
+const { deriveProductionStatus, buildCallbackBody, buildCancelCallbackBody, batchResults } = require('./productionCallback');
 
 const base = { petitionNo: 'P-1', productionWorkflow: { requestNo: 'SA1' }, items: [{ seq: 1, sampleName: 'A', batchNo: 'B1', sendToLab: true }] };
 const s = (o) => deriveProductionStatus({ ...base, ...o });
@@ -45,5 +45,49 @@ test('callback ส่งรายการตัวอย่างที่ข�
   assert.equal(body.lis_status, 'more_sample');
   assert.deepEqual(body.more_sample.items[0], { item_seq: 1, quantity: 2, sample_name: 'A', batch_no: 'B1', lot_no: '', sent_amount: null, sent_unit: null });
   assert.equal(buildCallbackBody({ ...base, productionWorkflow: undefined, status: 'approved' }), null);
+});
+
+test('ยกเลิกคำขอ: ส่ง cancelled พร้อมเหตุผล ผู้ยกเลิก และเวลา', () => {
+  const at = new Date('2026-11-03T03:00:00Z');
+  const body = buildCancelCallbackBody({ ...base, status: 'pendingReview' }, { reason: 'ส่งคำขอซ้ำ', actor: 'หัวหน้า QC', at });
+  assert.equal(body.request_no, 'SA1');
+  assert.equal(body.lis_status, 'cancelled');
+  assert.equal(body.cancel_reason, 'ส่งคำขอซ้ำ');
+  assert.equal(body.cancelled_by, 'หัวหน้า QC');
+  assert.equal(body.cancelled_at, at.toISOString());
+  assert.equal(buildCancelCallbackBody({ ...base, productionWorkflow: undefined }, { reason: 'x' }), null);
+});
+
+test('ผลราย batch: ส่งค่า ถพ. ทันที แต่ส่ง %AI เมื่อ Lab อนุมัติแล้วเท่านั้น', () => {
+  const petition = {
+    ...base, status: 'inProgress', qcReceivedAt: new Date(), labReceivedAt: new Date(),
+    items: [{ seq: 1, batchNo: 'B1', commonName: 'CYPERMETHRIN 35% W/V EC', sendToQc: true, sendToLab: true }],
+  };
+  const qcResults = [
+    { itemSeq: 1, parameterId: 'sg', values: { 'ค่าถพ.': '1.0234', 'อุณหภูมิ': '30' } },
+    { itemSeq: 1, parameterId: 'ai', values: { '%AI::CYPERMETHRIN': '35.12' } },
+  ];
+  const sgIds = new Set(['sg']);
+  const pending = batchResults(petition, qcResults, sgIds)[0];
+  assert.equal(pending.batch_no, 'B1');
+  assert.equal(pending.sg, '1.0234');
+  assert.equal(pending.sg_temp, '30');
+  assert.equal(pending.ai_status, 'pending');
+  assert.equal(pending.ai, '');
+
+  const approved = { ...petition, itemApprovals: [
+    { seq: 1, side: 'qc', status: 'approved' },
+    { seq: 1, side: 'lab', status: 'approved', conclusion: 'accepted-oos' },
+  ] };
+  const done = batchResults(approved, qcResults, sgIds)[0];
+  assert.equal(done.physical, 'approved');
+  assert.equal(done.ai_status, 'fail');
+  assert.equal(done.ai, '35.12%');
+});
+
+test('callback แนบ batch_results ไปด้วย', () => {
+  const body = buildCallbackBody({ ...base, status: 'inProgress', qcReceivedAt: new Date() });
+  assert.ok(Array.isArray(body.batch_results));
+  assert.equal(body.batch_results[0].batch_no, 'B1');
 });
 

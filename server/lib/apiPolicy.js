@@ -15,7 +15,9 @@ const API_SCOPES = [
 const API_POLICIES = [
   {
     id: 'production-integration',
-    methods: ['POST'],
+    // PUT = production แก้ไขคำขอ (PUT /petitions/:petitionNo) ต้องผ่าน guard ด้วย ไม่งั้นผู้เรียกที่ใช้
+    // X-API-Key จะไม่ได้ req.apiKey แล้วโดน 401 ส่วน GET ห้ามใส่ เพราะหน้าเว็บเรียก GET /petitions/:token
+    methods: ['POST', 'PUT'],
     prefix: '/production-integration',
     scope: 'integration:write',
     label: 'สร้างคำขอจากระบบ production',

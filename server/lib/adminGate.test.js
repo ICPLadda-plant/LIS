@@ -1,4 +1,4 @@
-const { createAdminGate } = require('./adminGate');
+const { createAdminGate, createAuthenticatedGate } = require('./adminGate');
 
 function makeReq(headers = {}) {
   const lower = Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
@@ -82,4 +82,24 @@ test('admin ที่ถูกระงับ (inactive) → 403', async () => {
   await gate(makeReq({ 'X-LIS-User': 'old-admin@icpladda.com' }), res, () => { called = true; });
   expect(called).toBe(false);
   expect(res.statusCode).toBe(403);
+});
+
+test('ผู้ใช้ที่รอ admin ยืนยัน → 403 พร้อม code ให้หน้าเว็บแสดงหน้ารออนุมัติ', async () => {
+  const gate = createAuthenticatedGate({
+    ...deps,
+    findUserByEmail: async () => ({ email: 'new@icpladda.com', roles: ['viewer'], status: 'active', approvalStatus: 'pending' }),
+  });
+  const res = makeRes();
+  let called = false;
+  await gate(makeReq({ 'X-LIS-User': 'new@icpladda.com' }), res, () => { called = true; });
+  expect(called).toBe(false);
+  expect(res.statusCode).toBe(403);
+  expect(res.body.code).toBe('ACCOUNT_PENDING_APPROVAL');
+});
+
+test('ผู้ใช้เดิมที่ไม่มี approvalStatus ยังผ่าน authenticated gate ได้', async () => {
+  const gate = createAuthenticatedGate(deps);
+  let called = false;
+  await gate(makeReq({ 'X-LIS-User': 'lab@icpladda.com' }), makeRes(), () => { called = true; });
+  expect(called).toBe(true);
 });

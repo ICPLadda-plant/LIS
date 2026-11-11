@@ -36,6 +36,8 @@ import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
 import { aiGridClass, aiSubstanceFromKey, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
+import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
+import { matchSubstanceKey } from '@/lib/substances';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
@@ -819,7 +821,7 @@ export default function LabTestingDetailPage() {
         const k = resultKey(item.seq, param._id!);
         return param.multiEntry ? getEntryValues({ entries: entriesByKey[k] }, param) : [values[k] ?? {}];
       },
-      (field) => expandFieldForItem(field, item.commonName, { category: petitionCategory }),
+      (field, param) => expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, isAiParameterFields(param.valueFields ?? [])),
     ));
   const savesForPhase = (phase: PetitionPhase) => (phase === 2 ? saveStatesPhase2 : saveStates);
 
@@ -879,8 +881,9 @@ export default function LabTestingDetailPage() {
         .map(([key, value]) => [key.slice(prefix.length), value])),
     };
     let count = 0;
+    const isAiParameter = isAiParameterFields(fieldsToScan);
     fieldsToScan.forEach((field) => {
-      expandFieldForItem(field, item.commonName, { category: petitionCategory }).forEach((unit) => {
+      expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, isAiParameter).forEach((unit) => {
         count += countUnitAbnormal(unit, src, context);
       });
     });
@@ -939,7 +942,7 @@ export default function LabTestingDetailPage() {
             : [{ values: phaseValues[k] ?? {}, suffix: '' }];
         visibleFields(param, phaseToCheck, item).forEach((field) => {
           if (field.type === 'reference') return; // reference fields are auto-resolved
-          expandFieldForItem(field, item.commonName, { category: petitionCategory }).forEach((unit) => {
+          expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, isAiParameterFields(param.valueFields ?? [])).forEach((unit) => {
             valueObjs.forEach(({ values: itemValues, suffix }) => {
               const val = itemValues[unit.key];
               // field-level `multiple` — required means at least one non-empty element
@@ -1239,6 +1242,11 @@ export default function LabTestingDetailPage() {
                       Batch: {item.batchNo}
                     </Badge>
                   )}
+                  {item.part && (
+                    <Badge variant="blue-soft" className="font-normal">
+                      ส่วน: {item.part}
+                    </Badge>
+                  )}
                   {item.sampleId && (
                     <Badge variant="primary-soft" className="font-normal text-xs">
                       {item.sampleId}
@@ -1477,7 +1485,7 @@ export default function LabTestingDetailPage() {
                                         fields.forEach((candidate) => {
                                           const kind = calculatedAiFieldKind(candidate.label);
                                           if (!kind) return;
-                                          expandFieldForItem(candidate, item.commonName, { category: petitionCategory })
+                                          expandAiAwareFieldForItem(candidate, item.commonName, { category: petitionCategory }, true)
                                             .forEach((derivedUnit) => {
                                     const substance = aiSubstanceFromKey(derivedUnit.key);
                                     onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries, hasSgParam), substance)[kind]));
@@ -1526,28 +1534,71 @@ export default function LabTestingDetailPage() {
                               onUnitChange: (label: string, val: unknown) => void,
                               saveInfoSrc: Record<string, FieldSaveInfo> | undefined,
                               scalarExtras: boolean,
-                            ) => (
-                              <div className={cn(
-                                'grid grid-cols-1 gap-4 pl-2',
-                                (param.valueFields ?? []).some((candidate) => calculatedAiFieldKind(candidate.label) === 'ai') ? 'sm:grid-cols-6' : 'sm:grid-cols-2',
-                              )}>
-                                {fields.map((field) => {
-                                  if (field.type === 'reference') {
-                                    const { value: refValue, sourceName } = resolveReference(item.seq, field);
-                                    return (
-                                      <ReferenceFieldDisplay
-                                        key={field.label}
-                                        field={field}
-                                        resolvedValue={refValue}
-                                        sourceName={sourceName}
-                                      />
-                                    );
-                                  }
-                                  const units = expandFieldForItem(field, item.commonName, { category: petitionCategory });
-                                  return units.map((unit) => renderEditUnit(unit, srcValues, onUnitChange, saveInfoSrc, scalarExtras));
-                                })}
-                              </div>
-                            );
+                            ) => {
+                              const isAiParameter = isAiParameterFields(param.valueFields ?? []);
+                              const renderField = (field: ParameterValueField) => {
+                                if (field.type === 'reference') {
+                                  const { value: refValue, sourceName } = resolveReference(item.seq, field);
+                                  return (
+                                    <ReferenceFieldDisplay
+                                      key={field.label}
+                                      field={field}
+                                      resolvedValue={refValue}
+                                      sourceName={sourceName}
+                                    />
+                                  );
+                                }
+                                const units = expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, isAiParameter);
+                                return units.map((unit) => renderEditUnit(unit, srcValues, onUnitChange, saveInfoSrc, scalarExtras));
+                              };
+                              const aiSubstances = isAiParameter ? aiSubstancesForItem(item.commonName) : [];
+                              if (aiSubstances.length === 0) {
+                                return (
+                                  <div className={cn('grid grid-cols-1 gap-4 pl-2', isAiParameter ? 'sm:grid-cols-6' : 'sm:grid-cols-2')}>
+                                    {fields.map(renderField)}
+                                  </div>
+                                );
+                              }
+                              // ยาผสม: แสดงชุด %AI แยกกล่องต่อสาร แล้วจึงแสดงช่องอื่นที่ใช้ร่วมกัน
+                              const unitsByField = fields.map((field) => ({
+                                field,
+                                units: field.type === 'reference'
+                                  ? []
+                                  : expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, true),
+                              }));
+                              const isSubstanceSetField = ({ field, units }: (typeof unitsByField)[number]) =>
+                                field.type !== 'reference' && units.length > 0 && units.every((unit) => unit.substanceName !== undefined);
+                              const sharedFields = unitsByField.filter((entry) => !isSubstanceSetField(entry)).map((entry) => entry.field);
+                              return (
+                                <div className="space-y-4 pl-2">
+                                  {aiSubstances.map((substance, si) => (
+                                    <section key={substance.key} className="space-y-3 rounded-lg border border-border p-3" aria-label={`ชุด %AI สารที่ ${si + 1}: ${substance.name}`}>
+                                      <h4 className="text-sm font-semibold text-foreground">
+                                        สารที่ {si + 1}: {substance.name}
+                                      </h4>
+                                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                                        {unitsByField.filter(isSubstanceSetField).flatMap(({ units }) => units
+                                          .filter((unit) => matchSubstanceKey(unit.substanceName ?? '') === substance.key)
+                                          .map((unit) => renderEditUnit(
+                                            calculatedAiFieldKind(unit.field.label) === 'ai'
+                                              ? unit
+                                              : { ...unit, field: { ...unit.field, label: stripAiSubstanceSuffix(unit.field.label) } },
+                                            srcValues,
+                                            onUnitChange,
+                                            saveInfoSrc,
+                                            scalarExtras,
+                                          )))}
+                                      </div>
+                                    </section>
+                                  ))}
+                                  {sharedFields.length > 0 && (
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                                      {sharedFields.map(renderField)}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            };
 
                             if (param.multiEntry) {
                               // Per-entry rendering. Saved entries come from entries[]; the

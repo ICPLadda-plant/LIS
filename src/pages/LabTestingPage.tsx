@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen } from 'lucide-react';
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
+import LabStartWorkDialog from '@/components/petition/LabStartWorkDialog';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
@@ -14,6 +15,7 @@ import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import {
   PETITION_DEPT_LABELS,
   type Petition,
+  type PetitionAssignedMachine,
   type PetitionDept,
 } from '@/types/petition.types';
 import { Button } from '@/components/ui/button';
@@ -59,6 +61,8 @@ export default function LabTestingPage() {
   const [parametersError, setParametersError] = useState(false);
   const groupMembership = useItemGroupMembership();
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  // คำร้องที่กด "เริ่มงาน" แล้ว รอเลือกเครื่องใน dialog
+  const [startTarget, setStartTarget] = useState<Petition | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const canClaimRole = normalizeRoles(user).some((r) => ['admin', 'lab-head', 'lab-analyze'].includes(r));
   const [freeAssign, setFreeAssign] = useState<LabFreeAssignState | null>(null);
@@ -111,12 +115,14 @@ export default function LabTestingPage() {
     !!labReceivedAt(p) && !!p.assignedTo && !isLabWorkAccepted(p)
     && (isFullAccess || isAssignedTo(p.assignedTo, user));
 
-  async function acceptPetition(p: Petition) {
+  // ผู้กดเริ่มงานเป็นคนเลือกเครื่องที่ใช้ (หัวหน้า assign แค่ผู้รับงาน)
+  async function acceptPetition(p: Petition, machines: PetitionAssignedMachine[]) {
     if (acceptingId) return;
     setAcceptingId(p._id);
     try {
-      await api.post<Petition>(`/petitions/${p._id}/accept`, { employeeId: user?.employeeId });
+      await api.post<Petition>(`/petitions/${p._id}/accept`, { employeeId: user?.employeeId, machines });
       toast.success(`เริ่มงาน ${p.petitionNo} แล้ว`);
+      setStartTarget(null);
       refresh();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
@@ -236,7 +242,7 @@ export default function LabTestingPage() {
             disabled={acceptingId === p._id}
             onClick={(e) => {
               e.stopPropagation();
-              void acceptPetition(p);
+              setStartTarget(p);
             }}
           >
             {acceptingId === p._id ? 'กำลังเริ่มงาน...' : 'เริ่มงาน'}
@@ -280,9 +286,19 @@ export default function LabTestingPage() {
           open={scanOpen}
           claimOnReceive
           initialCode={scanCode}
+          pendingPetitions={awaitingReceive}
           onClose={() => setScanOpen(false)}
           onAccepted={() => { refresh(); refreshAwaiting(); }}
         />
+
+        {startTarget && (
+          <LabStartWorkDialog
+            petition={startTarget}
+            saving={acceptingId === startTarget._id}
+            onConfirm={(machines) => { void acceptPetition(startTarget, machines); }}
+            onClose={() => setStartTarget(null)}
+          />
+        )}
 
         <PageToolbar
           search={{

@@ -10,6 +10,7 @@ import { useAuth } from "@/context/AuthContext";
 import { normalizeRoles } from "@/lib/roles";
 import { readSeeAll, writeSeeAll, SEE_ALL_EVENT } from "@/lib/petitionAudience";
 import { formatDateTime } from "@/lib/dateTime";
+import { api } from "@/lib/api";
 
 const levelColor: Record<NotificationLevel, string> = {
   info: "bg-blue-500",
@@ -90,12 +91,17 @@ const NotificationBell = ({ className, iconClassName }: NotificationBellProps) =
         {isAdmin && (
           <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
             <label htmlFor="notify-see-all" className="text-xs text-muted-foreground">
-              ดูแจ้งเตือนทั้งระบบ (ไม่จำกัดแผนก)
+              ดูแจ้งเตือนทั้งระบบ (ทุก role)
             </label>
             <Switch
               id="notify-see-all"
               checked={seeAll}
-              onCheckedChange={(value) => { setSeeAll(value); writeSeeAll(value); }}
+              onCheckedChange={(value) => {
+                setSeeAll(value);
+                writeSeeAll(value);
+                // ให้ PWA ได้รับทุก role ตามสวิตช์นี้ด้วย — เครื่องที่ยังไม่เปิดรับ push จะไม่มีผล
+                api.setPushSeeAll(value).catch(() => undefined);
+              }}
             />
           </div>
         )}

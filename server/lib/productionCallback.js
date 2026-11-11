@@ -3,6 +3,9 @@
 const crypto = require('crypto');
 const { hasLabTrack } = require('./petitionStatusLog');
 const { requiresQcTrack } = require('./petitionSubmissionRules');
+const { itemRequiresSide, itemSideStatus, findItemApproval } = require('./itemApprovals');
+const { isSgParameter, readSgReading } = require('./sgConfirmation');
+const { aiFromQcResults } = require('./coaErp');
 
 const DEFAULT_URL = 'https://app-plant.icpladda.com/production-react/api/lis_result_callback.php';
 const LIS_BASE = 'https://app-plant.icpladda.com/LIS';
@@ -55,7 +58,54 @@ function moreSampleInfo(p) {
   return { round_id: String(round._id), side: round.side, reason: round.reason, status: round.status, requested_at: round.requestedAt, items };
 }
 
-function buildCallbackBody(petition) {
+// ผลราย batch ให้ Production เห็น: ค่า ถพ. (จากผล QC), กายภาพผ่าน/ไม่ผ่าน, %AI (เฉพาะ batch ที่ส่ง Lab)
+// %AI ส่งตัวเลขเมื่อ Lab อนุมัติรายการแล้วเท่านั้น ระหว่างวิเคราะห์ส่งแค่สถานะ "pending"
+// sgParameterIds = รหัสพารามิเตอร์ QC ที่เก็บค่า ถพ. (ไม่ส่ง = อ่านจากผลทุกตัว)
+function batchResults(petition, qcResults = [], sgParameterIds = null) {
+  const groups = new Map();
+  for (const item of petition?.items || []) {
+    const batchNo = String(item.batchNo || '').trim();
+    const key = batchNo || `#${item.seq}`;
+    if (!groups.has(key)) groups.set(key, { batchNo, items: [] });
+    groups.get(key).items.push(item);
+  }
+  const resultsFor = (seq) => (qcResults || []).filter((r) => Number(r.itemSeq) === Number(seq));
+  const isSgResult = (r) => (sgParameterIds ? sgParameterIds.has(String(r.parameterId)) : true);
+  return [...groups.values()].map(({ batchNo, items }) => {
+    const qcItems = items.filter((item) => itemRequiresSide(petition, item, 'qc'));
+    const labItems = items.filter((item) => itemRequiresSide(petition, item, 'lab'));
+    const qcStatuses = qcItems.map((item) => itemSideStatus(petition, item, 'qc'));
+    const labStatuses = labItems.map((item) => itemSideStatus(petition, item, 'lab'));
+    const physical = !qcItems.length ? 'none'
+      : qcStatuses.every((s) => s === 'approved') ? 'approved'
+        : qcStatuses.some((s) => s === 'rejected') ? 'rejected' : 'pending';
+    const labApproved = labItems.length > 0 && labStatuses.every((s) => s === 'approved');
+    const aiStatus = !labItems.length ? 'none'
+      : labApproved
+        ? (labItems.some((item) => findItemApproval(petition, item.seq, 'lab')?.conclusion === 'accepted-oos') ? 'fail' : 'pass')
+        : 'pending';
+    let sg = '';
+    let sgTemp = '';
+    for (const item of items) {
+      const reading = resultsFor(item.seq).filter(isSgResult).map(readSgReading).find((r) => r.value);
+      if (reading) { sg = reading.value; sgTemp = reading.temperature; break; }
+    }
+    let ai = '';
+    if (labApproved) {
+      for (const item of labItems) {
+        const found = aiFromQcResults(resultsFor(item.seq), item.commonName);
+        if (found?.result) { ai = found.result; break; }
+      }
+    }
+    return {
+      batch_no: batchNo,
+      item_seqs: items.map((item) => item.seq),
+      sg, sg_temp: sgTemp, physical, ai, ai_status: aiStatus,
+    };
+  });
+}
+
+function buildCallbackBody(petition, qcResults = [], sgParameterIds = null) {
   const requestNo = String(petition?.productionWorkflow?.requestNo || '').trim();
   if (!requestNo) return null;
   const lisStatus = deriveProductionStatus(petition);
@@ -67,12 +117,28 @@ function buildCallbackBody(petition) {
     result_summary: `LIS ${petition.petitionNo}: ${SUMMARY[lisStatus] || lisStatus}`,
     result_url: `${LIS_BASE}/petitions/${encodeURIComponent(petition.petitionNo)}`,
     more_sample: moreSampleInfo(petition),
+    batch_results: batchResults(petition, qcResults, sgParameterIds),
   };
 }
 
-async function sendProductionStatus(petition) {
+// LIS ยกเลิกคำขอ → Production เปลี่ยนคำขอเป็น cancelled พร้อมเหตุผล
+function buildCancelCallbackBody(petition, { reason, actor, at } = {}) {
+  const requestNo = String(petition?.productionWorkflow?.requestNo || '').trim();
+  if (!requestNo) return null;
+  const why = String(reason || '').trim();
+  return {
+    request_no: requestNo,
+    petition_no: petition.petitionNo,
+    lis_status: 'cancelled',
+    result_summary: `LIS ${petition.petitionNo}: ยกเลิกคำขอ${why ? ` — ${why}` : ''}`,
+    cancel_reason: why,
+    cancelled_by: String(actor || '').trim(),
+    cancelled_at: (at ? new Date(at) : new Date()).toISOString(),
+  };
+}
+
+async function postProductionCallback(body) {
   const url = callbackUrl();
-  const body = buildCallbackBody(petition);
   if (!url || !body) return { skipped: true };
   const raw = JSON.stringify(body);
   const headers = { 'Content-Type': 'application/json' };
@@ -90,15 +156,36 @@ async function sendProductionStatus(petition) {
   return { ...json, lis_status: body.lis_status };
 }
 
-// โหลด petition ล่าสุด แล้วส่งถ้าสถานะหรือรอบตัวอย่างเพิ่มเปลี่ยน
+function sendProductionStatus(petition, qcResults = [], sgParameterIds = null) {
+  return postProductionCallback(buildCallbackBody(petition, qcResults, sgParameterIds));
+}
+
+function sendProductionCancel(petition, info) {
+  return postProductionCallback(buildCancelCallbackBody(petition, info));
+}
+
+async function loadResultsForCallback(petitionId) {
+  const QCTestResult = require('../models/QCTestResult');
+  const Parameter = require('../models/Parameter');
+  const qcResults = await QCTestResult.find({ petitionId: String(petitionId) }).lean();
+  const ids = [...new Set(qcResults.map((r) => String(r.parameterId)).filter(Boolean))];
+  const params = ids.length ? await Parameter.find({ _id: { $in: ids.filter((id) => /^[a-f0-9]{24}$/i.test(id)) } }, { valueFields: 1, scope: 1 }).lean() : [];
+  const sgParameterIds = new Set(params.filter((p) => p.scope !== 'lab' && isSgParameter(p)).map((p) => String(p._id)));
+  return { qcResults, sgParameterIds };
+}
+
+// โหลด petition ล่าสุด แล้วส่งถ้าสถานะ รอบตัวอย่างเพิ่ม หรือผลราย batch เปลี่ยน
 async function syncPetition(id, { force = false } = {}) {
   const Petition = require('../models/Petition');
   const doc = await Petition.findById(id).lean();
-  const body = buildCallbackBody(doc);
+  if (!doc) return { skipped: true };
+  const { qcResults, sgParameterIds } = await loadResultsForCallback(doc._id);
+  const body = buildCallbackBody(doc, qcResults, sgParameterIds);
   if (!body) return { skipped: true };
-  const key = body.lis_status + '|' + (body.more_sample ? body.more_sample.round_id + ':' + body.more_sample.status : '');
+  const resultsKey = crypto.createHash('sha1').update(JSON.stringify(body.batch_results)).digest('hex').slice(0, 12);
+  const key = body.lis_status + '|' + (body.more_sample ? body.more_sample.round_id + ':' + body.more_sample.status : '') + '|' + resultsKey;
   if (!force && doc.productionWorkflow?.lastSyncKey === key) return { skipped: true, unchanged: true };
-  const result = await sendProductionStatus(doc);
+  const result = await postProductionCallback(body);
   await Petition.updateOne({ _id: doc._id }, { $set: {
     'productionWorkflow.lastSyncKey': key,
     'productionWorkflow.lisStatus': body.lis_status,
@@ -116,4 +203,19 @@ function notifyProductionOnEvent(petition) {
   }, 1500);
 }
 
-module.exports = { deriveProductionStatus, buildCallbackBody, sendProductionStatus, syncPetition, notifyProductionOnEvent };
+// approvals ยังเรียกแจ้งราย batch อยู่ — สถานะทั้งใบคำนวณใหม่จาก petition ล่าสุดอยู่แล้ว จึงส่งต่อให้ sync ปกติ
+function notifyProductionBatches(petition) {
+  notifyProductionOnEvent(petition);
+}
+
+module.exports = {
+  deriveProductionStatus,
+  batchResults,
+  buildCallbackBody,
+  buildCancelCallbackBody,
+  sendProductionStatus,
+  sendProductionCancel,
+  syncPetition,
+  notifyProductionOnEvent,
+  notifyProductionBatches,
+};

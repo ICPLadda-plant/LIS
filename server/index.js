@@ -60,6 +60,9 @@ function mountApi(path, router) {
 const { apiGuard } = require('./lib/apiGuard');
 app.use(apiGuard);
 
+// แจ้งเตือนระบบให้ admin เมื่อ API ตอบ 401 / 403 / 5xx (lib/systemAlerts)
+app.use(require('./lib/systemAlerts').systemAlertMiddleware);
+
 // API Routes
 mountApi('/samples', require('./routes/samples'));
 mountApi('/auth', require('./routes/auth'));
@@ -108,6 +111,7 @@ mountApi('/ai', require('./routes/ai'));
 mountApi('/validation-ai', require('./routes/validationAi'));
 mountApi('/line', require('./routes/line')); // LINE webhook + group registry
 mountApi('/push', require('./routes/push')); // แจ้งเตือน PWA (Web Push) ต่อเครื่อง
+mountApi('/notifications', require('./routes/notifications')); // ฟีดกระดิ่ง (คำขอ + สต็อก + ระบบ)
 mountApi('/dev', require('./routes/dev')); // dev-only helpers (gated by ALLOW_DEV_STATUS)
 
 const healthHandler = (_req, res) => res.json({ status: 'ok' });
@@ -172,6 +176,7 @@ mongoose.connect(MONGODB_URI)
     console.log('✅ Connected to MongoDB');
     loadAllModels();
     app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    require('./lib/notificationScheduler').startNotificationScheduler();
     ensureCollections().catch((err) => {
       console.error('❌ Collection initialization error:', err.message);
     });

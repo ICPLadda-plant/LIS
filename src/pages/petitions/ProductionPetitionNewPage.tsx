@@ -12,10 +12,12 @@ import ItemsStep, { qcLabSampleTargets, type ItemRowValues } from '@/components/
 import type { SubmitterValues } from '@/components/petition/wizard/SubmitterPicker';
 import LabRequestStep, { type LabRequestRowValues } from '@/components/petition/wizard/LabRequestStep';
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
-import { createPetition, createLabRequest } from '@/hooks/usePetition';
+import { createPetition, createLabRequest, updateLabRequest } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
+import { resolveHrEmployeeName, useEmployeeOptions } from '@/hooks/useExternalLookups';
 import { api } from '@/lib/api';
 import { canPrintSampleLabel } from '@/lib/petitionPrintability';
+import { normalizeSamplePart, sameSampleLine } from '@/lib/samplePart';
 import {
   buildPetitionMasterItemOptions,
   findMatchingPetitionMasterItem,
@@ -182,6 +184,13 @@ export function objectToSearchParams(input: unknown): URLSearchParams {
     Object.entries(input as Record<string, unknown>).forEach(([key, value]) => append(key, value));
   }
   return params;
+}
+
+// Production ส่ง query string ทั้งก้อนผ่าน POST (ยาวเกินใส่ URL ได้) → อ่านเหมือนมาจาก URL ทุกประการ
+// ห้ามแปลงผ่าน objectToSearchParams เพราะจะทิ้งช่องว่าง แล้วตัวอย่างท้าย ๆ ไปได้ค่าของตัวแรกแทน
+export function integrationPayloadToSearchParams(payload: unknown): URLSearchParams {
+  const query = (payload as { query?: unknown } | null)?.query;
+  return typeof query === 'string' ? new URLSearchParams(query) : objectToSearchParams(payload);
 }
 
 export function buildProductionReturnUrl(searchParams: URLSearchParams, createdPetition?: Pick<Petition, 'petitionNo'> | null): string {
@@ -383,19 +392,64 @@ function routesToQcAndLab(searchParams: URLSearchParams): boolean {
   return targets.includes('qc') && targets.includes('lab');
 }
 
+function itemSides(item: ItemRowValues, side: 'qc' | 'lab'): Array<'qc' | 'lab'> {
+  const quantities = item.labelQuantities ?? [];
+  return item.labelQuantitySides?.length === quantities.length ? item.labelQuantitySides : quantities.map(() => side);
+}
+
+// Production บางครั้งส่ง batch เดียวมาเป็น 2 แถว: แถวส่ง QC อย่างเดียว + แถวส่ง Lab (%AI) อย่างเดียว
+// โดยไม่แนบ routeTargets มา — ต้องรวมเป็น 1 รายการ 2 ชิ้นตัวอย่าง (เหมือน labQty) ไม่งั้นคำขอแตกเป็นรายการซ้ำชื่อเดียวกัน
+export function mergeSplitQcLabRows(items: ItemRowValues[]): ItemRowValues[] {
+  const key = (item: ItemRowValues) => {
+    const batchNo = item.batchNo.trim().toUpperCase();
+    return batchNo ? `${item.sampleName.trim().toUpperCase()}|${batchNo}|${normalizeSamplePart(item.part).toUpperCase()}` : '';
+  };
+  const isQcOnly = (item: ItemRowValues) => item.sendToQc !== false && !item.sendToLab;
+  const isLabOnly = (item: ItemRowValues) => item.sendToQc === false && item.sendToLab === true;
+  const used = new Set<ItemRowValues>();
+  const merged: ItemRowValues[] = [];
+  for (const item of items) {
+    if (used.has(item)) continue;
+    const itemKey = key(item);
+    const partner = itemKey && (isQcOnly(item) || isLabOnly(item))
+      ? items.find((other) => other !== item && !used.has(other) && key(other) === itemKey && sameSampleLine(item, other)
+        && (isQcOnly(item) ? isLabOnly(other) : isQcOnly(other)))
+      : undefined;
+    if (!partner) {
+      merged.push(item);
+      continue;
+    }
+    used.add(partner);
+    const [qc, lab] = isQcOnly(item) ? [item, partner] : [partner, item];
+    const labelQuantities = [...(qc.labelQuantities ?? []), ...(lab.labelQuantities ?? [])];
+    merged.push({
+      ...qc,
+      sendToQc: true,
+      sendToLab: true,
+      sampleQuantity: labelQuantities.length || qc.sampleQuantity,
+      labelQuantities,
+      labelQuantity: labelQuantities.join(', '),
+      labelQuantitySides: [...itemSides(qc, 'qc'), ...itemSides(lab, 'lab')],
+      note: qc.note === lab.note || !lab.note ? qc.note : [qc.note, lab.note].filter(Boolean).join(' | '),
+    });
+  }
+  return merged.map((item, index) => ({ ...item, seq: index + 1 }));
+}
+
 // ส่งทั้ง QC และ LAB: Production อาจส่ง batch เดียวกันมาเป็น 2 แถว (แถวละปริมาณ)
 // แต่ฟอร์มต้องการ 1 รายการต่อ batch ที่มีปริมาณ 2 ค่า จึงรวมแถวให้ก่อน
 export function mergeQcLabSameBatchItems(items: ItemRowValues[]): ItemRowValues[] {
   const merged: ItemRowValues[] = [];
-  const byKey = new Map<string, ItemRowValues>();
+  const byKey = new Map<string, ItemRowValues[]>();
   for (const item of items) {
     const batchNo = item.batchNo.trim();
-    const key = batchNo ? `${item.sampleName.trim().toLowerCase()}|${batchNo}` : '';
-    const existing = key ? byKey.get(key) : undefined;
+    // batch เดียวกันแต่คนละส่วน หรือ Production ยืนยันแยกรายการ (lineRef ต่างกัน) = คนละรายการ
+    const key = batchNo ? `${item.sampleName.trim().toLowerCase()}|${batchNo}|${normalizeSamplePart(item.part).toLowerCase()}` : '';
+    const existing = key ? byKey.get(key)?.find((candidate) => sameSampleLine(candidate, item)) : undefined;
     if (!existing) {
       const copy = { ...item };
       merged.push(copy);
-      if (key) byKey.set(key, copy);
+      if (key) byKey.set(key, [...(byKey.get(key) ?? []), copy]);
       continue;
     }
     const quantities = [...(existing.labelQuantities ?? []), ...(item.labelQuantities ?? [])].filter((entry) => entry.trim());
@@ -413,26 +467,21 @@ function uniqueValues(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-function getNestedSampleValues(
-  searchParams: URLSearchParams,
-  keys: string[],
-  options: { splitComma?: boolean } = {},
-): string[] {
-  const values: Array<{ index: number; value: string }> = [];
+// samples[i][key] คือ 1 ค่าต่อ 1 ตัวอย่างเสมอ ห้ามตัดด้วย , | ; เพราะชื่อสารอย่าง "2,4-D" มีจุลภาคอยู่ในชื่อ
+// และคืนค่าตามตำแหน่ง i (ช่องที่ว่างเป็น '') เพื่อให้ค่าของแต่ละตัวอย่างไม่เลื่อนไปปนกับตัวอย่างอื่น
+function getNestedSampleValues(searchParams: URLSearchParams, keys: string[]): string[] {
+  const values: string[] = [];
   const lowerKeys = keys.map((key) => key.toLowerCase());
 
   for (const [rawKey, rawValue] of searchParams.entries()) {
     const match = rawKey.toLowerCase().match(/^samples\[(\d+)\]\[([^\]]+)\]$/);
     if (!match || !lowerKeys.includes(match[2])) continue;
     const index = Number(match[1]);
-    for (const item of splitQueryList(rawValue, options.splitComma)) {
-      values.push({ index, value: item });
-    }
+    if (values[index]) continue;
+    values[index] = rawValue.trim();
   }
 
-  return values
-    .sort((a, b) => a.index - b.index)
-    .map((item) => item.value);
+  return Array.from(values, (value) => value ?? '');
 }
 
 function getSampleOrQueryValues(
@@ -440,7 +489,7 @@ function getSampleOrQueryValues(
   keys: string[],
   options: { splitComma?: boolean } = {},
 ): string[] {
-  const nested = getNestedSampleValues(searchParams, keys, options);
+  const nested = getNestedSampleValues(searchParams, keys);
   return nested.length ? nested : getQueryValues(searchParams, keys, options);
 }
 
@@ -450,7 +499,16 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
   const batchNos = getSampleOrQueryValues(searchParams, ['batchNo', 'batch'], { splitComma: true });
   const lotNos = getSampleOrQueryValues(searchParams, ['lotNo', 'lot'], { splitComma: true });
   const commonNames = getSampleOrQueryValues(searchParams, ['commonName', 'activeIngredient']).map(normalizeProductionCommonName);
-  const productionDates = getSampleOrQueryValues(searchParams, ['productionDate', 'requestDate', 'mfgDate'], { splitComma: true });
+  // samples[i][requestDate] คือวันที่ส่งของ Production จึงไม่ใช้แทนวันที่ผลิตรายตัวอย่าง
+  const nestedProductionDates = getNestedSampleValues(searchParams, ['productionDate', 'mfgDate']);
+  const productionDates = nestedProductionDates.length
+    ? nestedProductionDates
+    : getQueryValues(searchParams, ['productionDate', 'requestDate', 'mfgDate'], { splitComma: true });
+  // ว/ด/ป บนป้ายนำส่ง = วันที่ส่งของ Production (รายตัวอย่าง → ระดับคำขอ → วันที่ผลิตสำหรับลิงก์รูปแบบเดิม)
+  const sendDates = getNestedSampleValues(searchParams, ['requestDate', 'sendDate', 'sentDate']);
+  const requestSendDate = getQueryValue(searchParams, ['requestDate', 'sendDate', 'sentDate']);
+  const labelSendDate = (index: number, productionDate: string) =>
+    valueAt(sendDates, index, false) || requestSendDate || productionDate;
   const packageUnits = getSampleOrQueryValues(searchParams, ['quantity', 'packageUnit', 'packSize', 'packsize']);
   const quantities = getSampleOrQueryValues(searchParams, ['qty', 'quantityValue', 'amount'], { splitComma: true });
   const quantityUnits = getSampleOrQueryValues(searchParams, ['unit', 'qtyUnit', 'quantityUnit'], { splitComma: true });
@@ -462,6 +520,13 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
   const sendToLabs = getSampleOrQueryValues(searchParams, ['sendToLab'], { splitComma: true });
   const sendToQcs = getSampleOrQueryValues(searchParams, ['sendToQc'], { splitComma: true });
   const labQtys = getSampleOrQueryValues(searchParams, ['labQty'], { splitComma: true });
+  const parts = getNestedSampleValues(searchParams, ['part']);
+  const lineRefs = getNestedSampleValues(searchParams, ['lineRef']);
+  const productionLineFields = (index: number) => {
+    const part = normalizeSamplePart(valueAt(parts, index, false));
+    const lineRef = valueAt(lineRefs, index, false).trim();
+    return { ...(part ? { part } : {}), ...(lineRef ? { lineRef } : {}) };
+  };
 
   const itemCount = Math.max(
     sampleNames.length,
@@ -489,13 +554,14 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     const labelQuantity = makeQuantityLabel(submittedQuantity, submittedUnit);
     return [withProductionSamples({
       ...singleItem,
+      ...productionLineFields(0),
       sendToLab: sendToLabFromDefault(singleItem, sendToLabs[0]),
       sendToQc: sendToQcFromQuery(sendToQcs[0]),
       productionDate: productionDate || null,
       packageUnit: packageUnits[0] || singleItem.packageUnit,
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
-      labelSampledDate: productionDate,
+      labelSampledDate: labelSendDate(0, productionDate),
       submittedQuantity,
       submittedUnit,
     }, searchParams, 0, labQtys[0] ?? '', submittedUnit)];
@@ -532,9 +598,10 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       note,
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
-      labelSampledDate: valueAt(productionDates, i),
+      labelSampledDate: labelSendDate(i, valueAt(productionDates, i)),
       submittedQuantity: valueAt(quantities, i, false),
       submittedUnit: valueAt(quantityUnits, i),
+      ...productionLineFields(i),
     };
 
     if ([
@@ -553,7 +620,8 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
     }
   }
 
-  return routesToQcAndLab(searchParams) ? mergeQcLabSameBatchItems(items) : dedupeImportedItems(items);
+  const pairedItems = mergeSplitQcLabRows(items);
+  return routesToQcAndLab(searchParams) ? mergeQcLabSameBatchItems(pairedItems) : dedupeImportedItems(pairedItems);
 }
 
 function makeBlankLabRequest(
@@ -619,7 +687,7 @@ export default function ProductionPetitionNewPage({
     let alive = true;
     api.get<unknown>(`/production-integration/petitions/${encodeURIComponent(integrationToken)}`)
       .then((res) => {
-        if (alive) setPostedSearchParams(objectToSearchParams(res.data.data));
+        if (alive) setPostedSearchParams(integrationPayloadToSearchParams(res.data.data));
       })
       .catch((err) => {
         if (alive) setError(err instanceof Error ? err.message : 'โหลดข้อมูลจาก Production ไม่สำเร็จ');
@@ -635,6 +703,8 @@ export default function ProductionPetitionNewPage({
   }, [effectiveSearchParams]);
   const prodOrderNos = prodOrderNosFromState?.length ? prodOrderNosFromState : prodOrderNosFromQuery;
   const productionRequestNo = getQueryValue(effectiveSearchParams, ['requestNo', 'request_no', 'submissionNo']);
+  // Production แก้คำขอที่อยู่ใน LIS แล้ว (เพิ่ม/ลดรายการ) → ตรวจซ้ำแล้วบันทึกทับใบเดิมแทนการสร้างใบใหม่
+  const editPetitionNo = integrationMode ? getQueryValue(effectiveSearchParams, ['editPetitionNo']) : '';
   const productionRequesterEmail = getQueryValue(effectiveSearchParams, ['requesterEmail', 'requester_email', 'email']);
   // QC รายวันที่ฝ่ายผลิตเลือก → "สุ่มโดย" บนป้าย และผู้นำส่งที่ /scanner
   const sampledBy = useMemo(() => {
@@ -705,18 +775,29 @@ export default function ProductionPetitionNewPage({
     email: integrationMode ? integrationActor.email : '',
   });
   const [delivererTouched, setDelivererTouched] = useState(false);
+  const { options: hrEmployees } = useEmployeeOptions();
 
   // Re-sync submitter when user auth resolves (read-only — always match logged-in user)
+  // ชื่อผู้ยื่นใช้ชื่อภาษาไทยจากรายชื่อ HR (จับคู่ด้วยอีเมล) ถ้าไม่พบใช้ชื่อจากบัญชี
   useEffect(() => {
     if (integrationMode) {
-      setSubmitter(integrationActor);
+      // production ส่งชื่อจากบัญชีของตัวเองมา (มักเป็นภาษาอังกฤษ) → ใช้ชื่อไทยจาก HR ทั้งผู้ยื่นและผู้นำส่ง
+      const resolvedActor = {
+        ...integrationActor,
+        name: resolveHrEmployeeName(hrEmployees, integrationActor.email, integrationActor.name),
+      };
+      setSubmitter(resolvedActor);
       if (!delivererTouched) {
-        setDeliverer(integrationActor);
+        setDeliverer(resolvedActor);
       }
     } else if (user?.name) {
-      setSubmitter({ employeeId: user.id ?? '', name: user.name, email: user.email ?? '' });
+      setSubmitter({
+        employeeId: user.id ?? '',
+        name: resolveHrEmployeeName(hrEmployees, user.email, user.name),
+        email: user.email ?? '',
+      });
     }
-  }, [user?.id, user?.name, delivererTouched, integrationMode, integrationActor]);
+  }, [user?.id, user?.name, user?.email, delivererTouched, integrationMode, integrationActor, hrEmployees]);
 
   const [items, setItems] = useState<ItemRowValues[]>(() =>
     initialQueryItems.length ? initialQueryItems : [makeBlankItem(1)],
@@ -827,9 +908,9 @@ export default function ProductionPetitionNewPage({
   const [createdPetition, setCreatedPetition] = useState<Petition | null>(null);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
   const routeTargets = useMemo<PetitionRouteTarget[] | null>(() => {
-    const targets = (searchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
+    const targets = (effectiveSearchParams.get('routeTargets') ?? '').split(',').filter((target): target is PetitionRouteTarget => target === 'qc' || target === 'lab');
     return targets.length ? targets : null;
-  }, [searchParams]);
+  }, [effectiveSearchParams]);
   const splitQcLab = Boolean(routeTargets?.includes('qc') && routeTargets.includes('lab'));
 
   function validateStep(): boolean {
@@ -964,14 +1045,19 @@ export default function ProductionPetitionNewPage({
         } : undefined,
         cause: '',
         revisionOf: revisionOfId || undefined,
+        replacePetitionNo: editPetitionNo || undefined,
       };
-      const created = await createPetition(payload as Parameters<typeof createPetition>[0]);
+      const created = await createPetition(payload as Parameters<typeof createPetition>[0]) as Petition & { existingLabRequestId?: string | null };
 
       if (labBatches.length > 0 && labRequest) {
         try {
-          await createLabRequest({ ...labRequest, petitionId: created._id });
+          if (created.existingLabRequestId) {
+            await updateLabRequest(created.existingLabRequestId, labRequest as Parameters<typeof updateLabRequest>[1]);
+          } else {
+            await createLabRequest({ ...labRequest, petitionId: created._id });
+          }
         } catch (e) {
-          setError(`สร้างใบคำขอรับบริการไม่สำเร็จ: ${e instanceof Error ? e.message : 'unknown'}`);
+          setError(`${created.existingLabRequestId ? 'แก้ไข' : 'สร้าง'}ใบคำขอรับบริการไม่สำเร็จ: ${e instanceof Error ? e.message : 'unknown'}`);
         }
       }
       if (publicMode) {
@@ -1007,7 +1093,7 @@ export default function ProductionPetitionNewPage({
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0 text-green-600" />
                 <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-foreground">สร้างคำขอเรียบร้อย</h2>
+                  <h2 className="text-lg font-semibold text-foreground">{editPetitionNo ? 'บันทึกการแก้ไขคำขอเรียบร้อย' : 'สร้างคำขอเรียบร้อย'}</h2>
                   <p className="text-sm text-muted-foreground">
                     เลขที่คำขอ: <span className="font-semibold text-foreground">{createdPetition.petitionNo}</span>
                   </p>
@@ -1033,7 +1119,7 @@ export default function ProductionPetitionNewPage({
         </Card>
       </div>
       {labelPrintOpen && (
-        <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label">
+        <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label" department={createdPetition?.submittedBy?.department || submitterDepartment}>
           <SampleLabelPrintTemplate petition={createdPetition} />
         </PrintPreviewDialog>
       )}
@@ -1056,6 +1142,11 @@ export default function ProductionPetitionNewPage({
                   </p>
                 )}
                 <p className="text-blue-800">Please review the imported sample data before saving.</p>
+                {editPetitionNo && (
+                  <p className="font-medium text-orange-700">
+                    แก้ไขคำขอ <span className="font-semibold">{editPetitionNo}</span> — ตรวจรายการอีกครั้งแล้วกดบันทึก ระบบจะบันทึกทับใบเดิมและให้พิมพ์สติกเกอร์ใหม่
+                  </p>
+                )}
                 {sampledBy && (
                   <p>
                     สุ่มโดย (QC รายวัน): <span className="font-semibold">{sampledBy.name}</span>

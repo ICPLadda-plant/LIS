@@ -129,24 +129,65 @@ test('GET / awaitingQcApproval returns petitions after either track confirms res
   }
 });
 
-test('PATCH /:id/assign requires Lab receipt, not QC receipt', async () => {
+test('PATCH /:id/assign works before Lab receives the sample and leaves machine choice for start', async () => {
   const originalFindOne = Petition.findOne;
-  const originalSave = Petition.prototype.save;
+  const doc = {
+    status: 'sampleSent',
+    async save() { throw new Error('stop-after-assign'); },
+  };
   try {
-    let saved = false;
-    Petition.findOne = async () => ({ status: 'pendingReview', qcReceivedAt: new Date(), receivedAt: new Date() });
-    Petition.prototype.save = async () => { saved = true; };
+    Petition.findOne = async () => doc;
     const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/assign', 'patch', {
       params: { id: 'P-2609-0001' },
       body: { employeeId: 'E1', name: 'Analyst' },
       headers,
     }));
-    assert.equal(res.statusCode, 409);
-    assert.match(res.body.error.message, /Lab ต้องรับตัวอย่างก่อน/);
-    assert.equal(saved, false);
+    assert.match(res.body.error.message, /stop-after-assign/);
+    assert.equal(doc.assignedTo.employeeId, 'E1');
+    assert.equal(doc.assignedTo.acceptedAt, undefined);
+    assert.equal(doc.status, 'sampleSent');
   } finally {
     Petition.findOne = originalFindOne;
-    Petition.prototype.save = originalSave;
+  }
+});
+
+test('POST /:id/accept requires Lab receipt before starting work', async () => {
+  const originalFindOne = Petition.findOne;
+  try {
+    Petition.findOne = async () => ({ status: 'sampleSent', assignedTo: { employeeId: 'E77', name: 'Analyst A' } });
+    const res = await withLabUser(ANALYST, undefined, (headers) => invoke('/:id/accept', 'post', {
+      params: { id: 'P-2609-0001' },
+      body: { machines: [] },
+      headers,
+    }));
+    assert.equal(res.statusCode, 409);
+    assert.match(res.body.error.message, /Lab ต้องรับตัวอย่างก่อนจึงจะเริ่มงานได้/);
+  } finally {
+    Petition.findOne = originalFindOne;
+  }
+});
+
+test('POST /:id/accept saves the machines chosen by the person starting work', async () => {
+  const originalFindOne = Petition.findOne;
+  const doc = {
+    status: 'inProgress',
+    labReceivedAt: new Date(),
+    assignedTo: { employeeId: 'E77', name: 'Analyst A' },
+    markModified() {},
+    async save() { throw new Error('stop-after-accept'); },
+  };
+  try {
+    Petition.findOne = async () => doc;
+    const res = await withLabUser(ANALYST, undefined, (headers) => invoke('/:id/accept', 'post', {
+      params: { id: 'P-2609-0001' },
+      body: { machines: [{ machineId: 'm1', code: 'NOPE-1', name: 'No standard machine' }, { code: 'bad' }] },
+      headers,
+    }));
+    assert.match(res.body.error.message, /stop-after-accept/);
+    assert.ok(doc.assignedTo.acceptedAt instanceof Date);
+    assert.deepEqual(doc.assignedMachines.map((m) => m.code), ['NOPE-1']);
+  } finally {
+    Petition.findOne = originalFindOne;
   }
 });
 
@@ -206,6 +247,7 @@ test('POST /:id/claim assigns the work to the logged-in analyst, ignoring body i
     assert.equal(doc.assignedTo.employeeId, 'E77');
     assert.equal(doc.assignedTo.name, 'Analyst A');
     assert.equal(doc.assignedTo.assignedBy, 'Analyst A');
+    assert.equal(doc.assignedTo.acceptedAt, undefined);
     assert.equal(doc.status, 'inProgress');
   } finally {
     Petition.findOne = originalFindOne;
@@ -316,3 +358,51 @@ test('latestDeliverableRevision follows repeated rejected resubmissions', async 
     Petition.findOne = originalFindOne;
   }
 });
+
+
+// Production แก้คำขอที่อยู่ใน LIS แล้วแบบเพิ่ม/ลดรายการ → บันทึกทับใบเดิม ไม่สร้างใบใหม่
+test('POST / with replacePetitionNo overwrites the existing production petition instead of creating one', async () => {
+  const LabRequest = require('../models/LabRequest');
+  const originals = { findOne: Petition.findOne, findOneAndUpdate: Petition.findOneAndUpdate, create: Petition.create, labFindOne: LabRequest.findOne };
+  const existing = {
+    _id: 'p1', petitionNo: 'P-2611-0001', status: 'deliveringQC', __v: 3,
+    submittedBy: { name: 'Prod', department: 'ผลิต 01' },
+    productionWorkflow: { requestNo: 'SA1' },
+    items: [{ seq: 1, sampleName: 'A', batchNo: 'B-1', sampleId: 'S-1' }],
+  };
+  existing.toObject = () => existing;
+  let update;
+  let created = false;
+  try {
+    Petition.findOne = async () => existing;
+    Petition.findOneAndUpdate = async (query, change) => {
+      assert.deepEqual(query, { _id: 'p1', status: 'deliveringQC', __v: 3 });
+      update = change.$set;
+      const saved = { ...existing, ...change.$set };
+      return { ...saved, toObject: () => saved };
+    };
+    Petition.create = async () => { created = true; };
+    LabRequest.findOne = () => ({ sort: () => ({ lean: async () => null }) });
+    const items = [
+      { seq: 1, sampleName: 'A', commonName: 'A', batchNo: 'B-1', productionDate: '2026-11-03', sendToQc: true, sendToLab: false },
+      { seq: 2, sampleName: 'A', commonName: 'A', batchNo: 'B-2', productionDate: '2026-11-03', sendToQc: true, sendToLab: false },
+    ];
+    const body = { dept: 'production', submittedBy: { name: 'Prod', department: 'ผลิต 01' }, items, replacePetitionNo: 'P-2611-0001', productionWorkflow: { requestNo: 'SA1' } };
+    const res = await invoke('/', 'post', { body });
+    assert.equal(res.statusCode, 200);
+    assert.equal(created, false);
+    assert.equal(res.body.petitionNo, 'P-2611-0001');
+    assert.deepEqual(update.items.map((it) => it.batchNo), ['B-1', 'B-2']);
+    assert.equal(update.items[0].sampleId, 'S-1');
+    assert.equal(res.body.existingLabRequestId, null);
+
+    const mismatch = await invoke('/', 'post', { body: { ...body, productionWorkflow: { requestNo: 'OTHER' } } });
+    assert.equal(mismatch.statusCode, 403);
+  } finally {
+    Petition.findOne = originals.findOne;
+    Petition.findOneAndUpdate = originals.findOneAndUpdate;
+    Petition.create = originals.create;
+    LabRequest.findOne = originals.labFindOne;
+  }
+});
+

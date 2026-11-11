@@ -106,6 +106,11 @@ describe('printer assignment config', () => {
     expect(pickPrinterAssignmentRoute(printers, 'service-request', 'ผลิต 1')).toBeNull();
   });
 
+  test('matches zero-padded department ผลิต 03 to printer assigned to ผลิต 3', () => {
+    const printers = [{ id: 'p3', kind: 'sticker', assignments: [{ department: 'ผลิต 3', docTypes: ['sample-label'], paperSize: 'label-100x50' }] }];
+    expect(pickPrinterAssignmentRoute(printers, 'sample-label', 'ผลิต 03')).toMatchObject({ printerConfig: { id: 'p3' } });
+  });
+
   test('does not use default flag to bypass print-time choice when multiple assignments match', () => {
     const printers = [
       {
