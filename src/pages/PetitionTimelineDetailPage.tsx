@@ -670,10 +670,10 @@ export default function PetitionTimelineDetailPage() {
 
     {labelPrintOpen && <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label" department={petition.submittedBy?.department}><SampleLabelPrintTemplate petition={petition} /></PrintPreviewDialog>}
     {servicePrintOpen && serviceLabRequest && <PrintPreviewDialog open={servicePrintOpen} onOpenChange={setServicePrintOpen} docType="service-request"><PetitionPrintTemplate labRequest={serviceLabRequest} petition={petition} qcResults={qcResults} sgParam={sgParameter} requestValues={requestValues} labReportPages={labReportPages} /></PrintPreviewDialog>}
-    {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
-    {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
-    {labResultOpen && <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" css={LAB_REPORT_CSS}><LabResultReportTemplate pages={labReportPages} /></PrintPreviewDialog>}
-    {chemReportOpen && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}><ChemAnalysisReportTemplate sheets={chemSheets} /></PrintPreviewDialog>}
+    {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa" title="Pre Report"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
+    {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa" title="Final Report"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
+    {labResultOpen && <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}><LabResultReportTemplate pages={labReportPages} /></PrintPreviewDialog>}
+    {chemReportOpen && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}><ChemAnalysisReportTemplate sheets={chemSheets} /></PrintPreviewDialog>}
     {grPrintOpen && goodsReceipt && (
       <PrintPreviewDialog open={grPrintOpen} onOpenChange={setGrPrintOpen} docType="goods-receipt" css={GOODS_RECEIPT_CSS}>
         <GoodsReceiptPrintTemplate doc={goodsReceipt} />

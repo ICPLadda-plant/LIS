@@ -30,6 +30,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   docType: PrintDocType;
+  /** ชื่อเอกสารบนหัว dialog ถ้าไม่ระบุจะใช้ชื่อตามประเภทเอกสารที่ใช้เลือกเครื่องพิมพ์ */
+  title?: string;
   /** แผนกเจ้าของเอกสาร (เช่น ผลิต 2) ใช้เลือกเครื่องพิมพ์แทนแผนกของผู้ใช้ที่ล็อกอิน */
   department?: string | null;
   css?: string;
@@ -258,6 +260,7 @@ export default function PrintPreviewDialog({
   open,
   onOpenChange,
   docType,
+  title,
   department,
   css,
   children,
@@ -376,7 +379,7 @@ export default function PrintPreviewDialog({
       <DialogContent className={`${sizeClass} flex flex-col overflow-hidden`}>
         <DialogHeader className="shrink-0 gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <DialogTitle>{previewOnly ? "ตัวอย่างเอกสาร" : "ตัวอย่างก่อนพิมพ์"} — {meta?.label ?? docType}</DialogTitle>
+            <DialogTitle>{previewOnly ? "ตัวอย่างเอกสาร" : "ตัวอย่างก่อนพิมพ์"} — {title ?? meta?.label ?? docType}</DialogTitle>
             {headerActions && <div className="flex flex-wrap items-center gap-2 sm:justify-end">{headerActions}</div>}
           </div>
           {previewOnly ? (

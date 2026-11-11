@@ -493,7 +493,7 @@ export default function QCApprovalReviewPage() {
           }}
         />
         {chemReportPrintable && (
-          <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}>
+          <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}>
             <ChemAnalysisReportTemplate sheets={chemSheets} />
           </PrintPreviewDialog>
         )}

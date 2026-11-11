@@ -229,13 +229,13 @@ export default function LabResultDetailPage() {
         )}
       </div>
 
-      <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="coa" css={LAB_REPORT_CSS}>
+      <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}>
         {report}
       </PrintPreviewDialog>
-      {chemReportPrintable && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}>
+      {chemReportPrintable && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}>
         <ChemAnalysisReportTemplate sheets={chemSheets} />
       </PrintPreviewDialog>}
-      {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" css={LAB_CALCULATION_CSS}>
+      {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" title="ใบคำนวณผลวิเคราะห์" css={LAB_CALCULATION_CSS}>
         {calcPages.map((page, i) => (
           <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} />
         ))}

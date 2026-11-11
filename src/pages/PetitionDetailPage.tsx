@@ -651,17 +651,17 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                   <SampleLabelPrintTemplate petition={data} />
                 </PrintPreviewDialog>
               )}
-              <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa">
+              <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa" title="Pre Report">
                 <ResultReportPrintTemplate kind="pre" petition={data} labRequests={labRequests ?? []} qcResults={qcResults} />
               </PrintPreviewDialog>
-              <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa">
+              <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa" title="Final Report">
                 <ResultReportPrintTemplate kind="final" petition={data} labRequests={labRequests ?? []} qcResults={qcResults} />
               </PrintPreviewDialog>
-              <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" css={LAB_REPORT_CSS}>
+              <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}>
                 <LabResultReportTemplate pages={labReportPages} />
               </PrintPreviewDialog>
               {chemReportPrintable && (
-                <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}>
+                <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}>
                   <ChemAnalysisReportTemplate sheets={chemSheets} />
                 </PrintPreviewDialog>
               )}
