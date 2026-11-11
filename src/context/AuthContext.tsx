@@ -118,6 +118,8 @@ interface AuthContextType {
   loginWithProductionToken: (token: string) => Promise<AuthUser>;
   logout: () => void;
   isPwa: boolean;
+  // เข้าระบบผ่าน SSO ของฝ่ายผลิต (ไม่ใช่บัญชี Microsoft ของ LIS)
+  isProductionSession?: boolean;
   accounts: AuthAccount[];
   activeAccountId?: string;
   switchAccount: (accountId: string) => void;
@@ -633,6 +635,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithProductionToken,
         logout,
         isPwa,
+        isProductionSession: !DEV_MODE && !!productionUser,
         accounts: authAccounts,
         activeAccountId: selectedAccountId,
         switchAccount,

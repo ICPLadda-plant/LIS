@@ -18,6 +18,7 @@ import LabHeadRoute from "@/components/LabHeadRoute";
 import RoutePointerLockGuard from "@/components/RoutePointerLockGuard";
 import { DevRoleSwitcher } from "@/components/DevRoleSwitcher";
 import EmployeeLinkGate from "@/components/lis/EmployeeLinkGate";
+import PwaInstallGate from "@/components/lis/PwaInstallGate";
 import GlobalStockQrScanListener from "@/components/lis/GlobalStockQrScanListener";
 import { RouteLoading } from "@/components/RouteLoading";
 import { StartupLoadingGate } from "@/components/StartupLoadingGate";
@@ -120,6 +121,7 @@ const App = () => (
         <AuthProvider>
           <DevRoleSwitcher />
           <EmployeeLinkGate />
+          <PwaInstallGate />
           <NotificationProvider>
             <DailyCheckReminderWatcher />
             <PetitionFlowWatcher />
