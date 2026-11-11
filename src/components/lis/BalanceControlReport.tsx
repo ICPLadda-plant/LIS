@@ -1,35 +1,45 @@
-import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
-import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
-import { fmtDate, fmtTime } from "@/lib/dailyCheckFormat";
+import BalanceControlChart, { BalanceControlLegend } from "@/components/lis/BalanceControlChart";
+import type { DailyCheckRecord } from "@/lib/api";
 import {
-  CONTROL_STATUS_LABEL,
-  balanceScaleTypeLabel,
-  classifyPoint,
-  countByStatus,
   formatControlNumber,
-  formatSd,
-  formatThaiMonth,
-  monthlyStats,
   type BalanceControlConfig,
   type BalanceScale,
   type ControlLimits,
   type MonthlyPoint,
 } from "@/lib/balanceControlChart";
-import type { DailyCheckRecord } from "@/lib/api";
-import BalanceControlChart, { BalanceControlLegend } from "@/components/lis/BalanceControlChart";
+import { BALANCE_CHART_TITLE, BALANCE_FORM_CODE, BALANCE_FORM_TITLE } from "@/lib/balanceControlExport";
+import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
+import { fmtDate, fmtTime } from "@/lib/dailyCheckFormat";
+import { A4_PRINT_FONT_FAMILY, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
-// รายงาน Quality Control Chart ของเครื่องชั่ง 1 เครื่อง / 1 เดือน — A4 แนวนอน
+// รายงานพิมพ์ Daily check เครื่องชั่ง ตามแบบฟอร์ม FM-WI-06-04-001-R00 (A4 แนวตั้ง)
+// ใช้สี/ฟอนต์ตายตัวแทน design token เพราะเป็นเอกสารควบคุมที่ต้องพิมพ์ออกมาเหมือนฟอร์มกระดาษเดิม
+
 export const BALANCE_CONTROL_REPORT_CSS = `
-@page { size: A4 landscape; margin: 12mm; }
-body{font-family:${A4_PRINT_FONT_FAMILY};margin:0;color:#000;font-size:${A4_PRINT_FONT_SIZE};}
-.bcr,.bcr *{font-family:${A4_PRINT_FONT_FAMILY};}
-.bcr{font-size:14pt;}
-.bcr table{border-collapse:collapse;width:100%;}
-.bcr th,.bcr td{border:1px solid #000;padding:2px 6px;vertical-align:middle;}
-.bcr thead th{background:#f3f4f6;}
-.bcr thead th,.bcr h1,.bcr h2,.bcr h3,.bcr .print-heading{font-weight:${A4_PRINT_HEADING_FONT_WEIGHT}!important;}
-.bcr .sig-line{border-bottom:1px dotted #000;display:inline-block;min-width:200px;}
-.bcr .avoid-break{break-inside:avoid;page-break-inside:avoid;}
+@page { size: A4 portrait; margin: 10mm; }
+body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
+.bcr, .bcr * { font-family: ${A4_PRINT_FONT_FAMILY}; box-sizing: border-box; }
+.bcr { color: #000; background: #fff; font-size: 13pt; line-height: 1.15; }
+.bcr h1, .bcr h2, .bcr .bcr-strong { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; }
+.bcr .bcr-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; }
+.bcr .bcr-head img { position: absolute; left: 0; top: 0; height: 40px; width: auto; }
+.bcr .bcr-head h1 { margin: 0; font-size: 18pt; }
+.bcr .bcr-info { display: grid; grid-template-columns: auto 1fr auto 1.4fr auto 1fr; column-gap: 6px; row-gap: 2px; margin: 6px 0 8px; font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; font-size: 13pt; align-items: end; }
+.bcr .bcr-fill { border-bottom: 1px solid #000; text-align: center; min-height: 1.2em; padding: 0 4px; }
+.bcr table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.bcr .bcr-table { border: 2px solid #000; }
+.bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 3px; font-size: 11.5pt; line-height: 1.05; height: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcr .bcr-table th { font-weight: 400; }
+.bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
+.bcr .bcr-note { display: flex; gap: 24px; margin: 6px 0 4px 16px; font-size: 12pt; }
+.bcr .bcr-chart { margin-top: 4px; }
+.bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 13pt; }
+.bcr .bcr-empty { border: 1px dashed #000; padding: 32px 0; text-align: center; font-size: 12pt; }
+.bcr .bcr-sign { display: flex; justify-content: space-between; gap: 24px; margin-top: 14px; font-size: 13pt; }
+.bcr .bcr-sign span { display: inline-block; border-bottom: 1px solid #000; min-width: 220px; }
+.bcr .bcr-sign .bcr-date { min-width: 160px; }
+.bcr .bcr-foot { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 12px; font-size: 11pt; }
+.bcr .bcr-printed { font-size: 9pt; color: #333; }
 `;
 
 export interface BalanceControlReportProps {
@@ -41,11 +51,22 @@ export interface BalanceControlReportProps {
   digits: number;
   month: string;
   printedBy: string;
-  printedAt: string; // ISO
+  printedAt: string;
 }
 
-const cell = "border border-black px-2 py-0.5";
-const headCell = `${cell} bg-gray-100 font-semibold text-center`;
+const resultMark = (record: DailyCheckRecord | null) => {
+  const status = record?.status100 ?? record?.status;
+  if (status === "pass") return "✓";
+  if (status === "fail") return "X";
+  return "";
+};
+
+const weightText = (record: DailyCheckRecord | null, index: number, decimals: number) => {
+  const raw = record?.weights100?.[index];
+  if (raw === undefined || raw === null || raw === "") return "";
+  const value = Number(raw);
+  return Number.isFinite(value) ? formatControlNumber(value, decimals) : String(raw);
+};
 
 export default function BalanceControlReport({
   scale,
@@ -58,154 +79,122 @@ export default function BalanceControlReport({
   printedBy,
   printedAt,
 }: BalanceControlReportProps) {
-  const values = series.map((point) => point.value);
-  const recorded = series.filter((point) => point.record);
-  const counts = countByStatus(values, limits);
-  const stats = monthlyStats(values);
-  const printedAtLabel = `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}`;
-  const fmt = (value: number | null | undefined) => formatControlNumber(value, digits);
-
-  const infoRows: Array<[string, string]> = [
-    ["รหัสเครื่องมือ", scale.code],
-    ["ชื่อเครื่องมือ", balanceScaleTypeLabel(scale)],
-    ["ยี่ห้อ", config.brand || "—"],
-    ["รุ่น", config.model || "—"],
-    ["รหัสตุ้มน้ำหนัก", config.weightCode || "—"],
-    ["น้ำหนักตุ้ม Daily check", `${config.nominal} g`],
-    ["ประจำเดือน", formatThaiMonth(month)],
-    ["ปรับปรุงค่า Control", config.updatedDate ? fmtDate(config.updatedDate) : "—"],
-  ];
-
-  const controlRows: Array<[string, string]> = [
-    ["Mean", fmt(limits?.mean)],
-    ["STD", formatSd(limits?.sd)],
-    ["2SD", formatSd(limits ? limits.sd * 2 : null)],
-    ["3SD", formatSd(limits ? limits.sd * 3 : null)],
-    ["UWL (+2SD)", fmt(limits?.uwl)],
-    ["LWL (−2SD)", fmt(limits?.lwl)],
-    ["UCL (+3SD)", fmt(limits?.ucl)],
-    ["LCL (−3SD)", fmt(limits?.lcl)],
-    ["MPE", config.mpe == null ? "—" : `±${config.mpe} g`],
-  ];
+  const printedDate = printedAt ? `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}` : "";
 
   return (
-    <div className="bcr bg-white text-black p-6" style={{ width: "1040px", fontFamily: A4_PRINT_FONT_FAMILY }}>
-      {/* Header */}
-      <div className="mb-3 flex items-center gap-3">
-        <img src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" className="h-12" />
-        <div>
-          <div className="print-heading text-[17px] font-bold">Quality Control Chart For Balance Daily Check</div>
-          <div className="text-[13px]">แบบบันทึกการตรวจสอบเครื่องชั่งประจำวัน — ห้องปฏิบัติการ บริษัท ไอ ซี พี ลัดดา จำกัด</div>
-        </div>
+    <section className="bcr bg-white text-black" style={{ width: "720px" }} data-month={month}>
+      <header className="bcr-head">
+        <img src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" />
+        <h1>{BALANCE_FORM_TITLE}</h1>
+      </header>
+
+      <div className="bcr-info">
+        <span>รหัสเครื่องมือ :</span>
+        <span className="bcr-fill">{scale.code}</span>
+        <span>ยี่ห้อ :</span>
+        <span className="bcr-fill">{config.brand}</span>
+        <span>รุ่น :</span>
+        <span className="bcr-fill">{config.model || scale.model}</span>
+        <span>รหัสตุ้มน้ำหนัก :</span>
+        <span className="bcr-fill">{config.weightCode}</span>
+        <span style={{ gridColumn: "span 2" }}>น้ำหนักตุ้ม Daily check :</span>
+        <span className="bcr-fill">{config.nominal}</span>
+        <span>g</span>
       </div>
 
-      {/* Info + control values */}
-      <div className="mb-3 grid grid-cols-2 gap-4">
-        <table>
-          <tbody>
-            {infoRows.map(([label, value]) => (
-              <tr key={label}>
-                <td className={`${cell} w-[45%] bg-gray-100`}>{label}</td>
-                <td className={cell}>{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <table>
-          <tbody>
-            {controlRows.map(([label, value]) => (
-              <tr key={label}>
-                <td className={`${cell} w-[45%] bg-gray-100`}>{label}</td>
-                <td className={`${cell} tabular-nums`}>{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Chart */}
-      <div className="avoid-break mb-3 border border-black p-2">
-        <div className="print-heading mb-1 text-center font-bold">Quality Control Chart — {scale.code} ({formatThaiMonth(month)})</div>
-        {limits && domain ? (
-          <>
-            <BalanceControlChart series={series} limits={limits} domain={domain} digits={digits} fixed />
-            <BalanceControlLegend fixed className="mt-1" />
-          </>
-        ) : (
-          <div className="py-10 text-center">ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้ จึงยังวาดเส้นควบคุมไม่ได้</div>
-        )}
-      </div>
-
-      {/* Table */}
-      <table>
+      <table className="bcr-table">
+        <colgroup>
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "9%" }} />
+          <col style={{ width: "12%" }} />
+          <col style={{ width: "16%" }} />
+        </colgroup>
         <thead>
           <tr>
-            <th className={headCell}>ซ้ำที่</th>
-            <th className={headCell}>วันที่</th>
-            <th className={headCell}>ค่าที่ได้ (g)</th>
-            <th className={headCell}>Mean</th>
-            <th className={headCell}>UWL</th>
-            <th className={headCell}>LWL</th>
-            <th className={headCell}>UCL</th>
-            <th className={headCell}>LCL</th>
-            <th className={headCell}>ผลเทียบเส้น Control</th>
-            <th className={headCell}>ผู้บันทึก</th>
+            <th rowSpan={2}>ว/ด/ป</th>
+            <th colSpan={3}>ครั้งที่</th>
+            <th rowSpan={2}>Mean</th>
+            <th rowSpan={2}>Result *</th>
+            <th rowSpan={2}>หมายเหตุ</th>
+            <th rowSpan={2}>ผู้บันทึก</th>
+          </tr>
+          <tr>
+            <th>1</th>
+            <th>2</th>
+            <th>3</th>
           </tr>
         </thead>
         <tbody>
-          {recorded.length === 0 ? (
-            <tr>
-              <td className={`${cell} text-center`} colSpan={10}>
-                ไม่มีข้อมูลการตรวจสอบในเดือนนี้
-              </td>
-            </tr>
-          ) : (
-            recorded.map((point, index) => {
-              const status = classifyPoint(point.value, limits);
-              return (
-                <tr key={point.date}>
-                  <td className={`${cell} text-center`}>{index + 1}</td>
-                  <td className={`${cell} text-center whitespace-nowrap`}>{fmtDate(point.date)}</td>
-                  <td className={`${cell} text-right tabular-nums`}>{fmt(point.value)}</td>
-                  <td className={`${cell} text-right tabular-nums`}>{fmt(limits?.mean)}</td>
-                  <td className={`${cell} text-right tabular-nums`}>{fmt(limits?.uwl)}</td>
-                  <td className={`${cell} text-right tabular-nums`}>{fmt(limits?.lwl)}</td>
-                  <td className={`${cell} text-right tabular-nums`}>{fmt(limits?.ucl)}</td>
-                  <td className={`${cell} text-right tabular-nums`}>{fmt(limits?.lcl)}</td>
-                  <td className={`${cell} text-center whitespace-nowrap`}>{status ? CONTROL_STATUS_LABEL[status] : "—"}</td>
-                  <td className={`${cell} whitespace-nowrap`}>{point.record?.recorder || "—"}</td>
-                </tr>
-              );
-            })
-          )}
+          {series.map((point) => {
+            const record = point.record;
+            return (
+              <tr key={point.date}>
+                <td>{fmtDate(point.date)}</td>
+                <td>{weightText(record, 0, scale.decimals)}</td>
+                <td>{weightText(record, 1, scale.decimals)}</td>
+                <td>{weightText(record, 2, scale.decimals)}</td>
+                <td>{record ? formatControlNumber(record.avg100, scale.decimals) : ""}</td>
+                <td>{resultMark(record)}</td>
+                <td />
+                <td>{record?.recorder ?? ""}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
-      {/* Summary */}
-      <div className="avoid-break mt-2 text-[13px]">
+      <div className="bcr-note">
+        <span className="bcr-strong">หมายเหตุ :</span>
+        <span>* Result :</span>
+        <span>
+          ✓ = <span className="bcr-strong">ผ่าน</span>
+        </span>
+        <span>
+          X = <span className="bcr-strong">ไม่ผ่าน</span>
+        </span>
+      </div>
+
+      <div className="bcr-chart">
+        <h2>{BALANCE_CHART_TITLE}</h2>
+        {limits && domain ? (
+          <>
+            <BalanceControlChart
+              fixed
+              width={700}
+              height={240}
+              series={series}
+              limits={limits}
+              domain={domain}
+              digits={digits}
+            />
+            <BalanceControlLegend fixed className="justify-center" />
+          </>
+        ) : (
+          <div className="bcr-empty">ยังไม่ได้ตั้งค่า Control (Mean/STD) จึงยังไม่มีกราฟ</div>
+        )}
+      </div>
+
+      <div className="bcr-sign">
         <div>
-          บันทึกทั้งหมด {stats.n} วัน — อยู่ในเกณฑ์ {counts.in} วัน · เกิน 2SD {counts.warning} วัน · เกิน 3SD {counts.out} วัน
+          ผู้ตรวจสอบ : <span>&nbsp;</span>
         </div>
         <div>
-          ค่าเฉลี่ยจริงของเดือน {fmt(stats.mean)} g · STD จริงของเดือน {formatSd(stats.sd)} g
+          วันที่ : <span className="bcr-date">&nbsp;</span>
         </div>
       </div>
 
-      {/* Signatures + print meta */}
-      <div className="avoid-break mt-8 flex justify-between text-[13px]">
-        <div className="text-center">
-          <div>
-            ผู้บันทึก <span className="sig-line inline-block min-w-[200px] border-b border-dotted border-black"></span>
-          </div>
-          <div className="mt-6">
-            ผู้ตรวจสอบ <span className="sig-line inline-block min-w-[200px] border-b border-dotted border-black"></span>
-          </div>
-        </div>
-        <div className="self-end text-right text-[12px] text-gray-600">
-          <div>พิมพ์เมื่อ: {printedAtLabel}</div>
-          <div>ผู้พิมพ์: {printedBy || "—"}</div>
-        </div>
-      </div>
-    </div>
+      <footer className="bcr-foot">
+        <span>{BALANCE_FORM_CODE}</span>
+        <span className="bcr-printed">
+          {printedBy ? `พิมพ์โดย ${printedBy} ` : ""}
+          {printedDate}
+        </span>
+        <span>P1/1</span>
+      </footer>
+    </section>
   );
 }

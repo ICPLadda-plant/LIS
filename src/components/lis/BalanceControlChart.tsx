@@ -105,10 +105,22 @@ interface BalanceControlChartProps {
   domain: [number, number];
   digits: number;
   fixed?: boolean;
+  /** ขนาดกราฟเมื่อ fixed (ใช้ในรายงานพิมพ์) */
+  width?: number;
+  height?: number;
   className?: string;
 }
 
-export default function BalanceControlChart({ series, limits, domain, digits, fixed = false, className }: BalanceControlChartProps) {
+export default function BalanceControlChart({
+  series,
+  limits,
+  domain,
+  digits,
+  fixed = false,
+  width = 980,
+  height = 300,
+  className,
+}: BalanceControlChartProps) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
   const data: ChartDatum[] = series.map((point) => ({ day: point.day, date: point.date, value: point.value }));
   const tickFont = fixed ? 13 : 11;
@@ -194,7 +206,7 @@ export default function BalanceControlChart({ series, limits, domain, digits, fi
 
   if (fixed) {
     return (
-      <LineChart width={980} height={300} data={data} margin={margin} className={className}>
+      <LineChart width={width} height={height} data={data} margin={margin} className={className}>
         {elements}
       </LineChart>
     );
