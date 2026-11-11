@@ -27,7 +27,8 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-summary { display: grid; grid-template-columns: auto 1fr auto auto 1fr auto auto 1fr auto; align-items: end; column-gap: 4mm; margin-top: 7mm; padding: 0 6mm; }
 .brom-form-signatures { display: grid; grid-template-columns: 1fr 1fr; align-items: start; column-gap: 18mm; margin-top: 12mm; padding: 0 6mm; }
 .brom-form-sign { display: grid; grid-template-columns: auto 1fr; align-items: end; column-gap: 6mm; }
-.brom-form-sign-role { grid-column: 1; text-align: center; margin-top: 2mm; }
+.brom-form-sign-role { grid-column: 1; grid-row: 2; text-align: center; margin-top: 2mm; }
+.brom-form-sign-name { grid-column: 2; grid-row: 2; text-align: center; margin-top: 1.5mm; }
 .brom-form-footer { margin-top: auto; padding-top: 6mm; font-size: 8pt; }
 @media screen { .brom-form-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 `;
@@ -201,8 +202,8 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
         </div>
 
         <div className="brom-form-signatures">
-          <div className="brom-form-sign"><span>Analyst</span><span className="brom-form-line" data-field="analyst">{name(page.analystName)}</span></div>
-          <div className="brom-form-sign"><span>Approved</span><span className="brom-form-line" data-field="approved">{name(page.labHeadName)}</span><span className="brom-form-sign-role">(หัวหน้าห้องปฏิบัติการ)</span></div>
+          <div className="brom-form-sign"><span>Analyst</span><span className="brom-form-line" /><span className="brom-form-sign-name" data-field="analyst">{name(page.analystName)}</span></div>
+          <div className="brom-form-sign"><span>Approved</span><span className="brom-form-line" /><span className="brom-form-sign-role">(หัวหน้าห้องปฏิบัติการ)</span><span className="brom-form-sign-name" data-field="approved">{name(page.labHeadName)}</span></div>
         </div>
         <div className="brom-form-footer">{LAB_CALCULATION_FORM_CODE}</div>
       </section>
