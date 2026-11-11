@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LabResultDetailPage from './LabResultDetailPage';
@@ -100,6 +100,14 @@ function renderPage() {
   );
 }
 
+function openPrintMenu() {
+  fireEvent.keyDown(screen.getByRole('button', { name: /พิมพ์เอกสาร/ }), { key: 'Enter' });
+}
+
+function labResultMenuItem() {
+  return screen.getByRole('menuitem', { name: /ผลวิเคราะห์ Lab/ });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.petition = basePetition();
@@ -113,15 +121,17 @@ beforeEach(() => {
 describe('LabResultDetailPage print action', () => {
   it('enables the print lab-result button once Lab approves results, before QC Final Result', () => {
     renderPage();
+    openPrintMenu();
 
-    expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeEnabled();
+    expect(labResultMenuItem()).not.toHaveAttribute('data-disabled');
   });
 
   it('disables the print lab-result button when Lab only completed results and QC has not confirmed Final Result', () => {
     Object.assign(mocks.petition, { labApprovedAt: undefined, labCompletedAt: '2026-07-14T00:00:00.000Z' });
     renderPage();
 
-    expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeDisabled();
+    // ไม่มีเอกสารใดพิมพ์ได้ ปุ่มรวมจึงถูกปิด
+    expect(screen.getByRole('button', { name: /พิมพ์เอกสาร/ })).toBeDisabled();
   });
 
   it('enables the print lab-result button when QC has confirmed Final Result', () => {
@@ -131,8 +141,9 @@ describe('LabResultDetailPage print action', () => {
     });
 
     renderPage();
+    openPrintMenu();
 
-    expect(screen.getByRole('button', { name: /พิมพ์ผลวิเคราะห์ Lab/ })).toBeEnabled();
+    expect(labResultMenuItem()).not.toHaveAttribute('data-disabled');
   });
 
   it('passes physical parameter to report pages but keeps lab result groups lab-only', async () => {
