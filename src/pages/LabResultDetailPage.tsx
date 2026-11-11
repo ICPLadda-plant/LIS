@@ -13,6 +13,7 @@ import { aiSubstancesForItem } from "@/lib/aiSubstanceFields";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
 import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
+import { itemSubmissionNoText } from "@/lib/petitionSampler";
 import LabResultGroups from "@/components/petition/LabResultGroups";
 import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/LabResultReportTemplate";
 import ChemAnalysisReportTemplate, { CHEM_ANALYSIS_REPORT_CSS } from "@/components/petition/ChemAnalysisReportTemplate";
@@ -66,7 +67,13 @@ export default function LabResultDetailPage() {
       includeRestrictedStandards: canSeeRestrictedStandards,
       showAutoPassRange: false,
       includeResultOnlyFields: true,
-    });
+    })
+      // รายการที่ไม่มีพารามิเตอร์ฝั่ง Lab ไม่ต้องแสดงในหน้าผลวิเคราะห์ Lab
+      .filter((group) => !group.unmatched)
+      .map((group) => {
+        const item = petition.items?.find((entry) => entry.seq === group.seq);
+        return item ? { ...group, submissionNo: itemSubmissionNoText(petition, item, "lab") || undefined } : group;
+      });
   }, [petition, parameters, results, groupMembership, canSeeRestrictedStandards]);
 
   const pages = useMemo(

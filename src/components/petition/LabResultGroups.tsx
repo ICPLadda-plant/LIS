@@ -27,6 +27,7 @@ export default function LabResultGroups({ groups, renderGroupActions }: Props) {
               <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                 <span>รายการที่ {g.seq}: {g.sampleName}</span>
                 {g.batchNo && <Badge variant="gray-soft" className="font-normal">Batch: {g.batchNo}</Badge>}
+                {g.submissionNo && <Badge variant="gray-soft" className="font-normal">ใบนำส่ง: {g.submissionNo}</Badge>}
                 {g.sampleId && <Badge variant="primary-soft" className="font-normal text-xs">{g.sampleId}</Badge>}
               </CardTitle>
               {renderGroupActions?.(g)}
