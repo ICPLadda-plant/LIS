@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Maximize2, Minus, Monitor, Plus, Printer, Server, ZoomIn, ZoomOut } from "lucide-react";
+import { FileText, Monitor, MoveHorizontal, Printer, Server, ZoomIn, ZoomOut } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -42,12 +42,19 @@ interface Props {
 }
 
 const MIN_PREVIEW_HEIGHT = 180;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2;
-const ZOOM_STEP = 0.1;
+/** ระดับซูมเทียบกับขนาดจริงของกระดาษ (1 = 100% ขนาดจริง) */
+const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
+const MIN_ZOOM = ZOOM_LEVELS[0];
+const MAX_ZOOM = ZOOM_LEVELS[ZOOM_LEVELS.length - 1];
+/** โหมดพอดีความกว้างไม่ขยายเกินขนาดนี้ เพื่อไม่ให้ฉลากเล็ก ๆ ถูกขยายจนล้นจอ */
+const MAX_FIT_WIDTH_ZOOM = 1.5;
 
-function clampZoom(value: number): number {
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(2))));
+type ZoomMode = "width" | "page" | "custom";
+
+function nextZoomLevel(current: number, direction: 1 | -1): number {
+  const epsilon = 0.001;
+  if (direction > 0) return ZOOM_LEVELS.find((level) => level > current + epsilon) ?? MAX_ZOOM;
+  return [...ZOOM_LEVELS].reverse().find((level) => level < current - epsilon) ?? MIN_ZOOM;
 }
 
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -79,11 +86,20 @@ function ScaledPreview({
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [fitScale, setFitScale] = useState(1);
-  const [zoom, setZoom] = useState(1);
+  const [fitPageScale, setFitPageScale] = useState(1);
+  const [fitWidthScale, setFitWidthScale] = useState(1);
+  const [zoomMode, setZoomMode] = useState<ZoomMode>("width");
+  const [customZoom, setCustomZoom] = useState(1);
   const [naturalHeight, setNaturalHeight] = useState(0);
   const [naturalWidth, setNaturalWidth] = useState(0);
-  const scale = fitScale * zoom;
+  const scale = zoomMode === "width" ? fitWidthScale : zoomMode === "page" ? fitPageScale : customZoom;
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+
+  const stepZoom = useCallback((direction: 1 | -1) => {
+    setCustomZoom(nextZoomLevel(scaleRef.current, direction));
+    setZoomMode("custom");
+  }, []);
 
   useLayoutEffect(() => {
     const outer = outerRef.current;
@@ -103,7 +119,8 @@ function ScaledPreview({
       const sheet = getSheetSize(printRef.current, content);
       const widthScale = sheet.width > 0 ? availW / sheet.width : 1;
       const heightScale = sheet.height > 0 ? availH / sheet.height : 1;
-      setFitScale(Math.min(widthScale, heightScale, 1));
+      setFitPageScale(Math.min(widthScale, heightScale, 1));
+      setFitWidthScale(Math.min(widthScale, MAX_FIT_WIDTH_ZOOM));
       setNaturalWidth(natW);
       setNaturalHeight(natH);
     };
@@ -127,25 +144,25 @@ function ScaledPreview({
 
       if (event.key === "+" || (isShortcut && event.key === "=")) {
         event.preventDefault();
-        setZoom((value) => clampZoom(value + ZOOM_STEP));
+        stepZoom(1);
         return;
       }
 
       if (event.key === "-" || event.key === "_") {
         event.preventDefault();
-        setZoom((value) => clampZoom(value - ZOOM_STEP));
+        stepZoom(-1);
         return;
       }
 
       if (event.key === "0") {
         event.preventDefault();
-        setZoom(1);
+        setZoomMode("width");
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [stepZoom]);
 
   useEffect(() => {
     const outer = outerRef.current;
@@ -154,46 +171,66 @@ function ScaledPreview({
     const handleWheel = (event: WheelEvent) => {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
-      setZoom((value) => clampZoom(value + (event.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP)));
+      stepZoom(event.deltaY < 0 ? 1 : -1);
     };
 
     outer.addEventListener("wheel", handleWheel, { passive: false });
     return () => outer.removeEventListener("wheel", handleWheel);
-  }, []);
+  }, [stepZoom]);
 
-  const zoomPercent = Math.round(zoom * 100);
+  const zoomPercent = Math.round(scale * 100);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex shrink-0 items-center justify-end gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant={zoomMode === "width" ? "secondary" : "outline"}
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => setZoomMode("width")}
+          title="ขยายให้เต็มความกว้าง แล้วเลื่อนลงเพื่ออ่าน (กด 0)"
+        >
+          <MoveHorizontal className="h-3.5 w-3.5" />
+          พอดีความกว้าง
+        </Button>
+        <Button
+          type="button"
+          variant={zoomMode === "page" ? "secondary" : "outline"}
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => setZoomMode("page")}
+          title="ย่อให้เห็นทั้งหน้า"
+        >
+          <FileText className="h-3.5 w-3.5" />
+          ทั้งหน้า
+        </Button>
         <Button
           type="button"
           variant="outline"
           size="icon"
           className="h-8 w-8"
-          onClick={() => setZoom((value) => clampZoom(value - ZOOM_STEP))}
-          disabled={zoom <= MIN_ZOOM}
+          onClick={() => stepZoom(-1)}
+          disabled={scale <= MIN_ZOOM + 0.001}
           aria-label="ย่อ"
           title="ย่อ"
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
-        <span className="w-12 text-center text-sm tabular-nums text-muted-foreground">{zoomPercent}%</span>
+        <span className="w-12 text-center text-sm tabular-nums text-muted-foreground" title="เทียบกับขนาดจริงของกระดาษ">
+          {zoomPercent}%
+        </span>
         <Button
           type="button"
           variant="outline"
           size="icon"
           className="h-8 w-8"
-          onClick={() => setZoom((value) => clampZoom(value + ZOOM_STEP))}
-          disabled={zoom >= MAX_ZOOM}
+          onClick={() => stepZoom(1)}
+          disabled={scale >= MAX_ZOOM - 0.001}
           aria-label="ขยาย"
           title="ขยาย"
         >
           <ZoomIn className="h-4 w-4" />
-        </Button>
-        <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => setZoom(1)}>
-          <Maximize2 className="h-3.5 w-3.5" />
-          พอดีหน้า
         </Button>
       </div>
       <div
@@ -238,7 +275,8 @@ export default function PrintPreviewDialog({
   const [selectedPrinterId, setSelectedPrinterId] = useState("");
   const { user } = useAuth();
   const meta = getPrintDocType(docType);
-  const widthClass = docType === "sample-label" || docType === "stock-label" ? "sm:max-w-2xl" : "sm:max-w-4xl";
+  const isLabel = docType === "sample-label" || docType === "stock-label";
+  const sizeClass = isLabel ? "sm:max-w-2xl max-h-[90vh] min-h-[70vh]" : "sm:max-w-5xl h-[92vh]";
   const isAdmin = normalizeRoles(user).includes("admin");
 
   const { data: configs, isFetched: printerConfigsLoaded } = useQuery({
@@ -335,7 +373,7 @@ export default function PrintPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`${widthClass} flex max-h-[90vh] min-h-[70vh] flex-col overflow-hidden`}>
+      <DialogContent className={`${sizeClass} flex flex-col overflow-hidden`}>
         <DialogHeader className="shrink-0 gap-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <DialogTitle>{previewOnly ? "ตัวอย่างเอกสาร" : "ตัวอย่างก่อนพิมพ์"} — {meta?.label ?? docType}</DialogTitle>
