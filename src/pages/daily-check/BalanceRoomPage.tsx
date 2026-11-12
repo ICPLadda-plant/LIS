@@ -124,7 +124,7 @@ const BalanceRoomPage = () => {
   const [month, setMonth] = useState(() => currentMonthStr());
   const [printOpen, setPrintOpen] = useState(false);
   const [printedAt, setPrintedAt] = useState("");
-  const [configOpen, setConfigOpen] = useState(false);
+  const [configWeight, setConfigWeight] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
   const [cameraTarget, setCameraTarget] = useState<{ type: "100" | "10"; index: number } | null>(null);
   const [readingPhoto, setReadingPhoto] = useState(false);
@@ -181,13 +181,7 @@ const BalanceRoomPage = () => {
     return map;
   }, [todayRecords, currentPeriod]);
 
-  const storedConfig = getBalanceControlConfig(controlConfigs, scale.id);
-  const config = useMemo(
-    () => storedConfig.nominal === scale.controlWeight
-      ? storedConfig
-      : { ...storedConfig, nominal: scale.controlWeight, mean: null, sd: null },
-    [scale.controlWeight, storedConfig],
-  );
+  const config = getBalanceControlConfig(controlConfigs, scale.id, scale.controlWeight);
   const series = useMemo(() => buildMonthlySeries(monthRecords ?? [], month, scale.controlWeight), [monthRecords, month, scale.controlWeight]);
   const values = useMemo(() => series.map(point => point.value), [series]);
   const baselineValues = useMemo(() => controlBaselineValues(series, 20), [series]);
@@ -212,6 +206,26 @@ const BalanceRoomPage = () => {
         : null,
     [baselineStats, month],
   );
+  const otherWeight = scale.controlWeight === 10 ? scale.primaryCalibrationWeight : 10;
+  const otherConfig = getBalanceControlConfig(controlConfigs, scale.id, otherWeight);
+  const otherSeries = buildMonthlySeries(monthRecords ?? [], month, otherWeight === 10 ? 10 : 100);
+  const otherValues = otherSeries.map((point) => point.value);
+  const otherBaselineStats = monthlyStats(controlBaselineValues(otherSeries, 20));
+  const otherSavedLimits = computeLimits(otherConfig.mean, otherConfig.sd);
+  const otherLimits = otherSavedLimits
+    ?? (otherBaselineStats.n === 20 ? computeLimits(otherBaselineStats.mean, otherBaselineStats.sd) : null);
+  const otherDigits = displayDigits(scale.decimals, otherLimits?.sd ?? otherConfig.sd);
+  const otherDomain = chartDomain(otherLimits, otherValues);
+  const otherStats = monthlyStats(otherValues);
+  const otherCounts = countByStatus(otherValues, otherLimits);
+  const otherSuggestion = otherBaselineStats.n === 20 && otherBaselineStats.mean != null && otherBaselineStats.sd != null
+    ? { n: otherBaselineStats.n, mean: otherBaselineStats.mean, sd: otherBaselineStats.sd, monthLabel: formatThaiMonth(month) }
+    : null;
+  const chartPanels = [
+    { weight: scale.controlWeight, config, series, limits, domain, digits, stats, baselineStats, counts, suggestion },
+    { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts, suggestion: otherSuggestion },
+  ].sort((a, b) => b.weight - a.weight);
+  const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
 
   const createMutation = useMutation({
     mutationFn: api.createDailyCheck,
@@ -467,7 +481,7 @@ const BalanceRoomPage = () => {
               <Button variant="success" className="gap-2" onClick={handleExport} disabled={exporting}>
                 <FileSpreadsheet className="h-4 w-4" /> {exporting ? "กำลัง Export..." : "Export Excel"}
               </Button>
-              <Button variant="outline" className="gap-2" onClick={() => setConfigOpen(true)}>
+              <Button variant="outline" className="gap-2" onClick={() => setConfigWeight(scale.controlWeight)}>
                 <Settings2 className="h-4 w-4" /> ตั้งค่าค่า Control
               </Button>
             </div>
@@ -644,57 +658,58 @@ const BalanceRoomPage = () => {
 
         {/* กราฟควบคุมคุณภาพ */}
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-start sm:justify-between">
+          <CardHeader className="pb-3">
             <div className="space-y-1">
               <CardTitle className="text-base">กราฟควบคุมคุณภาพ (Control Chart)</CardTitle>
               <CardDescription>
-                ค่าเฉลี่ยตุ้ม {scale.controlWeight} g รายวันของ {scale.code} — {formatThaiMonth(month)}
+                แยกตามตุ้ม Calibration ทั้ง 2 เกณฑ์ของ {scale.code} — {formatThaiMonth(month)}
               </CardDescription>
             </div>
-            {limits && (
-              <div className="flex flex-wrap gap-1.5">
-                <Badge variant="green-soft">ในเกณฑ์ {counts.in}</Badge>
-                <Badge variant="yellow-soft">เกิน 2SD {counts.warning}</Badge>
-                <Badge variant="red-soft">เกิน 3SD {counts.out}</Badge>
-              </div>
-            )}
           </CardHeader>
-          <CardContent className="space-y-3">
-            {domain ? (
-              <>
-                <BalanceControlChart series={series} limits={limits} domain={domain} digits={digits} />
-                {limits ? (
-                  <BalanceControlLegend controlWeight={scale.controlWeight} />
-                ) : (
-                  <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-3 text-center sm:flex-row">
-                    <p className="text-sm text-muted-foreground">
-                      ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้ — กราฟแสดงค่าที่บันทึกแล้วโดยยังไม่มีเส้นควบคุม
+          <CardContent className="grid gap-4 xl:grid-cols-2">
+            {chartPanels.map((panel) => (
+              <section key={panel.weight} className="space-y-3 rounded-lg border bg-card p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</h3>
+                    <p className="text-xs text-muted-foreground">ค่าเฉลี่ยรายวันและเส้น Control ของเกณฑ์นี้</p>
+                  </div>
+                  {panel.limits ? (
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant="green-soft">ในเกณฑ์ {panel.counts.in}</Badge>
+                      <Badge variant="yellow-soft">เกิน 2SD {panel.counts.warning}</Badge>
+                      <Badge variant="red-soft">เกิน 3SD {panel.counts.out}</Badge>
+                    </div>
+                  ) : null}
+                </div>
+                {panel.domain ? (
+                  <>
+                    <BalanceControlChart series={panel.series} limits={panel.limits} domain={panel.domain} digits={panel.digits} className="h-[280px]" />
+                    {panel.limits ? (
+                      <BalanceControlLegend controlWeight={panel.weight} />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-3 py-3 text-center sm:flex-row">
+                        <p className="text-sm text-muted-foreground">กราฟมีข้อมูลแล้ว แต่ยังไม่มีเส้น Mean/UWL/LWL/UCL/LCL</p>
+                        <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setConfigWeight(panel.weight)}>
+                          <Settings2 className="h-4 w-4" /> ตั้งค่า {panel.weight} g
+                        </Button>
+                      </div>
+                    )}
+                    <p className="text-center text-xs text-muted-foreground">
+                      ข้อมูล {panel.stats.n} วัน · baseline {panel.baselineStats.n}/20 ค่า
                     </p>
-                    <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setConfigOpen(true)}>
-                      <Settings2 className="h-4 w-4" /> ตั้งค่าค่า Control
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-4 py-10 text-center">
+                    <Activity className="h-7 w-7 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลหรือค่า Control สำหรับตุ้ม {panel.weight} g</p>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setConfigWeight(panel.weight)}>
+                      <Settings2 className="h-4 w-4" /> ตั้งค่า {panel.weight} g
                     </Button>
                   </div>
                 )}
-                <p className="text-center text-xs text-muted-foreground">
-                  {stats.n > 0
-                    ? `ข้อมูลจริงเดือนนี้ ${stats.n} วัน · baseline ${baselineStats.n}/20 ค่า · Mean ${fmt(baselineStats.mean)} · SD ${formatSd(baselineStats.sd)}`
-                    : "ยังไม่มีการบันทึกในเดือนนี้"}
-                </p>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-4 py-12 text-center">
-                <Activity className="h-8 w-8 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้</p>
-                  <p className="text-sm text-muted-foreground">
-                    กรอก Mean และ STD จากผลการสอบเทียบ เพื่อสร้างเส้น UWL/LWL (±2SD) และ UCL/LCL (±3SD)
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setConfigOpen(true)}>
-                  <Settings2 className="h-4 w-4" /> ตั้งค่าค่า Control
-                </Button>
-              </div>
-            )}
+              </section>
+            ))}
           </CardContent>
         </Card>
       </div>
@@ -782,12 +797,12 @@ const BalanceRoomPage = () => {
       )}
 
       <BalanceControlConfigDialog
-        open={configOpen}
-        onOpenChange={setConfigOpen}
+        open={configWeight != null}
+        onOpenChange={(open) => { if (!open) setConfigWeight(null); }}
         scale={scale}
-        config={config}
-        digits={digits}
-        suggestion={suggestion}
+        config={activePanel.config}
+        digits={activePanel.digits}
+        suggestion={activePanel.suggestion}
       />
     </div>
   );

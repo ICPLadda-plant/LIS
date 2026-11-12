@@ -158,7 +158,8 @@ describe("BalanceRoomPage", () => {
 
   it("asks for control values when the scale has no config", async () => {
     renderPage();
-    expect(await screen.findByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).toBeInTheDocument();
+    expect(await screen.findByText("ยังไม่มีข้อมูลหรือค่า Control สำหรับตุ้ม 500 g")).toBeInTheDocument();
+    expect(screen.getByText("ยังไม่มีข้อมูลหรือค่า Control สำหรับตุ้ม 10 g")).toBeInTheDocument();
   });
 
   it("shows recorded values before control limits are configured", async () => {
@@ -183,7 +184,7 @@ describe("BalanceRoomPage", () => {
 
     renderPage();
 
-    expect(await screen.findByText(/กราฟแสดงค่าที่บันทึกแล้วโดยยังไม่มีเส้นควบคุม/)).toBeInTheDocument();
+    expect(await screen.findAllByText(/กราฟมีข้อมูลแล้ว แต่ยังไม่มีเส้น Mean/)).toHaveLength(2);
   });
 
   it("loads the selected scale records for the current month", async () => {

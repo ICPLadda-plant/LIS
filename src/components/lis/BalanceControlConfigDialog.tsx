@@ -140,7 +140,7 @@ export default function BalanceControlConfigDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>ตั้งค่าค่า Control — {scale.code}</DialogTitle>
+          <DialogTitle>ตั้งค่าค่า Control — {scale.code} · ตุ้ม {config.nominal} g</DialogTitle>
           <DialogDescription>
             กรอก Mean และ STD จากการประเมินเครื่องชั่ง ระบบจะคำนวณเส้นเฝ้าระวัง (±2SD) และเส้นควบคุม (±3SD) ให้อัตโนมัติ
           </DialogDescription>

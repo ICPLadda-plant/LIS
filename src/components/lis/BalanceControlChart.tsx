@@ -237,7 +237,7 @@ export function BalanceControlLegend({
 }: {
   fixed?: boolean;
   className?: string;
-  controlWeight?: 10 | 100;
+  controlWeight?: number;
 }) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
   const items: LegendItem[] = [

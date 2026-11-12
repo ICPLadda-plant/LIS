@@ -14,10 +14,11 @@ const BalanceControlConfigSchema = new mongoose.Schema({
   model: { type: String, default: '' },
   weightCode: { type: String, default: '' },   // รหัสตุ้มน้ำหนัก เช่น GL55-11006
   nominal: { type: Number, default: 100 },     // น้ำหนักตุ้ม Daily check (g)
-  mean: { type: Number, required: true },
-  sd: { type: Number, required: true },
+  mean: { type: Number, default: null },
+  sd: { type: Number, default: null },
   mpe: { type: Number, default: null },        // Maximum permissible error (g)
   updatedDate: { type: String, default: '' },  // YYYY-MM-DD วันที่ปรับปรุงค่า Control
+  controls: { type: mongoose.Schema.Types.Mixed, default: {} }, // ค่า Control แยกตามน้ำหนักตุ้ม
 }, { timestamps: true });
 
 module.exports = mongoose.model('BalanceControlConfig', BalanceControlConfigSchema);

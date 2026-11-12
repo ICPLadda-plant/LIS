@@ -137,11 +137,11 @@ describe("chartDomain / formatSd", () => {
 });
 
 describe("config defaults / validation", () => {
-  it("มีค่าเริ่มต้นครบ 5 เครื่องและยังไม่มีค่า Control", () => {
-    expect(BALANCE_CONTROL_DEFAULTS.map((config) => config.scaleId)).toEqual([
-      "scale-1", "scale-2", "scale-3", "scale-4", "scale-5",
-    ]);
+  it("มีค่าเริ่มต้นครบ 2 ตุ้มต่อเครื่องและยังไม่มีค่า Control", () => {
+    expect(BALANCE_CONTROL_DEFAULTS).toHaveLength(10);
+    expect(BALANCE_CONTROL_DEFAULTS.filter((config) => config.scaleId === "scale-1").map((config) => config.nominal)).toEqual([500, 10]);
     expect(getBalanceControlConfig(undefined, "scale-1")).toMatchObject({ mean: null, sd: null, nominal: 10 });
+    expect(getBalanceControlConfig(undefined, "scale-1", 500)).toMatchObject({ mean: null, sd: null, nominal: 500 });
   });
 
   it("ตรวจค่าที่กรอกด้วยข้อความเดียวกับ server", () => {

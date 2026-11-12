@@ -61,15 +61,18 @@ const DEFAULT_SCALE_META = [
   { scaleId: "scale-5", brand: "Sartorius", model: "MCE225P-3S00-D" },
 ];
 
-export const BALANCE_CONTROL_DEFAULTS: BalanceControlConfig[] = DEFAULT_SCALE_META.map((meta) => ({
-  ...meta,
-  weightCode: "",
-  nominal: meta.scaleId === "scale-1" ? 10 : 100,
-  mean: null,
-  sd: null,
-  mpe: 0.5,
-  updatedDate: "",
-}));
+export const BALANCE_CONTROL_DEFAULTS: BalanceControlConfig[] = DEFAULT_SCALE_META.flatMap((meta) => {
+  const scale = BALANCE_SCALES.find((item) => item.id === meta.scaleId);
+  return [scale?.primaryCalibrationWeight ?? 100, 10].map((nominal) => ({
+    ...meta,
+    weightCode: "",
+    nominal,
+    mean: null,
+    sd: null,
+    mpe: 0.5,
+    updatedDate: "",
+  }));
+});
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
@@ -78,15 +81,17 @@ const isFiniteNumber = (value: unknown): value is number =>
 export function getBalanceControlConfig(
   configs: BalanceControlConfig[] | undefined,
   scaleId: string,
+  nominal?: number,
 ): BalanceControlConfig {
+  const targetNominal = nominal ?? BALANCE_SCALES.find((scale) => scale.id === scaleId)?.controlWeight ?? 100;
   return (
-    configs?.find((config) => config.scaleId === scaleId) ??
-    BALANCE_CONTROL_DEFAULTS.find((config) => config.scaleId === scaleId) ?? {
+    configs?.find((config) => config.scaleId === scaleId && config.nominal === targetNominal) ??
+    BALANCE_CONTROL_DEFAULTS.find((config) => config.scaleId === scaleId && config.nominal === targetNominal) ?? {
       scaleId,
       brand: "",
       model: "",
       weightCode: "",
-      nominal: 100,
+      nominal: targetNominal,
       mean: null,
       sd: null,
       mpe: null,

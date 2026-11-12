@@ -25,13 +25,14 @@ function mockResponse() {
 describe('GET /balance-control-config', () => {
   beforeEach(() => mockFind.mockReset());
 
-  it('returns defaults for all five scales when nothing is stored', async () => {
+  it('returns two control weights for all five scales when nothing is stored', async () => {
     mockFind.mockResolvedValue([]);
     const res = mockResponse();
     await getHandler({}, res);
     const { data } = res.json.mock.calls[0][0];
-    expect(data.map((d) => d.scaleId)).toEqual(['scale-1', 'scale-2', 'scale-3', 'scale-4', 'scale-5']);
-    expect(data[0]).toMatchObject({ brand: 'Mettler Toledo', model: 'MS3002S', nominal: 10, mean: null, sd: null });
+    expect(data).toHaveLength(10);
+    expect(data.slice(0, 2)).toMatchObject([{ scaleId: 'scale-1', nominal: 500 }, { scaleId: 'scale-1', nominal: 10 }]);
+    expect(data[0]).toMatchObject({ brand: 'Mettler Toledo', model: 'MS3002S', mean: null, sd: null });
   });
 
   it('merges stored control values over the defaults', async () => {
@@ -39,7 +40,7 @@ describe('GET /balance-control-config', () => {
     const res = mockResponse();
     await getHandler({}, res);
     const { data } = res.json.mock.calls[0][0];
-    expect(data[1]).toMatchObject({ scaleId: 'scale-2', weightCode: 'GL55-11006', mean: 99.99972, sd: 0.0000476 });
+    expect(data.find((item) => item.scaleId === 'scale-2' && item.nominal === 100)).toMatchObject({ weightCode: 'GL55-11006', mean: 99.99972, sd: 0.0000476 });
     expect(data[0].mean).toBeNull();
   });
 });
@@ -69,6 +70,13 @@ describe('PUT /balance-control-config/:scaleId', () => {
     expect(res.json).toHaveBeenCalledWith({ error: message });
   });
 
+  it('rejects a control weight that does not belong to the scale', async () => {
+    const res = mockResponse();
+    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 100, mean: 100, sd: 0.1 } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'น้ำหนักตุ้มไม่ตรงกับเครื่องชั่ง' });
+  });
+
   it('upserts valid control values', async () => {
     const res = mockResponse();
     await putHandler({
@@ -77,7 +85,12 @@ describe('PUT /balance-control-config/:scaleId', () => {
     }, res);
     expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
       { scaleId: 'scale-2' },
-      expect.objectContaining({ brand: 'Mettler Toledo', model: 'MS204', weightCode: 'GL55-11006', nominal: 100, mean: 99.99972 }),
+      { $set: expect.objectContaining({
+        scaleId: 'scale-2',
+        brand: 'Mettler Toledo',
+        model: 'MS204',
+        'controls.100': expect.objectContaining({ weightCode: 'GL55-11006', nominal: 100, mean: 99.99972 }),
+      }) },
       { new: true, upsert: true },
     );
     expect(res.json.mock.calls[0][0].data).toMatchObject({ scaleId: 'scale-2', sd: 0.0000476, updatedDate: '2026-10-26' });
