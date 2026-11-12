@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // ค่า Control (baseline) ของเครื่องชั่งแต่ละเครื่อง — ใช้วาด Control Chart
-// ของ Daily check ตุ้ม 100 g เทียบกับ Mean ±2SD (UWL/LWL) และ ±3SD (UCL/LCL)
+// ของ Daily check ตามตุ้มน้ำหนักที่กำหนดต่อเครื่อง เทียบกับ Mean ±2SD และ ±3SD
 const BalanceControlConfigSchema = new mongoose.Schema({
   scaleId: {
     type: String,

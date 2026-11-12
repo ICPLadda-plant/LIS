@@ -13,7 +13,7 @@ const SCALE_DEFAULTS = [
 ].map((d) => ({
   ...d,
   weightCode: '',
-  nominal: 100,
+  nominal: d.scaleId === 'scale-1' ? 10 : 100,
   mean: null,
   sd: null,
   mpe: 0.5,

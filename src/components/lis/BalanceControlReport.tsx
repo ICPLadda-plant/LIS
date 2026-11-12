@@ -56,15 +56,15 @@ export interface BalanceControlReportProps {
   printedAt: string;
 }
 
-const resultMark = (record: DailyCheckRecord | null) => {
-  const status = record?.status100 ?? record?.status;
+const resultMark = (record: DailyCheckRecord | null, controlWeight: 10 | 100) => {
+  const status = controlWeight === 10 ? record?.status10 ?? record?.status : record?.status100 ?? record?.status;
   if (status === "pass") return "√";
   if (status === "fail") return "X";
   return "";
 };
 
-const weightText = (record: DailyCheckRecord | null, index: number, decimals: number) => {
-  const raw = record?.weights100?.[index];
+const weightText = (weights: DailyCheckRecord["weights100"] | undefined, index: number, decimals: number) => {
+  const raw = weights?.[index];
   if (raw === undefined || raw === null || raw === "") return "";
   const value = Number(raw);
   return Number.isFinite(value) ? formatControlNumber(value, decimals) : String(raw);
@@ -108,14 +108,15 @@ export default function BalanceControlReport({
       <tbody>
         {points.map((point) => {
           const record = point.record;
+          const weights = scale.controlWeight === 10 ? record?.weights10 : record?.weights100;
           return (
             <tr key={point.date}>
               <td>{fmtDate(point.date)}</td>
-              <td>{weightText(record, 0, scale.decimals)}</td>
-              <td>{weightText(record, 1, scale.decimals)}</td>
-              <td>{weightText(record, 2, scale.decimals)}</td>
-              <td>{record ? formatControlNumber(record.avg100, scale.decimals) : ""}</td>
-              <td>{resultMark(record)}</td>
+              <td>{weightText(weights, 0, scale.decimals)}</td>
+              <td>{weightText(weights, 1, scale.decimals)}</td>
+              <td>{weightText(weights, 2, scale.decimals)}</td>
+              <td>{record ? formatControlNumber(scale.controlWeight === 10 ? record.avg10 : record.avg100, scale.decimals) : ""}</td>
+              <td>{resultMark(record, scale.controlWeight)}</td>
               <td />
               <td>{record?.recorder ?? ""}</td>
             </tr>
@@ -142,7 +143,7 @@ export default function BalanceControlReport({
         <span>รหัสตุ้มน้ำหนัก :</span>
         <span className="bcr-fill">{config.weightCode}</span>
         <span style={{ gridColumn: "span 2" }}>น้ำหนักตุ้ม Daily check :</span>
-        <span className="bcr-fill">{config.nominal}</span>
+        <span className="bcr-fill">{scale.controlWeight}</span>
         <span>g</span>
       </div>
 

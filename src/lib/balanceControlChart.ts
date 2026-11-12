@@ -1,6 +1,6 @@
-// Quality Control Chart ของเครื่องชั่ง (Daily check ด้วยตุ้ม 100 g)
+// Quality Control Chart ของเครื่องชั่ง (Daily check ด้วยตุ้มที่กำหนดต่อเครื่อง)
 // - ค่า Control (Mean / STD) ตั้งต่อเครื่อง → คำนวณเส้น UWL/LWL (±2SD) และ UCL/LCL (±3SD)
-// - ค่าที่ได้ของแต่ละวัน = avg100 ของการบันทึกล่าสุดในวันนั้น แล้วนำมาเทียบกับเส้นควบคุม
+// - ค่าที่ได้ของแต่ละวัน = ค่าเฉลี่ยของตุ้มที่กำหนดต่อเครื่องจากการบันทึกล่าสุดในวันนั้น
 // ฝั่ง server (server/routes/balanceControlConfig.js) ใช้ default และข้อความ validate ชุดเดียวกัน
 
 export interface BalanceScale {
@@ -12,14 +12,16 @@ export interface BalanceScale {
   model: string;
   /** ความละเอียดของเครื่อง (จำนวนตำแหน่งทศนิยม) */
   decimals: number;
+  /** ตุ้มน้ำหนักที่นำมาสร้าง Control Chart */
+  controlWeight: 10 | 100;
 }
 
 export const BALANCE_SCALES: BalanceScale[] = [
-  { id: "scale-1", code: "LD-005", name: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง", model: "Balance A", decimals: 2 },
-  { id: "scale-2", code: "LD-006", name: "LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง", model: "Balance B", decimals: 4 },
-  { id: "scale-3", code: "LD-021", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C", decimals: 5 },
-  { id: "scale-4", code: "LD-047", name: "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance D", decimals: 5 },
-  { id: "scale-5", code: "LD-048", name: "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance E", decimals: 5 },
+  { id: "scale-1", code: "LD-005", name: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง", model: "Balance A", decimals: 2, controlWeight: 10 },
+  { id: "scale-2", code: "LD-006", name: "LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง", model: "Balance B", decimals: 4, controlWeight: 100 },
+  { id: "scale-3", code: "LD-021", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C", decimals: 5, controlWeight: 100 },
+  { id: "scale-4", code: "LD-047", name: "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance D", decimals: 5, controlWeight: 100 },
+  { id: "scale-5", code: "LD-048", name: "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance E", decimals: 5, controlWeight: 100 },
 ];
 
 export const balanceScaleTypeLabel = (scale: BalanceScale) => `เครื่องชั่งดิจิตอล ${scale.decimals} ตำแหน่ง`;
@@ -60,7 +62,7 @@ const DEFAULT_SCALE_META = [
 export const BALANCE_CONTROL_DEFAULTS: BalanceControlConfig[] = DEFAULT_SCALE_META.map((meta) => ({
   ...meta,
   weightCode: "",
-  nominal: 100,
+  nominal: meta.scaleId === "scale-1" ? 10 : 100,
   mean: null,
   sd: null,
   mpe: 0.5,
@@ -171,6 +173,7 @@ export function formatThaiMonth(month: string): string {
 export interface ControlSeriesRecord {
   date: string;
   avg100: number;
+  avg10?: number;
   checkedAt: string;
 }
 
@@ -184,12 +187,13 @@ export interface MonthlyPoint<R extends ControlSeriesRecord = ControlSeriesRecor
 const timeOf = (iso: string) => Date.parse(iso) || 0;
 
 /** 1 จุดต่อวันของเดือน (ใช้การบันทึกล่าสุดของวัน); วันไม่มีข้อมูล value = null */
-export function buildMonthlySeries<R extends ControlSeriesRecord>(records: R[], month: string): MonthlyPoint<R>[] {
+export function buildMonthlySeries<R extends ControlSeriesRecord>(records: R[], month: string, controlWeight: 10 | 100 = 100): MonthlyPoint<R>[] {
   const range = monthRange(month);
   if (!range) return [];
   const latestByDate = new Map<string, R>();
   for (const record of records) {
-    if (!record?.date?.startsWith(`${month}-`) || !isFiniteNumber(record.avg100)) continue;
+    const value = controlWeight === 10 ? record.avg10 : record.avg100;
+    if (!record?.date?.startsWith(`${month}-`) || !isFiniteNumber(value)) continue;
     const previous = latestByDate.get(record.date);
     if (!previous || timeOf(record.checkedAt) > timeOf(previous.checkedAt)) latestByDate.set(record.date, record);
   }
@@ -197,8 +201,13 @@ export function buildMonthlySeries<R extends ControlSeriesRecord>(records: R[], 
   return Array.from({ length: days }, (_, index) => {
     const date = `${month}-${String(index + 1).padStart(2, "0")}`;
     const record = latestByDate.get(date) ?? null;
-    return { day: index + 1, date, value: record ? record.avg100 : null, record };
+    return { day: index + 1, date, value: record ? (controlWeight === 10 ? record.avg10 ?? null : record.avg100) : null, record };
   });
+}
+
+/** เลือกค่าจริงตามลำดับวันไม่เกินจำนวนที่กำหนด สำหรับสร้าง baseline Control Chart */
+export function controlBaselineValues(series: MonthlyPoint[], limit = 20): number[] {
+  return series.flatMap((point) => point.value == null ? [] : [point.value]).slice(0, limit);
 }
 
 /** ค่าเฉลี่ยและ SD แบบ sample (n − 1) เหมือน STDEV ใน Excel */

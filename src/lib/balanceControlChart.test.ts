@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BALANCE_CONTROL_DEFAULTS,
   buildMonthlySeries,
+  controlBaselineValues,
   chartDomain,
   classifyPoint,
   computeLimits,
@@ -74,6 +75,18 @@ describe("buildMonthlySeries", () => {
     expect(buildMonthlySeries([], "2028-02")).toHaveLength(29);
     expect(buildMonthlySeries([], "2026-13")).toEqual([]);
   });
+
+  it("LD-005 ใช้ค่าเฉลี่ยตุ้ม 10 g และเลือก baseline 20 ค่าแรก", () => {
+    const records = Array.from({ length: 22 }, (_, index) => ({
+      date: `2026-11-${String(index + 1).padStart(2, "0")}`,
+      avg100: 100 + index,
+      avg10: 10 + index / 100,
+      checkedAt: `2026-11-${String(index + 1).padStart(2, "0")}T08:00:00.000Z`,
+    }));
+    const series = buildMonthlySeries(records, "2026-11", 10);
+    expect(series[0].value).toBe(10);
+    expect(controlBaselineValues(series)).toEqual(Array.from({ length: 20 }, (_, index) => 10 + index / 100));
+  });
 });
 
 describe("monthRange / formatThaiMonth", () => {
@@ -128,7 +141,7 @@ describe("config defaults / validation", () => {
     expect(BALANCE_CONTROL_DEFAULTS.map((config) => config.scaleId)).toEqual([
       "scale-1", "scale-2", "scale-3", "scale-4", "scale-5",
     ]);
-    expect(getBalanceControlConfig(undefined, "scale-1")).toMatchObject({ mean: null, sd: null, nominal: 100 });
+    expect(getBalanceControlConfig(undefined, "scale-1")).toMatchObject({ mean: null, sd: null, nominal: 10 });
   });
 
   it("ตรวจค่าที่กรอกด้วยข้อความเดียวกับ server", () => {

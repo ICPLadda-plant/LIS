@@ -45,6 +45,7 @@ import {
   chartDomain,
   classifyPoint,
   computeLimits,
+  controlBaselineValues,
   countByStatus,
   currentMonthStr,
   displayDigits,
@@ -180,11 +181,23 @@ const BalanceRoomPage = () => {
     return map;
   }, [todayRecords, currentPeriod]);
 
-  const config = getBalanceControlConfig(controlConfigs, scale.id);
-  const limits = useMemo(() => computeLimits(config.mean, config.sd), [config.mean, config.sd]);
-  const digits = displayDigits(scale.decimals, config.sd);
-  const series = useMemo(() => buildMonthlySeries(monthRecords ?? [], month), [monthRecords, month]);
+  const storedConfig = getBalanceControlConfig(controlConfigs, scale.id);
+  const config = useMemo(
+    () => storedConfig.nominal === scale.controlWeight
+      ? storedConfig
+      : { ...storedConfig, nominal: scale.controlWeight, mean: null, sd: null },
+    [scale.controlWeight, storedConfig],
+  );
+  const series = useMemo(() => buildMonthlySeries(monthRecords ?? [], month, scale.controlWeight), [monthRecords, month, scale.controlWeight]);
   const values = useMemo(() => series.map(point => point.value), [series]);
+  const baselineValues = useMemo(() => controlBaselineValues(series, 20), [series]);
+  const baselineStats = useMemo(() => monthlyStats(baselineValues), [baselineValues]);
+  const savedLimits = useMemo(() => computeLimits(config.mean, config.sd), [config.mean, config.sd]);
+  const limits = useMemo(
+    () => savedLimits ?? (baselineStats.n === 20 ? computeLimits(baselineStats.mean, baselineStats.sd) : null),
+    [baselineStats, savedLimits],
+  );
+  const digits = displayDigits(scale.decimals, limits?.sd ?? config.sd);
   const domain = useMemo(() => chartDomain(limits, values), [limits, values]);
   const stats = useMemo(() => monthlyStats(values), [values]);
   const counts = useMemo(() => countByStatus(values, limits), [values, limits]);
@@ -194,10 +207,10 @@ const BalanceRoomPage = () => {
   );
   const suggestion = useMemo<BalanceControlSuggestion | null>(
     () =>
-      stats.n >= 2 && stats.mean != null && stats.sd != null
-        ? { n: stats.n, mean: stats.mean, sd: stats.sd, monthLabel: formatThaiMonth(month) }
+      baselineStats.n === 20 && baselineStats.mean != null && baselineStats.sd != null
+        ? { n: baselineStats.n, mean: baselineStats.mean, sd: baselineStats.sd, monthLabel: formatThaiMonth(month) }
         : null,
-    [stats, month],
+    [baselineStats, month],
   );
 
   const createMutation = useMutation({
@@ -336,7 +349,9 @@ const BalanceRoomPage = () => {
   const savingThisScale = createMutation.isPending && createMutation.variables?.scaleId === scale.id;
 
   // ค่าปัจจุบัน (กำลังกรอก หรือผลที่บันทึกแล้ววันนี้) เทียบกับเส้น Control
-  const compareValue = showResult ? todayRec?.avg100 ?? null : calcAvg(draft.weights100);
+  const compareValue = scale.controlWeight === 10
+    ? (showResult ? todayRec?.avg10 ?? null : calcAvg(draft.weights10))
+    : (showResult ? todayRec?.avg100 ?? null : calcAvg(draft.weights100));
   const compareStatus = classifyPoint(compareValue, limits);
 
   const fmt = (value: number | null | undefined) => formatControlNumber(value, digits);
@@ -346,7 +361,7 @@ const BalanceRoomPage = () => {
     { label: "ยี่ห้อ", value: config.brand || "—" },
     { label: "รุ่น", value: config.model || "—" },
     { label: "รหัสตุ้มน้ำหนัก", value: config.weightCode || "—" },
-    { label: "น้ำหนักตุ้ม", value: `${config.nominal} g` },
+    { label: "น้ำหนักตุ้ม Control Chart", value: `${scale.controlWeight} g` },
     { label: "ประจำเดือน/ปี", value: formatThaiMonth(month) },
   ];
 
@@ -571,14 +586,14 @@ const BalanceRoomPage = () => {
             {weightBlock("10")}
 
             <div className="rounded-md border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground">เทียบกับเส้น Control (ตุ้ม 100 g)</p>
+              <p className="text-xs font-medium text-muted-foreground">เทียบกับเส้น Control (ตุ้ม {scale.controlWeight} g)</p>
               {!limits ? (
                 <p className="mt-1 text-sm text-muted-foreground">
                   ยังไม่มีค่า Mean / STD ของเครื่องนี้ — กดปุ่มตั้งค่าเพื่อเริ่มเทียบกับกราฟ
                 </p>
               ) : compareValue == null ? (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  กรอกค่าตุ้ม 100 g ให้ครบ 3 ครั้ง ระบบจะเทียบกับเส้น Control ให้ทันที
+                  กรอกค่าตุ้ม {scale.controlWeight} g ให้ครบ 3 ครั้ง ระบบจะเทียบกับเส้น Control ให้ทันที
                 </p>
               ) : (
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
@@ -631,7 +646,7 @@ const BalanceRoomPage = () => {
             <div className="space-y-1">
               <CardTitle className="text-base">กราฟควบคุมคุณภาพ (Control Chart)</CardTitle>
               <CardDescription>
-                ค่าเฉลี่ยตุ้ม {config.nominal} g รายวันของ {scale.code} — {formatThaiMonth(month)}
+                ค่าเฉลี่ยตุ้ม {scale.controlWeight} g รายวันของ {scale.code} — {formatThaiMonth(month)}
               </CardDescription>
             </div>
             {limits && (
@@ -649,7 +664,7 @@ const BalanceRoomPage = () => {
                 <BalanceControlLegend />
                 <p className="text-center text-xs text-muted-foreground">
                   {stats.n > 0
-                    ? `ข้อมูลจริงเดือนนี้ ${stats.n} วัน · Mean ${fmt(stats.mean)} · SD ${formatSd(stats.sd)}`
+                    ? `ข้อมูลจริงเดือนนี้ ${stats.n} วัน · baseline ${baselineStats.n}/20 ค่า · Mean ${fmt(baselineStats.mean)} · SD ${formatSd(baselineStats.sd)}`
                     : "ยังไม่มีการบันทึกในเดือนนี้"}
                 </p>
               </>
@@ -676,7 +691,7 @@ const BalanceRoomPage = () => {
         <div>
           <h3 className="text-base font-semibold text-foreground">บันทึกรายวัน — {formatThaiMonth(month)}</h3>
           <p className="text-sm text-muted-foreground">
-            ใช้ผลการบันทึกล่าสุดของแต่ละวัน (ค่าเฉลี่ยตุ้ม 100 g) เทียบกับเส้น Control
+            ใช้ผลการบันทึกล่าสุดของแต่ละวัน (ค่าเฉลี่ยตุ้ม {scale.controlWeight} g) เทียบกับเส้น Control
           </p>
         </div>
         <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">

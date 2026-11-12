@@ -150,11 +150,11 @@ export default function BalanceControlConfigDialog({
           {suggestion ? (
             <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
               <p className="text-muted-foreground">
-                ข้อมูล {suggestion.monthLabel}: {suggestion.n} วัน · Mean {formatControlNumber(suggestion.mean, digits)} · STD{" "}
+                ข้อมูล 20 ค่าแรกของ {suggestion.monthLabel} · Mean {formatControlNumber(suggestion.mean, digits)} · STD{" "}
                 {formatSd(suggestion.sd)}
               </p>
               <Button type="button" variant="outline" size="sm" className="gap-2" onClick={applySuggestion}>
-                <Calculator className="h-4 w-4" /> ใช้ค่าจากข้อมูลเดือนนี้
+                <Calculator className="h-4 w-4" /> ใช้ baseline 20 ค่า
               </Button>
             </div>
           ) : null}

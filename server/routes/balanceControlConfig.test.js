@@ -31,7 +31,7 @@ describe('GET /balance-control-config', () => {
     await getHandler({}, res);
     const { data } = res.json.mock.calls[0][0];
     expect(data.map((d) => d.scaleId)).toEqual(['scale-1', 'scale-2', 'scale-3', 'scale-4', 'scale-5']);
-    expect(data[0]).toMatchObject({ brand: 'Mettler Toledo', model: 'MS3002S', nominal: 100, mean: null, sd: null });
+    expect(data[0]).toMatchObject({ brand: 'Mettler Toledo', model: 'MS3002S', nominal: 10, mean: null, sd: null });
   });
 
   it('merges stored control values over the defaults', async () => {

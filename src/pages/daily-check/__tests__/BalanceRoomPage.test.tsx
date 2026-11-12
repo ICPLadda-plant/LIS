@@ -122,34 +122,34 @@ describe("BalanceRoomPage", () => {
         brand: "Mettler Toledo",
         model: "MS3002S",
         weightCode: "W-100",
-        nominal: 100,
-        mean: 99.99972,
-        sd: 0.0000476,
+        nominal: 10,
+        mean: 10,
+        sd: 0.004,
         mpe: 0.5,
         updatedDate: "2026-10-26",
       },
     ]);
     renderPage();
 
-    expect(await screen.findByText("99.999720")).toBeInTheDocument();
-    expect(screen.getByText("0.0000476")).toBeInTheDocument();
+    expect(await screen.findByText("10.0000")).toBeInTheDocument();
+    expect(screen.getByText("0.00400")).toBeInTheDocument();
     // UWL = Mean + 2SD, LCL = Mean − 3SD (ไม่ใช่ค่า LCL ที่ผิดในชีต Excel)
-    expect(screen.getByText("99.999815")).toBeInTheDocument();
-    expect(screen.getByText("99.999577")).toBeInTheDocument();
+    expect(screen.getByText("10.0080")).toBeInTheDocument();
+    expect(screen.getByText("9.9880")).toBeInTheDocument();
     expect(screen.queryByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).not.toBeInTheDocument();
   });
 
-  it("compares the current 100 g average with the control lines", async () => {
+  it("compares the current LD-005 10 g average with the control lines", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 100, mean: 100, sd: 0.001, mpe: 0.5, updatedDate: "" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, mpe: 0.5, updatedDate: "" },
     ]);
     renderPage();
-    await screen.findByText("100.0000");
+    await screen.findByText("10.0000");
 
-    const [first100] = screen.getAllByPlaceholderText("ครั้งที่ 1");
-    const [second100] = screen.getAllByPlaceholderText("ครั้งที่ 2");
-    const [third100] = screen.getAllByPlaceholderText("ครั้งที่ 3");
-    [first100, second100, third100].forEach(input => fireEvent.change(input, { target: { value: "100.004" } }));
+    const [, first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
+    const [, second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
+    const [, third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
+    [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.004" } }));
 
     expect(screen.getByText("เกิน 3SD (นอกเกณฑ์)")).toBeInTheDocument();
   });
