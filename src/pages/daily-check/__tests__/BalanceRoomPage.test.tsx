@@ -82,9 +82,9 @@ describe("BalanceRoomPage", () => {
     expect(screen.queryByText("นอกเวลาบันทึก")).not.toBeInTheDocument();
     expect(screen.getByText(/บันทึกได้ทุกเวลา/)).toBeInTheDocument();
 
-    const [first500, first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
-    const [second500, second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
-    const [third500, third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
+    const [first10, first500] = screen.getAllByPlaceholderText("ครั้งที่ 1");
+    const [second10, second500] = screen.getAllByPlaceholderText("ครั้งที่ 2");
+    const [third10, third500] = screen.getAllByPlaceholderText("ครั้งที่ 3");
     [first500, second500, third500].forEach(input => fireEvent.change(input, { target: { value: "500.01" } }));
     [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.01" } }));
 
@@ -114,7 +114,7 @@ describe("BalanceRoomPage", () => {
     fireEvent.change(fileInput!, { target: { files: [new File(["image"], "balance.jpg", { type: "image/jpeg" })] } });
 
     await waitFor(() => expect(readBalanceDisplayValueFromImageMock).toHaveBeenCalled());
-    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[0]).toHaveValue(100.012);
+    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[1]).toHaveValue(100.012);
   });
 
   it("shows the control values and limits from the saved config", async () => {
@@ -148,9 +148,9 @@ describe("BalanceRoomPage", () => {
     renderPage();
     await screen.findByText("10.0000");
 
-    const [, first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
-    const [, second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
-    const [, third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
+    const [first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
+    const [second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
+    const [third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
     [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.004" } }));
 
     expect(screen.getByText("เกิน 3SD (นอกเกณฑ์)")).toBeInTheDocument();

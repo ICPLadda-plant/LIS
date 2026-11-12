@@ -598,8 +598,8 @@ const BalanceRoomPage = () => {
             )}
           </CardHeader>
           <CardContent className="space-y-4">
-            {weightBlock("100")}
             {weightBlock("10")}
+            {weightBlock("100")}
 
             <div className="rounded-md border bg-muted/40 p-3">
               <p className="text-xs font-medium text-muted-foreground">เทียบกับเส้น Control (ตุ้ม {scale.controlWeight} g)</p>
