@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import BalanceRoomPage from "../BalanceRoomPage";
 import { currentMonthStr, monthRange } from "@/lib/balanceControlChart";
@@ -153,6 +153,9 @@ describe("BalanceRoomPage", () => {
   it("opens the print report for the selected scale", async () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /Print/ }));
-    expect(await screen.findByTestId("print-preview")).toBeInTheDocument();
+    const preview = await screen.findByTestId("print-preview");
+    expect(within(preview).getAllByRole("table")).toHaveLength(2);
+    expect(within(preview).getByText(/01\/.*\/2026/)).toBeInTheDocument();
+    expect(within(preview).getByText(/16\/.*\/2026/)).toBeInTheDocument();
   });
 });
