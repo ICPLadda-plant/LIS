@@ -116,8 +116,18 @@ export default function CoaCreateDialog({
   const [erpMatchChecked, setErpMatchChecked] = useState(false);
   const erp = request?.externalCoaRequest;
   const erpSeq = erp?.line || 1;
-  const erpSample = erp ? request?.sampleSnapshots?.[0] : undefined;
-  const erpBase = filled({ sampleName: erpSample?.sampleName, commonName: erpSample?.commonName });
+  const erpSamples = erp ? request?.sampleSnapshots ?? [] : [];
+  const erpSample = erpSamples[0];
+  const erpValues = (key: "batchNo" | "lotNo" | "productionDate") =>
+    [...new Set(erpSamples.map((sample) => sample[key]?.trim()).filter(Boolean))] as string[];
+  const erpProductionDates = erpValues("productionDate");
+  const erpBase = filled({
+    sampleName: erpSample?.sampleName,
+    commonName: erpSample?.commonName,
+    batchNo: erpValues("batchNo").join(", "),
+    lotNo: erpValues("lotNo").join(", "),
+    productionDate: erpProductionDates.length === 1 ? erpProductionDates[0] : undefined,
+  });
   const { data, isFetching, error: loadError, refetch } = useQuery({ queryKey: ["coa", "eligible-petitions"], queryFn: api.getEligibleCoaPetitions, enabled: open });
   const petitions = useMemo(() => data?.items ?? [], [data]);
   const selectedPetition = useMemo(

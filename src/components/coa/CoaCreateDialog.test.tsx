@@ -138,4 +138,18 @@ describe("CoaCreateDialog", () => {
       externalCoaRequest: { saleOrderNo: "SO1", line: 10000, itemNo: "FC-1" },
     }));
   });
+
+  it("prefills every ERP Batch that shares the Lot Description production date", async () => {
+    mocks.eligible.mockResolvedValueOnce({ items: [] });
+    renderDialog({
+      ...erpRequest,
+      sampleSnapshots: ['080', '081', '082'].map((batchNo) => ({
+        itemSeq: 10000, sampleName: 'ช้างมาร์กี้', commonName: 'Glyphosate 48% SL',
+        batchNo, lotNo: `26S-GLY48-${batchNo}-111169`, productionDate: '2026-11-11',
+      })),
+    });
+
+    expect(await screen.findByLabelText("Batch *")).toHaveValue("080, 081, 082");
+    expect(screen.getByLabelText("MANUFACTURING DATE *")).toHaveValue("2026-11-11");
+  });
 });

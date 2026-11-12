@@ -648,6 +648,28 @@ test('enrichExternalCoaDocumentsWithErpLots adds the ERP Lot to a COA request ro
   assert.equal(enriched.sampleSnapshots[0].productionDate, '2026-10-09');
 });
 
+test('enrichExternalCoaDocumentsWithErpLots keeps every Batch from the same Lot Description production date', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-MARKY', Line: 10000, ItemNo: 'F-GLY48',
+    TradeName: 'ช้างมาร์กี้', CommonName: 'GLYPHOSATE 48% W/V SL', ShipmentDate: '2026-11-12', remark: 'COA',
+  }]);
+
+  const [enriched] = router.enrichExternalCoaDocumentsWithErpLots([source], {
+    stockRows: [
+      { item_no: 'F-GLY48', lot_no: 'FG261111-010', 'Lot Description': '26S-GLY48-080-111169', stock_qty: 10 },
+      { item_no: 'F-GLY48', lot_no: 'FG261111-011', 'Lot Description': '26S-GLY48-081-111169', stock_qty: 10 },
+      { item_no: 'F-GLY48', lot_no: 'FG261111-012', 'Lot Description': '26S-GLY48-082-111169', stock_qty: 10 },
+      { item_no: 'F-GLY48', lot_no: 'FG261103-009', 'Lot Description': '26S-GLY48-079-031169', stock_qty: 10 },
+    ],
+    mfRows: [],
+  });
+
+  assert.deepEqual(enriched.sampleSnapshots.map((sample) => sample.batchNo), ['080', '081', '082']);
+  assert.deepEqual(enriched.sampleSnapshots.map((sample) => sample.productionDate), [
+    '2026-11-11', '2026-11-11', '2026-11-11',
+  ]);
+});
+
 test('manual route creates an ERP-linked COA without a petition and hides the ERP request row', async () => {
   const originals = {
     create: CoaDocument.create, find: CoaDocument.find, auditCreate: CoaAuditLog.create,

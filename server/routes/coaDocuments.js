@@ -564,13 +564,23 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petit
     if (!samples.length) return source;
     return {
       ...source,
-      sampleSnapshots: samples.map((sample) => {
+      sampleSnapshots: samples.flatMap((sample) => {
         const sampleSource = { ...source, selectedItemSeqs: [sample.itemSeq], sampleSnapshots: [sample],
           externalCoaRequest: { ...source.externalCoaRequest, itemNo: sample.sampleId } };
         const requestMatch = findBestRequestItem(petitions, sampleSource, labRequests);
-        const resolved = sampleFromSources(sampleSource, stockRows, mfRows, requestMatch?.item).sample;
-        return { ...sample, lotNo: resolved.lotNo || sample.lotNo, batchNo: resolved.batchNo || sample.batchNo,
-          productionDate: resolved.productionDate || sample.productionDate };
+        const sourceData = sampleFromSources(sampleSource, stockRows, mfRows, requestMatch?.item);
+        const resolved = sourceData.sample;
+        const sameProductionBatches = sourceData.stockCandidates
+          .filter((candidate) => candidate.productionDate === resolved.productionDate && candidate.batchNo)
+          .filter((candidate, index, rows) => rows.findIndex((row) => row.batchNo === candidate.batchNo) === index)
+          .sort((left, right) => left.batchNo.localeCompare(right.batchNo, undefined, { numeric: true }));
+        const batches = sameProductionBatches.length > 1 ? sameProductionBatches : [resolved];
+        return batches.map((batch) => ({
+          ...sample,
+          lotNo: batch.lotNo || sample.lotNo,
+          batchNo: batch.batchNo || sample.batchNo,
+          productionDate: batch.productionDate || sample.productionDate,
+        }));
       }),
     };
   });
