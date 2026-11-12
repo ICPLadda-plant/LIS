@@ -224,7 +224,7 @@ const BalanceRoomPage = () => {
   const chartPanels = [
     { weight: scale.controlWeight, config, series, limits, domain, digits, stats, baselineStats, counts, suggestion },
     { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts, suggestion: otherSuggestion },
-  ].sort((a, b) => b.weight - a.weight);
+  ].sort((a, b) => a.weight - b.weight);
   const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
 
   const createMutation = useMutation({
