@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
@@ -6,6 +6,7 @@ import {
   ArrowDownToLine,
   ArrowUpToLine,
   CheckCircle2,
+  Camera,
   ChevronsDown,
   ChevronsUp,
   FileSpreadsheet,
@@ -30,7 +31,7 @@ import BalanceControlChart, { BalanceControlLegend } from "@/components/lis/Bala
 import BalanceControlConfigDialog, { type BalanceControlSuggestion } from "@/components/lis/BalanceControlConfigDialog";
 import BalanceControlReport, { BALANCE_CONTROL_REPORT_CSS } from "@/components/lis/BalanceControlReport";
 import { api, type DailyCheckRecord } from "@/lib/api";
-import { getDailyCheckTrend, type DailyCheckTrend } from "@/lib/aiApi";
+import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTrend } from "@/lib/aiApi";
 import { useAuth } from "@/context/AuthContext";
 import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
 import { formatDate } from "@/lib/dateTime";
@@ -124,6 +125,9 @@ const BalanceRoomPage = () => {
   const [printedAt, setPrintedAt] = useState("");
   const [configOpen, setConfigOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState<{ type: "100" | "10"; index: number } | null>(null);
+  const [readingPhoto, setReadingPhoto] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const scale = BALANCE_SCALES.find(s => s.id === selectedScaleId) ?? BALANCE_SCALES[0];
   const typeLabel = balanceScaleTypeLabel(scale);
@@ -231,6 +235,42 @@ const BalanceRoomPage = () => {
     }
   };
 
+  const openWeightCamera = (type: "100" | "10", index: number) => {
+    setCameraTarget({ type, index });
+    cameraInputRef.current?.click();
+  };
+
+  const handleWeightPhoto = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !cameraTarget) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("กรุณาถ่ายหรือเลือกไฟล์รูปภาพ");
+      return;
+    }
+
+    setReadingPhoto(true);
+    try {
+      const imageDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("อ่านไฟล์รูปไม่สำเร็จ"));
+        reader.readAsDataURL(file);
+      });
+      const result = await readBalanceDisplayValueFromImage(imageDataUrl);
+      if (!result.value || !Number.isFinite(Number(result.value))) {
+        toast.error(result.error || "อ่านค่าจากหน้าจอไม่ได้ กรุณาถ่ายให้ตรงและชัดขึ้น");
+        return;
+      }
+      updateWeight(scale.id, cameraTarget.type, cameraTarget.index, result.value);
+      toast.success(`อ่านค่าได้ ${result.value} g`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "อ่านรูปไม่สำเร็จ");
+    } finally {
+      setReadingPhoto(false);
+    }
+  };
+
   const handleCheck = (id: string) => {
     const r = getDraft(id);
     if (r.weights100.some(v => !v) || r.weights10.some(v => !v)) {
@@ -324,17 +364,29 @@ const BalanceRoomPage = () => {
         </label>
         <div className="grid grid-cols-3 gap-1.5">
           {[0, 1, 2].map(i => (
-            <Input
-              key={i}
-              type="number"
-              step="0.001"
-              inputMode="decimal"
-              placeholder={showResult && savedWeights ? String(savedWeights[i] ?? "") : `ครั้งที่ ${i + 1}`}
-              value={weights[i]}
-              onChange={e => updateWeight(scale.id, type, i, e.target.value)}
-              disabled={createMutation.isPending}
-              className="h-9 text-sm tabular-nums"
-            />
+            <div key={i} className="flex min-w-0 gap-1">
+              <Input
+                type="number"
+                step="0.001"
+                inputMode="decimal"
+                placeholder={showResult && savedWeights ? String(savedWeights[i] ?? "") : `ครั้งที่ ${i + 1}`}
+                value={weights[i]}
+                onChange={e => updateWeight(scale.id, type, i, e.target.value)}
+                disabled={createMutation.isPending}
+                className="h-9 min-w-0 text-sm tabular-nums"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                aria-label={`ถ่ายรูปอ่านค่าน้ำหนัก ${type} กรัม ครั้งที่ ${i + 1}`}
+                onClick={() => openWeightCamera(type, i)}
+                disabled={createMutation.isPending || readingPhoto}
+              >
+                <Camera className="h-4 w-4" />
+              </Button>
+            </div>
           ))}
         </div>
         {showResult && savedAvg != null && (
@@ -348,6 +400,7 @@ const BalanceRoomPage = () => {
 
   return (
     <div className="space-y-4">
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" hidden onChange={handleWeightPhoto} />
       {/* หัวรายงาน + ตัวเลือกเครื่อง/เดือน + ออกรายงาน */}
       <Card>
         <CardContent className="flex flex-col gap-4 p-4 sm:p-6 xl:flex-row xl:items-end xl:justify-between">

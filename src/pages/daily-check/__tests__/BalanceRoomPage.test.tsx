@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   user: { name: "Dev Administrator", id: "dev", email: "dev@example.com" },
   period: "morning" as "morning" | null,
 }));
+const readBalanceDisplayValueFromImageMock = vi.hoisted(() => vi.fn());
 
 const apiMock = vi.hoisted(() => ({
   getDailyChecks: vi.fn().mockResolvedValue([]),
@@ -22,6 +23,7 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/aiApi", () => ({
   getDailyCheckTrend: vi.fn().mockResolvedValue(null),
+  readBalanceDisplayValueFromImage: readBalanceDisplayValueFromImageMock,
 }));
 
 vi.mock("@/lib/dailyCheckPeriod", () => ({
@@ -52,6 +54,7 @@ describe("BalanceRoomPage", () => {
     state.period = "morning";
     apiMock.getDailyChecks.mockResolvedValue([]);
     apiMock.getBalanceControlConfigs.mockResolvedValue([]);
+    readBalanceDisplayValueFromImageMock.mockResolvedValue({ value: "100.012" });
   });
 
   it("does not show an inline records tab", () => {
@@ -94,6 +97,22 @@ describe("BalanceRoomPage", () => {
       scaleId: "scale-1",
       scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
     });
+  });
+
+  it("shows a camera button beside every weight value", () => {
+    renderPage();
+    expect(screen.getAllByRole("button", { name: /ถ่ายรูปอ่านค่าน้ำหนัก/ })).toHaveLength(6);
+  });
+
+  it("fills the selected weight with the value read from a photo", async () => {
+    const { container } = renderPage();
+    fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 100 กรัม ครั้งที่ 1" }));
+    const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(fileInput).not.toBeNull();
+    fireEvent.change(fileInput!, { target: { files: [new File(["image"], "balance.jpg", { type: "image/jpeg" })] } });
+
+    await waitFor(() => expect(readBalanceDisplayValueFromImageMock).toHaveBeenCalled());
+    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[0]).toHaveValue(100.012);
   });
 
   it("shows the control values and limits from the saved config", async () => {

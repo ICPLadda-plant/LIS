@@ -127,6 +127,31 @@ export async function readStockLabelCodeFromImage(imageDataUrl: string): Promise
   }
 }
 
+export interface BalanceDisplayOcrResult {
+  value: string;
+  rawText?: string;
+  error?: string;
+}
+
+export async function readBalanceDisplayValueFromImage(imageDataUrl: string): Promise<BalanceDisplayOcrResult> {
+  try {
+    const res = await fetch(`${AI_BASE}/balance-display-ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageDataUrl }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = (await res.json().catch(() => ({}))) as Partial<BalanceDisplayOcrResult>;
+    if (!res.ok) return { value: '', error: body.error || `OCR failed: ${res.status}` };
+    return {
+      value: typeof body.value === 'string' ? body.value : '',
+      rawText: typeof body.rawText === 'string' ? body.rawText : '',
+    };
+  } catch (err) {
+    return { value: '', error: (err as Error).message || 'OCR failed' };
+  }
+}
+
 export interface GenerateParameterResult {
   parameter: Record<string, unknown>;
   valid: boolean;
