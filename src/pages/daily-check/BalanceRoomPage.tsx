@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import BalanceControlChart, { BalanceControlLegend } from "@/components/lis/BalanceControlChart";
 import BalanceControlConfigDialog, { type BalanceControlSuggestion } from "@/components/lis/BalanceControlConfigDialog";
@@ -439,21 +438,6 @@ const BalanceRoomPage = () => {
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="space-y-1">
-              <Label htmlFor="balance-scale" className="text-xs text-muted-foreground">เครื่องชั่ง</Label>
-              <Select value={selectedScaleId} onValueChange={setSelectedScaleId}>
-                <SelectTrigger id="balance-scale" className="sm:w-72">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BALANCE_SCALES.map(s => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {`${s.code} · ${balanceScaleTypeLabel(s)}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="space-y-1">
               <Label htmlFor="balance-month" className="text-xs text-muted-foreground">ประจำเดือน</Label>
               <Input
