@@ -3,13 +3,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpToLine,
   CheckCircle2,
   Camera,
+  ChevronsDown,
+  ChevronsUp,
   FileSpreadsheet,
   Printer,
   RotateCcw,
   Scale,
   Settings2,
+  Sigma,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -19,6 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import StatCard from "@/components/lis/StatCard";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import BalanceControlChart, { BalanceControlLegend } from "@/components/lis/BalanceControlChart";
 import BalanceControlConfigDialog, { type BalanceControlSuggestion } from "@/components/lis/BalanceControlConfigDialog";
@@ -568,7 +575,7 @@ const BalanceRoomPage = () => {
               <Badge variant="gray-soft">ยังไม่ตรวจวันนี้</Badge>
             )}
           </CardHeader>
-          <CardContent className="grid gap-4 xl:grid-cols-2">
+          <CardContent className="space-y-4">
             {weightBlock("10")}
             {weightBlock("100")}
 
@@ -653,21 +660,26 @@ const BalanceRoomPage = () => {
                     </div>
                   ) : null}
                 </div>
-                <dl className="grid grid-cols-3 gap-x-4 gap-y-2 border-y py-2 sm:grid-cols-6">
-                  {[
-                    ["Mean", formatControlNumber(panel.limits?.mean, panel.digits)],
-                    ["STD", formatSd(panel.limits?.sd ?? panel.config.sd)],
-                    ["UWL", formatControlNumber(panel.limits?.uwl, panel.digits)],
-                    ["LWL", formatControlNumber(panel.limits?.lwl, panel.digits)],
-                    ["UCL", formatControlNumber(panel.limits?.ucl, panel.digits)],
-                    ["LCL", formatControlNumber(panel.limits?.lcl, panel.digits)],
-                  ].map(([label, value]) => (
-                    <div key={label} className="min-w-0">
-                      <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
-                      <dd className="truncate text-sm font-semibold tabular-nums text-foreground">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
+                  <StatCard
+                    icon={Target}
+                    variant="blue"
+                    label="MEAN"
+                    value={formatControlNumber(panel.limits?.mean, panel.digits)}
+                    sublabel={panel.config.updatedDate ? `ปรับปรุง ${fmtDate(panel.config.updatedDate)}` : "ค่า Control"}
+                  />
+                  <StatCard
+                    icon={Sigma}
+                    variant="neutral"
+                    label="STD"
+                    value={formatSd(panel.limits?.sd ?? panel.config.sd)}
+                    sublabel={panel.limits ? `2SD ${formatSd(2 * panel.limits.sd)} · 3SD ${formatSd(3 * panel.limits.sd)}` : undefined}
+                  />
+                  <StatCard icon={ArrowUpToLine} variant="green" label="UWL" value={formatControlNumber(panel.limits?.uwl, panel.digits)} sublabel="Mean + 2SD" />
+                  <StatCard icon={ArrowDownToLine} variant="green" label="LWL" value={formatControlNumber(panel.limits?.lwl, panel.digits)} sublabel="Mean − 2SD" />
+                  <StatCard icon={ChevronsUp} variant="amber" label="UCL" value={formatControlNumber(panel.limits?.ucl, panel.digits)} sublabel="Mean + 3SD" />
+                  <StatCard icon={ChevronsDown} variant="amber" label="LCL" value={formatControlNumber(panel.limits?.lcl, panel.digits)} sublabel="Mean − 3SD" />
+                </div>
                 {panel.domain ? (
                   <>
                     <BalanceControlChart series={panel.series} limits={panel.limits} domain={panel.domain} digits={panel.digits} className="h-[280px]" />
