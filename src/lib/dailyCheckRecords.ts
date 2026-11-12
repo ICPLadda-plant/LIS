@@ -1,4 +1,5 @@
 import type { DailyCheckRecord, EnvCheckRecord, EquipmentCheckRecord } from "./api";
+import { BALANCE_SCALES } from "./balanceControlChart";
 import { getDailyCheckPeriod, type DailyCheckPeriod } from "./dailyCheckPeriod";
 import { getRoomBySlug } from "./dailyCheckRooms";
 import { EQUIPMENT_ROOM_SLUGS } from "./roomEquipment";
@@ -63,7 +64,9 @@ const normalizeEquipmentRecord = (record: EquipmentCheckRecord): DailyCheckRecor
   roomName: getRoomBySlug(record.roomSlug)?.label ?? record.roomSlug,
 });
 
-const normalizeBalanceRecord = (record: DailyCheckRecord): DailyCheckRecordRow => ({
+const normalizeBalanceRecord = (record: DailyCheckRecord): DailyCheckRecordRow => {
+  const primaryWeight = BALANCE_SCALES.find((scale) => scale.id === record.scaleId)?.primaryCalibrationWeight ?? 100;
+  return ({
   _id: rowId("balance", record._id, `${record.scaleId}-${record.checkedAt}`),
   roomSlug: "balance",
   roomName: BALANCE_ROOM_NAME,
@@ -74,11 +77,11 @@ const normalizeBalanceRecord = (record: DailyCheckRecord): DailyCheckRecordRow =
   readings: [
     ...record.weights100.map((value, index) => ({
       key: `weight100-${index + 1}`,
-      label: `100g #${index + 1}`,
+      label: `${primaryWeight}g #${index + 1}`,
       value: textValue(value),
       unit: "g",
     })),
-    { key: "avg100", label: "เฉลี่ย 100g", value: fixed(record.avg100, 4), unit: "g" },
+    { key: "avg100", label: `เฉลี่ย ${primaryWeight}g`, value: fixed(record.avg100, 4), unit: "g" },
     ...record.weights10.map((value, index) => ({
       key: `weight10-${index + 1}`,
       label: `10g #${index + 1}`,
@@ -96,7 +99,8 @@ const normalizeBalanceRecord = (record: DailyCheckRecord): DailyCheckRecordRow =
   checkedAt: record.checkedAt,
   createdAt: record.createdAt,
   updatedAt: record.updatedAt,
-});
+  });
+};
 
 const normalizeEnvRecord = (record: EnvCheckRecord): DailyCheckRecordRow => ({
   _id: rowId("env", record._id, `${record.room}-${record.checkedAt}`),

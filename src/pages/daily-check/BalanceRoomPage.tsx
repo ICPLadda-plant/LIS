@@ -310,7 +310,7 @@ const BalanceRoomPage = () => {
       weights10: r.weights10,
       avg100,
       avg10,
-      status100: evaluate(avg100, 100),
+      status100: evaluate(avg100, target.primaryCalibrationWeight),
       status10: evaluate(avg10, 10),
       tolerance: TOLERANCE,
       recorder: user.name,
@@ -361,11 +361,13 @@ const BalanceRoomPage = () => {
     { label: "ยี่ห้อ", value: config.brand || "—" },
     { label: "รุ่น", value: config.model || "—" },
     { label: "รหัสตุ้มน้ำหนัก", value: config.weightCode || "—" },
+    { label: "ตุ้ม Calibration", value: `10 g และ ${scale.primaryCalibrationWeight} g` },
     { label: "น้ำหนักตุ้ม Control Chart", value: `${scale.controlWeight} g` },
     { label: "ประจำเดือน/ปี", value: formatThaiMonth(month) },
   ];
 
   const weightBlock = (type: "100" | "10") => {
+    const nominalWeight = type === "100" ? scale.primaryCalibrationWeight : 10;
     const weights = type === "100" ? draft.weights100 : draft.weights10;
     const savedWeights = type === "100" ? todayRec?.weights100 : todayRec?.weights10;
     const savedStatus = type === "100" ? todayRec?.status100 : todayRec?.status10;
@@ -373,7 +375,7 @@ const BalanceRoomPage = () => {
     return (
       <div>
         <label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-          น้ำหนักมาตรฐาน {type} g (3 ครั้ง)
+          น้ำหนักมาตรฐาน {nominalWeight} g (3 ครั้ง)
           {showResult && savedStatus === "pass" && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
           {showResult && savedStatus === "fail" && <span className="text-xs text-destructive">ไม่ผ่าน</span>}
         </label>
@@ -382,7 +384,7 @@ const BalanceRoomPage = () => {
             <div key={i} className="flex min-w-0 gap-1">
               <Input
                 type="number"
-                step="0.001"
+                step={10 ** -scale.decimals}
                 inputMode="decimal"
                 placeholder={showResult && savedWeights ? String(savedWeights[i] ?? "") : `ครั้งที่ ${i + 1}`}
                 value={weights[i]}
@@ -395,7 +397,7 @@ const BalanceRoomPage = () => {
                 variant="outline"
                 size="icon"
                 className="h-9 w-9 shrink-0"
-                aria-label={`ถ่ายรูปอ่านค่าน้ำหนัก ${type} กรัม ครั้งที่ ${i + 1}`}
+                aria-label={`ถ่ายรูปอ่านค่าน้ำหนัก ${nominalWeight} กรัม ครั้งที่ ${i + 1}`}
                 onClick={() => openWeightCamera(type, i)}
                 disabled={createMutation.isPending || readingPhoto}
               >
@@ -406,7 +408,7 @@ const BalanceRoomPage = () => {
         </div>
         {showResult && savedAvg != null && (
           <p className={cn("mt-1 text-xs", savedStatus === "pass" ? "text-green-600" : "text-destructive")}>
-            ค่าเฉลี่ย: {savedAvg.toFixed(4)} g {savedStatus === "pass" ? "อยู่ในเกณฑ์" : "เกินเกณฑ์"} (±{TOLERANCE}g)
+            ค่าเฉลี่ย: {savedAvg.toFixed(scale.decimals)} g {savedStatus === "pass" ? "อยู่ในเกณฑ์" : "เกินเกณฑ์"} (±{TOLERANCE}g)
           </p>
         )}
       </div>

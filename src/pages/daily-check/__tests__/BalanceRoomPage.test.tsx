@@ -82,10 +82,10 @@ describe("BalanceRoomPage", () => {
     expect(screen.queryByText("นอกเวลาบันทึก")).not.toBeInTheDocument();
     expect(screen.getByText(/บันทึกได้ทุกเวลา/)).toBeInTheDocument();
 
-    const [first100, first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
-    const [second100, second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
-    const [third100, third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
-    [first100, second100, third100].forEach(input => fireEvent.change(input, { target: { value: "100.01" } }));
+    const [first500, first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
+    const [second500, second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
+    const [third500, third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
+    [first500, second500, third500].forEach(input => fireEvent.change(input, { target: { value: "500.01" } }));
     [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.01" } }));
 
     const [saveButton] = screen.getAllByRole("button", { name: /บันทึกผล Calibrate/ });
@@ -96,6 +96,8 @@ describe("BalanceRoomPage", () => {
     expect(apiMock.createDailyCheck.mock.calls[0][0]).toMatchObject({
       scaleId: "scale-1",
       scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
+      avg100: 500.01,
+      status100: "pass",
     });
   });
 
@@ -106,7 +108,7 @@ describe("BalanceRoomPage", () => {
 
   it("fills the selected weight with the value read from a photo", async () => {
     const { container } = renderPage();
-    fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 100 กรัม ครั้งที่ 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 500 กรัม ครั้งที่ 1" }));
     const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]');
     expect(fileInput).not.toBeNull();
     fireEvent.change(fileInput!, { target: { files: [new File(["image"], "balance.jpg", { type: "image/jpeg" })] } });
