@@ -568,6 +568,17 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petit
         const sampleSource = { ...source, selectedItemSeqs: [sample.itemSeq], sampleSnapshots: [sample],
           externalCoaRequest: { ...source.externalCoaRequest, itemNo: sample.sampleId } };
         const requestMatch = findBestRequestItem(petitions, sampleSource, labRequests);
+        const requestBatches = (requestMatch?.items || [])
+          .filter((item) => item.batchNo && item.productionDate)
+          .sort((left, right) => String(left.batchNo).localeCompare(String(right.batchNo), undefined, { numeric: true }));
+        if (requestBatches.length > 1) {
+          return requestBatches.map((item) => ({
+            ...sample,
+            lotNo: item.lotNo || item.batchNo,
+            batchNo: item.batchNo,
+            productionDate: normalizeIsoDate(item.productionDate),
+          }));
+        }
         const sourceData = sampleFromSources(sampleSource, stockRows, mfRows, requestMatch?.item);
         const resolved = sourceData.sample;
         const sameProductionBatches = sourceData.stockCandidates

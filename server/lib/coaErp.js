@@ -596,7 +596,19 @@ function findBestRequestItem(petitions, source, labRequests = []) {
     || right.identityScore - left.identityScore
     || left.dateDistance - right.dateDistance
     || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
-  return candidates[0] || null;
+  const best = candidates[0];
+  if (!best) return null;
+  const bestProductionDate = normalizeIsoDate(best.item.productionDate)
+    || lotSnapshot(best.item.lotNo || best.item.batchNo).productionDate;
+  const items = candidates
+    .filter((candidate) => candidate.petition === best.petition
+      && candidate.identityTier === best.identityTier
+      && candidate.identityScore === best.identityScore
+      && (normalizeIsoDate(candidate.item.productionDate)
+        || lotSnapshot(candidate.item.lotNo || candidate.item.batchNo).productionDate) === bestProductionDate)
+    .map((candidate) => candidate.item)
+    .filter((item, index, rows) => rows.findIndex((row) => text(row.batchNo || row.lotNo) === text(item.batchNo || item.lotNo)) === index);
+  return { ...best, items };
 }
 
 function findBestCoaHistorySample(coas, source) {

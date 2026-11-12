@@ -699,6 +699,33 @@ test('enrichExternalCoaDocumentsWithErpLots keeps every Batch from the same Lot 
   ]);
 });
 
+test('enrichExternalCoaDocumentsWithErpLots prefers production request Batches over RM stock lots', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-KARAT', Line: 10000, ItemNo: 'F-KRT35-1X20',
+    TradeName: 'กะรัต 35', CommonName: 'CYPERMETHRIN 35% W/V EC', ShipmentDate: '2026-11-09', remark: 'COA',
+  }]);
+  const petition = {
+    _id: 'petition-karat', updatedAt: '2026-11-11',
+    items: ['080', '081', '082'].map((batchNo, index) => ({
+      seq: index + 1, itemNo: 'RS-CY35-V', sampleName: 'CYPERMETHRIN 35% W/V EC',
+      commonName: 'CYPERMETHRIN 35% W/V EC', batchNo, productionDate: '2026-11-11',
+    })),
+  };
+
+  const [enriched] = router.enrichExternalCoaDocumentsWithErpLots([source], {
+    stockRows: [
+      { item_no: 'RS-CY35-V', lot_no: 'RM261103-007', stock_qty: 445 },
+      { item_no: 'RS-CY35-V', lot_no: 'RM261103-008', stock_qty: 2000 },
+    ],
+    mfRows: [],
+  }, [petition]);
+
+  assert.deepEqual(enriched.sampleSnapshots.map((sample) => sample.batchNo), ['080', '081', '082']);
+  assert.deepEqual(enriched.sampleSnapshots.map((sample) => sample.productionDate), [
+    '2026-11-11', '2026-11-11', '2026-11-11',
+  ]);
+});
+
 test('manual route creates an ERP-linked COA without a petition and hides the ERP request row', async () => {
   const originals = {
     create: CoaDocument.create, find: CoaDocument.find, auditCreate: CoaAuditLog.create,
