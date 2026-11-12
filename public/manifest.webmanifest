@@ -11,6 +11,9 @@
   "launch_handler": {
     "client_mode": "focus-existing"
   },
+  "related_applications": [
+    { "platform": "webapp", "url": "manifest.webmanifest" }
+  ],
   "shortcuts": [
     {
       "name": "หน้าหลัก",

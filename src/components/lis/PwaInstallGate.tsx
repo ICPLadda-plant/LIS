@@ -75,7 +75,15 @@ const PwaInstallGate = () => {
   const [prompting, setPrompting] = useState(false);
 
   const required =
-    gateEnabled() && requiresPwaInstall({ user, isProductionSession, pathname, isStandalone, isDesktop });
+    gateEnabled() &&
+    requiresPwaInstall({
+      user,
+      isProductionSession,
+      pathname,
+      isStandalone,
+      isAppInstalled: install.installedOnDevice,
+      isDesktop,
+    });
   if (!required) return null;
 
   const handleInstall = async () => {
