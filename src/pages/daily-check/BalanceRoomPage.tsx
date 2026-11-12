@@ -556,28 +556,6 @@ const BalanceRoomPage = () => {
         </CardContent>
       </Card>
 
-      {/* ค่า Control */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
-        <StatCard
-          icon={Target}
-          variant="blue"
-          label="MEAN"
-          value={fmt(limits?.mean)}
-          sublabel={config.updatedDate ? `ปรับปรุง ${fmtDate(config.updatedDate)}` : "ค่า Control"}
-        />
-        <StatCard
-          icon={Sigma}
-          variant="neutral"
-          label="STD"
-          value={formatSd(config.sd)}
-          sublabel={limits ? `2SD ${formatSd(2 * limits.sd)} · 3SD ${formatSd(3 * limits.sd)}` : undefined}
-        />
-        <StatCard icon={ArrowUpToLine} variant="green" label="UWL" value={fmt(limits?.uwl)} sublabel="Mean + 2SD" />
-        <StatCard icon={ArrowDownToLine} variant="green" label="LWL" value={fmt(limits?.lwl)} sublabel="Mean − 2SD" />
-        <StatCard icon={ChevronsUp} variant="amber" label="UCL" value={fmt(limits?.ucl)} sublabel="Mean + 3SD" />
-        <StatCard icon={ChevronsDown} variant="amber" label="LCL" value={fmt(limits?.lcl)} sublabel="Mean − 3SD" />
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ฟอร์มบันทึกของเครื่องที่เลือก */}
         <Card>
@@ -666,7 +644,7 @@ const BalanceRoomPage = () => {
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 xl:grid-cols-2">
+          <CardContent className="space-y-4">
             {chartPanels.map((panel) => (
               <section key={panel.weight} className="space-y-3 rounded-lg border bg-card p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -681,6 +659,26 @@ const BalanceRoomPage = () => {
                       <Badge variant="red-soft">เกิน 3SD {panel.counts.out}</Badge>
                     </div>
                   ) : null}
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6">
+                  <StatCard
+                    icon={Target}
+                    variant="blue"
+                    label="MEAN"
+                    value={formatControlNumber(panel.limits?.mean, panel.digits)}
+                    sublabel={panel.config.updatedDate ? `ปรับปรุง ${fmtDate(panel.config.updatedDate)}` : "ค่า Control"}
+                  />
+                  <StatCard
+                    icon={Sigma}
+                    variant="neutral"
+                    label="STD"
+                    value={formatSd(panel.limits?.sd ?? panel.config.sd)}
+                    sublabel={panel.limits ? `2SD ${formatSd(2 * panel.limits.sd)} · 3SD ${formatSd(3 * panel.limits.sd)}` : undefined}
+                  />
+                  <StatCard icon={ArrowUpToLine} variant="green" label="UWL" value={formatControlNumber(panel.limits?.uwl, panel.digits)} sublabel="Mean + 2SD" />
+                  <StatCard icon={ArrowDownToLine} variant="green" label="LWL" value={formatControlNumber(panel.limits?.lwl, panel.digits)} sublabel="Mean − 2SD" />
+                  <StatCard icon={ChevronsUp} variant="amber" label="UCL" value={formatControlNumber(panel.limits?.ucl, panel.digits)} sublabel="Mean + 3SD" />
+                  <StatCard icon={ChevronsDown} variant="amber" label="LCL" value={formatControlNumber(panel.limits?.lcl, panel.digits)} sublabel="Mean − 3SD" />
                 </div>
                 {panel.domain ? (
                   <>
