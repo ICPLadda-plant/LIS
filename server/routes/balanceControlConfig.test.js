@@ -14,6 +14,9 @@ const handler = (method, path) => router.stack.find(
 
 const getHandler = handler('get', '/');
 const putHandler = handler('put', '/:scaleId');
+const baselineValues = Array.from({ length: 20 }, (_, index) => 100 + index / 1000);
+const baselineMean = baselineValues.reduce((sum, value) => sum + value, 0) / baselineValues.length;
+const baselineSd = Math.sqrt(baselineValues.reduce((sum, value) => sum + (value - baselineMean) ** 2, 0) / (baselineValues.length - 1));
 
 function mockResponse() {
   const res = {};
@@ -59,10 +62,9 @@ describe('PUT /balance-control-config/:scaleId', () => {
   });
 
   it.each([
-    [{ mean: 'abc', sd: 0.1 }, 'ค่า Mean ต้องเป็นตัวเลข'],
-    [{ mean: 100, sd: null }, 'ค่า STD ต้องเป็นตัวเลข'],
-    [{ mean: 100, sd: 0 }, 'ค่า STD ต้องมากกว่า 0'],
-    [{ mean: 100, sd: 0.1, updatedDate: '26/10/2569' }, 'วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD'],
+    [{ baselineValues: baselineValues.slice(0, 19) }, 'กรอกค่าบันทึกให้ครบ 20 ค่า'],
+    [{ baselineValues: [...baselineValues.slice(0, 19), 'abc'] }, 'กรอกค่าบันทึกให้ครบ 20 ค่า'],
+    [{ baselineValues, updatedDate: '26/10/2569' }, 'วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD'],
   ])('rejects invalid body %j', async (body, message) => {
     const res = mockResponse();
     await putHandler({ params: { scaleId: 'scale-1' }, body }, res);
@@ -72,7 +74,7 @@ describe('PUT /balance-control-config/:scaleId', () => {
 
   it('rejects a control weight that does not belong to the scale', async () => {
     const res = mockResponse();
-    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 100, mean: 100, sd: 0.1 } }, res);
+    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 100, baselineValues } }, res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ error: 'น้ำหนักตุ้มไม่ตรงกับเครื่องชั่ง' });
   });
@@ -81,7 +83,7 @@ describe('PUT /balance-control-config/:scaleId', () => {
     const res = mockResponse();
     await putHandler({
       params: { scaleId: 'scale-2' },
-      body: { weightCode: ' GL55-11006 ', mean: 99.99972, sd: 0.0000476, mpe: 0.5, updatedDate: '2026-10-26' },
+      body: { weightCode: ' GL55-11006 ', nominal: 100, baselineValues, mpe: 0.5, updatedDate: '2026-10-26' },
     }, res);
     expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
       { scaleId: 'scale-2' },
@@ -89,10 +91,17 @@ describe('PUT /balance-control-config/:scaleId', () => {
         scaleId: 'scale-2',
         brand: 'Mettler Toledo',
         model: 'MS204',
-        'controls.100': expect.objectContaining({ weightCode: 'GL55-11006', nominal: 100, mean: 99.99972 }),
+        'controls.100': expect.objectContaining({ weightCode: 'GL55-11006', nominal: 100, mean: baselineMean, sd: baselineSd, baselineValues }),
       }) },
       { new: true, upsert: true },
     );
-    expect(res.json.mock.calls[0][0].data).toMatchObject({ scaleId: 'scale-2', sd: 0.0000476, updatedDate: '2026-10-26' });
+    expect(res.json.mock.calls[0][0].data).toMatchObject({ scaleId: 'scale-2', mean: baselineMean, sd: baselineSd, baselineValues, updatedDate: '2026-10-26' });
+  });
+
+  it('rejects 20 identical values because STD is zero', async () => {
+    const res = mockResponse();
+    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 10, baselineValues: Array(20).fill(10) } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'ค่า STD ต้องมากกว่า 0' });
   });
 });

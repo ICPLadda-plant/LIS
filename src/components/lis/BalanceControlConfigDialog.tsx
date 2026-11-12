@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Calculator, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
   computeLimits,
   formatControlNumber,
   formatSd,
+  monthlyStats,
   validateBalanceControlInput,
   type BalanceControlConfig,
   type BalanceControlConfigInput,
@@ -27,8 +28,7 @@ import {
 // ตั้งค่าค่า Control (Mean / STD) ของเครื่องชั่ง 1 เครื่อง แล้วแสดงเส้น UWL/LWL/UCL/LCL ที่จะได้ทันที
 
 interface FormState {
-  mean: string;
-  sd: string;
+  baselineValues: string[];
   nominal: string;
   mpe: string;
   weightCode: string;
@@ -40,8 +40,7 @@ interface FormState {
 const numText = (value: number | null | undefined) => (value == null ? "" : String(value));
 
 const toForm = (config: BalanceControlConfig): FormState => ({
-  mean: numText(config.mean),
-  sd: numText(config.sd),
+  baselineValues: Array.from({ length: 20 }, (_, index) => numText(config.baselineValues?.[index])),
   nominal: numText(config.nominal),
   mpe: numText(config.mpe),
   weightCode: config.weightCode,
@@ -52,14 +51,6 @@ const toForm = (config: BalanceControlConfig): FormState => ({
 
 /** "" → null, ข้อความที่ไม่ใช่ตัวเลข → NaN (ให้ validate แจ้งเตือน) */
 const parseOptional = (text: string) => (text.trim() === "" ? null : Number(text));
-const parseRequired = (text: string) => (text.trim() === "" ? Number.NaN : Number(text));
-
-export interface BalanceControlSuggestion {
-  n: number;
-  mean: number;
-  sd: number;
-  monthLabel: string;
-}
 
 interface BalanceControlConfigDialogProps {
   open: boolean;
@@ -67,7 +58,6 @@ interface BalanceControlConfigDialogProps {
   scale: BalanceScale;
   config: BalanceControlConfig;
   digits: number;
-  suggestion?: BalanceControlSuggestion | null;
 }
 
 export default function BalanceControlConfigDialog({
@@ -76,7 +66,6 @@ export default function BalanceControlConfigDialog({
   scale,
   config,
   digits,
-  suggestion,
 }: BalanceControlConfigDialogProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<FormState>(() => toForm(config));
@@ -85,9 +74,13 @@ export default function BalanceControlConfigDialog({
     if (open) setForm(toForm(config));
   }, [open, config]);
 
+  const baselineValues = form.baselineValues.map(Number);
+  const baselineComplete = form.baselineValues.every((value) => value.trim() !== "" && Number.isFinite(Number(value)));
+  const stats = monthlyStats(baselineComplete ? baselineValues : []);
   const input: BalanceControlConfigInput = {
-    mean: parseRequired(form.mean),
-    sd: parseRequired(form.sd),
+    mean: stats.mean ?? Number.NaN,
+    sd: stats.sd ?? Number.NaN,
+    baselineValues: baselineComplete ? baselineValues : [],
     nominal: parseOptional(form.nominal),
     mpe: parseOptional(form.mpe),
     weightCode: form.weightCode.trim(),
@@ -119,14 +112,11 @@ export default function BalanceControlConfigDialog({
     mutation.mutate(input);
   };
 
-  const applySuggestion = () => {
-    if (!suggestion) return;
+  const setBaselineValue = (index: number) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({
       ...prev,
-      mean: suggestion.mean.toFixed(Math.max(digits + 2, 6)),
-      sd: formatSd(suggestion.sd),
+      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? event.target.value : value),
     }));
-  };
 
   const previewItems = [
     { label: "UCL (+3SD)", value: preview?.ucl },
@@ -138,35 +128,41 @@ export default function BalanceControlConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>ตั้งค่าค่า Control — {scale.code} · ตุ้ม {config.nominal} g</DialogTitle>
           <DialogDescription>
-            กรอก Mean และ STD จากการประเมินเครื่องชั่ง ระบบจะคำนวณเส้นเฝ้าระวัง (±2SD) และเส้นควบคุม (±3SD) ให้อัตโนมัติ
+            กรอกผลการชั่ง 20 ค่า ระบบจะคำนวณ Mean, STD, UWL, LWL, UCL และ LCL ให้อัตโนมัติ
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {suggestion ? (
-            <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-muted-foreground">
-                ข้อมูล 20 ค่าแรกของ {suggestion.monthLabel} · Mean {formatControlNumber(suggestion.mean, digits)} · STD{" "}
-                {formatSd(suggestion.sd)}
-              </p>
-              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={applySuggestion}>
-                <Calculator className="h-4 w-4" /> ใช้ baseline 20 ค่า
-              </Button>
+          <div className="space-y-2">
+            <Label>ค่าบันทึกสำหรับคำนวณ Control (20 ค่า) *</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+              {form.baselineValues.map((value, index) => (
+                <div key={index} className="space-y-1">
+                  <Label htmlFor={`bcc-value-${index}`} className="text-xs text-muted-foreground">ค่าที่ {index + 1}</Label>
+                  <Input
+                    id={`bcc-value-${index}`}
+                    inputMode="decimal"
+                    value={value}
+                    onChange={setBaselineValue(index)}
+                    aria-label={`ค่าบันทึกที่ ${index + 1}`}
+                  />
+                </div>
+              ))}
             </div>
-          ) : null}
+          </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-1.5">
-              <Label htmlFor="bcc-mean">Mean (g) *</Label>
-              <Input id="bcc-mean" inputMode="decimal" value={form.mean} onChange={setField("mean")} placeholder="เช่น 99.99972" />
+              <Label htmlFor="bcc-mean">Mean (g)</Label>
+              <Input id="bcc-mean" value={formatControlNumber(stats.mean, digits)} readOnly className="bg-muted/40" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="bcc-sd">STD (g) *</Label>
-              <Input id="bcc-sd" inputMode="decimal" value={form.sd} onChange={setField("sd")} placeholder="เช่น 0.0000476" />
+              <Label htmlFor="bcc-sd">STD (g)</Label>
+              <Input id="bcc-sd" value={formatSd(stats.sd)} readOnly className="bg-muted/40" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-nominal">น้ำหนักตุ้ม Daily check (g)</Label>

@@ -162,6 +162,24 @@ describe("BalanceRoomPage", () => {
     expect(screen.getByText("ยังไม่มีข้อมูลหรือค่า Control สำหรับตุ้ม 10 g")).toBeInTheDocument();
   });
 
+  it("calculates control values from 20 entered readings", async () => {
+    apiMock.updateBalanceControlConfig.mockResolvedValue({});
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "ตั้งค่า 10 g" }));
+
+    const baselineValues = Array.from({ length: 20 }, (_, index) => 10 + index / 1000);
+    baselineValues.forEach((value, index) => {
+      fireEvent.change(screen.getByLabelText(`ค่าบันทึกที่ ${index + 1}`), { target: { value: String(value) } });
+    });
+    fireEvent.click(screen.getByRole("button", { name: "บันทึกค่า Control" }));
+
+    await waitFor(() => expect(apiMock.updateBalanceControlConfig).toHaveBeenCalledTimes(1));
+    const [, input] = apiMock.updateBalanceControlConfig.mock.calls[0];
+    expect(input.baselineValues).toEqual(baselineValues);
+    expect(input.mean).toBeCloseTo(10.0095);
+    expect(input.sd).toBeGreaterThan(0);
+  });
+
   it("shows recorded values before control limits are configured", async () => {
     apiMock.getDailyChecks.mockImplementation((params?: { from?: string }) =>
       Promise.resolve(params?.from ? [{

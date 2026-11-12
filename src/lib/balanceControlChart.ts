@@ -37,6 +37,7 @@ export interface BalanceControlConfig {
   nominal: number;
   mean: number | null;
   sd: number | null;
+  baselineValues?: number[];
   mpe: number | null;
   /** วันที่ปรับปรุงค่า Control (YYYY-MM-DD) หรือ "" */
   updatedDate: string;
@@ -49,6 +50,7 @@ export interface BalanceControlConfigInput {
   nominal?: number | null;
   mean: number;
   sd: number;
+  baselineValues?: number[];
   mpe?: number | null;
   updatedDate?: string;
 }
@@ -69,6 +71,7 @@ export const BALANCE_CONTROL_DEFAULTS: BalanceControlConfig[] = DEFAULT_SCALE_ME
     nominal,
     mean: null,
     sd: null,
+    baselineValues: [],
     mpe: 0.5,
     updatedDate: "",
   }));
@@ -94,6 +97,7 @@ export function getBalanceControlConfig(
       nominal: targetNominal,
       mean: null,
       sd: null,
+      baselineValues: [],
       mpe: null,
       updatedDate: "",
     }
@@ -284,12 +288,15 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** ข้อความเดียวกับ validate() ฝั่ง server */
 export function validateBalanceControlInput(input: BalanceControlConfigInput): string | null {
-  const { mean, sd, nominal, mpe, updatedDate } = input;
+  const { mean, sd, baselineValues, nominal, mpe, updatedDate } = input;
   if (!isFiniteNumber(mean)) return "ค่า Mean ต้องเป็นตัวเลข";
   if (!isFiniteNumber(sd)) return "ค่า STD ต้องเป็นตัวเลข";
   if (sd <= 0) return "ค่า STD ต้องมากกว่า 0";
   if (nominal != null && (!isFiniteNumber(nominal) || nominal <= 0)) return "น้ำหนักตุ้มต้องมากกว่า 0";
   if (mpe != null && (!isFiniteNumber(mpe) || mpe < 0)) return "ค่า MPE ต้องไม่ติดลบ";
   if (updatedDate && !DATE_RE.test(updatedDate)) return "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD";
+  if (!Array.isArray(baselineValues) || baselineValues.length !== 20 || !baselineValues.every(isFiniteNumber)) {
+    return "กรอกค่าบันทึกให้ครบ 20 ค่า";
+  }
   return null;
 }

@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import BalanceControlChart, { BalanceControlLegend } from "@/components/lis/BalanceControlChart";
-import BalanceControlConfigDialog, { type BalanceControlSuggestion } from "@/components/lis/BalanceControlConfigDialog";
+import BalanceControlConfigDialog from "@/components/lis/BalanceControlConfigDialog";
 import BalanceControlReport, { BALANCE_CONTROL_REPORT_CSS } from "@/components/lis/BalanceControlReport";
 import { api, type DailyCheckRecord } from "@/lib/api";
 import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTrend } from "@/lib/aiApi";
@@ -191,13 +191,6 @@ const BalanceRoomPage = () => {
     () => series.filter((point): point is RecordedPoint => point.record != null && point.value != null),
     [series],
   );
-  const suggestion = useMemo<BalanceControlSuggestion | null>(
-    () =>
-      baselineStats.n === 20 && baselineStats.mean != null && baselineStats.sd != null
-        ? { n: baselineStats.n, mean: baselineStats.mean, sd: baselineStats.sd, monthLabel: formatThaiMonth(month) }
-        : null,
-    [baselineStats, month],
-  );
   const otherWeight = scale.controlWeight === 10 ? scale.primaryCalibrationWeight : 10;
   const otherConfig = getBalanceControlConfig(controlConfigs, scale.id, otherWeight);
   const otherSeries = buildMonthlySeries(monthRecords ?? [], month, otherWeight === 10 ? 10 : 100);
@@ -210,12 +203,9 @@ const BalanceRoomPage = () => {
   const otherDomain = chartDomain(otherLimits, otherValues);
   const otherStats = monthlyStats(otherValues);
   const otherCounts = countByStatus(otherValues, otherLimits);
-  const otherSuggestion = otherBaselineStats.n === 20 && otherBaselineStats.mean != null && otherBaselineStats.sd != null
-    ? { n: otherBaselineStats.n, mean: otherBaselineStats.mean, sd: otherBaselineStats.sd, monthLabel: formatThaiMonth(month) }
-    : null;
   const chartPanels = [
-    { weight: scale.controlWeight, config, series, limits, domain, digits, stats, baselineStats, counts, suggestion },
-    { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts, suggestion: otherSuggestion },
+    { weight: scale.controlWeight, config, series, limits, domain, digits, stats, baselineStats, counts },
+    { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts },
   ].sort((a, b) => a.weight - b.weight);
   const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
 
@@ -772,7 +762,6 @@ const BalanceRoomPage = () => {
         scale={scale}
         config={activePanel.config}
         digits={activePanel.digits}
-        suggestion={activePanel.suggestion}
       />
     </div>
   );

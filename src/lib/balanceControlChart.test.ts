@@ -137,6 +137,7 @@ describe("chartDomain / formatSd", () => {
 });
 
 describe("config defaults / validation", () => {
+  const baselineValues = Array.from({ length: 20 }, (_, index) => 100 + index / 1000);
   it("มีค่าเริ่มต้นครบ 2 ตุ้มต่อเครื่องและยังไม่มีค่า Control", () => {
     expect(BALANCE_CONTROL_DEFAULTS).toHaveLength(10);
     expect(BALANCE_CONTROL_DEFAULTS.filter((config) => config.scaleId === "scale-1").map((config) => config.nominal)).toEqual([500, 10]);
@@ -153,6 +154,9 @@ describe("config defaults / validation", () => {
     expect(validateBalanceControlInput({ mean: 100, sd: 1, updatedDate: "26/10/2569" })).toBe(
       "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD",
     );
-    expect(validateBalanceControlInput({ mean: 99.99972, sd: 0.0000476, mpe: 0.5, updatedDate: "2026-10-26" })).toBeNull();
+    expect(validateBalanceControlInput({ mean: 99.99972, sd: 0.0000476, baselineValues, mpe: 0.5, updatedDate: "2026-10-26" })).toBeNull();
+    expect(validateBalanceControlInput({ mean: 100, sd: 1, baselineValues: baselineValues.slice(0, 19) })).toBe(
+      "กรอกค่าบันทึกให้ครบ 20 ค่า",
+    );
   });
 });

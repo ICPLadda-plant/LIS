@@ -24,6 +24,7 @@ function pick(doc, def, nominal) {
     nominal,
     mean: typeof saved?.mean === 'number' ? saved.mean : null,
     sd: typeof saved?.sd === 'number' ? saved.sd : null,
+    baselineValues: Array.isArray(saved?.baselineValues) ? saved.baselineValues : [],
     mpe: typeof saved?.mpe === 'number' ? saved.mpe : 0.5,
     updatedDate: saved?.updatedDate || '',
   };
@@ -33,16 +34,22 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 // Validate control values; mirrors validateBalanceControlInput on the client.
 function validate(body) {
-  const { mean, sd, nominal, mpe, updatedDate } = body;
-  if (!isNum(mean)) return 'ค่า Mean ต้องเป็นตัวเลข';
-  if (!isNum(sd)) return 'ค่า STD ต้องเป็นตัวเลข';
-  if (sd <= 0) return 'ค่า STD ต้องมากกว่า 0';
+  const { baselineValues, nominal, mpe, updatedDate } = body;
+  if (!Array.isArray(baselineValues) || baselineValues.length !== 20 || !baselineValues.every(isNum)) {
+    return 'กรอกค่าบันทึกให้ครบ 20 ค่า';
+  }
   if (nominal != null && (!isNum(nominal) || nominal <= 0)) return 'น้ำหนักตุ้มต้องมากกว่า 0';
   if (mpe != null && (!isNum(mpe) || mpe < 0)) return 'ค่า MPE ต้องไม่ติดลบ';
   if (updatedDate && (typeof updatedDate !== 'string' || !DATE_RE.test(updatedDate))) {
     return 'วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD';
   }
   return null;
+}
+
+function baselineStats(values) {
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const variance = values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (values.length - 1);
+  return { mean, sd: Math.sqrt(variance) };
 }
 
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
@@ -78,13 +85,16 @@ router.put('/:scaleId', async (req, res) => {
     if (!def.weights.includes(nominal)) {
       return res.status(400).json({ error: 'น้ำหนักตุ้มไม่ตรงกับเครื่องชั่ง' });
     }
+    const { mean, sd } = baselineStats(body.baselineValues);
+    if (sd <= 0) return res.status(400).json({ error: 'ค่า STD ต้องมากกว่า 0' });
     const control = {
       brand: str(body.brand) || def.brand,
       model: str(body.model) || def.model,
       weightCode: str(body.weightCode),
       nominal,
-      mean: body.mean,
-      sd: body.sd,
+      mean,
+      sd,
+      baselineValues: body.baselineValues,
       mpe: body.mpe != null ? body.mpe : null,
       updatedDate: str(body.updatedDate),
     };

@@ -16,6 +16,7 @@ const BalanceControlConfigSchema = new mongoose.Schema({
   nominal: { type: Number, default: 100 },     // น้ำหนักตุ้ม Daily check (g)
   mean: { type: Number, default: null },
   sd: { type: Number, default: null },
+  baselineValues: { type: [Number], default: [] },
   mpe: { type: Number, default: null },        // Maximum permissible error (g)
   updatedDate: { type: String, default: '' },  // YYYY-MM-DD วันที่ปรับปรุงค่า Control
   controls: { type: mongoose.Schema.Types.Mixed, default: {} }, // ค่า Control แยกตามน้ำหนักตุ้ม
