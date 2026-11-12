@@ -103,6 +103,35 @@ test('DELETE /:id allows QC Head and removes the COA with its audit log', async 
   }
 });
 
+test('DELETE /:id allows the creator to remove their own draft', async () => {
+  const originals = {
+    findById: CoaDocument.findById,
+    deleteOne: CoaDocument.deleteOne,
+    auditDeleteMany: CoaAuditLog.deleteMany,
+  };
+  const restoreActor = stubActorLookup({
+    user: { name: 'COA Creator', email: 'creator@example.com', role: 'lab-staff', roles: ['lab-staff'], status: 'active' },
+  });
+  try {
+    CoaDocument.findById = async () => ({
+      _id: '507f1f77bcf86cd799439011', status: 'draft', createdBy: { email: 'creator@example.com' },
+    });
+    CoaAuditLog.deleteMany = async () => {};
+    CoaDocument.deleteOne = async () => {};
+    const res = await invoke('/:id', 'delete', {
+      params: { id: '507f1f77bcf86cd799439011' },
+      body: { _user: { email: 'creator@example.com' } },
+    });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.body, { ok: true });
+  } finally {
+    CoaDocument.findById = originals.findById;
+    CoaDocument.deleteOne = originals.deleteOne;
+    CoaAuditLog.deleteMany = originals.auditDeleteMany;
+    restoreActor();
+  }
+});
+
 test('ERP manual creation, editing, submit, approval and revision preserve entered results without Lab lookup', async () => {
   const originals = { fetch: global.fetch, create: CoaDocument.create, findById: CoaDocument.findById,
     auditCreate: CoaAuditLog.create, petitionFindById: Petition.findById };

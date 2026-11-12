@@ -1744,10 +1744,15 @@ router.post('/:id/print-event', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const actor = await actorFromRequest(req.body);
-    if (!isQcHead(actor)) return res.status(403).json({ error: 'ลบ COA ได้เฉพาะ QC Head' });
     const coaId = objectId(req.params.id);
     const doc = await CoaDocument.findById(coaId);
     if (!doc) return res.status(404).json({ error: 'ไม่พบ COA' });
+    const isDraftCreator = doc.status === 'draft'
+      && actor.email
+      && String(doc.createdBy?.email || '').trim().toLowerCase() === actor.email.trim().toLowerCase();
+    if (!isQcHead(actor) && !isDraftCreator) {
+      return res.status(403).json({ error: 'ลบร่าง COA ได้เฉพาะผู้สร้างหรือ QC Head' });
+    }
     await withCoaTransaction(async (session) => {
       await CoaAuditLog.deleteMany({ coaId }, session ? { session } : undefined);
       await CoaDocument.deleteOne({ _id: coaId }, session ? { session } : undefined);

@@ -722,6 +722,11 @@ export default function CoaCenterPage() {
   };
   const canDeleteCoa = roles.some((role) => role.replace(/[\s-]+/g, "_").toLowerCase() === "qc_head")
     || user?.permissions?.includes("coa.approve");
+  const canDeleteDocument = (doc: CoaDocument) => canDeleteCoa || (
+    doc.status === "draft"
+    && Boolean(user?.email)
+    && doc.createdBy?.email?.trim().toLowerCase() === user.email.trim().toLowerCase()
+  );
   const invalidateCoaDocuments = () => queryClient.invalidateQueries({ queryKey: ["coa", "documents"] });
   const syncCoaDocument = (doc: CoaDocument) => {
     queryClient.setQueryData<{ items: CoaDocument[] }>(["coa", "documents"], (current) => {
@@ -1499,7 +1504,7 @@ export default function CoaCenterPage() {
                           <Mail className="h-4 w-4" />
                           ส่งอีเมล
                         </Button>
-                        {canDeleteCoa && (
+                        {canDeleteDocument(doc) && (
                           <Button
                             type="button"
                             variant="destructive"
@@ -1623,7 +1628,7 @@ export default function CoaCenterPage() {
                           >
                             เสร็จสิ้น
                           </Button>
-                          {canDeleteCoa && (
+                          {canDeleteDocument(doc) && (
                             <Button
                               type="button"
                               variant="destructive"

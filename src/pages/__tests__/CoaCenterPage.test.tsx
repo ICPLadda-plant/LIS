@@ -34,6 +34,7 @@ vi.mock("@/lib/api", () => ({
           status: "draft",
           petitionId: "p1",
           petitionNoSnapshot: "P-2608-0001",
+          createdBy: { name: "COA Creator", email: "creator@example.com", role: "lab-staff" },
           customerSnapshot: { name: "Customer A" },
           selectedItemSeqs: [1],
           sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade A", commonName: "Common A", batchNo: "B-001", lotNo: "L-001", productionDate: "2026-08-01" }],
@@ -820,6 +821,22 @@ describe("CoaCenterPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "ลบ COA 00032026" }));
     await waitFor(() => expect(api.deleteCoaDocument).toHaveBeenCalledWith("c4", {
       _user: expect.objectContaining({ email: "qc-head@example.com" }),
+    }));
+  });
+
+  it("lets the creator delete their own draft", async () => {
+    authMock.current = {
+      name: "COA Creator", email: "creator@example.com", role: "lab-staff",
+      roles: ["lab-staff"], permissions: [],
+    };
+    vi.spyOn(window, "confirm").mockReturnValueOnce(true);
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "สถานะ ดำเนินการแล้ว" }));
+    fireEvent.click(await screen.findByRole("button", { name: "ลบ COA 00012026" }));
+
+    await waitFor(() => expect(api.deleteCoaDocument).toHaveBeenCalledWith("c1", {
+      _user: expect.objectContaining({ email: "creator@example.com" }),
     }));
   });
 });
