@@ -324,7 +324,7 @@ test('density history selects the matching batch family nearest the shipment dat
   });
 });
 
-test('ERP Lot No. takes precedence and its six date digits supply the production date', () => {
+test('ERP Lot Description supplies the batch and its trailing date', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
     sampleSnapshots: [{ sampleName: 'Trade A', commonName: 'EMAMECTIN BENZOATE 2.0% W/V ME' }],
@@ -332,13 +332,13 @@ test('ERP Lot No. takes precedence and its six date digits supply the production
   }, [{
     item_no: 'FC-LINOI-1X16',
     lot_no: 'FG260404-002',
-    'Lot Description': 'FG261015-008',
+    'Lot Description': '26S-EMB2-ME-240-151069',
     stock_qty: 64,
   }], []);
 
-  assert.equal(result.sample.lotNo, 'FG260404-002');
-  assert.equal(result.sample.batchNo, '002');
-  assert.equal(result.sample.productionDate, '2026-04-04');
+  assert.equal(result.sample.lotNo, '26S-EMB2-ME-240-151069');
+  assert.equal(result.sample.batchNo, '240');
+  assert.equal(result.sample.productionDate, '2026-10-15');
 });
 
 test('matching ERP Lot Description supplies production date before an existing request date', () => {
