@@ -16,10 +16,10 @@ import { A4_PRINT_FONT_FAMILY, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printC
 // ใช้สี/ฟอนต์ตายตัวแทน design token เพราะเป็นเอกสารควบคุมที่ต้องพิมพ์ออกมาเหมือนฟอร์มกระดาษเดิม
 
 export const BALANCE_CONTROL_REPORT_CSS = `
-@page { size: A4 portrait; margin: 10mm; }
+@page { size: A4 portrait; margin: 5mm; }
 body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr, .bcr * { font-family: ${A4_PRINT_FONT_FAMILY}; box-sizing: border-box; }
-.bcr { color: #000; background: #fff; border: 2px solid #000; font-size: 11pt; line-height: 1.1; padding: 8px 8px 6px; }
+.bcr { color: #000; background: #fff; border: 2px solid #000; display: flex; flex-direction: column; min-height: 1084px; font-size: 11pt; line-height: 1.1; padding: 8px 8px 6px; }
 .bcr h1, .bcr h2, .bcr .bcr-strong { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; }
 .bcr .bcr-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; }
 .bcr .bcr-head img { position: absolute; left: 0; top: 0; height: 44px; width: auto; }
@@ -29,14 +29,14 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .bcr .bcr-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .bcr .bcr-table { border: 2px solid #000; }
-.bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 7.5pt; line-height: 1; height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 7.5pt; line-height: 1; height: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bcr .bcr-table th { font-weight: 400; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 9pt; }
-.bcr .bcr-chart { border: 1px solid #000; padding: 6px 4px 4px; }
+.bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 365px; padding: 6px 4px 4px; }
 .bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 11pt; }
 .bcr .bcr-chart-limits { display: flex; justify-content: space-around; margin-top: 2px; font-size: 8pt; }
-.bcr .bcr-empty { border: 1px dashed #000; padding: 32px 0; text-align: center; font-size: 12pt; }
+.bcr .bcr-empty { border: 1px dashed #000; display: flex; min-height: 330px; align-items: center; justify-content: center; text-align: center; font-size: 12pt; }
 .bcr .bcr-sign { display: flex; justify-content: space-around; gap: 24px; margin-top: 10px; font-size: 10pt; }
 .bcr .bcr-sign span { display: inline-block; border-bottom: 1px solid #000; min-width: 220px; }
 .bcr .bcr-sign .bcr-date { min-width: 160px; }
@@ -126,7 +126,7 @@ export default function BalanceControlReport({
   );
 
   return (
-    <section className="bcr bg-white text-black" style={{ width: "720px" }} data-month={month}>
+    <section className="bcr bg-white text-black" style={{ width: "756px" }} data-month={month}>
       <header className="bcr-head">
         <img src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" />
         <h1>{BALANCE_FORM_TITLE}</h1>
@@ -168,8 +168,8 @@ export default function BalanceControlReport({
           <>
             <BalanceControlChart
               fixed
-              width={690}
-              height={260}
+              width={724}
+              height={350}
               series={series}
               limits={limits}
               domain={domain}
