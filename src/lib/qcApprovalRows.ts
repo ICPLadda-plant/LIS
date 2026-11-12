@@ -29,6 +29,8 @@ export interface ApprovalFieldRow {
   /** รูป/วิดีโอที่อัปโหลด (ช่องชนิด photo) ให้หน้าแสดงเป็นรูปย่อแทนข้อความ path */
   mediaUrls?: string[];
   standardText: string;
+  /** แถวที่ใช้เกณฑ์ %ฉลาก (เกณฑ์กรม / ผ่านเกณฑ์ 25%) — เกณฑ์นี้ใช้ภายในเท่านั้น ห้ามพิมพ์ลงใบรายงาน */
+  labelTolerance?: boolean;
   abnormal: boolean;
   note: string;
   phase: 1 | 2;
@@ -233,6 +235,7 @@ export function buildApprovalGroups(
                   value: asStr(raw),
                   mediaUrls: mediaUrlsFromValue(raw),
                   standardText: rowStandardText,
+                  ...(unit.labelTolerance ? { labelTolerance: true } : {}),
                   abnormal: rowAbnormal,
                   note,
                   phase,

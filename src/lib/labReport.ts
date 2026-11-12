@@ -64,9 +64,13 @@ function labRequestForItem(item: PetitionItem, labRequests: LabRequest[]): LabRe
   );
 }
 
+// เกณฑ์กรม / เกณฑ์ 25% เป็นเกณฑ์ภายในสำหรับอนุมัติผล ห้ามแสดงในใบรายงานทุกกรณี
+const INTERNAL_CRITERIA_PATTERN = /เกณฑ์กรม|เกณฑ์\s*25\s*%|ช่วงอนุมัติ|ช่วงที่อนุมัติ|หัวหน้า|ฉลาก\s*±|ผ่าน\s*[\d±]/u;
+
 function labReportCriteriaText(standardText: string): string {
   const raw = standardText.trim();
   if (!raw) return "";
+  if (INTERNAL_CRITERIA_PATTERN.test(raw)) return DASH;
 
   const numericParts = raw
     .split(/\s*(?:·|\|)\s*/u)
@@ -80,9 +84,6 @@ function labReportCriteriaText(standardText: string): string {
     .filter((part) => /\d/.test(part));
 
   if (!numericParts.length) return raw;
-  if (/เกณฑ์กรม|หัวหน้า/u.test(raw)) {
-    return numericParts[numericParts.length - 1];
-  }
   return numericParts.join(" · ");
 }
 
@@ -109,7 +110,7 @@ function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string):
         out.push({
           testItem: `${r.label}${unit}`,
           result: r.value || DASH,
-          criteria: r.standardText ? labReportCriteriaText(r.standardText) : DASH,
+          criteria: r.labelTolerance || !r.standardText ? DASH : labReportCriteriaText(r.standardText),
           method: methodForRow(r.label, p.parameterName, commonName || group.commonName),
         });
       });

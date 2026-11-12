@@ -133,25 +133,25 @@ describe("buildLabReportPages", () => {
     expect(page.rows[0].method).toBe("-");
   });
 
-  it("prints only the head reviewer range and keeps the percent unit for label tolerance criteria", () => {
+  it.each([
+    ["ผ่าน 48.13–51.88 · เกณฑ์กรม 47.50–52.50 %", false],
+    ["ผ่านเกณฑ์ 25% 48.13–51.88\nเกณฑ์กรม 47.50–52.50 %", false],
+    ["เกณฑ์กรม 47.50–52.50 % · เกินช่วงที่อนุมัติได้", false],
+    ["47.50–52.50 %", true],
+  ])("ไม่พิมพ์เกณฑ์กรม/เกณฑ์ 25%% ลงใบรายงาน: %s", (standardText, labelTolerance) => {
     const labelToleranceGroups: ApprovalItemGroup[] = [
       {
         ...groups[0],
         params: [
           {
             ...groups[0].params[0],
-            rows: [
-              {
-                ...groups[0].params[0].rows[0],
-                standardText: "ผ่าน 48.13–51.88 · เกณฑ์กรม 47.50–52.50 %",
-              },
-            ],
+            rows: [{ ...groups[0].params[0].rows[0], standardText, labelTolerance }],
           },
         ],
       },
     ];
     const out = buildLabReportPages(petition, labRequests, labelToleranceGroups);
-    expect(out[0].rows[0].criteria).toBe("47.50–52.50 %");
+    expect(out[0].rows[0].criteria).toBe("-");
   });
 
   it("item ที่ไม่มี group → rows ว่าง + fallback ลูกค้า", () => {
