@@ -230,10 +230,18 @@ interface LegendItem {
   dot?: string;
 }
 
-export function BalanceControlLegend({ fixed = false, className }: { fixed?: boolean; className?: string }) {
+export function BalanceControlLegend({
+  fixed = false,
+  className,
+  controlWeight = 100,
+}: {
+  fixed?: boolean;
+  className?: string;
+  controlWeight?: 10 | 100;
+}) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
   const items: LegendItem[] = [
-    { key: "value", label: "ค่าที่ได้ (เฉลี่ยตุ้ม 100 g)", stroke: palette.value, dot: palette.value },
+    { key: "value", label: `ค่าที่ได้ (เฉลี่ยตุ้ม ${controlWeight} g)`, stroke: palette.value, dot: palette.value },
     { key: "mean", label: "Mean", stroke: palette.mean },
     { key: "warning-line", label: "UWL / LWL (±2SD)", stroke: palette.warningLine, dash: "6 4" },
     { key: "control-line", label: "UCL / LCL (±3SD)", stroke: palette.controlLine, dash: "2 4" },

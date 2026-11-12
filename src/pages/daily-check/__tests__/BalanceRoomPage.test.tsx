@@ -161,6 +161,31 @@ describe("BalanceRoomPage", () => {
     expect(await screen.findByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).toBeInTheDocument();
   });
 
+  it("shows recorded values before control limits are configured", async () => {
+    apiMock.getDailyChecks.mockImplementation((params?: { from?: string }) =>
+      Promise.resolve(params?.from ? [{
+        _id: "daily-1",
+        scaleId: "scale-1",
+        scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
+        date: `${currentMonthStr()}-12`,
+        weights100: [500, 500, 500],
+        weights10: [10, 10, 10],
+        avg100: 500,
+        avg10: 10,
+        status100: "pass",
+        status10: "pass",
+        status: "pass",
+        tolerance: 0.05,
+        recorder: "Dev Administrator",
+        checkedAt: `${currentMonthStr()}-12T08:00:00.000Z`,
+      }] : []),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText(/กราฟแสดงค่าที่บันทึกแล้วโดยยังไม่มีเส้นควบคุม/)).toBeInTheDocument();
+  });
+
   it("loads the selected scale records for the current month", async () => {
     renderPage();
     const range = monthRange(currentMonthStr());

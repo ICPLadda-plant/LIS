@@ -660,10 +660,21 @@ const BalanceRoomPage = () => {
             )}
           </CardHeader>
           <CardContent className="space-y-3">
-            {limits && domain ? (
+            {domain ? (
               <>
                 <BalanceControlChart series={series} limits={limits} domain={domain} digits={digits} />
-                <BalanceControlLegend />
+                {limits ? (
+                  <BalanceControlLegend controlWeight={scale.controlWeight} />
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-3 text-center sm:flex-row">
+                    <p className="text-sm text-muted-foreground">
+                      ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้ — กราฟแสดงค่าที่บันทึกแล้วโดยยังไม่มีเส้นควบคุม
+                    </p>
+                    <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setConfigOpen(true)}>
+                      <Settings2 className="h-4 w-4" /> ตั้งค่าค่า Control
+                    </Button>
+                  </div>
+                )}
                 <p className="text-center text-xs text-muted-foreground">
                   {stats.n > 0
                     ? `ข้อมูลจริงเดือนนี้ ${stats.n} วัน · baseline ${baselineStats.n}/20 ค่า · Mean ${fmt(baselineStats.mean)} · SD ${formatSd(baselineStats.sd)}`
