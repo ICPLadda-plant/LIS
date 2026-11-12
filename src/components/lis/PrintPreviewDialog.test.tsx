@@ -30,6 +30,19 @@ beforeEach(() => {
 });
 
 describe("PrintPreviewDialog auto print", () => {
+  it("applies document CSS to the on-screen preview", async () => {
+    apiMock.getPrinterConfigs.mockResolvedValue([]);
+
+    renderDialog(
+      <PrintPreviewDialog open onOpenChange={vi.fn()} docType="daily-check-report" css=".qa-preview { display: grid; }">
+        <div className="qa-preview">daily check</div>
+      </PrintPreviewDialog>,
+    );
+
+    expect(await screen.findByText("daily check")).toBeInTheDocument();
+    expect(document.querySelector("style[data-print-preview-style]")).toHaveTextContent(".qa-preview { display: grid; }");
+  });
+
   it("renders document actions in the preview header", async () => {
     apiMock.getPrinterConfigs.mockResolvedValue([]);
 
