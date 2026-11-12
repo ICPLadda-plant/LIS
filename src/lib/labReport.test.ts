@@ -134,24 +134,24 @@ describe("buildLabReportPages", () => {
   });
 
   it.each([
-    ["ผ่าน 48.13–51.88 · เกณฑ์กรม 47.50–52.50 %", false],
-    ["ผ่านเกณฑ์ 25% 48.13–51.88\nเกณฑ์กรม 47.50–52.50 %", false],
-    ["เกณฑ์กรม 47.50–52.50 % · เกินช่วงที่อนุมัติได้", false],
-    ["47.50–52.50 %", true],
-  ])("ไม่พิมพ์เกณฑ์กรม/เกณฑ์ 25%% ลงใบรายงาน: %s", (standardText, labelTolerance) => {
+    ["ผ่าน 48.13–51.88 · เกณฑ์กรม 47.50–52.50 %", "47.50–52.50 %"],
+    ["ผ่านเกณฑ์ 25% 48.13–51.88\nเกณฑ์กรม 47.50–52.50 %", "47.50–52.50 %"],
+    ["เกณฑ์กรม 47.50–52.50 % · เกินช่วงที่อนุมัติได้", "47.50–52.50 %"],
+    ["ผ่านเกณฑ์ 25% 48.13–51.88", "-"],
+  ])("พิมพ์เกณฑ์กรมได้ แต่ไม่พิมพ์เกณฑ์ 25%%: %s", (standardText, expected) => {
     const labelToleranceGroups: ApprovalItemGroup[] = [
       {
         ...groups[0],
         params: [
           {
             ...groups[0].params[0],
-            rows: [{ ...groups[0].params[0].rows[0], standardText, labelTolerance }],
+            rows: [{ ...groups[0].params[0].rows[0], standardText }],
           },
         ],
       },
     ];
     const out = buildLabReportPages(petition, labRequests, labelToleranceGroups);
-    expect(out[0].rows[0].criteria).toBe("-");
+    expect(out[0].rows[0].criteria).toBe(expected);
   });
 
   it("item ที่ไม่มี group → rows ว่าง + fallback ลูกค้า", () => {

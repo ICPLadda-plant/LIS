@@ -64,15 +64,12 @@ function labRequestForItem(item: PetitionItem, labRequests: LabRequest[]): LabRe
   );
 }
 
-// เกณฑ์กรม / เกณฑ์ 25% เป็นเกณฑ์ภายในสำหรับอนุมัติผล ห้ามแสดงในใบรายงานทุกกรณี
-const INTERNAL_CRITERIA_PATTERN = /เกณฑ์กรม|เกณฑ์\s*25\s*%|ช่วงอนุมัติ|ช่วงที่อนุมัติ|หัวหน้า|ฉลาก\s*±|ผ่าน\s*[\d±]/u;
+const HEAD_CRITERIA_LABEL = "เกณฑ์กรม";
+// ช่วงผ่านอัตโนมัติ (เกณฑ์ 25%) ใช้ภายในตอนอนุมัติผลเท่านั้น ห้ามพิมพ์ลงใบรายงาน
+const AUTO_PASS_CRITERIA_PATTERN = /ผ่าน(?:เกณฑ์)?\s*(?:25\s*%|[\d±])|ฉลาก\s*±/u;
 
-function labReportCriteriaText(standardText: string): string {
-  const raw = standardText.trim();
-  if (!raw) return "";
-  if (INTERNAL_CRITERIA_PATTERN.test(raw)) return DASH;
-
-  const numericParts = raw
+function numericCriteriaParts(text: string): string[] {
+  return text
     .split(/\s*(?:·|\|)\s*/u)
     .map((part) =>
       part
@@ -82,7 +79,21 @@ function labReportCriteriaText(standardText: string): string {
         .trim(),
     )
     .filter((part) => /\d/.test(part));
+}
 
+function labReportCriteriaText(standardText: string): string {
+  const raw = standardText.trim();
+  if (!raw) return "";
+
+  // เกณฑ์กรมแสดงได้ตามปกติ แต่ตัดช่วงผ่านอัตโนมัติ (เกณฑ์ 25%) ที่อยู่ก่อนหน้าออก
+  const headIndex = raw.lastIndexOf(HEAD_CRITERIA_LABEL);
+  if (headIndex >= 0) {
+    const headParts = numericCriteriaParts(raw.slice(headIndex + HEAD_CRITERIA_LABEL.length));
+    return headParts[0] || DASH;
+  }
+  if (AUTO_PASS_CRITERIA_PATTERN.test(raw)) return DASH;
+
+  const numericParts = numericCriteriaParts(raw);
   if (!numericParts.length) return raw;
   return numericParts.join(" · ");
 }
@@ -110,7 +121,7 @@ function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string):
         out.push({
           testItem: `${r.label}${unit}`,
           result: r.value || DASH,
-          criteria: r.labelTolerance || !r.standardText ? DASH : labReportCriteriaText(r.standardText),
+          criteria: r.standardText ? labReportCriteriaText(r.standardText) : DASH,
           method: methodForRow(r.label, p.parameterName, commonName || group.commonName),
         });
       });
