@@ -30,6 +30,7 @@ import { crosshairAt, formatCrosshairTime } from "@/lib/petitionTimelineCrosshai
 import { estimateMetric, formatDateTime, type TimelineMetricTone } from "@/lib/petitionTimelineMetric";
 import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
+import { labReportPagesWithResults } from "@/lib/labReport";
 import { isResearchAndDevelopmentPetition } from "@/lib/petitionRouting";
 import { canSeePetition, isLabRole, petitionHasLabReadableItem } from "@/lib/petitionVisibility";
 import { normalizeRoles } from "@/lib/roles";
@@ -355,6 +356,7 @@ export default function PetitionTimelineDetailPage() {
     [petition, labRequests, parameters, qcResults, groupMembership],
   );
   const chemSheets = useMemo(() => (petition ? buildChemAnalysisSheets(petition, labReportPages) : []), [petition, labReportPages]);
+  const labResultPrintPages = useMemo(() => labReportPagesWithResults(labReportPages), [labReportPages]);
 
   const loadDocumentData = useCallback(async (): Promise<boolean> => {
     if (!petitionId) return false;
@@ -438,7 +440,7 @@ export default function PetitionTimelineDetailPage() {
     { key: "sampleLabel", label: "ป้ายนำส่งตัวอย่าง", icon: Printer, availableAt: requestedAt, open: setLabelPrintOpen },
     ...(serviceLabRequest ? [{ key: "serviceRequest" as const, label: "ใบคำขอรับบริการ", icon: FileText, availableAt: requestedAt, open: setServicePrintOpen }] : []),
     ...(canShowPreReport ? [{ key: "preReport" as const, label: "Pre Report", icon: FileText, availableAt: preReportAt, open: setPreReportOpen }] : []),
-    ...(canPrintLabResult(petition) && labReportPages.length > 0 ? [{ key: "labResult" as const, label: "พิมพ์ผลวิเคราะห์ Lab", icon: FlaskConical, availableAt: petition.labApprovedAt || petition.approvedAt, open: setLabResultOpen }] : []),
+    ...(canPrintLabResult(petition) && labResultPrintPages.length > 0 ? [{ key: "labResult" as const, label: "พิมพ์ผลวิเคราะห์ Lab", icon: FlaskConical, availableAt: petition.labApprovedAt || petition.approvedAt, open: setLabResultOpen }] : []),
     ...(petition.status === "approved" ? [{ key: "finalReport" as const, label: "Final Report", icon: FileCheck2, availableAt: petition.approvedAt, open: setFinalReportOpen }] : []),
     ...(canPrintChemAnalysisReport(petition) ? [{ key: "chemReport" as const, label: "ใบรายงานผลการวิเคราะห์", icon: FileCheck2, availableAt: petition.labApprovedAt || petition.approvedAt, open: setChemReportOpen }] : []),
   ]);
@@ -672,7 +674,7 @@ export default function PetitionTimelineDetailPage() {
     {servicePrintOpen && serviceLabRequest && <PrintPreviewDialog open={servicePrintOpen} onOpenChange={setServicePrintOpen} docType="service-request"><PetitionPrintTemplate labRequest={serviceLabRequest} petition={petition} qcResults={qcResults} sgParam={sgParameter} requestValues={requestValues} labReportPages={labReportPages} /></PrintPreviewDialog>}
     {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa" title="Pre Report"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa" title="Final Report"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
-    {labResultOpen && <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}><LabResultReportTemplate pages={labReportPages} /></PrintPreviewDialog>}
+    {labResultOpen && <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}><LabResultReportTemplate pages={labResultPrintPages} /></PrintPreviewDialog>}
     {chemReportOpen && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}><ChemAnalysisReportTemplate sheets={chemSheets} /></PrintPreviewDialog>}
     {grPrintOpen && goodsReceipt && (
       <PrintPreviewDialog open={grPrintOpen} onOpenChange={setGrPrintOpen} docType="goods-receipt" css={GOODS_RECEIPT_CSS}>

@@ -115,7 +115,7 @@ beforeEach(() => {
   mocks.getParameters.mockReturnValue(new Promise<ParameterItem[]>(() => {}));
   mocks.getQCResults.mockReturnValue(new Promise(() => {}));
   mocks.buildApprovalGroups.mockReturnValue([]);
-  mocks.buildLabResultReportPages.mockReturnValue([{ reportNo: 'LR-1' }]);
+  mocks.buildLabResultReportPages.mockReturnValue([{ reportNo: 'LR-1', rows: [{ testItem: 'AI', result: '1', criteria: '-', method: '-' }] }]);
 });
 
 describe('LabResultDetailPage print action', () => {

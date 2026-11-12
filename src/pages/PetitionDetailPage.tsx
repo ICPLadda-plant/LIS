@@ -61,6 +61,7 @@ import { buildApprovalGroups } from '@/lib/qcApprovalRows';
 import ParameterRemarksCard from '@/components/lis/ParameterRemarksCard';
 import { buildLaLisAssistant, type LaLisIssue } from '@/lib/laLisAssistant';
 import { buildLabResultReportPages } from '@/lib/labResultReport';
+import { labReportPagesWithResults } from '@/lib/labReport';
 import { canPrintSampleLabel, canPrintPreReport, canPrintLabResult } from '@/lib/petitionPrintability';
 import { isVisibleInAssignQueue, isWaitingForAssignment } from '@/lib/petitionQueueVisibility';
 import { labReceivedAt } from '@/lib/receiveStatus';
@@ -236,6 +237,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
     [data, labRequests, parameters, qcResults, groupMembership],
   );
   const chemSheets = useMemo(() => (data ? buildChemAnalysisSheets(data, labReportPages) : []), [data, labReportPages]);
+  const labResultPrintPages = useMemo(() => labReportPagesWithResults(labReportPages), [labReportPages]);
   const chemReportPrintable = data ? canPrintChemAnalysisReport(data) && chemSheets.length > 0 : false;
 
   useEffect(() => {
@@ -378,7 +380,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                           Pre Report
                         </Button>
                       )}
-                      {canPrintLabResult(data) && labReportPages.length > 0 && (
+                      {canPrintLabResult(data) && labResultPrintPages.length > 0 && (
                         <Button variant="primary-outline" size="sm" onClick={() => setLabResultOpen(true)}>
                           <FlaskConical className="h-4 w-4" />
                           พิมพ์ผลวิเคราะห์ Lab
@@ -658,7 +660,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                 <ResultReportPrintTemplate kind="final" petition={data} labRequests={labRequests ?? []} qcResults={qcResults} />
               </PrintPreviewDialog>
               <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}>
-                <LabResultReportTemplate pages={labReportPages} />
+                <LabResultReportTemplate pages={labResultPrintPages} />
               </PrintPreviewDialog>
               {chemReportPrintable && (
                 <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}>

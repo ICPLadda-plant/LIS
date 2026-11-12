@@ -183,3 +183,12 @@ export function buildLabReportPages(
     };
   });
 }
+
+/**
+ * หน้าที่ควรพิมพ์ในใบรายงานผลการทดสอบ: ตัดตัวอย่างที่ไม่มีรายการทดสอบฝั่ง Lab ออก
+ * (เช่น ตัวอย่างที่ส่ง QC อย่างเดียวในคำร้องเดียวกัน) — ผลจาก buildLabReportPages
+ * ยังต้องเรียงตาม petition.items สำหรับเอกสารอื่น จึงกรองตอนพิมพ์แทน
+ */
+export function labReportPagesWithResults(pages: LabReportPage[]): LabReportPage[] {
+  return pages.filter((page) => page.rows.length > 0);
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildLabReportPages, buddhistDate } from "@/lib/labReport";
+import { buildLabReportPages, buddhistDate, labReportPagesWithResults } from "@/lib/labReport";
 import type { Petition } from "@/types/petition.types";
 import type { LabRequest } from "@/types/labRequest.types";
 import type { ApprovalItemGroup } from "@/lib/qcApprovalRows";
@@ -160,6 +160,12 @@ describe("buildLabReportPages", () => {
     expect(p.customer.name).toBe("สมชาย"); // ไม่มี labRequest → submittedBy.name
     expect(p.customer.department).toBe("แผนกผลิต"); // PETITION_DEPT_LABELS[production]
     expect(p.sample.condition).toBe("บกพร่อง");
+  });
+
+  it("ใบรายงานผลการทดสอบพิมพ์เฉพาะตัวอย่างที่มีผลฝั่ง Lab", () => {
+    const printPages = labReportPagesWithResults(pages);
+    expect(printPages).toHaveLength(1);
+    expect(printPages[0].sample.name).toBe("Glyphosate");
   });
 
   it("ชื่อในข้อมูลลูกค้าใช้ชื่อผู้ขอบริการ ไม่ใช้ชื่อบริษัทผู้ส่งตัวอย่าง", () => {

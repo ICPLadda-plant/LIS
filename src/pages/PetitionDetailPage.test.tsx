@@ -134,7 +134,7 @@ vi.mock('@/lib/petitionPrintability', () => ({
 }));
 
 vi.mock('@/lib/labResultReport', () => ({
-  buildLabResultReportPages: () => [{ reportNo: 'LR-1' }],
+  buildLabResultReportPages: () => [{ reportNo: 'LR-1', rows: [{ testItem: 'AI', result: '1', criteria: '-', method: '-' }] }],
 }));
 
 function renderPage() {

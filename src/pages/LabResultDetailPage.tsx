@@ -12,6 +12,7 @@ import { useItemGroupMembership } from "@/hooks/useItemGroupMembership";
 import { buildApprovalGroups } from "@/lib/qcApprovalRows";
 import { aiSubstancesForItem } from "@/lib/aiSubstanceFields";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
+import { labReportPagesWithResults } from "@/lib/labReport";
 import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { itemSubmissionNoText } from "@/lib/petitionSampler";
@@ -91,8 +92,9 @@ export default function LabResultDetailPage() {
     [petition, labRequests, parameters, results, groupMembership],
   );
 
-  const report = <LabResultReportTemplate pages={pages} />;
-  const labResultPrintable = petition ? canPrintLabResult(petition) && pages.length > 0 : false;
+  const reportPages = useMemo(() => labReportPagesWithResults(pages), [pages]);
+  const report = <LabResultReportTemplate pages={reportPages} />;
+  const labResultPrintable = petition ? canPrintLabResult(petition) && reportPages.length > 0 : false;
   const chemSheets = useMemo(() => (petition ? buildChemAnalysisSheets(petition, pages) : []), [petition, pages]);
   const chemReportPrintable = petition ? canPrintChemAnalysisReport(petition) && chemSheets.length > 0 : false;
   // ใบคำนวณใช้ได้ทุกสาร: หัวกระดาษจากหน้ารายงาน แต่ค่าดิบ (Area Inj / % Sample) มาจาก groups
