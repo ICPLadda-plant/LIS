@@ -128,6 +128,44 @@ describe('PetitionView R&D parameter visibility', () => {
     expect(screen.getByText('1.7')).toBeInTheDocument();
   });
 
+  it('shows configured standards for the specific-gravity parameter', async () => {
+    fixtures.getParameters.mockResolvedValue([
+      {
+        _id: 'qc-sg',
+        name: 'ค่า ถพ.',
+        scope: 'qc',
+        shareWithLab: true,
+        applyAll: true,
+        valueFields: [
+          { label: 'ค่าถพ.', type: 'float', unit: 'g/cm3' },
+          { label: 'อุณหภูมิ', type: 'float', unit: '°C', standardOperator: 'between', standardValue: 29.5, standardValue2: 30.49 },
+        ],
+      },
+    ] as ParameterItem[]);
+    fixtures.getQCResults.mockResolvedValue([
+      {
+        petitionId: fixtures.petition._id,
+        itemSeq: 1,
+        parameterId: 'qc-sg',
+        parameterName: 'ค่า ถพ.',
+        values: { 'ค่าถพ.': '0.987', 'อุณหภูมิ': '30' },
+      },
+    ]);
+
+    render(
+      <PetitionView
+        petition={{
+          ...fixtures.petition,
+          submittedBy: { ...fixtures.petition.submittedBy, department: 'QC' },
+        } as Petition}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('ค่า ถพ.')).toBeInTheDocument());
+    expect(screen.queryByText('ไม่แสดงเกณฑ์')).not.toBeInTheDocument();
+    expect(screen.getByText('ผ่านเกณฑ์')).toBeInTheDocument();
+  });
+
   it('shows a dash without the missing-standard badge in result mode', async () => {
     fixtures.getQCResults.mockResolvedValue([
       {

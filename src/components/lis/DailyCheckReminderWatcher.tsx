@@ -5,6 +5,8 @@ import { useNotifications } from "@/context/NotificationContext";
 import { useAuth } from "@/context/AuthContext";
 import { DAILY_CHECK_SCALE_TOTAL } from "@/lib/dailyCheckProgress";
 import { getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
+import { normalizeRoles } from "@/lib/roles";
+import { isLabRole } from "@/lib/petitionVisibility";
 
 const STORAGE_PREFIX = "lis.dailyCheck.reminderShown.";
 
@@ -15,21 +17,23 @@ const todayStr = () => {
 
 /**
  * เช็คทุกนาที — ถ้าอยู่ในรอบเช้า/บ่าย และยังบันทึก Daily Check ไม่ครบ
- * push notification ครั้งเดียวต่อรอบ (กันซ้ำด้วย localStorage)
+ * push notification ครั้งเดียวต่อรอบ (กันซ้ำด้วย localStorage) — เฉพาะ role ตระกูล Lab
+ * (PWA ส่งจาก server/lib/notificationScheduler.js)
  */
 const DailyCheckReminderWatcher = () => {
   const { user } = useAuth();
   const { push, dismiss, notifications } = useNotifications();
+  const isLabUser = normalizeRoles(user).some(isLabRole);
 
   const { data: summary } = useQuery({
     queryKey: ["daily-checks", "today-summary"],
     queryFn: api.getDailyCheckTodaySummary,
     refetchInterval: 60_000,
-    enabled: !!user,
+    enabled: !!user && isLabUser,
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isLabUser) return;
     if (!summary) return;
 
     const tick = () => {
@@ -79,7 +83,7 @@ const DailyCheckReminderWatcher = () => {
     tick();
     const id = window.setInterval(tick, 60_000);
     return () => window.clearInterval(id);
-  }, [user, summary, notifications, push, dismiss]);
+  }, [user, isLabUser, summary, notifications, push, dismiss]);
 
   return null;
 };

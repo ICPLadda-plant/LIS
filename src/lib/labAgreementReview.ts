@@ -1,4 +1,4 @@
-import type { LabAgreementReview } from '@/types/labRequest.types';
+import type { LabAgreementReview, LabRequest } from '@/types/labRequest.types';
 
 export const PERSONNEL_ABLE_REASON_LABELS = {
   trained: 'ได้รับการฝึกอบรมแล้ว',
@@ -31,4 +31,9 @@ export const EQUIP_NOT_READY_REASON_LABELS = {
 
 export function isReviewFilled(r?: LabAgreementReview | null): boolean {
   return !!r && !!r.reviewedBy && !!r.reviewedAt;
+}
+
+/** Lab รับตัวอย่างได้เมื่อทุกใบ L ของคำร้องทบทวนแล้วและสรุปว่าพร้อมรับงาน (ไม่มีใบ L = ไม่ต้องทบทวน) */
+export function isReadyToReceive(requests: Pick<LabRequest, 'labAgreementReview'>[]): boolean {
+  return requests.every((r) => isReviewFilled(r.labAgreementReview) && r.labAgreementReview?.acceptable !== false);
 }

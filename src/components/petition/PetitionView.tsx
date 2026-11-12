@@ -18,7 +18,6 @@ import {
   resolveLabelTolerance,
 } from '@/lib/parameterValidation';
 import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
-import { SG_FIELD_LABEL } from '@/lib/formSpecificGravity';
 import { itemSubmissionNoText } from '@/lib/petitionSampler';
 import { MediaThumbnails } from '@/components/lis/MediaThumbnails';
 import { mediaUrlsFromValue } from '@/lib/mediaUrls';
@@ -91,7 +90,6 @@ export default function PetitionView({ petition: p, hideMissingStandardBadge = f
   ) => {
     if (!result) return [];
     const valueRows = getEntryValues(result, param);
-    const isSgParam = (param.valueFields ?? []).some((field) => field.label === SG_FIELD_LABEL);
     const otherParams: Record<string, Record<string, unknown>> = {};
     for (const r of results) {
       if (r.itemSeq !== item.seq) continue;
@@ -134,7 +132,7 @@ export default function PetitionView({ petition: p, hideMissingStandardBadge = f
                 value,
                 standard: rowStandard,
                 hasStandard: rowStandard.trim() !== '',
-                hideStandard: isSgParam || (unit as { hiddenStandard?: boolean }).hiddenStandard === true,
+                hideStandard: (unit as { hiddenStandard?: boolean }).hiddenStandard === true,
                 abnormal: lt
                   ? (lt.status === 'review' || lt.status === 'fail')
                   : (unit as { hiddenStandard?: boolean }).hiddenStandard === true ? false : isFieldAbnormal(effectiveField, value),

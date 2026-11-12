@@ -18,6 +18,11 @@ RewriteBase /LIS/
 RewriteRule ^app\.html$ - [L]
 RewriteRule ^(?:index\.html)?$ /LIS/app.html [L]
 
+# ไฟล์ build ที่ไม่มีอยู่ (เช่น build เก่าที่ถูกลบ) ต้องตอบ 404 ห้ามส่ง app.html กลับไปแทน JS/CSS
+# ไม่อย่างนั้น Cloudflare และ PWA จะจำหน้า HTML ไว้ใต้ชื่อไฟล์ JS แล้วแอปค้างจอขาว
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^assets/ - [R=404,L]
+
 # SPA fallback: ทุก route ที่ไม่ใช่ไฟล์จริง → app.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

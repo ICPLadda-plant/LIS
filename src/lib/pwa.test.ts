@@ -64,6 +64,6 @@ describe("PWA helpers", () => {
       serviceWorker,
     });
 
-    expect(register).toHaveBeenCalledWith("/LIS/sw.js?v=5", { scope: "/LIS/", updateViaCache: "none" });
+    expect(register).toHaveBeenCalledWith("/LIS/sw.js?v=6", { scope: "/LIS/", updateViaCache: "none" });
   });
 });

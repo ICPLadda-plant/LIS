@@ -1,0 +1,130 @@
+{
+  "name": "Production to LIS: ฝากคำขอและคืนลิงก์สั้น",
+  "nodes": [
+    {
+      "id": "receive",
+      "name": "Receive production request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "lis-production-petition-post",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lis/production-petitions",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "post",
+      "name": "POST to LIS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://app-plant.icpladda.com/LIS/api/production-integration/petitions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}",
+        "options": {
+          "timeout": 30000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "result",
+      "name": "Prepare short links",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const response = $json;\nconst status = Number(response.statusCode || 502);\nconst body = response.body;\nif (status !== 201 || body?.ok !== true || !/^[A-Za-z0-9_-]{16,80}$/.test(body?.token || '')) {\n  return [{ json: { statusCode: status >= 400 && status <= 599 ? status : 502, body: { ok: false, error: { message: 'LIS request failed; check n8n execution', upstreamStatus: response.statusCode || null } } } }];\n}\n// Apache may strip /LIS before proxying; construct the public path explicitly.\nconst origin = 'https://app-plant.icpladda.com';\nconst path = '/LIS/petitions/ProductionIntegrationPetitionNewPage?integrationToken=' + encodeURIComponent(body.token);\nreturn [{ json: { statusCode: 201, body: { ok: true, redirectUrl: origin + path, ssoUrl: origin + '/production-react/api/lis_sso.php?ret=' + encodeURIComponent(path), expiresInSeconds: 172800, submitted: false } } }];"
+      }
+    },
+    {
+      "id": "respond",
+      "name": "Respond to production",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.body }}",
+        "options": {
+          "responseCode": "={{ $json.statusCode }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Receive production request": {
+      "main": [
+        [
+          {
+            "node": "POST to LIS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST to LIS": {
+      "main": [
+        [
+          {
+            "node": "Prepare short links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare short links": {
+      "main": [
+        [
+          {
+            "node": "Respond to production",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  }
+}

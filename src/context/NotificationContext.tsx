@@ -12,6 +12,8 @@ export interface AppNotification {
   link?: string;          // path เปิดเมื่อกด
   createdAt: number;
   read: boolean;
+  /** เปิดกระดิ่งแล้วเห็นรายการนี้ (ใช้ซ่อนตัวเลขบนกระดิ่ง) — ต่างจาก read ที่ต้องกดดูรายการจริง */
+  seen?: boolean;
   /**
    * เมื่อ persistent = true จะอยู่ใน localStorage ข้ามรีเฟรชจนกว่าจะ dismiss
    * (เช่น แจ้งเตือน 8:00 ของ daily check)
@@ -25,15 +27,20 @@ export interface AppNotification {
   snoozedUntil?: number;
 }
 
-export type PinnedNotificationInput = Omit<AppNotification, "createdAt" | "read" | "pinned" | "snoozedUntil">;
+export type PinnedNotificationInput = Omit<AppNotification, "createdAt" | "read" | "seen" | "pinned" | "snoozedUntil">;
 
 interface NotificationContextType {
   notifications: AppNotification[];
+  /** จำนวนที่ยังไม่ได้กดอ่าน */
   unreadCount: number;
+  /** จำนวนที่ยังไม่อ่านและยังไม่เคยเห็นตอนเปิดกระดิ่ง — ใช้เป็นตัวเลขบนกระดิ่ง */
+  unseenCount: number;
   push: (n: Omit<AppNotification, "createdAt" | "read"> & { createdAt?: number; read?: boolean }) => void;
   dismiss: (id: string) => void;
   markRead: (id: string) => void;
   markAllRead: () => void;
+  /** เปิดกระดิ่งแล้ว: ตัวเลขหาย แต่รายการยังคงเป็น "ยังไม่ได้อ่าน" */
+  markAllSeen: () => void;
   clearAll: () => void;
   /** แทนที่รายการ pinned ทั้งหมด; markUnread = รอบเตือนใหม่ ให้กลับมาเป็นยังไม่อ่านและยกเลิกการปิดชั่วคราว */
   syncPinned: (items: PinnedNotificationInput[], options?: { markUnread?: boolean }) => void;
@@ -118,6 +125,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
           pinned: true,
           createdAt: existing?.createdAt ?? Date.now(),
           read: options?.markUnread ? false : existing?.read ?? false,
+          seen: options?.markUnread ? false : existing?.seen ?? false,
           snoozedUntil: options?.markUnread ? undefined : existing?.snoozedUntil ?? snoozes[item.id],
         };
       });
@@ -169,6 +177,13 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     setState(prev => ({ ...prev, notifications: prev.notifications.map(n => ({ ...n, read: true })) }));
   }, []);
 
+  const markAllSeen = useCallback(() => {
+    setPinned(prev => prev.some(n => !n.seen) ? prev.map(n => ({ ...n, seen: true })) : prev);
+    setState(prev => prev.notifications.some(n => !n.seen)
+      ? { ...prev, notifications: prev.notifications.map(n => ({ ...n, seen: true })) }
+      : prev);
+  }, []);
+
   // "ล้าง" ลบเฉพาะรายการทั่วไป — งานด่วนที่ปักไว้หายเองเมื่อบันทึกผลแล้วเท่านั้น
   const clearAll = useCallback(() => setState(prev => ({ ...prev, notifications: [] })), []);
 
@@ -177,14 +192,17 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
   const pinnedIds = new Set(visiblePinned.map(n => n.id));
   const merged = [...visiblePinned, ...notifications.filter(n => !pinnedIds.has(n.id))];
   const unreadCount = merged.filter(n => !n.read).length;
+  const unseenCount = merged.filter(n => !n.read && !n.seen).length;
 
   const value: NotificationContextType = {
     notifications: merged,
     unreadCount,
+    unseenCount,
     push,
     dismiss,
     markRead,
     markAllRead,
+    markAllSeen,
     clearAll,
     syncPinned,
   };

@@ -66,6 +66,7 @@ type MsalAccountControls = {
 };
 
 const PRODUCTION_SSO_USER_STORAGE_KEY = "lis_production_sso_user";
+export const DEV_ACCESS_CONTROL_RETRY_MS = 3000;
 
 function readStoredProductionUser(): AuthUser | null {
   const raw = localStorage.getItem(PRODUCTION_SSO_USER_STORAGE_KEY);
@@ -118,6 +119,8 @@ interface AuthContextType {
   loginWithProductionToken: (token: string) => Promise<AuthUser>;
   logout: () => void;
   isPwa: boolean;
+  // เข้าระบบผ่าน SSO ของฝ่ายผลิต (ไม่ใช่บัญชี Microsoft ของ LIS)
+  isProductionSession?: boolean;
   accounts: AuthAccount[];
   activeAccountId?: string;
   switchAccount: (accountId: string) => void;
@@ -230,7 +233,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!DEV_MODE) return;
 
     let active = true;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     const loadMatrix = (force = false) => {
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = undefined;
       loadAccessControl(force)
         .then((data) => {
           if (!active) return;
@@ -238,7 +244,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setDevRoles(data.roles ?? []);
         })
         .catch((err) => {
+          if (!active) return;
           console.error("Failed to load access matrix for dev role", err);
+          retryTimer = setTimeout(() => loadMatrix(true), DEV_ACCESS_CONTROL_RETRY_MS);
         });
     };
 
@@ -247,6 +255,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.addEventListener("lis-access-groups-changed", refresh);
     return () => {
       active = false;
+      if (retryTimer) clearTimeout(retryTimer);
       window.removeEventListener("lis-access-groups-changed", refresh);
     };
   }, []);
@@ -306,6 +315,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ส่งอีเมลผู้ใช้ปัจจุบันให้ api.ts แนบเป็น header X-LIS-User (backend ใช้ตรวจ
   // สิทธิ์ admin ของ route /api-keys)
   useEffect(() => {
+    if (DEV_MODE && !user?.email) return;
     setApiUserEmail(user?.email);
   }, [user?.email]);
 
@@ -633,6 +643,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         loginWithProductionToken,
         logout,
         isPwa,
+        isProductionSession: !DEV_MODE && !!productionUser,
         accounts: authAccounts,
         activeAccountId: selectedAccountId,
         switchAccount,

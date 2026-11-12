@@ -1,494 +1,177 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const {
-  bellDescribe,
-  isCollapsibleDuplicate,
-  isRelevant,
-  levelForEvent,
-  shouldPlaySampleArrivalSound,
-  toNotification,
-} = require('./petitionNotifications');
+const { notificationForViewer, isCollapsibleDuplicate, petitionNotices } = require('./petitionNotifications');
 
-// batchNo ลงท้าย 1 หรือ 6 = งาน Lab (กติกาเดิมใน petitionStatusLog.isLabBatch)
-const labItem = { batchNo: '326', sampleName: 'OMETHOATE' };
-const petition = {
+// ผู้ชมตัวอย่างครบทุก role (roles รวม role พื้นฐานของตระกูลแล้ว เหมือน viewerFromUser)
+const viewers = {
+  qcStaff: { roles: ['qc-staff'], employeeId: 'Q1', name: 'QC เอ', email: 'qc1@x' },
+  qcOther: { roles: ['qc-staff'], employeeId: 'Q2', name: 'QC บี', email: 'qc2@x' },
+  qcHead: { roles: ['qc-head', 'qc-staff'], employeeId: 'QH', name: 'หัวหน้า QC', email: 'qch@x' },
+  qcApprover: { roles: ['qc-approver', 'qc-staff'], employeeId: 'QA', name: 'ผู้อนุมัติ QC', email: 'qca@x' },
+  qcDataConfig: { roles: ['qc-data-config', 'qc-staff'], employeeId: 'QD', name: 'QC Config', email: 'qcd@x' },
+  labAssignee: { roles: ['lab-analyze'], employeeId: 'E200', name: 'สมหญิง', email: 'lab1@x' },
+  labOther: { roles: ['lab-analyze'], employeeId: 'E201', name: 'สมศรี', email: 'lab2@x' },
+  labHead: { roles: ['lab-head', 'lab-analyze'], employeeId: 'LH', name: 'หัวหน้า Lab', email: 'labh@x' },
+  labInventory: { roles: ['lab-inventory', 'lab-analyze'], employeeId: 'LI', name: 'คลัง Lab', email: 'labi@x' },
+  labDataConfig: { roles: ['lab-data-config', 'lab-analyze'], employeeId: 'LD', name: 'Lab Config', email: 'labd@x' },
+  submitter: { roles: ['viewer'], employeeId: 'E100', name: 'สมชาย', email: 'req@x' },
+  viewerOther: { roles: ['viewer'], employeeId: 'E999', name: 'คนอื่น', email: 'other@x' },
+  customRole: { roles: ['production-planner'], employeeId: 'P1', name: 'วางแผน', email: 'plan@x' },
+  admin: { roles: ['admin'], employeeId: 'AD', name: 'แอดมิน', email: 'admin@x' },
+};
+const QC_ALL = ['qcApprover', 'qcDataConfig', 'qcHead', 'qcOther', 'qcStaff'];
+const LAB_ALL = ['labAssignee', 'labDataConfig', 'labHead', 'labInventory', 'labOther'];
+
+const basePetition = {
   _id: 'p1',
-  petitionNo: 'P-2606-0018',
-  dept: 'production',
-  items: [labItem],
+  petitionNo: 'P-2611-0001',
+  routeTargets: ['qc', 'lab'],
+  items: [{ seq: 1, batchNo: '326', sampleName: 'OMETHOATE' }],
   submittedBy: { name: 'สมชาย', employeeId: 'E100', department: 'Production' },
+  assignedTo: { employeeId: 'E200', name: 'สมหญิง', department: 'Lab วิเคราะห์' },
+  qcHandlers: [{ employeeId: 'Q1', name: 'QC เอ', email: 'qc1@x' }],
 };
 
-const sampleLog = (type = 'additionalSampleRequested', roundId = 'round-1', side = 'lab') => ({
-  _id: 'audit-round-1', petitionId: 'p1', event: 'updated', toStatus: 'inProgress',
-  actor: 'ผู้ตรวจจากเซิร์ฟเวอร์', createdAt: '2026-09-19T03:00:00.000Z',
-  metadata: {
-    type, side, additionalSampleId: roundId, reason: 'ผลไม่ผ่าน',
-    items: [{ itemSeq: 1, quantity: 2 }, { itemSeq: 2, quantity: 3 }],
-    actor: 'ไม่ใช่ผู้ตรวจ', createdAt: '2000-01-01T00:00:00.000Z',
-  },
+let seq = 0;
+const log = (over) => ({ _id: 'log' + (++seq), petitionId: 'p1', actor: 'ระบบทดสอบ', createdAt: '2026-11-11T03:00:00.000Z', ...over });
+
+function recipients(petition, entry) {
+  return Object.keys(viewers).filter((key) => notificationForViewer(petition, entry, viewers[key])).sort();
+}
+const sorted = (list) => [...list].sort();
+
+test('คำขอใหม่: ทุก role ตระกูล QC และ Lab ได้รับ แต่ viewer/role อื่น/admin ไม่ได้', () => {
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'created' })), sorted([...QC_ALL, ...LAB_ALL]));
+  const qcOnly = { ...basePetition, routeTargets: ['qc'] };
+  assert.deepStrictEqual(recipients(qcOnly, log({ event: 'created' })), sorted(QC_ALL));
 });
 
-test('additional request/receipt reaches department OR exact requester, never unrelated assignee', () => {
-  for (const department of ['R&D', 'FG']) {
-    const source = { ...petition, submittedBy: { ...petition.submittedBy, department }, assignedTo: { employeeId: 'E200' } };
-    for (const type of ['additionalSampleRequested', 'additionalSampleReceived']) {
-      const desc = bellDescribe(source, sampleLog(type));
-      assert.ok(desc);
-      const audience = department === 'R&D' ? 'rd' : 'fg';
-      assert.deepStrictEqual(desc.audiences, [audience]);
-      assert.strictEqual(isRelevant(desc, source, { employeeId: 'E100', audiences: [] }), true);
-      assert.strictEqual(isRelevant(desc, source, { employeeId: 'E999', audiences: [audience] }), true);
-      for (const other of ['production', 'rm', 'qc', 'lab', audience === 'rd' ? 'fg' : 'rd']) {
-        assert.strictEqual(isRelevant(desc, source, { employeeId: 'E200', audiences: [other] }), false);
-      }
-      assert.strictEqual(isRelevant(desc, source, { employeeId: 'E10', name: 'สมชาย', audiences: [] }), false);
-    }
-  }
+test('แผนกไม่มีผลแล้ว: viewer ที่อยู่แผนก QC ไม่ได้รับงานของฝั่ง QC', () => {
+  const viewerInQcDept = { roles: ['viewer'], employeeId: 'V1', department: 'QC ควบคุมคุณภาพ' };
+  assert.strictEqual(notificationForViewer(basePetition, log({ event: 'created' }), viewerInQcDept), null);
 });
 
-test('additional bell reaches requester when both department sources are missing', () => {
-  const source = { _id: 'p1', submittedBy: { employeeId: 'E100' } };
-  const desc = bellDescribe(source, sampleLog());
-  assert.ok(desc);
-  assert.strictEqual(isRelevant(desc, source, { employeeId: ' E100 ', audiences: [] }), true);
-  assert.strictEqual(isRelevant(desc, source, { audiences: [] }), false);
+test('ส่งตัวอย่างแล้ว: QC มีเสียง ส่วน Lab ได้รับเฉพาะงานที่ส่ง Lab หรืองาน Lab อย่างเดียว', () => {
+  const entry = log({ event: 'statusChanged', fromStatus: 'deliveringQC', toStatus: 'sampleSent' });
+  assert.deepStrictEqual(recipients(basePetition, entry), sorted(QC_ALL));
+  assert.strictEqual(notificationForViewer(basePetition, entry, viewers.qcStaff).playSound, true);
+  assert.deepStrictEqual(recipients({ ...basePetition, sentToLab: true }, entry), sorted([...QC_ALL, ...LAB_ALL]));
+  const labOnly = { ...basePetition, routeTargets: ['lab'] };
+  assert.deepStrictEqual(recipients(labOnly, entry), sorted(LAB_ALL));
+  assert.strictEqual(notificationForViewer(labOnly, entry, viewers.labOther).playSound, true);
 });
 
-test('additional sent bell only reaches requesting side, not generic job owners', () => {
-  const source = { ...petition, assignedTo: { employeeId: 'E200' } };
-  for (const side of ['qc', 'lab']) {
-    const desc = bellDescribe(source, sampleLog('additionalSampleSent', 'round-1', side));
-    assert.ok(desc);
-    assert.strictEqual(isRelevant(desc, source, { employeeId: 'E999', audiences: [side] }), true);
-    assert.strictEqual(isRelevant(desc, source, { employeeId: 'E100', audiences: ['production'] }), false);
-    assert.strictEqual(isRelevant(desc, source, { employeeId: 'E200', audiences: [side === 'lab' ? 'qc' : 'lab'] }), false);
-  }
+test('QC รับตัวอย่าง: QC ทุกคน + ผู้ยื่น; รับบางป้ายยังไม่แจ้ง', () => {
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'received', metadata: { side: 'qc' } })), sorted([...QC_ALL, 'submitter']));
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'received', metadata: { side: 'qc', partial: true } })), []);
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'received', metadata: { side: 'lab' } })), ['submitter']);
 });
 
-test('additional bell preserves petition link/server timestamp and uses audit actor, not metadata', () => {
-  const log = sampleLog();
-  const desc = bellDescribe(petition, log);
-  assert.ok(desc);
-  const notification = toNotification(petition, log, desc);
-  assert.strictEqual(notification.title, 'ขอตัวอย่างเพิ่ม ' + petition.petitionNo);
-  assert.match(notification.message, /LAB/);
-  assert.match(notification.message, /ผลไม่ผ่าน/);
-  assert.match(notification.message, /รวม 5/);
-  assert.match(notification.message, /ผู้ตรวจจากเซิร์ฟเวอร์/);
-  assert.doesNotMatch(notification.message, /ไม่ใช่ผู้ตรวจ/);
-  assert.strictEqual(notification.link, '/petition/p1');
-  assert.strictEqual(notification.createdAt, log.createdAt);
+test('เริ่มบันทึกผลฝั่ง QC: QC ทุกคน, id คงที่ต่อคำขอ; ผลฝั่ง Lab ไม่แจ้ง', () => {
+  const first = log({ event: 'resultEntered', metadata: { side: 'qc', parameterName: 'pH' } });
+  assert.deepStrictEqual(recipients(basePetition, first), sorted(QC_ALL));
+  const a = notificationForViewer(basePetition, first, viewers.qcOther).id;
+  const b = notificationForViewer(basePetition, log({ event: 'resultEntered', metadata: { side: 'qc' } }), viewers.qcOther).id;
+  assert.strictEqual(a, b);
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'resultEntered', metadata: { side: 'lab' } })), []);
 });
 
-test('additional duplicate rounds collapse per petition, side and event type', () => {
-  const seen = new Set();
-  const first = sampleLog();
-  assert.strictEqual(isCollapsibleDuplicate(first, seen), false);
-  assert.strictEqual(isCollapsibleDuplicate({ ...first, _id: 'audit-duplicate' }, seen), true);
-  assert.strictEqual(isCollapsibleDuplicate(sampleLog('additionalSampleRequested', 'round-2'), seen), false);
-  assert.strictEqual(isCollapsibleDuplicate(sampleLog('additionalSampleRequested', 'round-1', 'qc'), seen), false);
-  assert.strictEqual(isCollapsibleDuplicate(sampleLog('additionalSampleSent'), seen), false);
-  assert.strictEqual(isCollapsibleDuplicate(sampleLog('additionalSampleReceived'), seen), false);
-  assert.strictEqual(isCollapsibleDuplicate({ ...first, petitionId: 'p2' }, seen), false);
-  assert.strictEqual(isCollapsibleDuplicate(sampleLog('additionalSampleRequested', ''), seen), false);
-  assert.strictEqual(isCollapsibleDuplicate({ petitionId: 'p1', event: 'resultEntered' }, seen), false);
+test('QC Approval: ได้แจ้งเมื่อมีผลกายภาพใหม่รอยืนยัน', () => {
+  const entry = log({ event: 'updated', metadata: { side: 'qc', kind: 'trackCompleted' } });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['qcApprover']);
+  assert.strictEqual(notificationForViewer(basePetition, entry, viewers.qcApprover).link, '/qc-approval/p1');
 });
 
-test('additional bell ID deduplicates same round across polls, preserving later rounds and stages', () => {
-  const notificationId = (log) => toNotification(petition, log, bellDescribe(petition, log)).id;
-  const first = sampleLog();
-  assert.strictEqual(notificationId(first), notificationId({ ...first, _id: 'second-audit-id' }));
-  assert.notStrictEqual(notificationId(first), notificationId(sampleLog('additionalSampleRequested', 'round-2')));
-  assert.notStrictEqual(notificationId(first), notificationId(sampleLog('additionalSampleSent')));
-  assert.notStrictEqual(notificationId(first), notificationId(sampleLog('additionalSampleReceived')));
+test('Lab Head: ได้แจ้งเมื่อผล Lab บันทึกแล้วรออนุมัติ', () => {
+  const entry = log({ event: 'updated', metadata: { side: 'lab', kind: 'trackCompleted' } });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['labHead']);
 });
 
-test('bellDescribe: created ใช้ถ้อยคำร่วมกับ LINE และแตกบรรทัดแรกเป็น title', () => {
-  const d = bellDescribe(petition, { event: 'created' });
-  assert.deepStrictEqual(d.audiences, ['qc']);
-  assert.strictEqual(d.title, '📋 คำขอใหม่ P-2606-0018');
-  assert.match(d.message, /ผู้ยื่น: สมชาย/);
-  assert.match(d.message, / · /); // หลายบรรทัดถูกรวบด้วย " · "
+test('QC Approval กดกายภาพผ่าน: เจ้าของงาน QC + ผู้ยื่น (QC คนอื่นไม่ได้)', () => {
+  const entry = log({ event: 'reviewed', metadata: { type: 'itemApproval', side: 'qc', decision: 'approve', seqs: [1] } });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['qcStaff', 'submitter']);
 });
 
-test('bellDescribe: assigned ในกระดิ่งบอกว่ามอบหมายให้คุณแล้ว ไม่แสดงชื่อผู้รับผิดชอบซ้ำ', () => {
-  const d = bellDescribe(
-    { ...petition, petitionNo: 'P-2609-0013', items: [{ batchNo: '326', sampleName: 'โบร์แลน' }] },
-    { event: 'assigned', metadata: { assignee: { employeeId: 'E200', name: 'Dev Lab Analyst', department: 'Lab วิเคราะห์' } } },
-  );
-
-  assert.deepStrictEqual(d.audiences, ['lab']);
-  assert.strictEqual(d.targetEmployeeId, 'E200');
-  assert.strictEqual(d.title, 'มอบหมายงาน P-2609-0013 ให้คุณแล้ว');
-  assert.strictEqual(d.message, 'ตัวอย่าง: 1 รายการ · โบร์แลน');
+test('QC Head: แจ้งเมื่องานรอออก Final Report (ครบทุกส่วน / Pre Result) และเมื่อออก Final แล้ว', () => {
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'statusChanged', toStatus: 'success' })), ['qcHead']);
+  const pre = log({ event: 'reviewed', metadata: { type: 'itemApproval', side: 'qc', decision: 'approve', seqs: [1], preResult: true } });
+  assert.ok(recipients(basePetition, pre).includes('qcHead'));
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'statusChanged', toStatus: 'approved' })), ['qcHead', 'qcStaff', 'submitter']);
 });
 
-test('bellDescribe: received — LINE ไม่ส่ง แต่กระดิ่งส่ง โดยดู side จาก metadata', () => {
-  const d = bellDescribe(petition, { event: 'received', metadata: { side: 'lab' } });
-  assert.deepStrictEqual(d.audiences, ['lab']);
-  assert.strictEqual(d.title, '📥 Lab รับตัวอย่าง P-2606-0018');
-});
-
-test('bellDescribe: received ที่ไม่มี side → null', () => {
-  assert.strictEqual(bellDescribe(petition, { event: 'received', metadata: {} }), null);
-});
-
-test('bellDescribe: resultEntered ไม่มี side → ทั้งสองฝั่งที่งานนี้มี', () => {
-  const d = bellDescribe(petition, { event: 'resultEntered', metadata: { parameterName: 'pH' } });
-  assert.deepStrictEqual(d.audiences, ['qc', 'lab']);
-  assert.strictEqual(d.title, '🧪 เริ่มบันทึกผล P-2606-0018');
-  assert.strictEqual(d.message, 'pH');
-});
-
-test('bellDescribe: resultUpdated → null เสมอ (แก้ค่าทีละช่องจะเด้งรัว)', () => {
-  assert.strictEqual(
-    bellDescribe(petition, { event: 'resultUpdated', metadata: { side: 'qc', parameterName: 'pH' } }),
-    null,
-  );
-});
-
-test('bellDescribe: reviewed → null', () => {
-  assert.strictEqual(bellDescribe(petition, { event: 'reviewed' }), null);
-});
-
-// Finding 3: หัวหน้า QC ส่งกลับ Lab/QC ทดสอบใหม่ — describeEvent ไม่รู้จัก (audiencesForEvent
-// map ธรรมดา 'inProgress' เป็น []) จึงต้องมี bell-only fallback เอง
-test('bellDescribe: statusChanged toStatus=inProgress ไม่มี metadata.returnTo (ธรรมดา) → null', () => {
-  assert.strictEqual(
-    bellDescribe(petition, { event: 'statusChanged', toStatus: 'inProgress' }),
-    null,
-  );
-});
-
-test('bellDescribe: statusChanged toStatus=inProgress + returnTo=lab → แจ้งฝั่ง lab ด้วย note เดิม', () => {
-  const log = {
-    event: 'statusChanged',
-    toStatus: 'inProgress',
-    note: 'หัวหน้า QC ส่งกลับฝั่ง Labทดสอบใหม่: กลิ่นผิดปกติ',
-    metadata: { returnTo: 'lab' },
-  };
-  const d = bellDescribe(petition, log);
-  assert.deepStrictEqual(d.audiences, ['lab']);
-  assert.strictEqual(d.title, '🔁 ส่งกลับทดสอบใหม่ P-2606-0018');
-  assert.strictEqual(d.message, log.note);
-});
-
-test('bellDescribe: statusChanged toStatus=inProgress + returnTo=qc → แจ้งฝั่ง qc', () => {
-  const log = {
-    event: 'statusChanged',
-    toStatus: 'inProgress',
-    note: 'หัวหน้า QC ส่งกลับฝั่ง QCทดสอบใหม่: ค่าคลาดเคลื่อน',
-    metadata: { returnTo: 'qc' },
-  };
-  assert.deepStrictEqual(bellDescribe(petition, log).audiences, ['qc']);
-});
-
-test('bellDescribe: statusChanged toStatus=inProgress + returnTo=both → แจ้งทั้งสองฝั่งที่งานนี้มี', () => {
-  const log = {
-    event: 'statusChanged',
-    toStatus: 'inProgress',
-    note: 'หัวหน้า QC ส่งกลับทั้ง Lab และ QCทดสอบใหม่: ทวนซ้ำทั้งหมด',
-    metadata: { returnTo: 'both' },
-  };
-  assert.deepStrictEqual(bellDescribe(petition, log).audiences, ['qc', 'lab']);
-});
-
-test('isRelevant: audience ตัดกัน → true', () => {
-  const desc = { audiences: ['qc'], title: 't' };
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['qc'], employeeId: 'E999' }), true);
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: 'E999' }), false);
-});
-
-test('bellDescribe/isRelevant: แจ้งการแก้ผลหลังปิดงานให้ QC Head ทุกคนเท่านั้น', () => {
-  const log = {
-    event: 'updated',
-    note: 'QC Head แก้ไขผล pH · เหตุผล: กรอกผลผิด',
-    metadata: { audience: 'qc', recipientRoles: ['qc-head'] },
-  };
-  const desc = bellDescribe(petition, log);
-
-  assert.deepStrictEqual(desc.recipientRoles, ['qc-head']);
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['qc'], roles: ['qc-head'] }), true);
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['qc'], roles: ['qc-staff'] }), false);
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], roles: ['qc-head'] }), true);
-  assert.strictEqual(toNotification(petition, log, desc).link, '/record-results/p1');
-});
-
-test('isRelevant: assigned notification ที่ระบุ targetEmployeeId เห็นเฉพาะคนถูกมอบหมาย', () => {
-  const desc = { audiences: ['lab'], title: 't', targetEmployeeId: 'E200' };
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: 'E200' }), true);
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: 'E201' }), false);
-});
-
-test('isRelevant: assigned notification ส่วนตัวต้องไม่ fallback เป็นทั้งแผนกเมื่อไม่มี employeeId', () => {
-  const desc = { audiences: ['lab'], title: 't', personal: true };
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: 'E201' }), false);
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: '' }), false);
-});
-
-test('isRelevant: งานที่ตัวเองถือ / คำขอที่ตัวเองยื่น → true แม้ audience ไม่ตรง', () => {
-  const desc = { audiences: ['qc'], title: 't' };
-  const assigned = { ...petition, assignedTo: { employeeId: 'E200', name: 'สมหญิง' } };
-  assert.strictEqual(isRelevant(desc, assigned, { audiences: ['lab'], employeeId: 'E200' }), true);
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: 'E100' }), true);
-});
-
-test('isRelevant: ไม่มี employeeId → ไม่ผ่านทางงานตัวเอง', () => {
-  const desc = { audiences: ['qc'], title: 't' };
-  assert.strictEqual(isRelevant(desc, petition, { audiences: ['lab'], employeeId: '' }), false);
-});
-
-test('isRelevant: seeAll ผ่านหมด', () => {
-  const desc = { audiences: ['qc'], title: 't' };
-  assert.strictEqual(isRelevant(desc, petition, { audiences: [], seeAll: true }), true);
-});
-
-test('shouldPlaySampleArrivalSound: เล่นเสียงเมื่อ sampleSent ตรง audience qc/lab เท่านั้น', () => {
-  const assigned = { ...petition, assignedTo: { employeeId: 'E200', name: 'สมหญิง' } };
-  const log = { event: 'statusChanged', fromStatus: 'deliveringQC', toStatus: 'sampleSent' };
-
-  assert.strictEqual(shouldPlaySampleArrivalSound(petition, log, { audiences: ['qc'] }, { audiences: ['qc'] }), true);
-  assert.strictEqual(shouldPlaySampleArrivalSound(petition, log, { audiences: ['lab'] }, { audiences: ['lab'] }), true);
-  assert.strictEqual(shouldPlaySampleArrivalSound(assigned, log, { employeeId: 'E200', audiences: ['viewer'] }, { audiences: ['qc'] }), false);
-  assert.strictEqual(shouldPlaySampleArrivalSound(assigned, log, { employeeId: 'E200', seeAll: true }, { audiences: ['qc'] }), false);
-  assert.strictEqual(shouldPlaySampleArrivalSound(assigned, log, { employeeId: 'E201' }), false);
-  assert.strictEqual(shouldPlaySampleArrivalSound(petition, log, { employeeId: 'E100' }), false);
-  assert.strictEqual(
-    shouldPlaySampleArrivalSound(petition, { event: 'statusChanged', fromStatus: 'inProgress', toStatus: 'sampleSent' }, { audiences: ['qc'] }, { audiences: ['qc'] }),
-    false,
-  );
-  assert.strictEqual(
-    shouldPlaySampleArrivalSound(assigned, { event: 'statusChanged', toStatus: 'approved' }, { employeeId: 'E200' }),
-    false,
-  );
-});
-
-test('toNotification: sampleSent sentToLab=true เล่นเสียงให้ทั้ง QC และ Lab, sentToLab=false เล่นเฉพาะ QC', () => {
-  const log = {
-    _id: 'log-sent-lab-routing',
-    petitionId: 'p1',
-    event: 'statusChanged',
-    fromStatus: 'deliveringQC',
-    toStatus: 'sampleSent',
-    createdAt: '2026-08-01T02:00:00.000Z',
-  };
-  const sentToLab = { ...petition, sentToLab: true, items: [{ batchNo: '320', sampleName: 'QC only by batch' }] };
-  const qcOnly = { ...petition, sentToLab: false, items: [labItem] };
-  const sentToLabDesc = bellDescribe(sentToLab, log);
-  const qcOnlyDesc = bellDescribe(qcOnly, log);
-
-  assert.deepStrictEqual(sentToLabDesc.audiences, ['qc', 'lab', 'production']);
-  assert.strictEqual(toNotification(sentToLab, log, sentToLabDesc, { audiences: ['qc'] }).playSound, true);
-  assert.strictEqual(toNotification(sentToLab, log, sentToLabDesc, { audiences: ['lab'] }).playSound, true);
-  assert.deepStrictEqual(qcOnlyDesc.audiences, ['qc', 'production']);
-  assert.strictEqual(toNotification(qcOnly, log, qcOnlyDesc, { audiences: ['qc'] }).playSound, true);
-  assert.strictEqual(toNotification(qcOnly, log, qcOnlyDesc, { audiences: ['lab'] }).playSound, undefined);
-});
-
-test('levelForEvent: rejected/success/approved/ผิดปกติ/อื่น', () => {
-  assert.strictEqual(levelForEvent({ event: 'statusChanged', toStatus: 'rejected' }), 'error');
-  assert.strictEqual(levelForEvent({ event: 'statusChanged', toStatus: 'success' }), 'success');
-  assert.strictEqual(levelForEvent({ event: 'statusChanged', toStatus: 'approved' }), 'success');
-  assert.strictEqual(levelForEvent({ event: 'updated', note: 'พบค่าผิดปกติ 2 รายการ' }), 'warning');
-  assert.strictEqual(levelForEvent({ event: 'created' }), 'info');
-});
-
-test('levelForEvent: statusChanged toStatus=inProgress + returnTo → warning (ถูกสั่งให้ทำใหม่)', () => {
-  assert.strictEqual(
-    levelForEvent({ event: 'statusChanged', toStatus: 'inProgress', metadata: { returnTo: 'lab' } }),
-    'warning',
-  );
-});
-
-test('levelForEvent: statusChanged toStatus=inProgress ไม่มี returnTo → info เหมือนเดิม (ไม่ถูกรบกวน)', () => {
-  assert.strictEqual(levelForEvent({ event: 'statusChanged', toStatus: 'inProgress' }), 'info');
-});
-
-test('toNotification: id = audit log id, link ชี้หน้า timeline ของคำขอ', () => {
-  const log = { _id: 'log1', event: 'created', createdAt: '2026-08-01T02:00:00.000Z' };
-  const desc = { audiences: ['qc'], title: 'T', message: 'M' };
-  assert.deepStrictEqual(toNotification(petition, log, desc), {
-    id: 'log1',
-    petitionId: 'p1',
-    petitionNo: 'P-2606-0018',
-    event: 'created',
-    fromStatus: undefined,
-    toStatus: undefined,
-    title: 'T',
-    message: 'M',
-    level: 'info',
-    link: '/petition/p1',
-    createdAt: '2026-08-01T02:00:00.000Z',
+test('มอบหมายงาน: ผู้รับงานคนเดียวพร้อมเสียง; ผู้รับงานเดิมรู้ว่างานไปอยู่กับใคร', () => {
+  const entry = log({
+    event: 'assigned',
+    metadata: { assignee: basePetition.assignedTo, previousAssignee: { employeeId: 'E201', name: 'สมศรี' }, recheckRound: 2 },
   });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['labAssignee', 'labOther']);
+  const mine = notificationForViewer(basePetition, entry, viewers.labAssignee);
+  assert.strictEqual(mine.sound, 'labAssigned');
+  assert.match(mine.title, /ให้คุณแล้ว/);
+  assert.match(notificationForViewer(basePetition, entry, viewers.labOther).title, /ถูกมอบหมายให้ สมหญิง/);
 });
 
-test('toNotification: statusChanged approved stays a normal bell notification', () => {
-  const log = {
-    _id: 'log-approved',
-    petitionId: 'p1',
-    event: 'statusChanged',
-    fromStatus: 'success',
-    toStatus: 'approved',
-    createdAt: '2026-08-01T02:00:00.000Z',
-  };
-  const desc = { audiences: ['qc', 'production'], title: 'อนุมัติแล้ว' };
-
-  const notification = toNotification(petition, log, desc);
-
-  assert.strictEqual(notification.petitionId, 'p1');
-  assert.strictEqual(notification.event, 'statusChanged');
-  assert.strictEqual(notification.fromStatus, 'success');
-  assert.strictEqual(notification.toStatus, 'approved');
+test('Re-check: ผู้รับงานเดิมรู้ว่าถูกสั่ง Re-check, เจ้าของงาน QC และผู้ยื่นได้รับ', () => {
+  const petition = { ...basePetition, assignedTo: undefined };
+  const entry = log({ event: 'recheck', metadata: { side: 'lab', round: 2, reason: 'ค่าเพี้ยน', previousAssignee: { employeeId: 'E200', name: 'สมหญิง' } } });
+  assert.deepStrictEqual(recipients(petition, entry), ['labAssignee', 'qcStaff', 'submitter']);
+  assert.match(notificationForViewer(petition, entry, viewers.labAssignee).message, /รอหัวหน้า Lab มอบหมาย/);
 });
 
-test('toNotification: sampleSent งานตัวเองแต่ไม่มี audience qc/lab ไม่แนบ playSound', () => {
-  const assigned = { ...petition, assignedTo: { employeeId: 'E200', name: 'สมหญิง' } };
-  const log = {
-    _id: 'log-sent',
-    petitionId: 'p1',
-    event: 'statusChanged',
-    fromStatus: 'deliveringQC',
-    toStatus: 'sampleSent',
-    createdAt: '2026-08-01T02:00:00.000Z',
-  };
-
-  const notification = toNotification(assigned, log, { audiences: ['qc'], title: 'ส่งตัวอย่างแล้ว' }, { employeeId: 'E200' });
-
-  assert.strictEqual(notification.playSound, undefined);
+test('QC ยืนยัน ถพ.: ผู้รับงาน Lab + ผู้ยื่นเห็นค่า; ยังไม่มีผู้รับงาน → หัวหน้า Lab', () => {
+  const entry = log({ event: 'updated', metadata: { kind: 'sgConfirmed', value: '1.12', temperature: '25', batchNo: '326', releasedToLab: true } });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['labAssignee', 'submitter']);
+  assert.match(notificationForViewer(basePetition, entry, viewers.submitter).message, /1\.12 ที่ 25/);
+  assert.deepStrictEqual(recipients({ ...basePetition, assignedTo: undefined }, entry), ['labHead', 'submitter']);
 });
 
-test('toNotification: sampleSent ที่ตรง audience ผู้รับ แนบ playSound ให้ client', () => {
-  const log = {
-    _id: 'log-sent-audience',
-    petitionId: 'p1',
-    event: 'statusChanged',
-    fromStatus: 'deliveringQC',
-    toStatus: 'sampleSent',
-    createdAt: '2026-08-01T02:00:00.000Z',
-  };
-
-  const notification = toNotification(petition, log, { audiences: ['qc'], title: 'ส่งตัวอย่างแล้ว' }, { audiences: ['qc'] });
-
-  assert.strictEqual(notification.playSound, true);
+test('หัวหน้า Lab ออกผล: ผู้รับงาน Lab + ผู้ยื่นเห็น %AI', () => {
+  const entry = log({ event: 'updated', metadata: { side: 'lab', kind: 'labApproved', aiResults: [{ itemSeq: 1, result: '45.2%' }] } });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['labAssignee', 'submitter']);
+  assert.match(notificationForViewer(basePetition, entry, viewers.submitter).message, /45\.2%/);
 });
 
-test('toNotification: assigned ฝั่ง Lab เล่นเสียงเฉพาะคนที่ถูก assign', () => {
-  const log = {
-    _id: 'log-lab-assigned',
-    petitionId: 'p1',
-    event: 'assigned',
-    createdAt: '2026-08-01T02:00:00.000Z',
-    metadata: { assignee: { employeeId: 'E200', name: 'สมหญิง', department: 'Lab วิเคราะห์' } },
-  };
-  const assigned = { ...petition, assignedTo: { employeeId: 'E200', name: 'สมหญิง', department: 'Lab วิเคราะห์' } };
-  const desc = { audiences: ['lab'], title: '👤 มอบหมายงาน P-2606-0018' };
-
-  assert.deepStrictEqual(
-    toNotification(assigned, log, desc, { employeeId: 'E200', audiences: ['lab'] }),
-    {
-      id: 'log-lab-assigned',
-      petitionId: 'p1',
-      petitionNo: 'P-2606-0018',
-      event: 'assigned',
-      fromStatus: undefined,
-      toStatus: undefined,
-      title: '👤 มอบหมายงาน P-2606-0018',
-      message: undefined,
-      level: 'info',
-      link: '/petition/p1',
-      createdAt: '2026-08-01T02:00:00.000Z',
-      playSound: true,
-      sound: 'labAssigned',
-    },
-  );
-  assert.strictEqual(toNotification(assigned, log, desc, { employeeId: 'E201', audiences: ['lab'] }).playSound, undefined);
-  assert.strictEqual(
-    toNotification(
-      { ...petition, assignedTo: { employeeId: 'E200', name: 'สมหญิง', department: 'QC' } },
-      { ...log, metadata: { assignee: { employeeId: 'E200', name: 'สมหญิง', department: 'QC' } } },
-      { audiences: ['qc'], title: '👤 มอบหมายงาน P-2606-0018' },
-      { employeeId: 'E200', audiences: ['qc'] },
-    ).playSound,
-    undefined,
-  );
+test('QC ขอตัวอย่างเพิ่ม: ผู้ยื่น + ผู้รับงาน Lab ของงานนั้น', () => {
+  const entry = log({
+    event: 'updated',
+    metadata: { type: 'additionalSampleRequested', side: 'qc', additionalSampleId: 'r1', reason: 'ไม่พอ', items: [{ itemSeq: 1, quantity: 1 }] },
+  });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['labAssignee', 'submitter']);
 });
 
-test('toNotification: assigned ฝั่ง Lab ไม่เล่นเสียงถ้าผู้รับเป็น viewer ไม่ใช่ lab', () => {
-  const log = {
-    _id: 'log-lab-assigned-viewer',
-    petitionId: 'p1',
-    event: 'assigned',
-    createdAt: '2026-08-01T02:00:00.000Z',
-    metadata: { assignee: { employeeId: 'E200', name: 'สมหญิง', department: 'Lab วิเคราะห์' } },
-  };
-  const assigned = { ...petition, assignedTo: { employeeId: 'E200', name: 'สมหญิง', department: 'Lab วิเคราะห์' } };
-
-  assert.strictEqual(
-    toNotification(assigned, log, { audiences: ['lab'], title: '👤 มอบหมายงาน P-2606-0018' }, { employeeId: 'E200', audiences: ['viewer'] }).playSound,
-    undefined,
-  );
+test('แก้ไขคำขอ: เจ้าของงาน QC และผู้รับงาน Lab', () => {
+  const entry = log({ event: 'updated', note: 'Production แก้ไขรายการ', metadata: { type: 'productionEdit', mode: 'review' } });
+  assert.deepStrictEqual(recipients(basePetition, entry), ['labAssignee', 'qcStaff']);
 });
 
-test('toNotification: role-sourced Dev Administrator lab assignment gets labAssigned sound', () => {
-  const log = {
-    _id: 'log-dev-admin-assigned',
-    petitionId: 'p1',
-    event: 'assigned',
-    createdAt: '2026-08-01T02:00:00.000Z',
-    metadata: { assignee: { employeeId: 'dev', name: 'Dev Administrator', department: 'Lab/วิเคราะห์', position: 'Lab Analyst' } },
-  };
-  const assigned = { ...petition, assignedTo: log.metadata.assignee };
-
-  const notification = toNotification(
-    assigned,
-    log,
-    { audiences: ['lab'], title: '👤 มอบหมายงาน P-2606-0018' },
-    { employeeId: 'dev', audiences: ['lab'] },
-  );
-
-  assert.strictEqual(notification.playSound, true);
-  assert.strictEqual(notification.sound, 'labAssigned');
+test('ส่งกลับให้แก้ไข: ผู้ยื่นได้รับ', () => {
+  assert.ok(recipients(basePetition, log({ event: 'statusChanged', toStatus: 'rejected', note: 'ชื่อผิด' })).includes('submitter'));
 });
 
-// Finding 1: resultEntered fires once per form field (qcResultAuditEvent logs every
-// field), so a burst of rows for one petition must collapse to just the newest — or
-// it fills the capped /notifications response and crowds out real milestones.
-test('isCollapsibleDuplicate: first resultEntered for a petition → not a duplicate, marks it seen', () => {
-  const seen = new Set();
-  assert.strictEqual(isCollapsibleDuplicate({ event: 'resultEntered', petitionId: 'p1' }, seen), false);
-  assert.ok(seen.has('p1'));
+test('คนที่ทำรายการเองไม่ได้รับแจ้งเตือนของตัวเอง', () => {
+  const entry = log({ event: 'statusChanged', toStatus: 'approved', actor: 'หัวหน้า QC' });
+  assert.ok(!recipients(basePetition, entry).includes('qcHead'));
 });
 
-test('isCollapsibleDuplicate: second+ resultEntered for the same petition → duplicate', () => {
-  const seen = new Set(['p1']);
-  assert.strictEqual(isCollapsibleDuplicate({ event: 'resultEntered', petitionId: 'p1' }, seen), true);
+test('Admin: ปกติได้เฉพาะงานของตัวเอง, เปิดดูทั้งระบบได้ทุกเหตุการณ์แบบไม่ซ้ำ', () => {
+  const entry = log({ event: 'assigned', metadata: { assignee: basePetition.assignedTo } });
+  assert.strictEqual(notificationForViewer(basePetition, entry, viewers.admin), null);
+  const all = notificationForViewer(basePetition, entry, { ...viewers.admin, seeAll: true });
+  assert.match(all.title, /ให้ สมหญิง/);
+  assert.strictEqual(all.playSound, undefined);
+  // role อื่นเปิด seeAll ไม่มีผล
+  assert.strictEqual(notificationForViewer(basePetition, entry, { ...viewers.viewerOther, seeAll: true }), null);
 });
 
-test('isCollapsibleDuplicate: resultEntered for a different petition → not a duplicate', () => {
-  const seen = new Set(['p1']);
-  assert.strictEqual(isCollapsibleDuplicate({ event: 'resultEntered', petitionId: 'p2' }, seen), false);
-  assert.ok(seen.has('p2'));
+test('petitionNotices: เหตุการณ์ที่ไม่มีผู้รับคืนลิสต์ว่าง', () => {
+  assert.deepStrictEqual(petitionNotices(basePetition, log({ event: 'resultUpdated', metadata: { side: 'qc' } })), []);
 });
 
-test('isCollapsibleDuplicate: non-resultEntered events are never collapsed, even for a seen petition', () => {
-  const seen = new Set(['p1']);
-  assert.strictEqual(
-    isCollapsibleDuplicate({ event: 'statusChanged', toStatus: 'rejected', petitionId: 'p1' }, seen),
-    false,
-  );
-});
-
-test('isCollapsibleDuplicate: newest-first loop keeps only the first resultEntered and reaches an older rejected row', () => {
-  // Simulates the exact scenario from the finding: 30 resultEntered rows for one
-  // petition (newest-first) followed by an older 'rejected' row for the same petition.
+test('isCollapsibleDuplicate: resultEntered ของคำขอเดียวกันเหลือแถวใหม่สุดแถวเดียว', () => {
   const logs = [
-    ...Array.from({ length: 30 }, (_, i) => ({ event: 'resultEntered', petitionId: 'p1', seq: i })),
-    { event: 'statusChanged', toStatus: 'rejected', petitionId: 'p1', seq: 30 },
+    ...Array.from({ length: 30 }, () => ({ event: 'resultEntered', petitionId: 'p1' })),
+    { event: 'statusChanged', toStatus: 'rejected', petitionId: 'p1' },
   ];
   const seen = new Set();
-  const survivors = logs.filter((log) => !isCollapsibleDuplicate(log, seen));
-  assert.strictEqual(survivors.length, 2); // 1 newest resultEntered + the rejected row
-  assert.strictEqual(survivors[0].event, 'resultEntered');
-  assert.strictEqual(survivors[1].event, 'statusChanged');
+  assert.strictEqual(logs.filter((entry) => !isCollapsibleDuplicate(entry, seen)).length, 2);
 });

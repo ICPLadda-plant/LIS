@@ -69,10 +69,7 @@ router.post('/', async (req, res) => {
     const overall = (status100 === 'pass' && status10 === 'pass') ? 'pass' : 'fail';
 
     const now = new Date();
-    const period = getDailyCheckPeriod(now);
-    if (!period) {
-      return res.status(400).json({ error: 'Daily Check บันทึกได้เฉพาะช่วงเช้า 08:00-12:00 หรือบ่าย 13:00-17:00' });
-    }
+    const period = getDailyCheckPeriod(now) || undefined;
 
     const created = await DailyCheck.create({
       scaleId, scaleName, model: model || '',

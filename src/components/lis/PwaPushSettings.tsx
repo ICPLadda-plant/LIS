@@ -6,11 +6,11 @@ import { Switch } from "@/components/ui/switch";
 import { api, type PushDevicesState } from "@/lib/api";
 import {
   describeDevice,
+  enablePushOnThisDevice,
   getCurrentPushSubscription,
   getPushSupport,
   PushPermissionDeniedError,
-  subscribeThisDevice,
-  toSubscriptionPayload,
+  writePushOptOut,
 } from "@/lib/pwaPush";
 
 type Busy = "toggle" | "test" | "pause" | null;
@@ -53,8 +53,8 @@ const PwaPushSettings = () => {
     try {
       if (checked) {
         if (!state?.publicKey) throw new Error("เซิร์ฟเวอร์ยังไม่ได้ตั้งค่าการแจ้งเตือน PWA");
-        const subscription = await subscribeThisDevice(state.publicKey);
-        const next = await api.subscribePush(toSubscriptionPayload(subscription), describeDevice());
+        // สวิตช์ "ดูแจ้งเตือนทั้งระบบ" ในกระดิ่ง (admin) ใช้กับเครื่องที่เพิ่งเปิดรับด้วย — server ตรวจสิทธิ์ admin เอง
+        const { subscription, state: next } = await enablePushOnThisDevice(state.publicKey);
         setEndpoint(subscription.endpoint);
         setState(next);
         setPermissionDenied(false);
@@ -64,6 +64,7 @@ const PwaPushSettings = () => {
         const currentEndpoint = endpoint ?? subscription?.endpoint ?? "";
         await subscription?.unsubscribe().catch(() => false);
         const next = await api.unsubscribePush(currentEndpoint);
+        writePushOptOut(true);
         setEndpoint(null);
         setState(next);
         toast.success("ปิดรับแจ้งเตือนบนเครื่องนี้แล้ว");

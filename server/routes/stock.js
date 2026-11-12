@@ -1,6 +1,16 @@
 const express = require('express');
 const fs = require('fs');
 const router = express.Router();
+
+// เบิก/รับ/ทิ้ง/แก้สต็อกสำเร็จ → สแกนหาสารที่เพิ่งใกล้หมด/หมด/ใกล้หมดอายุ/หมดอายุ (lib/stockAlerts)
+router.use((req, res, next) => {
+  if (req.method !== 'GET') {
+    res.on('finish', () => {
+      if (res.statusCode < 400) require('../lib/stockAlerts').requestStockAlertScan();
+    });
+  }
+  next();
+});
 const { normalizeQuantity, EMPTY_REMAINING_EPSILON } = require('../lib/stockQuantity');
 
 // หลัง $inc ค่าใน DB อาจมีเศษทศนิยม — ปัดให้เรียบร้อยและตั้งสถานะหมดถ้าเหลือ 0
