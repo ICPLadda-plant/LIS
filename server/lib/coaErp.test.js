@@ -337,6 +337,7 @@ test('ERP Lot No. takes precedence and its six date digits supply the production
   }], []);
 
   assert.equal(result.sample.lotNo, 'FG260404-002');
+  assert.equal(result.sample.batchNo, '002');
   assert.equal(result.sample.productionDate, '2026-04-04');
 });
 
