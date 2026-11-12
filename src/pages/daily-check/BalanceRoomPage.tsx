@@ -644,7 +644,7 @@ const BalanceRoomPage = () => {
               </CardDescription>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="grid gap-4 xl:grid-cols-2">
             {chartPanels.map((panel) => (
               <section key={panel.weight} className="space-y-3 rounded-lg border bg-card p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
