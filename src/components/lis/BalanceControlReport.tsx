@@ -30,7 +30,7 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .bcr .bcr-table { border: 2px solid #000; }
 .bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 12pt; line-height: 1; height: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bcr .bcr-table th { font-weight: 400; }
+.bcr .bcr-table th { font-weight: 400; white-space: normal; overflow: visible; text-overflow: clip; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
 .bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 365px; padding: 6px 4px 4px; }
