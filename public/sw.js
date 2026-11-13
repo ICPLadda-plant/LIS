@@ -1,8 +1,7 @@
-const CACHE_VERSION = "lis-pwa-v5";
+// เปลี่ยนพร้อม PWA_SERVICE_WORKER_VERSION ใน src/lib/pwa.ts — activate จะลบ cache รุ่นเก่าทิ้งทั้งหมด
+const CACHE_VERSION = "lis-pwa-v6";
+// ไม่ precache "./" และ index.html: production ใช้ app.html และ index.html เป็น template ของ dev
 const APP_SHELL = [
-  "./",
-  "./index.html",
-  "./manifest.webmanifest",
   "./favicon.png?v=2",
   "./pwa-icon-180.png?v=2",
   "./pwa-icon-192.png?v=2",
@@ -22,6 +21,27 @@ function isCacheableRequest(request) {
   if (url.pathname.includes("/api") || url.pathname.includes("/uploads")) return false;
   if (NETWORK_ONLY_PARAMS.some((param) => url.searchParams.has(param))) return false;
   return true;
+}
+
+// ไฟล์ build ของ Vite ชื่อมี hash ไม่เปลี่ยนเนื้อหา จึงใช้ cache ก่อนได้
+function isHashedBuildAsset(url) {
+  return url.pathname.includes("/assets/");
+}
+
+// ไฟล์ที่หายไปหลัง build ใหม่ server อาจตอบหน้า HTML กลับมาแทน (SPA fallback)
+// ถ้าเก็บ HTML นั้นไว้แทน JS/CSS แอปจะค้างจอขาวถาวร จึงเก็บเฉพาะ response ที่เป็นไฟล์จริง
+function isSafeToCache(request, response) {
+  if (!response || response.status !== 200 || response.type === "opaque") return false;
+  const contentType = (response.headers.get("Content-Type") || "").toLowerCase();
+  const url = new URL(request.url);
+  if (contentType.includes("text/html") && !url.pathname.endsWith(".html")) return false;
+  return true;
+}
+
+function putInCache(request, response) {
+  if (!isSafeToCache(request, response)) return;
+  const copy = response.clone();
+  caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
 }
 
 // เปิดหน้าแอป (ไม่ใช่ไฟล์อย่าง .pdf/.png) — ถ้าได้ error ให้แสดงหน้ารอระบบกลับมาแทน
@@ -114,16 +134,28 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const url = new URL(request.url);
+  if (isHashedBuildAsset(url)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached && isSafeToCache(request, cached)) return cached;
+        return fetch(request).then((response) => {
+          putInCache(request, response);
+          return response;
+        });
+      }),
+    );
+    return;
+  }
+
+  // ไฟล์ชื่อคงที่ (manifest, ไอคอน, ไฟล์ใน public/) ดึงจาก server ก่อนเพื่อให้ได้รุ่นล่าสุด ใช้ cache เมื่อ offline
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
-        if (!response || response.status !== 200 || response.type === "opaque") return response;
-        const copy = response.clone();
-        caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
+    fetch(request)
+      .then((response) => {
+        putInCache(request, response);
         return response;
-      });
-    }),
+      })
+      .catch(() => caches.match(request).then((cached) => cached || Response.error())),
   );
 });
 

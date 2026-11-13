@@ -22,6 +22,7 @@ const Parameter = require("../models/Parameter");
 const Petition = require("../models/Petition");
 const { scheduleOrUnlockPhase2 } = require("../lib/phaseAdvance");
 const PetitionAuditLog = require('../models/PetitionAuditLog');
+const { recordQcHandler } = require('../lib/qcHandlers');
 const { qcResultAuditEvent, qcResultNote } = require('../lib/auditEvents');
 const { pendingAdditionalSamples, requiredSampleRoundId } = require('../lib/additionalSamples');
 const { currentUser, canTestSide } = require('./additionalSamples');
@@ -394,11 +395,13 @@ router.put("/", serializePetitionWrite(async (req, res) => {
         event: isClosed ? 'updated' : auditEvent,
         actor: enteredBy?.name || enteredBy?.email || 'system',
         note: isClosed ? `แก้ไขผลหลังปิดงาน: ${String(overrideReason).trim()} · ${qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName })}` : qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName }),
-        metadata: { itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
+        metadata: { side: paramForCheck?.scope === 'lab' ? 'lab' : 'qc', itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
       }).catch((err) => {
         console.error('[audit-log] qc-result write failed:', err.message);
       });
     }
+
+    if (!isClosed && paramForCheck?.scope !== 'lab') recordQcHandler(petitionId, existingUser || enteredBy);
 
     if (isClosed) {
       notifyPetitionEvent(petitionForEdit, {

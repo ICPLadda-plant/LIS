@@ -48,6 +48,21 @@ test('manual snapshots save AI criteria as center plus-minus values', () => {
   assert.equal(snapshots.resultSnapshots[1].criteria, '20% ± 1.20');
 });
 
+test('manual snapshots preserve separate results for every Batch', () => {
+  const first = input();
+  const second = input();
+  second.sample = { ...second.sample, itemSeq: 10001, batchNo: 'B2', productionDate: '2026-10-02' };
+  second.results = second.results.map((row) => ({ ...row, itemSeq: 10001, result: 'Blue liquid' }));
+
+  const snapshots = manualCoaSnapshots({
+    samples: [{ ...first.sample, itemSeq: 10000 }, second.sample],
+    results: [{ ...first.results[0], itemSeq: 10000 }, ...second.results],
+  }, 10000);
+
+  assert.deepEqual(snapshots.sampleSnapshots.map((sample) => sample.batchNo), ['B1', 'B2']);
+  assert.deepEqual(snapshots.resultSnapshots.map((row) => row.itemSeq), [10000, 10001]);
+});
+
 test('manual snapshots reject missing fields, invalid dates and empty results', () => {
   for (const mutate of [
     (data) => { data.sample.batchNo = ' '; },

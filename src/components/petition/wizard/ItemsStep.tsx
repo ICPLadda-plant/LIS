@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { productionDateFromLotNo } from '@/lib/coaLot';
 import {
   findMatchingPetitionMasterItem,
   type PetitionMasterItemOption,
@@ -215,7 +216,11 @@ export default function ItemsStep({
 
   function setBatchNo(idx: number, batchNo: string) {
     const item = value[idx];
-    setItem(idx, patchWithLabDefault(item, { batchNo }, { syncDefault: true }));
+    const productionDate = productionDateFromLotNo(batchNo);
+    setItem(idx, patchWithLabDefault(item, {
+      batchNo,
+      ...(productionDate ? { productionDate } : {}),
+    }, { syncDefault: true }));
   }
 
   function setCommonName(idx: number, commonName: string) {

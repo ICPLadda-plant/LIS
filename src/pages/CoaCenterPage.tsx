@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ComponentProps } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AlertTriangle, BellRing, CheckCircle2, FileCheck2, FileDown, FilePlus2, Folder, Pencil, Printer, Trash2, TrendingUp, XCircle } from "lucide-react";
+import { AlertTriangle, BellRing, CheckCircle2, ChevronDown, Copy, FileCheck2, FileDown, FilePlus2, Folder, Layers3, Mail, Pencil, Printer, Tags, Trash2, TrendingUp, Wrench, XCircle } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,7 +32,9 @@ type CoaDocumentStage = "requested" | "inProgress" | "pendingApproval" | "approv
 type CoaWorkflowStage = "all" | CoaDocumentStage;
 
 const BROMADIOLONE_DEMO_COA_ID = "demo-coa-bromadiolone-0005";
-const BROMADIOLONE_DEMO_COA_NO = "00042026";
+const BROMADIOLONE_DEMO_COA_NO = "13482026";
+const BROMADIOLONE_DEMO_SEQUENCE = 1348;
+const BROMADIOLONE_DEMO_CREATED_AT = "2026-11-07T00:00:00.000+07:00";
 
 type DemoCoaEditForm = {
   sampleName: string;
@@ -71,6 +73,15 @@ function batchProductionLabel(sample: CoaSampleSnapshot) {
   const batch = sample.batchNo?.trim();
   const productionDate = formatProductionDate(sample.productionDate);
   return [batch, productionDate].filter(Boolean).join(" / ");
+}
+
+function externalRequestQuantityLabel(doc: CoaDocument) {
+  const request = doc.externalCoaRequest;
+  if (!request) return "-";
+  const unit = request.unit?.trim();
+  const format = (value?: number) => value == null ? "-" : value.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  const suffix = unit ? ` ${unit}` : "";
+  return `ขอ ${format(request.quantity)}${suffix} / คงเหลือ ${format(request.outstandingQty)}${suffix}`;
 }
 
 function customerName(doc: CoaDocument) {
@@ -125,13 +136,12 @@ function replaceDemoResult(rows: CoaDocument["resultSnapshots"], testItem: strin
   return replaced ? nextRows : [...nextRows, { itemSeq: 1, testItem, result }];
 }
 
-function makeBromadioloneDemoCoa(status: CoaDocument["status"] = "requested", now = new Date()): CoaDocument {
-  const isoNow = now.toISOString();
+function makeBromadioloneDemoCoa(status: CoaDocument["status"] = "requested"): CoaDocument {
   return {
     _id: BROMADIOLONE_DEMO_COA_ID,
     coaNo: status === "requested" ? null : BROMADIOLONE_DEMO_COA_NO,
     coaYear: 2026,
-    sequence: status === "requested" ? undefined : 4,
+    sequence: status === "requested" ? undefined : BROMADIOLONE_DEMO_SEQUENCE,
     revision: 0,
     status,
     petitionId: "demo-petition-bromadiolone-0005",
@@ -157,8 +167,8 @@ function makeBromadioloneDemoCoa(status: CoaDocument["status"] = "requested", no
     print: { printCount: 0 },
     createdBy: { name: "Demo User", email: "demo@example.com", role: "demo" },
     updatedBy: { name: "Demo User", email: "demo@example.com", role: "demo" },
-    createdAt: isoNow,
-    updatedAt: isoNow,
+    createdAt: BROMADIOLONE_DEMO_CREATED_AT,
+    updatedAt: BROMADIOLONE_DEMO_CREATED_AT,
   };
 }
 
@@ -375,20 +385,99 @@ function CoaNotificationAlert({
     : duplicateRequestDocs.some((doc) => workflowStageFor(doc) === "inProgress")
       ? "inProgress"
       : "approved";
+  const summaryItems = [
+    {
+      label: `รออนุมัติ ${pendingApprovalDocs.length} รายการ`,
+      value: pendingApprovalDocs.length,
+      hint: "รอ QC Head ตรวจ",
+      icon: AlertTriangle,
+      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+      bar: "bg-yellow-500",
+    },
+    {
+      label: `ต้องแก้ไขข้อมูลใหม่ ${correctionDocs.length} รายการ`,
+      value: correctionDocs.length,
+      hint: "ถูกส่งกลับให้แก้ไข",
+      icon: Wrench,
+      tone: "border-destructive/30 bg-destructive/10 text-destructive",
+      bar: "bg-destructive",
+    },
+    {
+      label: `ขอใบซ้ำ ${duplicateRequestDocs.length} รายการ`,
+      value: duplicateRequestDocs.length,
+      hint: "ใบแก้ไขหรือออกซ้ำ",
+      icon: Copy,
+      tone: "border-primary/30 bg-primary/10 text-primary",
+      bar: "bg-primary",
+    },
+    {
+      label: `ชื่อสามัญซ้ำ ${duplicateCommonNameGroups.length} กลุ่ม`,
+      value: duplicateCommonNameGroups.length,
+      hint: "กลุ่มชื่อที่ควรตรวจ",
+      icon: Tags,
+      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+      bar: "bg-yellow-500",
+    },
+    {
+      label: `Batch/วันที่ผลิตซ้ำ ${duplicateBatchProductionDateGroups.length} กลุ่ม`,
+      value: duplicateBatchProductionDateGroups.length,
+      hint: "กลุ่ม Batch ที่ควรตรวจ",
+      icon: Layers3,
+      tone: "border-yellow-500/30 bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
+      bar: "bg-yellow-500",
+    },
+    {
+      label: `อนุมัติแล้ว ${approvedDocs.length} รายการ`,
+      value: approvedDocs.length,
+      hint: "เอกสารพร้อมใช้งาน",
+      icon: CheckCircle2,
+      tone: "border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300",
+      bar: "bg-green-500",
+    },
+  ];
+  const maxSummaryValue = Math.max(...summaryItems.map((item) => item.value), 1);
 
   return (
     <Alert data-testid="coa-notification-alert" className="border-border bg-card text-card-foreground shadow-sm [&>svg]:text-primary-500">
       <BellRing className="h-5 w-5" />
-      <AlertTitle className="flex flex-wrap items-center gap-2">
-        แจ้งเตือนเอกสาร COA
-        {pendingApprovalDocs.length > 0 && <Badge variant="primary-soft">รออนุมัติ {pendingApprovalDocs.length} รายการ</Badge>}
-        {correctionDocs.length > 0 && <Badge variant="primary-soft">ต้องแก้ไขข้อมูลใหม่ {correctionDocs.length} รายการ</Badge>}
-        {duplicateRequestDocs.length > 0 && <Badge variant="primary-soft">ขอใบซ้ำ {duplicateRequestDocs.length} รายการ</Badge>}
-        {duplicateCommonNameGroups.length > 0 && <Badge variant="primary-soft">ชื่อสามัญซ้ำ {duplicateCommonNameGroups.length} กลุ่ม</Badge>}
-        {duplicateBatchProductionDateGroups.length > 0 && <Badge variant="primary-soft">Batch/วันที่ผลิตซ้ำ {duplicateBatchProductionDateGroups.length} กลุ่ม</Badge>}
-        {approvedDocs.length > 0 && <Badge variant="primary-soft">อนุมัติแล้ว {approvedDocs.length} รายการ</Badge>}
-      </AlertTitle>
+      <AlertTitle className="text-base font-semibold text-foreground">แจ้งเตือนเอกสาร COA</AlertTitle>
       <AlertDescription>
+        <p className="text-sm text-muted-foreground">ภาพรวมงานที่ต้องติดตามและเอกสารที่พร้อมใช้งาน</p>
+        <div data-testid="coa-notification-summary" className="mt-4 rounded-lg border bg-muted/30 p-3">
+          <div className="mb-3 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold text-foreground">ภาพรวมสถานะ</h3>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            {summaryItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="rounded-lg border bg-card p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-2xl font-bold leading-none text-foreground">{item.value}</div>
+                      <div className="mt-1 truncate text-xs text-muted-foreground">{item.hint}</div>
+                    </div>
+                    <span className={`rounded-full border p-2 ${item.tone}`}>
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                    <div className={`h-full rounded-full ${item.bar}`} style={{ width: `${(item.value / maxSummaryValue) * 100}%` }} />
+                  </div>
+                  <span className="sr-only">{item.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div className="mt-5 flex items-center gap-2 border-b pb-2">
+          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <div>
+            <h3 className="text-sm font-semibold text-foreground">รายละเอียดที่ต้องตรวจสอบ</h3>
+            <p className="text-xs text-muted-foreground">เลือกดูรายการเพื่อดำเนินการต่อ หรือเทียบข้อมูลที่อาจซ้ำกัน</p>
+          </div>
+        </div>
         <div className="mt-3 grid gap-3 xl:grid-cols-3">
           {pendingApprovalDocs.length > 0 && (
             <div className="rounded-md border bg-card p-3">
@@ -469,42 +558,64 @@ function CoaNotificationAlert({
           )}
           {duplicateCommonNameGroups.length > 0 && (
             <div className="rounded-md border bg-card p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <AlertTriangle className="h-4 w-4" />
-                ชื่อสามัญซ้ำ
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <AlertTriangle className="h-4 w-4" />
+                    ชื่อสามัญซ้ำ
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">พบ {duplicateCommonNameGroups.length} กลุ่มที่ควรตรวจสอบ</p>
+                </div>
+                <Badge variant="yellow-soft">{duplicateCommonNameGroups.reduce((sum, group) => sum + group.documents.length, 0)} ใบ</Badge>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">พบชื่อสามัญเดียวกันในหลายเอกสาร COA ภายในช่วงที่กำลังดู</p>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {duplicateCommonNameGroups.map((group) => (
-                  <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
-                    <div className="flex flex-wrap items-center gap-2 font-semibold">
-                      <span>{group.label}</span>
-                      <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
-                    </div>
-                    <div className="mt-1 text-muted-foreground">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
-                  </li>
-                ))}
-              </ul>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียดชื่อสามัญซ้ำ
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {duplicateCommonNameGroups.map((group) => (
+                    <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-2 font-semibold">
+                        <span>{group.label}</span>
+                        <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
+                      </div>
+                      <div className="mt-1 text-muted-foreground">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
           {duplicateBatchProductionDateGroups.length > 0 && (
             <div className="rounded-md border bg-card p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                <AlertTriangle className="h-4 w-4" />
-                Batch และวันที่ผลิตซ้ำ
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <AlertTriangle className="h-4 w-4" />
+                    Batch และวันที่ผลิตซ้ำ
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">พบ {duplicateBatchProductionDateGroups.length} กลุ่มที่ควรตรวจสอบ</p>
+                </div>
+                <Badge variant="yellow-soft">{duplicateBatchProductionDateGroups.reduce((sum, group) => sum + group.documents.length, 0)} ใบ</Badge>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">พบ Batch No. คู่กับวันที่ผลิตเดียวกันในหลายเอกสาร</p>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {duplicateBatchProductionDateGroups.map((group) => (
-                  <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
-                    <div className="flex flex-wrap items-center gap-2 font-semibold">
-                      <span>{group.label}</span>
-                      <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
-                    </div>
-                    <div className="mt-1">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
-                  </li>
-                ))}
-              </ul>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียด Batch และวันที่ผลิต
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {duplicateBatchProductionDateGroups.map((group) => (
+                    <li key={group.key} className="rounded border bg-muted/50 px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-2 font-semibold">
+                        <span>{group.label}</span>
+                        <Badge variant="primary-soft">{group.documents.length} ใบ</Badge>
+                      </div>
+                      <div className="mt-1">{group.documents.slice(0, 3).map(coaNotificationLabel).join(" · ")}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
           {approvedDocs.length > 0 && (
@@ -524,14 +635,20 @@ function CoaNotificationAlert({
                   <div>อนุมัติวันนี้</div>
                 </div>
               </div>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {approvedPreviewDocs.map((doc) => (
-                  <li key={doc._id} className="rounded border bg-muted/50 px-2 py-1.5">
-                    <div className="font-semibold">{coaNotificationLabel(doc)}</div>
-                    <div>{customerName(doc)} · อนุมัติ {approvedSummaryDate(doc)}</div>
-                  </li>
-                ))}
-              </ul>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียดเอกสารที่อนุมัติ
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {approvedPreviewDocs.map((doc) => (
+                    <li key={doc._id} className="rounded border bg-muted/50 px-2 py-1.5">
+                      <div className="font-semibold">{coaNotificationLabel(doc)}</div>
+                      <div>{customerName(doc)} · อนุมัติ {approvedSummaryDate(doc)}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
           {dailyRequestSummaries.length > 0 && (
@@ -540,18 +657,26 @@ function CoaNotificationAlert({
                 <BellRing className="h-4 w-4" />
                 สรุปจำนวนคำขอแต่ละวัน
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">นับจากวันที่สร้างคำขอ COA ในช่วงข้อมูลที่กำลังดู</p>
-              <ul className="mt-3 space-y-2 text-xs text-foreground">
-                {dailyRequestSummaries.map((summary) => (
-                  <li key={summary.dateKey} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-muted/50 px-2 py-1.5">
-                    <span className="font-semibold">{summary.label}</span>
-                    <span className="flex flex-wrap items-center gap-2">
-                      <Badge variant="primary-soft">{summary.count} คำขอ</Badge>
-                      {summary.approvedCount > 0 && <Badge variant="primary-soft">อนุมัติ {summary.approvedCount}</Badge>}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {dailyRequestSummaries.length} วัน · รวม {dailyRequestSummaries.reduce((sum, summary) => sum + summary.count, 0)} คำขอ
+              </p>
+              <details className="group mt-3 border-t pt-2">
+                <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold text-primary [&::-webkit-details-marker]:hidden">
+                  ดูรายละเอียดคำขอแต่ละวัน
+                  <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+                </summary>
+                <ul className="mt-2 space-y-2 text-xs text-foreground">
+                  {dailyRequestSummaries.map((summary) => (
+                    <li key={summary.dateKey} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-muted/50 px-2 py-1.5">
+                      <span className="font-semibold">{summary.label}</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <Badge variant="primary-soft">{summary.count} คำขอ</Badge>
+                        {summary.approvedCount > 0 && <Badge variant="primary-soft">อนุมัติ {summary.approvedCount}</Badge>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             </div>
           )}
         </div>
@@ -664,7 +789,7 @@ export default function CoaCenterPage() {
       setDemoCoa({
         ...doc,
         coaNo: doc.coaNo || BROMADIOLONE_DEMO_COA_NO,
-        sequence: doc.sequence || 4,
+        sequence: doc.sequence || BROMADIOLONE_DEMO_SEQUENCE,
         status: "draft",
         updatedBy: actor,
         updatedAt: new Date().toISOString(),
@@ -720,9 +845,9 @@ export default function CoaCenterPage() {
       setDemoCoa({
         ...doc,
         coaNo: doc.coaNo || BROMADIOLONE_DEMO_COA_NO,
-        sequence: doc.sequence || 4,
+        sequence: doc.sequence || BROMADIOLONE_DEMO_SEQUENCE,
         status: "approved",
-        approval: { ...doc.approval, approvedBy: actor, approvedAt: new Date().toISOString() },
+        approval: { ...doc.approval, approvedBy: actor, approvedAt: BROMADIOLONE_DEMO_CREATED_AT },
         updatedBy: actor,
         updatedAt: new Date().toISOString(),
       });
@@ -804,6 +929,7 @@ export default function CoaCenterPage() {
   const coaRequestTrendTotal = useMemo(() => (
     coaRequestTrend.reduce((sum, entry) => sum + entry.requestCount, 0)
   ), [coaRequestTrend]);
+  const coaRequestTrendMax = coaRequestTrend[0]?.requestCount || 1;
   const coaRequestTrendScopeLabel = activeTab === "all"
     ? (openAllYear ? `แฟ้มปี ${buddhistYear(openAllYear)}` : "ทุกปี")
     : `ปี ${selectedYear}`;
@@ -832,6 +958,7 @@ export default function CoaCenterPage() {
       customerName(doc),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.sampleName)),
       joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName)),
+      joinValues(doc.sampleSnapshots?.map((sample) => sample.lotNo)),
       joinValues(doc.sampleSnapshots?.map(batchProductionLabel)),
     ].join(" ").toLowerCase().includes(query)), query, (doc) => {
       const samples = doc.sampleSnapshots ?? [];
@@ -915,6 +1042,7 @@ export default function CoaCenterPage() {
   const showCompanyColumn = showApprovedCommandColumns;
   const showCommonNameColumn = !showApprovedCommandColumns;
   const showLotColumn = !showApprovedCommandColumns;
+  const showQuantityColumn = showCreateActions;
   const showStatusColumn = activeTab !== "all" && !showInProgressReviewColumns && !showCreateActions && !showApprovedCommandColumns;
   const showCommandColumn = showPrintActions || showCreateActions || showEditActions || showApprovalActions;
   const tableColumnCount = [
@@ -925,6 +1053,7 @@ export default function CoaCenterPage() {
     showCompanyColumn,
     showCommonNameColumn,
     showLotColumn,
+    showQuantityColumn,
     showStatusColumn,
     showCommandColumn,
   ].filter(Boolean).length;
@@ -1017,34 +1146,54 @@ export default function CoaCenterPage() {
               </div>
             ) : (
               <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-                <div className="space-y-3">
+                <div className="overflow-hidden rounded-lg border bg-muted/30">
+                  <div className="hidden grid-cols-[minmax(14rem,1fr)_minmax(12rem,2fr)_5rem] gap-4 border-b bg-muted px-4 py-2 text-xs font-semibold text-muted-foreground md:grid">
+                    <span>ชื่อยาและผล %AI</span>
+                    <span>ความถี่เทียบกับอันดับสูงสุด</span>
+                    <span className="text-right">สัดส่วน</span>
+                  </div>
+                  <div className="divide-y">
                   {coaRequestTrend.map((entry, index) => (
-                  <div key={entry.key} className="rounded-lg border border-border bg-muted/50 p-3">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div key={entry.key} className="grid gap-3 bg-card px-4 py-3 md:grid-cols-[minmax(14rem,1fr)_minmax(12rem,2fr)_5rem] md:items-center md:gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-50 px-1.5 text-xs text-primary-600">{index + 1}</span>
-                            <span className="truncate">{entry.commonName}</span>
-                          </div>
-                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                            <span>Label %AI {formatCoaTrendPercent(entry.labelAiPercent)}</span>
-                            <span>Avg %AI {formatCoaTrendPercent(entry.averageAiPercent, 4)}</span>
-                            {entry.latestAiResult && <span>ล่าสุด {entry.latestAiResult}</span>}
-                          </div>
+                          <span className="truncate">{entry.commonName}</span>
                         </div>
-                      <div className="text-right text-sm font-semibold text-primary-600">
-                          {entry.requestCount} ครั้ง
-                        <div className="text-xs font-normal text-muted-foreground">{formatCoaTrendPercent(entry.sharePercent, 1)} ของทั้งหมด</div>
+                        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          <span>Label %AI {formatCoaTrendPercent(entry.labelAiPercent)}</span>
+                          <span>Avg %AI {formatCoaTrendPercent(entry.averageAiPercent, 4)}</span>
+                          {entry.latestAiResult && <span>ล่าสุด {entry.latestAiResult}</span>}
                         </div>
                       </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-background">
+                      <div className="min-w-0">
+                        <div className="mb-1.5 flex items-center justify-between text-xs md:hidden">
+                          <span className="text-muted-foreground">ความถี่</span>
+                          <span className="font-semibold text-primary">{entry.requestCount} ครั้ง</span>
+                        </div>
                         <div
-                        className="h-full rounded-full bg-primary-500"
-                          style={{ width: `${Math.max(6, Math.min(100, entry.sharePercent))}%` }}
-                        />
+                          role="progressbar"
+                          aria-label={`${entry.commonName} ขอ ${entry.requestCount} ครั้ง`}
+                          aria-valuemin={0}
+                          aria-valuemax={coaRequestTrendMax}
+                          aria-valuenow={entry.requestCount}
+                          className="relative h-8 overflow-hidden rounded-md bg-muted"
+                        >
+                          <div
+                            className="flex h-full min-w-10 items-center justify-end rounded-md bg-primary-500 px-2 text-xs font-bold text-primary-foreground transition-[width]"
+                            style={{ width: `${(entry.requestCount / coaRequestTrendMax) * 100}%` }}
+                          >
+                            {entry.requestCount} ครั้ง
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-2 md:block md:text-right">
+                        <span className="text-xs text-muted-foreground md:hidden">สัดส่วนทั้งหมด</span>
+                        <span className="text-sm font-semibold text-foreground">{formatCoaTrendPercent(entry.sharePercent, 1)}</span>
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
                 {topCoaRequestTrend && (
                 <div className="rounded-lg border border-primary-100 bg-primary-50 p-4 text-sm text-primary-700">
@@ -1197,6 +1346,7 @@ export default function CoaCenterPage() {
                   {showCompanyColumn && <th className="px-4 py-3">ชื่อลูกค้า</th>}
                   {showCommonNameColumn && <th className="px-4 py-3">ชื่อสามัญ</th>}
                   {showLotColumn && <th className="px-4 py-3">BATCH No. (แบช + วันที่ผลิตตามฉลาก)</th>}
+                  {showQuantityColumn && <th className="px-4 py-3">จำนวนที่ลูกค้าขอ</th>}
                   {showStatusColumn && <th className="px-4 py-3">สถานะ</th>}
                   {showCommandColumn && <th className="px-4 py-3">คำสั่ง</th>}
                 </tr>
@@ -1250,6 +1400,7 @@ export default function CoaCenterPage() {
                     {showCompanyColumn && <td className="px-4 py-3">{customerName(doc)}</td>}
                     {showCommonNameColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map((sample) => sample.commonName))}</td>}
                     {showLotColumn && <td className="px-4 py-3">{joinValues(doc.sampleSnapshots?.map(batchProductionLabel))}</td>}
+                    {showQuantityColumn && <td className="whitespace-nowrap px-4 py-3">{externalRequestQuantityLabel(doc)}</td>}
                     {showStatusColumn && (
                       <td className="px-4 py-3">
                         <Badge variant={workflowStageBadgeVariantFor(workflowStageFor(doc))}>
@@ -1332,6 +1483,21 @@ export default function CoaCenterPage() {
                         >
                           <FileDown className="h-4 w-4" />
                           บันทึกไฟล์ PDF
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 gap-2"
+                          disabled={!canPrintCoa(doc.status)}
+                          aria-label={`ส่งอีเมล COA ${doc.coaNo || doc.petitionNoSnapshot || doc._id}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            navigate(`/coa/${doc._id}?email=1`);
+                          }}
+                        >
+                          <Mail className="h-4 w-4" />
+                          ส่งอีเมล
                         </Button>
                         {canDeleteCoa && (
                           <Button
@@ -1457,6 +1623,23 @@ export default function CoaCenterPage() {
                           >
                             เสร็จสิ้น
                           </Button>
+                          {canDeleteCoa && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="gap-2"
+                              disabled={deleteCoa.isPending}
+                              aria-label={`ลบ COA ${coaDisplayNo(doc)}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDelete(doc);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              ลบ
+                            </Button>
+                          )}
                         </div>
                       </td>
                     )}

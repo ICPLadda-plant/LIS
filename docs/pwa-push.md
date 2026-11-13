@@ -1,6 +1,6 @@
 # แจ้งเตือน PWA (Web Push)
 
-ผู้ใช้เปิดรับแจ้งเตือนได้ที่ **ตั้งค่าโปรไฟล์ → แจ้งเตือนบนเบราว์เซอร์** ระบบจะเตือนแม้ปิดเบราว์เซอร์อยู่ สำหรับเหตุการณ์เดียวกับที่กระดิ่งเล่นเสียง คือ ตัวอย่างมาถึง QC/Lab และงาน Lab ใหม่ที่ถูกมอบหมายให้ผู้ใช้
+ผู้ใช้เปิดรับแจ้งเตือนได้ที่ **ตั้งค่าโปรไฟล์ → แจ้งเตือนบนเบราว์เซอร์** ระบบจะเตือนแม้ปิดเบราว์เซอร์อยู่ ทุกเหตุการณ์ที่ผู้ใช้ได้รับในกระดิ่ง (ผู้รับตาม role ดู [notifications-by-role.md](notifications-by-role.md)) รวมถึงงานด่วนรายชั่วโมงและ Daily Check
 
 ## ตั้งค่า server (ทำครั้งเดียวต่อ environment)
 
@@ -31,8 +31,7 @@
 
 ## โค้ดที่เกี่ยวข้อง
 
-- `server/routes/push.js` — API `/api/push/*` (devices, subscribe, unsubscribe, pause, test)
-- `server/lib/webPush.js` — ส่ง push และเลือกผู้รับจากเหตุการณ์ (เรียกจาก `lineNotify.notifyPetitionEvent`)
-- `server/lib/pushAudience.js` — พอร์ตของ `src/lib/petitionAudience.ts` ต้องแก้คู่กัน
+- `server/routes/push.js` — API `/api/push/*` (devices, subscribe, unsubscribe, pause, see-all, test)
+- `server/lib/webPush.js` — ส่ง push ตามกฎเดียวกับกระดิ่ง เรียกจาก `PetitionAuditLog` post-save และ `appNotifications.publishAppNotification`
 - `public/sw.js` — รับ push และเปิดหน้าคำขอเมื่อกดแจ้งเตือน
 - `src/components/lis/PwaPushSettings.tsx`, `src/lib/pwaPush.ts` — หน้าตั้งค่าฝั่งผู้ใช้

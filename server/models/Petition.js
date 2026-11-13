@@ -186,6 +186,11 @@ const PetitionSchema = new mongoose.Schema(
     labCompletedBy: String,
     qcCompletedAt: Date,
     qcCompletedBy: String,
+    // คนที่ทำงานฝั่ง QC ของคำขอนี้ (รับตัวอย่าง/บันทึกผล/ยืนยันผล) — ใช้แจ้งเตือน "งานของตัวเอง"
+    qcHandlers: {
+      type: [new mongoose.Schema({ employeeId: String, email: String, name: String }, { _id: false })],
+      default: undefined,
+    },
     // Lab supervisor approval (ด่านหลังผู้ทดสอบ Lab บันทึกผล — success เกิดหลังขั้นนี้)
     labApprovedAt: Date,
     labApprovedBy: String,

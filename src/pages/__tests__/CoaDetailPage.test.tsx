@@ -14,7 +14,11 @@ const mocks = vi.hoisted(() => ({
   reviseCoaDocument: vi.fn(),
   cancelCoaDocument: vi.fn(),
   recordCoaPrintEvent: vi.fn(),
+  getEmployees: vi.fn(),
   openPrintPdf: vi.fn(),
+  createPrintPdfBlob: vi.fn(),
+  sendMicrosoftMailWithPdf: vi.fn(),
+  ensureMicrosoftMailAccount: vi.fn(),
 }));
 
 vi.mock("@/components/lis/AppLayout", () => ({
@@ -28,6 +32,7 @@ vi.mock("@/components/lis/PrintPreviewDialog", () => ({
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: mocks.user }) }));
 vi.mock("@/lib/api", () => ({
   api: {
+    get: mocks.getEmployees,
     getCoaDocument: mocks.getCoaDocument,
     updateCoaDocument: mocks.updateCoaDocument,
     submitCoaDocument: mocks.submitCoaDocument,
@@ -40,6 +45,11 @@ vi.mock("@/lib/api", () => ({
 }));
 vi.mock("@/lib/print", () => ({
   openPrintPdf: mocks.openPrintPdf,
+  createPrintPdfBlob: mocks.createPrintPdfBlob,
+}));
+vi.mock("@/lib/microsoftMail", () => ({
+  ensureMicrosoftMailAccount: mocks.ensureMicrosoftMailAccount,
+  sendMicrosoftMailWithPdf: mocks.sendMicrosoftMailWithPdf,
 }));
 
 function documentWith(status: string) {
@@ -88,7 +98,11 @@ beforeEach(() => {
   mocks.reviseCoaDocument.mockResolvedValue({ _id: "c2" });
   mocks.cancelCoaDocument.mockResolvedValue(documentWith("cancelled"));
   mocks.recordCoaPrintEvent.mockResolvedValue(documentWith("printed"));
+  mocks.getEmployees.mockResolvedValue({ data: { data: [{ employeeId: "E1", name: "Employee One", department: "QC", email: "employee@icpladda.com" }] } });
   mocks.openPrintPdf.mockResolvedValue(undefined);
+  mocks.createPrintPdfBlob.mockResolvedValue(new Blob(["pdf"]));
+  mocks.sendMicrosoftMailWithPdf.mockResolvedValue(undefined);
+  mocks.ensureMicrosoftMailAccount.mockResolvedValue({ username: "sender@icpladda.com" });
 });
 
 describe("CoaDetailPage", () => {
@@ -217,6 +231,14 @@ describe("CoaDetailPage", () => {
     await waitFor(() => expect(mocks.openPrintPdf).toHaveBeenCalledWith("coa", expect.any(HTMLElement), expect.objectContaining({
       fileName: "COA-00012026.pdf",
     })));
+  });
+
+  it("opens the internal employee email picker from the COA table", async () => {
+    mocks.getCoaDocument.mockResolvedValue(documentWith("approved"));
+    renderPage("/coa/c1?email=1");
+
+    const dialog = await screen.findByRole("dialog", { name: "ส่ง COA ทางอีเมล" });
+    expect(within(dialog).getByLabelText("ผู้รับ")).toHaveTextContent("Employee One · QC · employee@icpladda.com");
   });
 
   it("requires a reason before rejecting and sends it with the authenticated actor", async () => {

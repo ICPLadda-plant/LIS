@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 const COOKIE_NAME = 'lis_session';
-const DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 7;
+const DEFAULT_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 function base64urlEncode(input) {
   return Buffer.from(input).toString('base64url');

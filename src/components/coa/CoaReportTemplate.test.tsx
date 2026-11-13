@@ -4,6 +4,11 @@ import CoaReportTemplate, { COA_REPORT_CSS } from "./CoaReportTemplate";
 import { buildCoaReportPages, type CoaReportPage } from "@/lib/coaReport";
 
 describe("CoaReportTemplate", () => {
+  it("uses the ICP letterhead template only on the final COA page", () => {
+    expect(COA_REPORT_CSS).toContain(".coa-page:last-child");
+    expect(COA_REPORT_CSS).toContain("coa-final-page-template.png");
+  });
+
   it.each(["GLYPHOSATE 48% SL", "EMAMECTIN BENZOATE 2% W/V ME", "Product 2% GR", "BROMADIOLONE 0.005%", "Other product"])(
     "renders only selected parameter results in the existing %s form",
     (commonName) => {
@@ -38,18 +43,18 @@ describe("CoaReportTemplate", () => {
       .toBeLessThan(rows.findIndex((row) => row.textContent?.includes("BATCH NO.")));
   });
 
-  it("does not append a duplicate percent unit after W/W", () => {
+  it("does not append any stored unit after an AI result", () => {
     const pages = buildCoaReportPages({
       coaNo: "00012026",
       sampleSnapshots: [{ itemSeq: 1, sampleName: "Trade A", commonName: "PRODUCT 10% SP", batchNo: "B1" }],
-      resultSnapshots: [{ itemSeq: 1, testItem: "%AI content (W/W)", result: "10.1 %W/W", unit: "%" }],
+      resultSnapshots: [{ itemSeq: 1, testItem: "%AI content (W/W)", result: "10.1%", unit: "% W/W%" }],
       formSelections: [{ itemSeq: 1, resultKeys: ["ai"] }],
     } as Parameters<typeof buildCoaReportPages>[0]);
 
     render(<CoaReportTemplate pages={pages} />);
 
-    expect(screen.getByText("10.1 %W/W")).toBeInTheDocument();
-    expect(screen.queryByText("10.1 %W/W %")).not.toBeInTheDocument();
+    expect(screen.getByText("10.1%")).toBeInTheDocument();
+    expect(screen.queryByText(/10\.1% W\/W%/)).not.toBeInTheDocument();
   });
 
   it("renders the special GR/WP/SP COA form", () => {
@@ -162,7 +167,7 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText("Appearance")).toBeInTheDocument();
     expect(screen.getByText("%AI content (W/W)")).toBeInTheDocument();
     expect(screen.getByText("Date of analysis")).toHaveAttribute("colspan", "2");
-    expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("19-10-2026");
+    expect(screen.getByText("Date of analysis").nextElementSibling).toHaveTextContent("19/10/2026");
     expect(screen.queryByText(/Density at 30/)).not.toBeInTheDocument();
     expect(screen.queryByText("1.120")).not.toBeInTheDocument();
   });
@@ -278,6 +283,7 @@ describe("CoaReportTemplate", () => {
         aiContentCriteria: "0.005% ± 0.00125",
         densityResult: "-",
         waxBlockSizeResult: "5.90 gm",
+        waxBlockSizeCriteria: "5.88 gm ± 5%",
         dateOfAnalysis: "20/08/2026",
         rows: [],
       }],
@@ -294,7 +300,9 @@ describe("CoaReportTemplate", () => {
     expect(screen.getByText(/PRODUCT/).closest("div")).toHaveTextContent("PRODUCT : Red Wax Block (BROMADIOLONE 0.005%)");
     expect(screen.getByText("Red wax block")).toBeInTheDocument();
     expect(screen.getByText("0.005% ± 0.00125")).toBeInTheDocument();
-    expect(screen.getByText("5.88 gm ± 5%")).toBeInTheDocument();
+    const waxBlockCells = within(screen.getByText("Wax block size").closest("tr")!).getAllByRole("cell");
+    expect(waxBlockCells).toHaveLength(3);
+    expect(waxBlockCells[1]).toHaveTextContent("5.88 gm ± 5%");
     expect(screen.getByText("LOT-008 / B-008")).toBeInTheDocument();
     expect(screen.getByText("5.90 gm")).toBeInTheDocument();
   });

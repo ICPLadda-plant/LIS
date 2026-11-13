@@ -329,6 +329,7 @@ export default function QCApprovalReviewPage() {
   const showDecisionBar = ready && !isClosed && allowedSides.length > 0;
   // final พร้อมแล้ว และเหลือรอแค่ฝั่งเดียว → ปุ่มฝั่งนั้นกับ Final Report ทำงานเหมือนกัน แสดงแค่ Final Report
   const sideButtons = canIssueFinal && decidableSides.length === 1 ? [] : decidableSides;
+  const commonNames = [...new Set((petition.items ?? []).map((item) => item.commonName?.trim()).filter(Boolean))].join(", ");
 
   return (
     <AppLayout title={petition.petitionNo}>
@@ -343,7 +344,7 @@ export default function QCApprovalReviewPage() {
           }
           actions={
             <span className="text-sm text-muted-foreground">
-              ผู้นำส่ง: {petition.submittedBy?.name ?? "-"}
+              Common Name: {commonNames || "-"}
             </span>
           }
         />

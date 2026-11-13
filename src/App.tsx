@@ -11,12 +11,15 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { ConfirmProvider } from "@/context/ConfirmDialog";
 import DailyCheckReminderWatcher from "@/components/lis/DailyCheckReminderWatcher";
 import PetitionFlowWatcher from "@/components/lis/PetitionFlowWatcher";
+import PushEnablePrompt from "@/components/lis/PushEnablePrompt";
 import UrgentPetitionReminder from "@/components/lis/UrgentPetitionReminder";
+import AdminSystemWatcher from "@/components/lis/AdminSystemWatcher";
 import PrivateRoute from "@/components/PrivateRoute";
 import LabHeadRoute from "@/components/LabHeadRoute";
 import RoutePointerLockGuard from "@/components/RoutePointerLockGuard";
 import { DevRoleSwitcher } from "@/components/DevRoleSwitcher";
 import EmployeeLinkGate from "@/components/lis/EmployeeLinkGate";
+import PwaInstallGate from "@/components/lis/PwaInstallGate";
 import GlobalStockQrScanListener from "@/components/lis/GlobalStockQrScanListener";
 import { RouteLoading } from "@/components/RouteLoading";
 import { StartupLoadingGate } from "@/components/StartupLoadingGate";
@@ -51,6 +54,7 @@ const LabApproval = lazy(() => import("./pages/LabApproval"));
 const LabApprovalReviewPage = lazy(() => import("./pages/LabApprovalReviewPage"));
 const AdminData = lazy(() => import("./pages/AdminData"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const ParameterSettings = lazy(() => import("./pages/ParameterSettings"));
 const FullSpecPage = lazy(() => import("./pages/FullSpecPage"));
 const AccessControl = lazy(() => import("./pages/AccessControl"));
@@ -119,10 +123,13 @@ const App = () => (
         <AuthProvider>
           <DevRoleSwitcher />
           <EmployeeLinkGate />
+          <PwaInstallGate />
+          <PushEnablePrompt />
           <NotificationProvider>
             <DailyCheckReminderWatcher />
             <PetitionFlowWatcher />
             <UrgentPetitionReminder />
+            <AdminSystemWatcher />
             <SampleProvider>
               <StartupLoadingGate minimumDurationMs={1500}>
               <Suspense fallback={<RouteLoading />}>
@@ -173,6 +180,7 @@ const App = () => (
               <Route path="/access-control" element={<PrivateRoute><AccessControl /></PrivateRoute>} />
               <Route path="/profile/signature" element={<PrivateRoute><SignatureCapturePage /></PrivateRoute>} />
               <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+              <Route path="/notifications" element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
               <Route path="/parameter-settings" element={<PrivateRoute><ParameterSettings /></PrivateRoute>} />
               <Route path="/full-spec" element={<PrivateRoute><FullSpecPage /></PrivateRoute>} />
               <Route path="/petitions" element={<PrivateRoute><PetitionTimelinePage /></PrivateRoute>} />

@@ -149,6 +149,8 @@ router.post('/petitions/:id/items', serializePetitionWrite(async (req, res) => {
 
     await petition.save();
 
+    // QC Approver อนุมัติครบแต่ออก Final เองไม่ได้ = Pre Result → แจ้งหัวหน้า QC ให้ออก Final Report
+    const preResult = decision === 'approve' && !finalPayload && allItemsApproved(petition);
     writeAudit(petition, {
       event: decision === 'reject' && prevStatus !== petition.status ? 'statusChanged' : 'reviewed',
       fromStatus: prevStatus,
@@ -157,7 +159,7 @@ router.post('/petitions/:id/items', serializePetitionWrite(async (req, res) => {
       note: decision === 'approve'
         ? `อนุมัติผล ${sideLabel} รายการที่ ${seqLabel}${note ? `: ${note}` : ''}`
         : `ไม่อนุมัติผล ${sideLabel} รายการที่ ${seqLabel} — ส่งกลับ${sideLabel}ทดสอบใหม่: ${note}`,
-      metadata: { type: 'itemApproval', side, decision, seqs: targets.map((t) => t.seq), returnTo: decision === 'reject' ? side : undefined },
+      metadata: { type: 'itemApproval', side, decision, seqs: targets.map((t) => t.seq), returnTo: decision === 'reject' ? side : undefined, preResult: preResult || undefined },
     }, decision === 'reject');
     if (finalPayload) writeAudit(petition, finalPayload, true);
 

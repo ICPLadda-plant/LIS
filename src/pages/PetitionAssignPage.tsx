@@ -47,7 +47,7 @@ function sortAssignQueue(petitions: Petition[]): Petition[] {
 const formatThaiDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' })
     .format(new Date(iso));
-import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
+import { bangkokDayKey, isSendDateReached, isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import { DEV_MODE, synthesizeDevAssignees } from '@/config/dev';
 import { isAssignedTo } from '@/lib/assignment';
 import { type MethodDoc } from '@/lib/methodRegistry';
@@ -221,7 +221,10 @@ export default function PetitionAssignPage() {
   const error = pendingError || inProgressError || staleReceivedError || recheckError || (parametersError instanceof Error ? parametersError.message : null);
 
 
+  // เปลี่ยนวันแล้วให้งานที่ถึงวันส่งโผล่ขึ้นมาเอง (now อัปเดตทุก 30 วินาที)
+  const todayKey = bangkokDayKey(now);
   const queuePetitions = useMemo(() => {
+    const today = new Date(`${todayKey}T12:00:00+07:00`);
     // งาน re-check ที่ยัง inProgress ซ้ำกับ inProgressData — กันการ์ดซ้ำด้วย _id
     const byId = new Map<string, Petition>();
     [
@@ -233,9 +236,13 @@ export default function PetitionAssignPage() {
       if (!byId.has(petition._id)) byId.set(petition._id, petition);
     });
     return [...byId.values()].filter(
-      (petition) => isVisibleInAssignQueue(petition) && hasAssignableLabParameter(petition, labParameters, groupMembership),
+      (petition) =>
+        isVisibleInAssignQueue(petition)
+        // งานรอมอบหมาย: แสดงเฉพาะใบที่วันที่ส่ง <= วันนี้ (ใบที่มอบหมายแล้วยังอยู่ในคอลัมน์ผู้รับงาน)
+        && (Boolean(petition.assignedTo) || isSendDateReached(petition, today))
+        && hasAssignableLabParameter(petition, labParameters, groupMembership),
     );
-  }, [inProgressData?.items, pendingData?.items, staleReceivedData?.items, recheckData?.items, labParameters, groupMembership]);
+  }, [inProgressData?.items, pendingData?.items, staleReceivedData?.items, recheckData?.items, labParameters, groupMembership, todayKey]);
 
   // Cache substance groups per petition
   const groupsByPetition = useMemo(() => {

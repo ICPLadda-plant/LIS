@@ -38,4 +38,12 @@ PetitionAuditLogSchema.index({ createdAt: -1 });
 PetitionAuditLogSchema.index({ event: 1, createdAt: -1 });
 PetitionAuditLogSchema.index({ toStatus: 1, createdAt: -1 });
 
+// ทุกแถวที่ลง audit log ส่ง PWA ตามกฎแจ้งเตือนกลาง (ไม่รอ — ไม่ให้การบันทึกช้าหรือพัง)
+PetitionAuditLogSchema.post('save', function dispatchPush(doc) {
+  const log = doc.toObject();
+  setImmediate(() => {
+    require('../lib/webPush').dispatchPetitionLogPush(log).catch(() => undefined);
+  });
+});
+
 module.exports = mongoose.model('PetitionAuditLog', PetitionAuditLogSchema);

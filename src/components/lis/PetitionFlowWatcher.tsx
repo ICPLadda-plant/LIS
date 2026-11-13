@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { isNotificationSoundEnabled } from "@/lib/appPreferences";
-import { audiencesForUser, readSeeAll, SEE_ALL_EVENT } from "@/lib/petitionAudience";
+import { readSeeAll, SEE_ALL_EVENT } from "@/lib/petitionAudience";
 import { normalizeRoles } from "@/lib/roles";
 import {
   PETITION_NOTIFICATIONS_REFRESH_EVENT,
@@ -142,20 +142,22 @@ const PetitionFlowWatcher = () => {
     return () => window.removeEventListener(SEE_ALL_EVENT, sync);
   }, []);
 
-  const audiences = useMemo(() => audiencesForUser(user), [user]);
   const roles = useMemo(() => normalizeRoles(user), [user]);
   const employeeId = user?.employeeId;
-  const enabled = !!user && (audiences.length > 0 || !!employeeId || seeAll);
+  const email = user?.email;
+  const name = user?.name;
+  const enabled = !!user;
 
   const { data, refetch } = useQuery({
-    queryKey: ["petition-notifications", employeeId ?? "", audiences.join(","), roles.join(","), seeAll],
+    queryKey: ["petition-notifications", employeeId ?? "", email ?? "", roles.join(","), seeAll],
     queryFn: () => {
       shouldMarkBackfilledRef.current = shouldBackfillPetitionNotifications(employeeId, user);
       return api.getPetitionNotifications({
         since: petitionNotificationSince(employeeId, user),
-        audiences,
         roles,
         employeeId,
+        email,
+        name,
         all: seeAll,
       });
     },
@@ -200,7 +202,7 @@ const PetitionFlowWatcher = () => {
         link: item.link,
         createdAt: new Date(item.createdAt).getTime(),
         persistent: true,
-        group: "petition",
+        group: item.group ?? "petition",
       });
     }
     if (!isScannerRoute()) {

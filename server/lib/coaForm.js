@@ -9,7 +9,7 @@ const physicalEnglish = {
   'ใส': 'Clear', 'ไม่มีสี': 'Colorless', 'ใสไม่มีสี': 'Colorless',
   'ขาว': 'White', 'ดำ': 'Black', 'แดง': 'Red', 'ส้ม': 'Orange', 'เหลือง': 'Yellow',
   'เขียว': 'Green', 'ฟ้า': 'Light blue', 'น้ำเงิน': 'Blue', 'ม่วง': 'Purple',
-  'ชมพู': 'Pink', 'น้ำตาล': 'Brown', 'เทา': 'Gray', 'เหลืองอ่อน': 'Pale yellow',
+  'ชมพู': 'Pink', 'น้ำตาล': 'Brown', 'เทา': 'Gray', 'เหลืองอ่อน': 'Pale yellow', 'ขาวนวล': 'Off white',
 };
 
 function isEnglishSpecification(value) {
@@ -17,6 +17,8 @@ function isEnglishSpecification(value) {
 }
 
 function translatedPhysical(values) {
+  const sources = values.map((value) => value.replace(/^สี/, ''));
+  if (sources.includes('ผงละเอียด') && sources.includes('ขาวนวล')) return 'Off white powder';
   const translated = values.map((value) => physicalEnglish[value.replace(/^สี/, '')]
     || (isEnglishSpecification(value) ? value : ''));
   return translated.every(Boolean) ? translated.join(', ') : '';
