@@ -14,9 +14,18 @@ const summary = (d, user) => {
 };
 
 // GET /api/documents — เฉพาะเอกสารที่ผู้ใช้มีสิทธิ์เห็น (ไม่ส่ง html เพื่อให้ list เบา)
+// ?templateFor=CODE&active=1 → แม่แบบที่สถานะ "ใช้งาน" ของฟอร์มนั้น (ส่ง html มาด้วย ใช้ตอนพิมพ์)
 router.get('/', async (req, res) => {
   try {
     const user = req.authenticatedUser || null;
+    const query = req.query || {};
+    if (query.templateFor) {
+      const filter = { templateFor: String(query.templateFor) };
+      if (query.active) filter.status = 'ใช้งาน';
+      const list = await LisDocument.find(filter).sort({ updatedAt: -1 }).lean();
+      const visible = list.filter((d) => canViewDocument(user, d));
+      return res.json({ data: visible.map((d) => ({ ...summary(d, user), html: d.html })) });
+    }
     const docs = await LisDocument.find().sort({ updatedAt: -1 }).lean();
     res.json({ data: docs.filter((d) => canViewDocument(user, d)).map((d) => summary(d, user)) });
   } catch (err) {

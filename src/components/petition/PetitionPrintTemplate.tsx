@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { customerCodeForPetition } from '@/lib/customerCode';
@@ -642,9 +642,12 @@ interface Props {
   requestValues?: Record<string, unknown>;
   /** หน้าใบรายงานผล Lab (เรียงตาม petition.items) ใช้เติมรายการทดสอบ/วิธีทดสอบ */
   labReportPages?: Array<{ rows: LabTestRow[] }>;
+  /** แม่แบบที่ผู้ใช้แก้ในหน้า "จัดการเอกสาร" (สถานะใช้งาน) ใช้แทนแผ่นนั้นของฟอร์มเดิม */
+  replacePage1?: ReactNode;
+  replacePage2?: ReactNode;
 }
 
-export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [] }: Props) {
+export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [], replacePage1, replacePage2 }: Props) {
   const labTestsBySeq: Record<number, LabTestRow[]> = {};
   const labTestsBySample = new Map<string, LabTestRow[]>();
   const sampleKey = (item: PetitionItem) => `${String(item.batchNo ?? '').trim()}|${item.sampleName ?? ''}`;
@@ -668,12 +671,12 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
     <>
       <style>{PRINT_CSS}</style>
       <div className="pr-root">
-        <PageOne
+        {replacePage1 ?? <PageOne
           lr={labRequest}
           customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
           yearShort={yearShort}
-        />
-        {sheets.map((rows, index) => (
+        />}
+        {replacePage2 ?? sheets.map((rows, index) => (
           <PageTwo key={index} lr={labRequest} petition={petition} printRows={rows} sheetNo={index + 1} sheetCount={sheets.length} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
         ))}
       </div>

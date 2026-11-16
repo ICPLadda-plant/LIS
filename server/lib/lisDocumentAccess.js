@@ -46,7 +46,7 @@ function sanitizeDocumentInput(body = {}, { partial = false } = {}) {
   if (has('source') || !partial) {
     out.source = SOURCES.includes(body.source) ? body.source : 'สร้างเอง';
   }
-  for (const k of ['code', 'rev', 'stage', 'printWhen']) if (has(k)) out[k] = str(body[k]);
+  for (const k of ['code', 'rev', 'stage', 'printWhen', 'templateFor']) if (has(k)) out[k] = str(body[k]);
   if (has('status')) {
     if (!DOC_STATUSES.includes(body.status)) return { error: 'สถานะเอกสารไม่ถูกต้อง' };
     out.status = body.status;

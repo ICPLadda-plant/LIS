@@ -13,6 +13,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import {
+  FILL_FIELDS, TEMPLATE_SCHEMAS, fillFieldHtml, hasFillFields, starterTemplateHtml, variableHtml,
+  type TemplateSchema,
+} from "@/lib/formTemplate";
+import FillFormView from "@/components/lis/FillFormView";
 import { Link } from "react-router-dom";
 import { Label } from "@/components/ui/label";
 import {
@@ -27,6 +32,7 @@ type Doc = {
   viewers: string[]; managers: string[];
   // จาก server: ใครสร้าง / สิทธิ์แก้ของผู้ใช้ปัจจุบัน; id ว่าง = ยังไม่เคยบันทึก
   createdBy?: string; canEdit?: boolean;
+  templateFor?: string;
 };
 type RoleOption = { id: string; name: string };
 const DEFAULT_META = { code: "", rev: "", status: "ร่าง" as DocStatus, paper: "A4 แนวตั้ง" as PaperSize, stage: "พิมพ์ตามต้องการ", printWhen: "", viewers: [] as string[], managers: [] as string[] };
@@ -37,7 +43,7 @@ const withMeta = (d: Partial<Doc>): Doc => ({ ...DEFAULT_META, ...d } as Doc);
 const LEGACY_KEY = "lis.documents";
 const payloadOf = (d: Doc, html?: string) => ({
   title: d.title, source: d.source, code: d.code, rev: d.rev, status: d.status, paper: d.paper,
-  stage: d.stage, printWhen: d.printWhen, viewers: d.viewers, managers: d.managers,
+  stage: d.stage, printWhen: d.printWhen, viewers: d.viewers, managers: d.managers, templateFor: d.templateFor ?? "",
   ...(html !== undefined ? { html } : {}),
 });
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
@@ -119,7 +125,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 const selectCls = "h-8 rounded-md border bg-background px-2 text-sm";
 
-function Ribbon() {
+function Ribbon({ schema }: { schema?: TemplateSchema }) {
   return (
     <Tabs defaultValue="home" className="rounded-lg border bg-card">
       <TabsList className="m-1">
@@ -176,6 +182,32 @@ function Ribbon() {
           <Tool label="ลบคอลัมน์" onClick={tableOps.delCol} />
           <Tool label="ลบตาราง" onClick={tableOps.delTable} />
         </Group>
+        <Group label="ช่องกรอก (ให้คนกรอกตอนพิมพ์)">
+          {FILL_FIELDS.map((f) => (
+            <Tool key={f.type} label={f.label} onClick={() => {
+              const label = window.prompt("ชื่อช่อง เช่น ชื่อผู้รับ, วันที่รับ", f.label.replace("ช่อง", ""));
+              if (label) exec("insertHTML", fillFieldHtml(f.type, label.trim()));
+            }} />
+          ))}
+        </Group>
+        {schema && (
+          <Group label="ข้อมูลจากระบบ (เติมอัตโนมัติตอนพิมพ์)">
+            <select aria-label="แทรกข้อมูลจากระบบ" className={selectCls} defaultValue="" onChange={(e) => {
+              const v = [...schema.vars, ...schema.itemVars].find((x) => x.key === e.target.value);
+              if (v) exec("insertHTML", variableHtml(v.key, v.label));
+              e.target.value = "";
+            }}>
+              <option value="" disabled>แทรกข้อมูล</option>
+              <optgroup label="ข้อมูลเอกสาร">{schema.vars.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}</optgroup>
+              <optgroup label="ข้อมูลรายตัวอย่าง (ใส่ในแถวรายการ)">{schema.itemVars.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}</optgroup>
+            </select>
+            <Tool label="ตารางรายการตัวอย่าง" onClick={() => {
+              const cols = schema.itemVars.slice(0, 4);
+              exec("insertHTML", "<table><tbody><tr>" + cols.map((c) => "<th>" + c.label + "</th>").join("") + '</tr><tr data-fv-repeat="items">'
+                + cols.map((c) => "<td>" + variableHtml(c.key, c.label) + "</td>").join("") + "</tr></tbody></table><p><br></p>");
+            }} />
+          </Group>
+        )}
         <Group label="อื่น ๆ">
           <Tool label="เส้นคั่น" onClick={() => exec("insertHorizontalRule")} />
           <Tool label="ขึ้นหน้าใหม่" onClick={() => exec("insertHTML", '<div class="page-break" style="page-break-after:always"></div><p><br></p>')} />
@@ -254,9 +286,10 @@ function MetaPanel({ doc, onChange, roles }: { doc: Doc; onChange: (patch: Parti
   );
 }
 
+type SystemDocRow = (typeof SYSTEM_DOCS)[number];
 const sysRoleText = (r: string[]) => (r.length ? r.join(", ") : "-");
 
-function SystemDocsTable() {
+function SystemDocsTable({ onEditTemplate }: { onEditTemplate: (d: SystemDocRow) => void }) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -276,6 +309,7 @@ function SystemDocsTable() {
                 <th className="px-3 py-2 font-medium">ผู้เห็น</th>
                 <th className="px-3 py-2 font-medium">ผู้จัดการ</th>
                 <th className="px-3 py-2 font-medium">พิมพ์ที่</th>
+                <th className="px-3 py-2"><span className="sr-only">แก้ฟอร์ม</span></th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -290,6 +324,11 @@ function SystemDocsTable() {
                   <td className="px-3 py-2 text-muted-foreground">{sysRoleText(d.managers)}</td>
                   <td className="px-3 py-2">
                     <Link to={d.page} className="inline-flex items-center gap-1 text-primary hover:underline">{d.pageLabel}<ExternalLink className="w-3 h-3" /></Link>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {TEMPLATE_SCHEMAS[d.code] && (
+                      <Button size="sm" variant="outline" className="whitespace-nowrap" onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -308,6 +347,7 @@ export default function DocumentManager() {
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [current, setCurrent] = useState<Doc | null>(null);
   const [saving, setSaving] = useState(false);
+  const [fillMode, setFillMode] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -354,10 +394,22 @@ export default function DocumentManager() {
     finally { setSaving(false); }
   };
 
+  // แก้ฟอร์มระบบ: เปิดแม่แบบที่มีอยู่ หรือสร้างใหม่จากแม่แบบเริ่มต้น
+  const editTemplate = async (sd: SystemDocRow) => {
+    const existing = docs.find((d) => d.templateFor === sd.code);
+    if (existing) return open(existing);
+    const d = withMeta({
+      id: "", title: "แม่แบบ " + sd.name, source: "สร้างเอง", updatedAt: new Date().toISOString(), canEdit: true,
+      code: sd.code, rev: sd.rev, paper: sd.paper, stage: sd.stage, printWhen: sd.status, templateFor: sd.code,
+    });
+    const html = starterTemplateHtml(sd.name, sd.code, sd.rev, TEMPLATE_SCHEMAS[sd.code]);
+    if (await persist(d, html)) toast.success('สร้างแม่แบบแล้ว ตั้งสถานะเป็น "ใช้งาน" เมื่อพร้อมให้ระบบพิมพ์ด้วยแม่แบบนี้');
+  };
+
   const open = async (d: Doc) => {
     try {
       const res = await api.get<Doc>("/documents/" + d.id);
-      setCurrent(withMeta(res.data.data));
+      setCurrent(withMeta(res.data.data)); setFillMode(false);
     } catch (e) { toast.error("เปิดเอกสารไม่สำเร็จ: " + errMsg(e)); }
   };
 
@@ -377,7 +429,7 @@ export default function DocumentManager() {
     catch (e) { toast.error("ลบไม่สำเร็จ: " + errMsg(e)); }
   };
 
-  const html = () => editor.current?.innerHTML ?? "";
+  const html = () => editor.current?.innerHTML ?? current?.html ?? "";
 
   const exportDocx = async () => {
     if (!current) return;
@@ -413,17 +465,28 @@ export default function DocumentManager() {
                 if (await persist(current, html())) toast.success("บันทึกแล้ว");
               }}><Save className="w-4 h-4" />{saving ? "กำลังบันทึก..." : "บันทึก"}</Button>
             ) : <Badge variant="secondary">อ่านอย่างเดียว</Badge>}
+            {hasFillFields(current.html || "") && (
+              <Button size="sm" variant={fillMode ? "default" : "outline"} onClick={() => {
+                if (!fillMode && current.canEdit) patch({ html: html() }); // เก็บที่แก้ค้างไว้ก่อนสลับโหมด
+                setFillMode(!fillMode);
+              }}>{fillMode ? "กลับไปแก้ฟอร์ม" : "กรอกแบบฟอร์ม"}</Button>
+            )}
             <Button size="sm" variant="outline" className="gap-1" onClick={exportDocx}><Download className="w-4 h-4" />ส่งออก .docx</Button>
             <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}><Printer className="w-4 h-4" />พิมพ์</Button>
           </div>
         </div>
-        <MetaPanel doc={current} onChange={patch} roles={roles} />
-        {current.canEdit && <div className="sticky top-0 z-10 print:hidden"><Ribbon /></div>}
+        {!fillMode && <MetaPanel doc={current} onChange={patch} roles={roles} />}
+        {current.templateFor && !fillMode && (
+          <p className="text-sm text-muted-foreground print:hidden">
+            แม่แบบนี้ใช้แทนฟอร์ม {current.templateFor} เมื่อสถานะเป็น "ใช้งาน" — ช่อง {"{{ ... }}"} ระบบจะเติมข้อมูลจริงตอนพิมพ์ แถวที่มีตัวแปรรายตัวอย่างจะถูกคัดลอกตามจำนวนตัวอย่าง
+          </p>
+        )}
+        {current.canEdit && !fillMode && <div className="sticky top-0 z-10 print:hidden"><Ribbon schema={current.templateFor ? TEMPLATE_SCHEMAS[current.templateFor] : undefined} /></div>}
         {/* พื้นที่หน้ากระดาษ: ใช้ขนาดกระดาษจริง (mm) เป็นข้อยกเว้นจาก design.md เพราะต้องเหมือนเอกสารพิมพ์ */}
         <div className="overflow-x-auto rounded-lg bg-muted py-6 print:bg-transparent print:p-0">
-          <div ref={editor} key={current.id || "new"} style={pageStyle} contentEditable={!!current.canEdit} suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
+          {fillMode ? <FillFormView html={current.html} style={pageStyle} /> : <div ref={editor} key={current.id || "new"} style={pageStyle} contentEditable={!!current.canEdit} suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
             className="doc-page mx-auto bg-white text-black shadow-md focus:outline-none print:shadow-none"
-            dangerouslySetInnerHTML={{ __html: current.html || "<p><br></p>" }} />
+            dangerouslySetInnerHTML={{ __html: current.html || "<p><br></p>" }} />}
         </div>
       </div>
     );
@@ -431,7 +494,7 @@ export default function DocumentManager() {
 
   return (
     <div className="space-y-4">
-      <SystemDocsTable />
+      <SystemDocsTable onEditTemplate={editTemplate} />
       <Card>
         <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>

@@ -36,6 +36,9 @@ import {
 import PetitionView from '@/components/petition/PetitionView';
 import { DevStatusStepper } from '@/components/petition/DevStatusStepper';
 import PetitionPrintTemplate from '@/components/petition/PetitionPrintTemplate';
+import TemplatePrintPage from '@/components/lis/TemplatePrintPage';
+import { useActiveTemplates } from '@/hooks/useActiveTemplates';
+import { petitionTemplateData } from '@/lib/formTemplate';
 import ResultReportPrintTemplate from '@/components/petition/ResultReportPrintTemplate';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
@@ -181,6 +184,8 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
   const [deleting, setDeleting] = useState(false);
   const autoPrintDone = useRef(false);
   const [printOpen, setPrintOpen] = useState(false);
+  // แม่แบบที่แก้ในหน้า "จัดการเอกสาร" (สถานะใช้งาน) แทนแผ่นของใบคำร้อง
+  const petitionTemplates = useActiveTemplates(['FM-QP-07-01-001', 'FM-QP-07-04-001'], printOpen);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
   const [preReportOpen, setPreReportOpen] = useState(false);
   const [finalReportOpen, setFinalReportOpen] = useState(false);
@@ -645,7 +650,11 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
 
               {serviceLabRequest && (
                 <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="service-request">
-                  <PetitionPrintTemplate labRequest={serviceLabRequest} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labReportPages={labReportPages} />
+                  <PetitionPrintTemplate
+                    labRequest={serviceLabRequest} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labReportPages={labReportPages}
+                    replacePage1={petitionTemplates['FM-QP-07-01-001'] && <TemplatePrintPage template={petitionTemplates['FM-QP-07-01-001']} data={petitionTemplateData(data)} />}
+                    replacePage2={petitionTemplates['FM-QP-07-04-001'] && <TemplatePrintPage template={petitionTemplates['FM-QP-07-04-001']} data={petitionTemplateData(data)} />}
+                  />
                 </PrintPreviewDialog>
               )}
               {data && (

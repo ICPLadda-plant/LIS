@@ -13,6 +13,8 @@ const LisDocumentSchema = new mongoose.Schema({
   paper: { type: String, enum: PAPER_SIZES, default: 'A4 แนวตั้ง' },
   stage: { type: String, default: 'พิมพ์ตามต้องการ' },
   printWhen: { type: String, default: '' },
+  // รหัสฟอร์มระบบที่เอกสารนี้เป็นแม่แบบแทน (เช่น FM-QP-07-04-001); ว่าง = เอกสารทั่วไป
+  templateFor: { type: String, default: '', index: true },
   viewers: { type: [String], default: [] }, // role ids; ว่าง = ทุกคน
   managers: { type: [String], default: [] }, // role ids
   createdBy: { type: String, default: '' },
