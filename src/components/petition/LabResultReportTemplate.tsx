@@ -93,7 +93,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
                   <div>โทร : {page.customer.phone}</div>
                 </td>
                 <td className="lr-half">
-                  <div className="lr-right lr-italic lr-small">ข้อมูลตัวอย่าง</div>
+                  <div className="lr-right lr-italic lr-small">ข้อมูลจากลูกค้า</div>
                   <div>ชื่อตัวอย่าง : {page.sample.name}</div>
                   <div>แบทช์หมายเลข : {page.sample.batchNo}</div>
                   <div>วันที่ผลิต/นำเข้า : {page.sample.productionDate}</div>
