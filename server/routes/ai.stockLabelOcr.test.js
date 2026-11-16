@@ -85,3 +85,21 @@ describe('stock label OCR route', () => {
     );
   });
 });
+
+describe('balance display OCR route', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsOpenAIConfigured.mockReturnValue(true);
+  });
+
+  test('returns a normalized decimal value from the balance display', async () => {
+    mockGenerateJSONFromImage.mockResolvedValue({ value: ' +100,0123 g ', rawText: '+100,0123 g' });
+    const handler = routeHandler('/balance-display-ocr');
+    const res = mockResponse();
+
+    await handler({ body: { imageDataUrl: 'data:image/jpeg;base64,abc' } }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ value: '100.0123', rawText: '+100,0123 g' });
+  });
+});

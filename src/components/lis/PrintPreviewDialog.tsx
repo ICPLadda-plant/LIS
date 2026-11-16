@@ -80,10 +80,12 @@ function getSheetSize(printEl: HTMLDivElement | null, contentEl: HTMLDivElement)
 function ScaledPreview({
   printRef,
   previewClassName,
+  css,
   children,
 }: {
   printRef: React.RefObject<HTMLDivElement>;
   previewClassName?: string;
+  css?: string;
   children: React.ReactNode;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
@@ -248,6 +250,7 @@ function ScaledPreview({
               transformOrigin: "top left",
             }}
           >
+            {css ? <style data-print-preview-style>{css}</style> : null}
             <div ref={printRef}>{children}</div>
           </div>
         </div>
@@ -391,7 +394,9 @@ export default function PrintPreviewDialog({
           )}
         </DialogHeader>
 
-        <ScaledPreview printRef={printRef} previewClassName={docType === "coa" ? "bg-muted" : undefined}>{children}</ScaledPreview>
+        <ScaledPreview printRef={printRef} previewClassName={docType === "coa" ? "bg-muted" : undefined} css={css}>
+          {children}
+        </ScaledPreview>
 
         {!previewOnly && outputMode === "server" && !serverConfigured && (
           <p className="shrink-0 text-sm text-red-600">
