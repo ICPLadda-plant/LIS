@@ -140,17 +140,6 @@ function PageOne({ lr, customerCode, yearShort }: { lr: LabRequest; customerCode
           <EditableText className="pr-line pr-line-sm" value={customerCode ? `${customerCode}/${yearShort}` : ''} />
         </div>
 
-        <div className="pr-p1-notify">
-          <div className="pr-p1-notify-line">
-            ห้องปฏิบัติการได้รับแจ้งการทบทวนข้อตกลงการบริการทดสอบทางโทรศัพท์, อีเมล์&nbsp;&nbsp;
-            <CB /> ใช่&nbsp;&nbsp;<CB /> ไม่ใช่
-          </div>
-          <div className="pr-p1-notify-line">
-            ลงชื่อ <Line width="4cm" /> ผู้แจ้ง&nbsp;&nbsp;
-            <Line width="4cm" /> ผู้รับแจ้ง
-          </div>
-        </div>
-
         <table className="pr-p1-table">
           <thead>
             <tr>
@@ -162,6 +151,13 @@ function PageOne({ lr, customerCode, yearShort }: { lr: LabRequest; customerCode
               </th>
               <th className="pr-p1-head-r">
                 <div className="pr-center"><b>สำหรับหัวหน้าห้องปฏิบัติการ</b></div>
+                <div className="pr-center" style={{ fontWeight: 'normal' }}>ห้องปฏิบัติการได้รับแจ้งการทบทวนข้อตกลงการบริการทดสอบ</div>
+                <div style={{ fontWeight: 'normal', textAlign: 'left' }}>
+                  ทางโทรศัพท์, อีเมล์&nbsp;&nbsp;&nbsp;&nbsp;<CB /> ใช่&nbsp;&nbsp;&nbsp;&nbsp;<CB /> ไม่ใช่
+                </div>
+                <div style={{ fontWeight: 'normal', textAlign: 'left' }}>
+                  ลงชื่อ <Line width="3cm" /> ผู้แจ้ง <Line width="3cm" /> ผู้รับแจ้ง
+                </div>
               </th>
             </tr>
           </thead>
@@ -790,13 +786,6 @@ const PRINT_CSS = `
 .pr-p1-title { font-size: 14pt; margin: 2pt 0 3pt; }
 .pr-p1-meta-row { text-align: right; font-size: 11pt; line-height: 1.25; }
 
-.pr-p1-notify {
-  border: 0.6pt solid #000;
-  padding: 3pt 6pt;
-  margin: 4pt 0 0;
-  font-size: 10.5pt;
-}
-.pr-p1-notify-line { line-height: 1.5; }
 
 .pr-p1-table {
   width: 100%; border-collapse: collapse; table-layout: fixed;
