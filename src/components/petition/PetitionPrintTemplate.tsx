@@ -546,7 +546,7 @@ function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgPa
               <th rowSpan={3}>ค่า ถ.พ.</th>
               <th rowSpan={3}>จำนวนหน่วยบรรจุ</th>
               <th rowSpan={3}>หน่วยทดสอบ</th>
-                <th rowSpan={3}>วิเคราะห์ %AI</th>
+              <th rowSpan={3}>รายการทดสอบ</th>
               <th colSpan={4} className="pr-officer-head">สำหรับเจ้าหน้าที่</th>
             </tr>
             <tr>
