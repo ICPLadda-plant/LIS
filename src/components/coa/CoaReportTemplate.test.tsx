@@ -55,8 +55,8 @@ describe("CoaReportTemplate", () => {
 
     expect(screen.getByText("10.1%").closest("td")).toHaveClass("coa-ai-result");
     expect(screen.queryByText(/10\.1% W\/W%/)).not.toBeInTheDocument();
-    expect(COA_REPORT_CSS).toContain("background-image: radial-gradient");
-    expect(COA_REPORT_CSS).toContain("print-color-adjust: exact");
+    expect(screen.getByText("10.1%").closest("td")?.querySelector("svg.coa-ai-dots")).toBeInTheDocument();
+    expect(COA_REPORT_CSS).toContain(".coa-ai-dots");
   });
 
   it("renders the special GR/WP/SP COA form", () => {

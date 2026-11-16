@@ -5,6 +5,7 @@ import type { CoaReportPage, CoaReportSample } from "@/lib/coaReport";
 import { isAiContentTestItem } from "@/lib/aiToleranceCriteria";
 import { PrintMediaValue } from "@/components/lis/PrintMediaValue";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
+import { useId, type ReactNode } from "react";
 
 export const COA_REPORT_CSS = `
 .coa-root, .coa-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: ${A4_PRINT_FONT_SIZE}; }
@@ -17,7 +18,9 @@ export const COA_REPORT_CSS = `
 .coa-center { text-align: center; }
 .coa-right { text-align: right; }
 .coa-muted { color: #555; }
-.coa-ai-result { background-image: radial-gradient(circle, #000 0.35pt, transparent 0.45pt); background-size: 2.2mm 2.2mm; background-position: center; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.coa-ai-result { position: relative; overflow: hidden; }
+.coa-ai-dots { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.coa-ai-value { position: relative; }
 .coa-sign { margin-top: 14mm; text-align: center; }
 .coa-line { display: inline-block; min-width: 62mm; border-bottom: 0.8pt dotted #000; }
 .coa-signature-image { display: block; max-width: 62mm; height: 18mm; margin: 0 auto -2mm; object-fit: contain; }
@@ -60,6 +63,17 @@ function ApprovalSignature({ page, fallbackUrl }: { page: CoaReportPage; fallbac
     : null;
 }
 
+function AiResultValue({ children }: { children: ReactNode }) {
+  const patternId = useId().replace(/:/g, "");
+  return <>
+    <svg className="coa-ai-dots" aria-hidden="true">
+      <defs><pattern id={patternId} width="8.3" height="8.3" patternUnits="userSpaceOnUse"><circle cx="4.15" cy="4.15" r="0.7" fill="#000" /></pattern></defs>
+      <rect width="100%" height="100%" fill={`url(#${patternId})`} />
+    </svg>
+    <span className="coa-ai-value">{children}</span>
+  </>;
+}
+
 function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSample; hideDensity?: boolean }) {
   const rows = hideDensity
     ? sample.rows.filter((row) => !/\bdensity\b/i.test(row.testItem || ""))
@@ -76,7 +90,7 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
       <tr key={`${row.testItem}-${index}`}>
         <td>{row.testItem}</td>
         <td>{row.criteria === "-" ? "" : row.criteria}</td>
-        <td className={isAiContentTestItem(row.testItem) ? "coa-ai-result" : undefined}><PrintMediaValue value={row.result}>{result}</PrintMediaValue></td>
+        <td className={isAiContentTestItem(row.testItem) ? "coa-ai-result" : undefined}>{isAiContentTestItem(row.testItem) ? <AiResultValue><PrintMediaValue value={row.result}>{result}</PrintMediaValue></AiResultValue> : <PrintMediaValue value={row.result}>{result}</PrintMediaValue>}</td>
       </tr>
     );
   });
@@ -131,7 +145,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
           <tr>
             <td>%AI content (W/W)</td>
             <td>{sample?.aiContentCriteria === "-" ? "" : sample?.aiContentCriteria}</td>
-            <td className="coa-ai-result">{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
+            <td className="coa-ai-result"><AiResultValue>{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</AiResultValue></td>
           </tr>
           <tr>
             <td colSpan={2}>Date of analysis</td>
@@ -192,7 +206,7 @@ function LiquidCoaPage({ page, index }: { page: CoaReportPage; index: number }) 
           <tr>
             <td>%AI content (W/V)</td>
             <td>{sample?.aiContentCriteria === "-" ? "" : sample?.aiContentCriteria}</td>
-            <td className="coa-ai-result">{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
+            <td className="coa-ai-result"><AiResultValue>{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</AiResultValue></td>
           </tr>
           <tr>
             <td colSpan={2}>Density at 30°C (g/cm³)</td>
@@ -257,7 +271,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
           <tr>
             <td>%AI content (W/W)</td>
             <td>{sample?.aiContentCriteria === "-" ? "0.005% ± 0.00125" : sample?.aiContentCriteria}</td>
-            <td className="coa-ai-result">{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
+            <td className="coa-ai-result"><AiResultValue>{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</AiResultValue></td>
           </tr>
           <tr>
             <td>Wax block size</td>
@@ -320,7 +334,7 @@ function StandardCoaPage({ page, index }: { page: CoaReportPage; index: number }
             {sample.rows.length ? sample.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 <td>{row.testItem || "-"}</td>
-                <td className={`coa-center${isAiContentTestItem(row.testItem) ? " coa-ai-result" : ""}`}><PrintMediaValue value={row.result}>{row.result || "-"}{sample.selectedResultsOnly && !isAiContentTestItem(row.testItem) && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</PrintMediaValue></td>
+                <td className={`coa-center${isAiContentTestItem(row.testItem) ? " coa-ai-result" : ""}`}>{isAiContentTestItem(row.testItem) ? <AiResultValue><PrintMediaValue value={row.result}>{row.result || "-"}</PrintMediaValue></AiResultValue> : <PrintMediaValue value={row.result}>{row.result || "-"}{sample.selectedResultsOnly && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</PrintMediaValue>}</td>
                 <td className="coa-center">{row.criteria || "-"}</td>
                 <td className="coa-center">{row.method || "-"}</td>
               </tr>
