@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildLabReportPages, buddhistDate } from "@/lib/labReport";
+import { buildLabReportPages, buddhistDate, labReportPagesWithResults } from "@/lib/labReport";
 import type { Petition } from "@/types/petition.types";
 import type { LabRequest } from "@/types/labRequest.types";
 import type { ApprovalItemGroup } from "@/lib/qcApprovalRows";
@@ -133,25 +133,25 @@ describe("buildLabReportPages", () => {
     expect(page.rows[0].method).toBe("-");
   });
 
-  it("prints only the head reviewer range and keeps the percent unit for label tolerance criteria", () => {
+  it.each([
+    ["ผ่าน 48.13–51.88 · เกณฑ์กรม 47.50–52.50 %", "47.50–52.50 %"],
+    ["ผ่านเกณฑ์ 25% 48.13–51.88\nเกณฑ์กรม 47.50–52.50 %", "47.50–52.50 %"],
+    ["เกณฑ์กรม 47.50–52.50 % · เกินช่วงที่อนุมัติได้", "47.50–52.50 %"],
+    ["ผ่านเกณฑ์ 25% 48.13–51.88", "-"],
+  ])("พิมพ์เกณฑ์กรมได้ แต่ไม่พิมพ์เกณฑ์ 25%%: %s", (standardText, expected) => {
     const labelToleranceGroups: ApprovalItemGroup[] = [
       {
         ...groups[0],
         params: [
           {
             ...groups[0].params[0],
-            rows: [
-              {
-                ...groups[0].params[0].rows[0],
-                standardText: "ผ่าน 48.13–51.88 · เกณฑ์กรม 47.50–52.50 %",
-              },
-            ],
+            rows: [{ ...groups[0].params[0].rows[0], standardText }],
           },
         ],
       },
     ];
     const out = buildLabReportPages(petition, labRequests, labelToleranceGroups);
-    expect(out[0].rows[0].criteria).toBe("47.50–52.50 %");
+    expect(out[0].rows[0].criteria).toBe(expected);
   });
 
   it("item ที่ไม่มี group → rows ว่าง + fallback ลูกค้า", () => {
@@ -160,6 +160,12 @@ describe("buildLabReportPages", () => {
     expect(p.customer.name).toBe("สมชาย"); // ไม่มี labRequest → submittedBy.name
     expect(p.customer.department).toBe("แผนกผลิต"); // PETITION_DEPT_LABELS[production]
     expect(p.sample.condition).toBe("บกพร่อง");
+  });
+
+  it("ใบรายงานผลการทดสอบพิมพ์เฉพาะตัวอย่างที่มีผลฝั่ง Lab", () => {
+    const printPages = labReportPagesWithResults(pages);
+    expect(printPages).toHaveLength(1);
+    expect(printPages[0].sample.name).toBe("Glyphosate");
   });
 
   it("ชื่อในข้อมูลลูกค้าใช้ชื่อผู้ขอบริการ ไม่ใช้ชื่อบริษัทผู้ส่งตัวอย่าง", () => {

@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { isDesktopDevice, isStandalonePwa } from "@/lib/pwa";
+import { getPwaInstallState, isDesktopDevice, isStandalonePwa } from "@/lib/pwa";
 import { requiresPwaInstall } from "@/lib/pwaInstallPolicy";
 import {
   enablePushOnThisDevice,
@@ -44,7 +44,14 @@ const PushEnablePrompt = () => {
   const approved = !user?.approvalStatus || user.approvalStatus === "approved";
   const installGateShown =
     import.meta.env.PROD &&
-    requiresPwaInstall({ user, isProductionSession, pathname, isStandalone: isStandalonePwa(), isDesktop: isDesktopDevice() });
+    requiresPwaInstall({
+      user,
+      isProductionSession,
+      pathname,
+      isStandalone: isStandalonePwa(),
+      isAppInstalled: getPwaInstallState().installedOnDevice,
+      isDesktop: isDesktopDevice(),
+    });
   const ready = Boolean(userKey) && approved && !installGateShown && !SKIP_PATHS.includes(pathname);
 
   useEffect(() => {

@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FlaskConical, Loader2, Printer } from "lucide-react";
+import { Calculator, ChevronDown, FileCheck2, FileText, FlaskConical, Loader2, Printer, type LucideIcon } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
 import PageHeader from "@/components/lis/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { api, type ParameterItem } from "@/lib/api";
 import { usePetition, useLabRequestsByPetition } from "@/hooks/usePetition";
 import { useItemGroupMembership } from "@/hooks/useItemGroupMembership";
 import { buildApprovalGroups } from "@/lib/qcApprovalRows";
 import { aiSubstancesForItem } from "@/lib/aiSubstanceFields";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
+import { labReportPagesWithResults } from "@/lib/labReport";
 import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
+import { itemSubmissionNoText } from "@/lib/petitionSampler";
 import LabResultGroups from "@/components/petition/LabResultGroups";
 import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/LabResultReportTemplate";
 import ChemAnalysisReportTemplate, { CHEM_ANALYSIS_REPORT_CSS } from "@/components/petition/ChemAnalysisReportTemplate";
@@ -25,6 +28,15 @@ import { normalizeRoles } from "@/lib/roles";
 import LabHeadEditAction from "@/components/lis/approval/LabHeadEditAction";
 
 const PHYSICAL_PARAMETER_NAME = "กายภาพ";
+
+type PrintDocumentOption = {
+  key: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  enabled: boolean;
+  open: () => void;
+};
 
 function isLabReportSourceParameter(parameter: ParameterItem): boolean {
   return parameter.scope === "lab" || parameter.name?.trim() === PHYSICAL_PARAMETER_NAME;
@@ -66,7 +78,13 @@ export default function LabResultDetailPage() {
       includeRestrictedStandards: canSeeRestrictedStandards,
       showAutoPassRange: false,
       includeResultOnlyFields: true,
-    });
+    })
+      // รายการที่ไม่มีพารามิเตอร์ฝั่ง Lab ไม่ต้องแสดงในหน้าผลวิเคราะห์ Lab
+      .filter((group) => !group.unmatched)
+      .map((group) => {
+        const item = petition.items?.find((entry) => entry.seq === group.seq);
+        return item ? { ...group, submissionNo: itemSubmissionNoText(petition, item, "lab") || undefined } : group;
+      });
   }, [petition, parameters, results, groupMembership, canSeeRestrictedStandards]);
 
   const pages = useMemo(
@@ -74,8 +92,9 @@ export default function LabResultDetailPage() {
     [petition, labRequests, parameters, results, groupMembership],
   );
 
-  const report = <LabResultReportTemplate pages={pages} />;
-  const labResultPrintable = petition ? canPrintLabResult(petition) && pages.length > 0 : false;
+  const reportPages = useMemo(() => labReportPagesWithResults(pages), [pages]);
+  const report = <LabResultReportTemplate pages={reportPages} />;
+  const labResultPrintable = petition ? canPrintLabResult(petition) && reportPages.length > 0 : false;
   const chemSheets = useMemo(() => (petition ? buildChemAnalysisSheets(petition, pages) : []), [petition, pages]);
   const chemReportPrintable = petition ? canPrintChemAnalysisReport(petition) && chemSheets.length > 0 : false;
   // ใบคำนวณใช้ได้ทุกสาร: หัวกระดาษจากหน้ารายงาน แต่ค่าดิบ (Area Inj / % Sample) มาจาก groups
@@ -105,6 +124,39 @@ export default function LabResultDetailPage() {
     .filter(hasCalculationData);
   // พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ
   const calcPrintable = Boolean(petition && (petition.labCompletedAt || petition.labApprovedAt) && calcPages.length > 0);
+
+  // รวมเอกสารพิมพ์ทั้งหมดไว้ในปุ่มเดียว ผู้ใช้เลือกจากชื่อและคำอธิบาย แทนการไล่อ่านหลายปุ่ม
+  const printOptions: PrintDocumentOption[] = [
+    {
+      key: "labResult",
+      label: "ผลวิเคราะห์ Lab",
+      description: labResultPrintable ? "ผลวิเคราะห์ของทุกตัวอย่างในคำร้องนี้" : "พิมพ์ได้หลังหัวหน้า Lab อนุมัติผล",
+      icon: FileText,
+      enabled: labResultPrintable,
+      open: () => setPrintOpen(true),
+    },
+    ...(calcPages.length > 0
+      ? [{
+          key: "calculation",
+          label: "ใบคำนวณ",
+          description: calcPrintable ? "ค่าดิบและการคำนวณสารสำคัญ" : "พิมพ์ได้หลัง Lab ออกผล",
+          icon: Calculator,
+          enabled: calcPrintable,
+          open: () => setBromPrintOpen(true),
+        }]
+      : []),
+    ...(chemReportPrintable
+      ? [{
+          key: "chemReport",
+          label: "ใบรายงานผลการวิเคราะห์",
+          description: "แบบฟอร์ม F-CHM-01-01 สำหรับส่งออก",
+          icon: FileCheck2,
+          enabled: true,
+          open: () => setChemReportOpen(true),
+        }]
+      : []),
+  ];
+  const anyPrintable = printOptions.some((option) => option.enabled);
 
   if (loading) {
     return (
@@ -137,15 +189,26 @@ export default function LabResultDetailPage() {
           actions={
             <div className="flex flex-wrap justify-end gap-2">
               <LabHeadEditAction petition={petition} />
-              <Button variant="primary-outline" onClick={() => labResultPrintable && setPrintOpen(true)} disabled={!labResultPrintable} className="gap-2">
-                <Printer className="h-4 w-4" /> พิมพ์ผลวิเคราะห์ Lab
-              </Button>
-              {calcPages.length > 0 && <Button variant="primary-outline" onClick={() => calcPrintable && setBromPrintOpen(true)} disabled={!calcPrintable} className="gap-2">
-                <Printer className="h-4 w-4" /> พิมพ์ใบคำนวณ
-              </Button>}
-              {chemReportPrintable && <Button variant="primary-outline" onClick={() => setChemReportOpen(true)} className="gap-2">
-                <Printer className="h-4 w-4" /> ใบรายงานผลการวิเคราะห์
-              </Button>}
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="primary-outline" disabled={!anyPrintable} className="gap-2">
+                    <Printer className="h-4 w-4" /> พิมพ์เอกสาร
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">เลือกเอกสารที่ต้องการพิมพ์</DropdownMenuLabel>
+                  {printOptions.map(({ key, label, description, icon: Icon, enabled, open }) => (
+                    <DropdownMenuItem key={key} disabled={!enabled} onSelect={open} className="cursor-pointer items-start gap-3 py-2">
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="flex flex-col gap-0.5">
+                        <span className="font-medium text-foreground">{label}</span>
+                        <span className="text-xs text-muted-foreground">{description}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           }
         />
@@ -168,13 +231,13 @@ export default function LabResultDetailPage() {
         )}
       </div>
 
-      <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="coa" css={LAB_REPORT_CSS}>
+      <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}>
         {report}
       </PrintPreviewDialog>
-      {chemReportPrintable && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" css={CHEM_ANALYSIS_REPORT_CSS}>
+      {chemReportPrintable && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}>
         <ChemAnalysisReportTemplate sheets={chemSheets} />
       </PrintPreviewDialog>}
-      {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" css={LAB_CALCULATION_CSS}>
+      {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" title="ใบคำนวณผลวิเคราะห์" css={LAB_CALCULATION_CSS}>
         {calcPages.map((page, i) => (
           <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} />
         ))}

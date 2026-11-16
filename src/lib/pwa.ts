@@ -1,4 +1,6 @@
 export const PWA_ACTIVE_ACCOUNT_STORAGE_KEY = "lis.pwa.activeAccountId";
+// เครื่องนี้มีแอป LIS ติดตั้งอยู่ — แท็บเบราว์เซอร์กับหน้าต่างแอปใช้ localStorage ร่วมกัน
+export const PWA_INSTALLED_STORAGE_KEY = "lis.pwa.installedOnDevice";
 
 // Bump with CACHE_VERSION in public/sw.js. The query gives the worker a new URL,
 // so browsers skip any CDN copy of an older sw.js still cached under the old URL.
@@ -17,10 +19,31 @@ export type PwaInstallState = {
   canPrompt: boolean;
   // ติดตั้งสำเร็จในแท็บนี้ (appinstalled)
   installed: boolean;
+  // รู้ว่าเครื่องนี้ติดตั้งแอปไว้แล้ว แม้หน้านี้จะเปิดอยู่ในแท็บเบราว์เซอร์
+  installedOnDevice: boolean;
 };
 
+type RelatedAppsNavigator = Navigator & { getInstalledRelatedApps?: () => Promise<unknown[]> };
+
+function readInstalledFlag() {
+  try {
+    return typeof localStorage !== "undefined" && localStorage.getItem(PWA_INSTALLED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeInstalledFlag(installed: boolean) {
+  try {
+    if (installed) localStorage.setItem(PWA_INSTALLED_STORAGE_KEY, "1");
+    else localStorage.removeItem(PWA_INSTALLED_STORAGE_KEY);
+  } catch {
+    // storage ปิดอยู่ — ใช้ค่าใน memory ต่อไป
+  }
+}
+
 let deferredInstallPrompt: BeforeInstallPromptEvent | null = null;
-let installState: PwaInstallState = { canPrompt: false, installed: false };
+let installState: PwaInstallState = { canPrompt: false, installed: false, installedOnDevice: readInstalledFlag() };
 const installStateListeners = new Set<() => void>();
 let installCaptureStarted = false;
 
@@ -29,9 +52,18 @@ function setInstallState(next: Partial<PwaInstallState>) {
   installStateListeners.forEach((listener) => listener());
 }
 
+function markInstalledOnDevice(installed: boolean) {
+  writeInstalledFlag(installed);
+  if (installState.installedOnDevice !== installed) setInstallState({ installedOnDevice: installed });
+}
+
 /**
  * beforeinstallprompt fires once, early in page load — before React mounts the
  * install gate — so it must be captured at startup and replayed on demand.
+ *
+ * ใช้จำด้วยว่าเครื่องนี้ติดตั้งแอปแล้วหรือยัง:
+ * - เปิดในหน้าต่างแอป / ติดตั้งสำเร็จ / getInstalledRelatedApps เจอ → ติดตั้งแล้ว
+ * - Chrome/Edge ยิง beforeinstallprompt เฉพาะตอนยังไม่ได้ติดตั้ง → ถอนแอปไปแล้ว
  */
 export function startPwaInstallPromptCapture(target: Window | undefined = typeof window === "undefined" ? undefined : window) {
   if (!target || installCaptureStarted) return;
@@ -39,12 +71,25 @@ export function startPwaInstallPromptCapture(target: Window | undefined = typeof
   target.addEventListener("beforeinstallprompt", (event) => {
     event.preventDefault();
     deferredInstallPrompt = event as BeforeInstallPromptEvent;
-    setInstallState({ canPrompt: true });
+    writeInstalledFlag(false);
+    setInstallState({ canPrompt: true, installedOnDevice: false });
   });
   target.addEventListener("appinstalled", () => {
     deferredInstallPrompt = null;
-    setInstallState({ canPrompt: false, installed: true });
+    writeInstalledFlag(true);
+    setInstallState({ canPrompt: false, installed: true, installedOnDevice: true });
   });
+
+  if (isStandalonePwa()) {
+    markInstalledOnDevice(true);
+    return;
+  }
+  const nav = target.navigator as RelatedAppsNavigator | undefined;
+  nav?.getInstalledRelatedApps?.()
+    .then((apps) => {
+      if (apps.length > 0 && !installState.canPrompt) markInstalledOnDevice(true);
+    })
+    .catch(() => {});
 }
 
 export function getPwaInstallState() {

@@ -49,6 +49,8 @@ export interface ApprovalItemGroup {
   sampleName: string;
   batchNo?: string;
   sampleId?: string;
+  /** เลขที่ใบนำส่ง (เช่น L03/69) — หน้าที่ต้องการแสดงเป็นผู้เติมเอง */
+  submissionNo?: string;
   commonName?: string;
   params: ApprovalParamGroup[];
   unmatched: boolean;

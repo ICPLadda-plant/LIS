@@ -60,11 +60,11 @@ const clean = (value?: string | null) => {
 const unique = (values: Array<string | undefined | null>) => [...new Set(values.map((v) => clean(v)).filter(Boolean))];
 
 /**
- * ใบรายงานผลการวิเคราะห์ (F-CHM-01-01) ออกได้เมื่อหัวหน้า QC ออก Final Result แล้ว
- * ซึ่งเกิดเมื่ออนุมัติครบทุกรายการทั้งฝั่ง QC และฝั่ง Lab และต้องมีรายการที่ส่ง Lab
+ * ใบรายงานผลการวิเคราะห์ (F-CHM-01-01) เปิดได้ตั้งแต่หัวหน้า Lab อนุมัติผล เพื่อให้ QC ดูและพิมพ์ประกอบการตัดสินได้
+ * ส่วนของ QC ในใบจะเติมตามผลที่ QC ตัดสินแล้วเท่านั้น (รายการที่ยังรอตัดสินเว้นว่าง) และต้องมีรายการที่ส่ง Lab
  */
 export function canPrintChemAnalysisReport(petition: Petition): boolean {
-  if (petition.status !== "approved") return false;
+  if (petition.status !== "approved" && !petition.labApprovedAt) return false;
   return (petition.items ?? []).some((item) => itemRequiresSide(petition, item, "lab"));
 }
 

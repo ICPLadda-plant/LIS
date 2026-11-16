@@ -64,11 +64,12 @@ function labRequestForItem(item: PetitionItem, labRequests: LabRequest[]): LabRe
   );
 }
 
-function labReportCriteriaText(standardText: string): string {
-  const raw = standardText.trim();
-  if (!raw) return "";
+const HEAD_CRITERIA_LABEL = "เกณฑ์กรม";
+// ช่วงผ่านอัตโนมัติ (เกณฑ์ 25%) ใช้ภายในตอนอนุมัติผลเท่านั้น ห้ามพิมพ์ลงใบรายงาน
+const AUTO_PASS_CRITERIA_PATTERN = /ผ่าน(?:เกณฑ์)?\s*(?:25\s*%|[\d±])|ฉลาก\s*±/u;
 
-  const numericParts = raw
+function numericCriteriaParts(text: string): string[] {
+  return text
     .split(/\s*(?:·|\|)\s*/u)
     .map((part) =>
       part
@@ -78,11 +79,22 @@ function labReportCriteriaText(standardText: string): string {
         .trim(),
     )
     .filter((part) => /\d/.test(part));
+}
 
-  if (!numericParts.length) return raw;
-  if (/เกณฑ์กรม|หัวหน้า/u.test(raw)) {
-    return numericParts[numericParts.length - 1];
+function labReportCriteriaText(standardText: string): string {
+  const raw = standardText.trim();
+  if (!raw) return "";
+
+  // เกณฑ์กรมแสดงได้ตามปกติ แต่ตัดช่วงผ่านอัตโนมัติ (เกณฑ์ 25%) ที่อยู่ก่อนหน้าออก
+  const headIndex = raw.lastIndexOf(HEAD_CRITERIA_LABEL);
+  if (headIndex >= 0) {
+    const headParts = numericCriteriaParts(raw.slice(headIndex + HEAD_CRITERIA_LABEL.length));
+    return headParts[0] || DASH;
   }
+  if (AUTO_PASS_CRITERIA_PATTERN.test(raw)) return DASH;
+
+  const numericParts = numericCriteriaParts(raw);
+  if (!numericParts.length) return raw;
   return numericParts.join(" · ");
 }
 
@@ -182,4 +194,13 @@ export function buildLabReportPages(
       remark: petition.conclusionNote || "",
     };
   });
+}
+
+/**
+ * หน้าที่ควรพิมพ์ในใบรายงานผลการทดสอบ: ตัดตัวอย่างที่ไม่มีรายการทดสอบฝั่ง Lab ออก
+ * (เช่น ตัวอย่างที่ส่ง QC อย่างเดียวในคำร้องเดียวกัน) — ผลจาก buildLabReportPages
+ * ยังต้องเรียงตาม petition.items สำหรับเอกสารอื่น จึงกรองตอนพิมพ์แทน
+ */
+export function labReportPagesWithResults(pages: LabReportPage[]): LabReportPage[] {
+  return pages.filter((page) => page.rows.length > 0);
 }

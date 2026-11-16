@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/lis/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShieldCheck, AlertTriangle, RotateCcw, Sparkles, Loader2, Eye } from "lucide-react";
 import { usePetitionList } from "@/hooks/usePetition";
 import type { Petition } from "@/types/petition.types";
@@ -49,6 +50,7 @@ const QCApproval = () => {
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
   const [draftingId, setDraftingId] = useState<string | null>(null);
   const [draftNotes, setDraftNotes] = useState<Record<string, string>>({});
+  const [view, setView] = useState<"pending" | "waiting">("pending");
 
   const sortedPetitions = useMemo(
     () =>
@@ -74,6 +76,13 @@ const QCApproval = () => {
     visibleSides.some((side) => sideApprovalState(petition, side).kind === "pending") ||
     (canIssueFinal && awaitingFinalReport(petition)),
   );
+  // ยังไม่มีเรื่องให้ตัดสิน เพราะฝั่งที่ผู้ใช้เห็นยังรอผล Lab / ผล QC (รวมที่ส่งกลับไปทดสอบใหม่)
+  const pendingIds = new Set(pendingPetitions.map((petition) => petition._id));
+  const waitingPetitions = sortedPetitions.filter((petition) =>
+    !pendingIds.has(petition._id) &&
+    visibleSides.some((side) => ["waiting-result", "returned"].includes(sideApprovalState(petition, side).kind)),
+  );
+  const shownPetitions = view === "pending" ? pendingPetitions : waitingPetitions;
   const detailPath = (petition: Petition) => {
     const side = visibleSides.find((s) => sideApprovalState(petition, s).kind === "pending") ?? visibleSides[0] ?? "qc";
     return `/qc-approval/${petition._id}?tab=${side}`;
@@ -248,16 +257,23 @@ const QCApproval = () => {
               ออก Final Result
             </span>
           }
-          description={`เปิดดูรายละเอียดเพื่อให้ผล${showLabTab ? "กายภาพ / AI หรือออก Final Report" : "กายภาพ"} · ${pendingPetitions.length} คำร้องรอตัดสิน`}
+          description={`เปิดดูรายละเอียดเพื่อให้ผล${showLabTab ? "กายภาพ / AI หรือออก Final Report" : "กายภาพ"} · ${pendingPetitions.length} คำร้องรอตัดสิน · ${waitingPetitions.length} คำร้องรอผล`}
         />
+
+        <Tabs value={view} onValueChange={(value) => setView(value as "pending" | "waiting")}>
+          <TabsList>
+            <TabsTrigger value="pending">รอตัดสิน ({pendingPetitions.length})</TabsTrigger>
+            <TabsTrigger value="waiting">รอผล Lab / QC ({waitingPetitions.length})</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <DataTable
           columns={columns}
-          data={pendingPetitions}
+          data={shownPetitions}
           rowKey={(p) => p._id}
           isLoading={petitionLoading}
           onRowClick={(p) => navigate(detailPath(p))}
-          emptyTitle="ไม่มีคำร้องที่รอตัดสินผล"
+          emptyTitle={view === "pending" ? "ไม่มีคำร้องที่รอตัดสินผล" : "ไม่มีคำร้องที่รอผล Lab หรือ QC"}
           tableClassName="min-w-[800px]"
         />
       </div>
