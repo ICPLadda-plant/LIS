@@ -15,6 +15,12 @@ const STOCK_LABEL_OCR_SYSTEM = `คุณอ่านข้อความจา
 ห้ามเดา ถ้าอ่านไม่ชัดให้คืนค่าว่าง
 ตอบเป็น JSON object เท่านั้น รูปแบบ {"labelCode":"","candidates":[],"rawText":""}`;
 
+const BALANCE_DISPLAY_OCR_SYSTEM = `คุณอ่านข้อความจากหน้าจอดิจิทัลของเครื่องชั่งในห้องแล็บ
+อ่านเฉพาะค่าตัวเลขน้ำหนักหลักที่แสดงบนหน้าจอ รวมเครื่องหมายลบและจุดทศนิยม
+ข้ามหน่วย g, mg, สัญลักษณ์สถานะ และตัวเลขอื่นรอบหน้าจอ
+ห้ามเดา ถ้าอ่านไม่ชัดให้คืนค่าว่าง
+ตอบเป็น JSON object เท่านั้น รูปแบบ {"value":"","rawText":""}`;
+
 function normalizeStockLabelCandidate(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
   if (digits.length < 5 || digits.length > 12) return '';
@@ -33,6 +39,14 @@ function stockLabelCandidatesFromOcr(payload) {
 
 function isSupportedImageDataUrl(value) {
   return /^data:image\/(?:png|jpe?g|webp);base64,/i.test(String(value || ''));
+}
+
+function normalizeBalanceDisplayValue(value) {
+  const text = String(value ?? '').trim().replace(/,/g, '.').replace(/\s+/g, '');
+  const match = text.match(/[+-]?\d{1,4}(?:\.\d{1,8})?/);
+  if (!match) return '';
+  const number = Number(match[0]);
+  return Number.isFinite(number) && Math.abs(number) <= 1000 ? match[0].replace(/^\+/, '') : '';
 }
 
 // POST /api/ai/outlier-check
@@ -367,6 +381,30 @@ router.post('/stock-label-ocr', async (req, res) => {
     const candidates = stockLabelCandidatesFromOcr(generated);
 
     res.json({ labelCode: candidates[0] || '', candidates, rawText });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'ocr failed' });
+  }
+});
+
+// POST /api/ai/balance-display-ocr
+// Body: { imageDataUrl }
+// Returns: { value, rawText }
+router.post('/balance-display-ocr', async (req, res) => {
+  try {
+    const imageDataUrl = String(req.body?.imageDataUrl || '').trim();
+    if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl required' });
+    if (!isSupportedImageDataUrl(imageDataUrl)) return res.status(400).json({ error: 'unsupported image data URL' });
+    if (imageDataUrl.length > 9_500_000) return res.status(413).json({ error: 'image too large' });
+    if (!isOpenAIConfigured()) return res.status(503).json({ error: 'OpenAI API key ไม่ได้ตั้งค่า' });
+
+    const generated = await generateJSONFromImage(
+      'อ่านค่าตัวเลขน้ำหนักหลักจากหน้าจอเครื่องชั่งในรูปนี้',
+      imageDataUrl,
+      { system: BALANCE_DISPLAY_OCR_SYSTEM, temperature: 0, maxTokens: 120 },
+    );
+    const rawText = typeof generated?.rawText === 'string' ? generated.rawText.trim() : '';
+    const value = normalizeBalanceDisplayValue(generated?.value || rawText);
+    res.json({ value, rawText });
   } catch (err) {
     res.status(500).json({ error: err.message || 'ocr failed' });
   }
