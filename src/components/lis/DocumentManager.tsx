@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
 import mammoth from "mammoth";
 import HTMLtoDOCX from "@turbodocx/html-to-docx";
@@ -12,10 +12,11 @@ import {
   List, ListOrdered, Printer, Redo2, Save, Strikethrough, Table, Trash2, Underline, Undo2, Download, ArrowLeft, ExternalLink, Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { Label } from "@/components/ui/label";
 import {
-  DOC_ROLES, DOC_STATUSES, DOC_STATUS_VARIANT, PAPER_MM, PAPER_SIZES, PRINT_STAGES, SYSTEM_DOCS,
+  DOC_STATUSES, DOC_STATUS_VARIANT, PAPER_MM, PAPER_SIZES, PRINT_STAGES, SYSTEM_DOCS,
   type DocStatus, type PaperSize,
 } from "@/lib/documentRegistry";
 
@@ -24,13 +25,22 @@ type Doc = {
   // ข้อมูลกำกับ (เอกสารเก่าที่บันทึกก่อนมีฟิลด์เหล่านี้จะได้ค่า default จาก withMeta)
   code: string; rev: string; status: DocStatus; paper: PaperSize; stage: string; printWhen: string;
   viewers: string[]; managers: string[];
+  // จาก server: ใครสร้าง / สิทธิ์แก้ของผู้ใช้ปัจจุบัน; id ว่าง = ยังไม่เคยบันทึก
+  createdBy?: string; canEdit?: boolean;
 };
+type RoleOption = { id: string; name: string };
 const DEFAULT_META = { code: "", rev: "", status: "ร่าง" as DocStatus, paper: "A4 แนวตั้ง" as PaperSize, stage: "พิมพ์ตามต้องการ", printWhen: "", viewers: [] as string[], managers: [] as string[] };
 const withMeta = (d: Partial<Doc>): Doc => ({ ...DEFAULT_META, ...d } as Doc);
 
-// ponytail: เก็บใน localStorage (เฉพาะเครื่องนี้, ~5MB). ย้ายไป API server เมื่อต้องแชร์เอกสารข้ามผู้ใช้
-const KEY = "lis.documents";
-const load = (): Doc[] => { try { return (JSON.parse(localStorage.getItem(KEY) || "[]") as Partial<Doc>[]).map(withMeta); } catch { return []; } };
+// เก็บที่ server (/api/documents) — server กรองตามสิทธิ์ผู้เห็น และตรวจสิทธิ์แก้/ลบ
+// LEGACY_KEY: เอกสารรุ่นแรกที่เคยเก็บในเบราว์เซอร์ จะถูกย้ายขึ้น server อัตโนมัติครั้งเดียว
+const LEGACY_KEY = "lis.documents";
+const payloadOf = (d: Doc, html?: string) => ({
+  title: d.title, source: d.source, code: d.code, rev: d.rev, status: d.status, paper: d.paper,
+  stage: d.stage, printWhen: d.printWhen, viewers: d.viewers, managers: d.managers,
+  ...(html !== undefined ? { html } : {}),
+});
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
 
 const FONTS = ["TH Sarabun New", "Angsana New", "Cordia New", "Tahoma", "Arial", "Times New Roman"];
 const SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
@@ -189,16 +199,17 @@ function Ribbon() {
   );
 }
 
-function RoleChips({ value, onChange, label }: { value: string[]; onChange: (v: string[]) => void; label: string }) {
+function RoleChips({ value, onChange, label, roles, disabled }: { value: string[]; onChange: (v: string[]) => void; label: string; roles: RoleOption[]; disabled?: boolean }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <div className="flex flex-wrap gap-1.5">
-        {DOC_ROLES.map((r) => {
-          const on = value.includes(r);
+        {roles.length === 0 && <span className="text-sm text-muted-foreground">กำลังโหลดรายชื่อ role...</span>}
+        {roles.map((r) => {
+          const on = value.includes(r.id);
           return (
-            <Button key={r} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7 px-2 text-xs" aria-pressed={on}
-              onClick={() => onChange(on ? value.filter((x) => x !== r) : [...value, r])}>{r}</Button>
+            <Button key={r.id} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7 px-2 text-xs" aria-pressed={on} disabled={disabled}
+              onClick={() => onChange(on ? value.filter((x) => x !== r.id) : [...value, r.id])}>{r.name}</Button>
           );
         })}
       </div>
@@ -206,9 +217,11 @@ function RoleChips({ value, onChange, label }: { value: string[]; onChange: (v: 
   );
 }
 
-function MetaPanel({ doc, onChange }: { doc: Doc; onChange: (patch: Partial<Doc>) => void }) {
+function MetaPanel({ doc, onChange, roles }: { doc: Doc; onChange: (patch: Partial<Doc>) => void; roles: RoleOption[] }) {
+  const ro = !doc.canEdit;
   return (
     <Card className="print:hidden">
+      <fieldset disabled={ro} className="contents">
       <CardHeader className="pb-3">
         <CardTitle className="text-base inline-flex items-center gap-2"><Settings2 className="w-4 h-4" />ข้อมูลเอกสาร</CardTitle>
       </CardHeader>
@@ -231,14 +244,17 @@ function MetaPanel({ doc, onChange }: { doc: Doc; onChange: (patch: Partial<Doc>
           </select></div>
         <div className="space-y-1.5 sm:col-span-1 lg:col-span-3"><Label htmlFor="doc-when">พิมพ์เมื่อ (เงื่อนไข / สถานะงาน)</Label>
           <Input id="doc-when" placeholder="เช่น เมื่อคำร้องสถานะ ทดสอบเสร็จสิ้น และ QC Head อนุมัติ" value={doc.printWhen} onChange={(e) => onChange({ printWhen: e.target.value })} /></div>
-        <div className="sm:col-span-2"><RoleChips label="ผู้ที่เห็น / พิมพ์ได้" value={doc.viewers} onChange={(v) => onChange({ viewers: v })} /></div>
-        <div className="sm:col-span-2"><RoleChips label="ผู้จัดการเอกสาร (แก้ไข / อนุมัติ)" value={doc.managers} onChange={(v) => onChange({ managers: v })} /></div>
+        <div className="sm:col-span-2 space-y-1"><RoleChips label="ผู้ที่เห็น / พิมพ์ได้" roles={roles} disabled={ro} value={doc.viewers} onChange={(v) => onChange({ viewers: v })} />
+          <p className="text-xs text-muted-foreground">ไม่เลือกเลย = ทุกคนที่เข้าระบบเห็น</p></div>
+        <div className="sm:col-span-2 space-y-1"><RoleChips label="ผู้จัดการเอกสาร (แก้ไข / ลบ)" roles={roles} disabled={ro} value={doc.managers} onChange={(v) => onChange({ managers: v })} />
+          <p className="text-xs text-muted-foreground">ผู้สร้าง{doc.createdBy ? " (" + doc.createdBy + ")" : ""} และผู้ดูแลระบบแก้ได้เสมอ</p></div>
       </CardContent>
+      </fieldset>
     </Card>
   );
 }
 
-const roleText = (r: string[]) => (r.length ? r.join(", ") : "-");
+const sysRoleText = (r: string[]) => (r.length ? r.join(", ") : "-");
 
 function SystemDocsTable() {
   return (
@@ -270,8 +286,8 @@ function SystemDocsTable() {
                   <td className="px-3 py-2 whitespace-nowrap"><Badge variant="secondary">{d.paper}</Badge></td>
                   <td className="px-3 py-2">{d.stage}</td>
                   <td className="px-3 py-2">{d.status}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{roleText(d.viewers)}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{roleText(d.managers)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{sysRoleText(d.viewers)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{sysRoleText(d.managers)}</td>
                   <td className="px-3 py-2">
                     <Link to={d.page} className="inline-flex items-center gap-1 text-primary hover:underline">{d.pageLabel}<ExternalLink className="w-3 h-3" /></Link>
                   </td>
@@ -286,18 +302,64 @@ function SystemDocsTable() {
 }
 
 export default function DocumentManager() {
-  const [docs, setDocs] = useState<Doc[]>(load);
+  const [docs, setDocs] = useState<Doc[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [roles, setRoles] = useState<RoleOption[]>([]);
   const [current, setCurrent] = useState<Doc | null>(null);
+  const [saving, setSaving] = useState(false);
   const editor = useRef<HTMLDivElement>(null);
 
-  const save = (next: Doc[]) => {
-    try { localStorage.setItem(KEY, JSON.stringify(next)); setDocs(next); return true; }
-    catch { toast.error("บันทึกไม่สำเร็จ พื้นที่เก็บเต็ม"); return false; }
-  };
-  const upsert = (d: Doc) => save([d, ...docs.filter((x) => x.id !== d.id)]);
+  const refresh = useCallback(async () => {
+    try {
+      const res = await api.get<Doc[]>("/documents");
+      setDocs(res.data.data.map(withMeta)); setLoadError("");
+    } catch (e) { setLoadError(errMsg(e)); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      // ย้ายเอกสารเก่าจากเบราว์เซอร์ขึ้น server ครั้งเดียว
+      try {
+        const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "[]") as Partial<Doc>[];
+        if (legacy.length) {
+          for (const d of legacy) await api.post("/documents", payloadOf(withMeta(d), d.html ?? ""));
+          localStorage.removeItem(LEGACY_KEY);
+          toast.success("ย้ายเอกสาร " + legacy.length + " รายการจากเครื่องนี้ขึ้นระบบแล้ว");
+        }
+      } catch { /* ย้ายไม่สำเร็จ เก็บไว้ลองใหม่รอบหน้า */ }
+      await refresh();
+    })();
+    api.get<RoleOption[]>("/documents/roles").then((r) => setRoles(r.data.data)).catch(() => setRoles([]));
+  }, [refresh]);
+
+  const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
+  const roleText = (r: string[], emptyText = "-") => (r.length ? r.map(roleName).join(", ") : emptyText);
+
   const newDoc = (t: string, html: string, source: Doc["source"]): Doc =>
-    withMeta({ id: crypto.randomUUID(), title: t, html, source, updatedAt: new Date().toISOString() });
+    withMeta({ id: "", title: t, html, source, updatedAt: new Date().toISOString(), canEdit: true });
   const patch = (p: Partial<Doc>) => setCurrent((c) => (c ? { ...c, ...p } : c));
+
+  const persist = async (d: Doc, html: string) => {
+    setSaving(true);
+    try {
+      const res = d.id
+        ? await api.put<Doc>("/documents/" + d.id, payloadOf(d, html))
+        : await api.post<Doc>("/documents", payloadOf(d, html));
+      const saved = withMeta(res.data.data);
+      setCurrent(saved); await refresh();
+      return saved;
+    } catch (e) { toast.error("บันทึกไม่สำเร็จ: " + errMsg(e)); return null; }
+    finally { setSaving(false); }
+  };
+
+  const open = async (d: Doc) => {
+    try {
+      const res = await api.get<Doc>("/documents/" + d.id);
+      setCurrent(withMeta(res.data.data));
+    } catch (e) { toast.error("เปิดเอกสารไม่สำเร็จ: " + errMsg(e)); }
+  };
 
   const importWord = async (file?: File) => {
     if (!file) return;
@@ -305,13 +367,14 @@ export default function DocumentManager() {
     try {
       const { value } = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
       const d = newDoc(file.name.replace(/\.docx$/i, ""), value, "นำเข้า Word");
-      upsert(d); setCurrent(d); toast.success("นำเข้าแล้ว กรุณากรอกข้อมูลเอกสาร: พิมพ์ตอนไหน ใครเห็น ขนาดกระดาษ");
+      if (await persist(d, value)) toast.success("นำเข้าแล้ว กรุณากรอกข้อมูลเอกสาร: พิมพ์ตอนไหน ใครเห็น ขนาดกระดาษ");
     } catch { toast.error("แปลงไฟล์ Word ไม่สำเร็จ"); }
   };
 
-  const remove = (d: Doc) => {
+  const remove = async (d: Doc) => {
     if (!confirm('ลบ "' + d.title + '"?')) return;
-    save(docs.filter((x) => x.id !== d.id));
+    try { await api.delete("/documents/" + d.id); toast.success("ลบแล้ว"); await refresh(); }
+    catch (e) { toast.error("ลบไม่สำเร็จ: " + errMsg(e)); }
   };
 
   const html = () => editor.current?.innerHTML ?? "";
@@ -342,21 +405,23 @@ export default function DocumentManager() {
           <Button variant="ghost" size="sm" className="gap-1" onClick={() => setCurrent(null)}>
             <ArrowLeft className="w-4 h-4" />รายการเอกสาร
           </Button>
-          <Input aria-label="ชื่อเอกสาร" value={current.title} onChange={(e) => patch({ title: e.target.value })} className="h-8 max-w-sm" />
+          <Input aria-label="ชื่อเอกสาร" readOnly={!current.canEdit} value={current.title} onChange={(e) => patch({ title: e.target.value })} className="h-8 max-w-sm" />
           <Badge variant={DOC_STATUS_VARIANT[current.status]}>{current.status}</Badge>
           <div className="ml-auto flex gap-2">
-            <Button size="sm" className="gap-1" onClick={() => {
-              if (upsert({ ...current, html: html(), updatedAt: new Date().toISOString() })) toast.success("บันทึกแล้ว");
-            }}><Save className="w-4 h-4" />บันทึก</Button>
+            {current.canEdit ? (
+              <Button size="sm" className="gap-1" disabled={saving} onClick={async () => {
+                if (await persist(current, html())) toast.success("บันทึกแล้ว");
+              }}><Save className="w-4 h-4" />{saving ? "กำลังบันทึก..." : "บันทึก"}</Button>
+            ) : <Badge variant="secondary">อ่านอย่างเดียว</Badge>}
             <Button size="sm" variant="outline" className="gap-1" onClick={exportDocx}><Download className="w-4 h-4" />ส่งออก .docx</Button>
             <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}><Printer className="w-4 h-4" />พิมพ์</Button>
           </div>
         </div>
-        <MetaPanel doc={current} onChange={patch} />
-        <div className="sticky top-0 z-10 print:hidden"><Ribbon /></div>
+        <MetaPanel doc={current} onChange={patch} roles={roles} />
+        {current.canEdit && <div className="sticky top-0 z-10 print:hidden"><Ribbon /></div>}
         {/* พื้นที่หน้ากระดาษ: ใช้ขนาดกระดาษจริง (mm) เป็นข้อยกเว้นจาก design.md เพราะต้องเหมือนเอกสารพิมพ์ */}
         <div className="overflow-x-auto rounded-lg bg-muted py-6 print:bg-transparent print:p-0">
-          <div ref={editor} key={current.id} style={pageStyle} contentEditable suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
+          <div ref={editor} key={current.id || "new"} style={pageStyle} contentEditable={!!current.canEdit} suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
             className="doc-page mx-auto bg-white text-black shadow-md focus:outline-none print:shadow-none"
             dangerouslySetInnerHTML={{ __html: current.html || "<p><br></p>" }} />
         </div>
@@ -401,23 +466,25 @@ export default function DocumentManager() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {docs.length === 0 && (
+                {loading && <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">กำลังโหลดเอกสาร...</td></tr>}
+                {!loading && loadError && <tr><td colSpan={8} className="py-8 text-center text-destructive">โหลดเอกสารไม่สำเร็จ: {loadError}</td></tr>}
+                {!loading && !loadError && docs.length === 0 && (
                   <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">ยังไม่มีเอกสาร กด "นำเข้า Word" เพื่อเริ่มจากไฟล์ที่มีอยู่</td></tr>
                 )}
                 {docs.map((d) => (
                   <tr key={d.id} className="align-top hover:bg-accent">
                     <td className="px-3 py-2 whitespace-nowrap"><div className="font-medium">{d.code || "-"}</div><div className="text-xs text-muted-foreground">{d.rev}</div></td>
                     <td className="px-3 py-2">
-                      <button className="text-left font-medium text-primary hover:underline" onClick={() => setCurrent(d)}>{d.title}</button>
+                      <button className="text-left font-medium text-primary hover:underline" onClick={() => open(d)}>{d.title}</button>
                       <div className="text-xs text-muted-foreground">{d.source} · {new Date(d.updatedAt).toLocaleString("th-TH")}</div>
                     </td>
                     <td className="px-3 py-2"><Badge variant={DOC_STATUS_VARIANT[d.status]}>{d.status}</Badge></td>
                     <td className="px-3 py-2 whitespace-nowrap"><Badge variant="secondary">{d.paper}</Badge></td>
                     <td className="px-3 py-2">{d.stage}{d.printWhen && <div className="text-xs text-muted-foreground">{d.printWhen}</div>}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{roleText(d.viewers)}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{roleText(d.managers)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{roleText(d.viewers, "ทุกคน")}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{roleText(d.managers, d.createdBy || "-")}</td>
                     <td className="px-3 py-2 text-right">
-                      <Button variant="ghost" size="icon" aria-label="ลบเอกสาร" onClick={() => remove(d)}><Trash2 className="w-4 h-4" /></Button>
+                      {d.canEdit && <Button variant="ghost" size="icon" aria-label="ลบเอกสาร" onClick={() => remove(d)}><Trash2 className="w-4 h-4" /></Button>}
                     </td>
                   </tr>
                 ))}
