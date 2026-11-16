@@ -13,8 +13,8 @@ export function useActiveTemplates(codes: string[], enabled = true) {
     if (!enabled) return;
     let alive = true;
     Promise.all(key.split("|").map((code) =>
-      api.get<ActiveTemplate[]>("/documents?templateFor=" + encodeURIComponent(code) + "&active=1")
-        .then((r) => [code, r.data.data[0]] as const)
+      api.get<{ data: ActiveTemplate[] }>("/documents?templateFor=" + encodeURIComponent(code) + "&active=1")
+        .then((r) => [code, Array.isArray(r.data.data?.data) ? r.data.data.data[0] : undefined] as const)
         .catch(() => [code, undefined] as const),
     )).then((pairs) => {
       if (!alive) return;

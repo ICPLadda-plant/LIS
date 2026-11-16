@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type React from "react";
 import mammoth from "mammoth";
-import HTMLtoDOCX from "@turbodocx/html-to-docx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +46,17 @@ const payloadOf = (d: Doc, html?: string) => ({
   ...(html !== undefined ? { html } : {}),
 });
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
+// @turbodocx/html-to-docx อ้าง `global` ของ Node — บน browser ไม่มี จึงชี้ไปที่ globalThis ก่อนโหลด
+// (โหลดตอนกดส่งออกเท่านั้น เพื่อไม่ให้ library ขนาดใหญ่ถ่วงการเปิดหน้า)
+const loadHtmlToDocx = async () => {
+  const g = globalThis as typeof globalThis & { global?: typeof globalThis };
+  g.global ??= globalThis;
+  return (await import("@turbodocx/html-to-docx")).default;
+};
+// api.get/post/put ห่อ body ไว้ใน res.data.data และ server ตอบ { data: ... } อีกชั้น
+type Envelope<T> = { data: T };
+const body = <T,>(res: { data: { data: Envelope<T> } }): T => res.data.data?.data as T;
+const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 const FONTS = ["TH Sarabun New", "Angsana New", "Cordia New", "Tahoma", "Arial", "Times New Roman"];
 const SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
@@ -352,8 +362,8 @@ export default function DocumentManager() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await api.get<Doc[]>("/documents");
-      setDocs(res.data.data.map(withMeta)); setLoadError("");
+      const res = await api.get<Envelope<Doc[]>>("/documents");
+      setDocs(asArray<Doc>(body(res)).map(withMeta)); setLoadError("");
     } catch (e) { setLoadError(errMsg(e)); }
     finally { setLoading(false); }
   }, []);
@@ -371,7 +381,7 @@ export default function DocumentManager() {
       } catch { /* ย้ายไม่สำเร็จ เก็บไว้ลองใหม่รอบหน้า */ }
       await refresh();
     })();
-    api.get<RoleOption[]>("/documents/roles").then((r) => setRoles(r.data.data)).catch(() => setRoles([]));
+    api.get<Envelope<RoleOption[]>>("/documents/roles").then((r) => setRoles(asArray<RoleOption>(body(r)))).catch(() => setRoles([]));
   }, [refresh]);
 
   const roleName = (id: string) => roles.find((r) => r.id === id)?.name ?? id;
@@ -385,9 +395,9 @@ export default function DocumentManager() {
     setSaving(true);
     try {
       const res = d.id
-        ? await api.put<Doc>("/documents/" + d.id, payloadOf(d, html))
-        : await api.post<Doc>("/documents", payloadOf(d, html));
-      const saved = withMeta(res.data.data);
+        ? await api.put<Envelope<Doc>>("/documents/" + d.id, payloadOf(d, html))
+        : await api.post<Envelope<Doc>>("/documents", payloadOf(d, html));
+      const saved = withMeta(body(res));
       setCurrent(saved); await refresh();
       return saved;
     } catch (e) { toast.error("บันทึกไม่สำเร็จ: " + errMsg(e)); return null; }
@@ -408,8 +418,8 @@ export default function DocumentManager() {
 
   const open = async (d: Doc) => {
     try {
-      const res = await api.get<Doc>("/documents/" + d.id);
-      setCurrent(withMeta(res.data.data)); setFillMode(false);
+      const res = await api.get<Envelope<Doc>>("/documents/" + d.id);
+      setCurrent(withMeta(body(res))); setFillMode(false);
     } catch (e) { toast.error("เปิดเอกสารไม่สำเร็จ: " + errMsg(e)); }
   };
 
@@ -436,6 +446,7 @@ export default function DocumentManager() {
     const mm = PAPER_MM[current.paper];
     const twip = (v: number) => Math.round((v / 25.4) * 1440);
     try {
+      const HTMLtoDOCX = await loadHtmlToDocx();
       const out = await HTMLtoDOCX(html(), null, {
         font: "TH Sarabun New", fontSize: 32, // half-points = 16pt
         orientation: mm.w > mm.h ? "landscape" : "portrait",
