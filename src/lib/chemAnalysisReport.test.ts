@@ -26,7 +26,7 @@ function petition(count: number, approvals: Petition["itemApprovals"] = []): Pet
     items: Array.from({ length: count }, (_, i) => ({ seq: i + 1, sampleName: "Cyper", commonName: "Cypermethrin", batchNo: "B" + (i + 1), sendToLab: true, sendToQc: true, sgConfirmedValue: "1.05" })),
     itemApprovals: approvals,
     createdAt: "", updatedAt: "",
-  } as Petition;
+  } as unknown as Petition;
 }
 
 describe("buildChemAnalysisSheets", () => {
@@ -56,9 +56,18 @@ describe("buildChemAnalysisSheets", () => {
     expect(sheets[0].qc.managerName).toBe("");
   });
 
-  it("ออกใบได้เฉพาะคำร้องที่อนุมัติครบแล้ว", () => {
+  it("เปิดใบได้เมื่อหัวหน้า Lab อนุมัติผลแล้ว ให้ QC ดูและพิมพ์ก่อนออก Final Result", () => {
     expect(canPrintChemAnalysisReport(petition(1))).toBe(true);
-    expect(canPrintChemAnalysisReport({ ...petition(1), status: "pending" } as Petition)).toBe(false);
+    expect(canPrintChemAnalysisReport({ ...petition(1), status: "pending" } as unknown as Petition)).toBe(false);
+    expect(canPrintChemAnalysisReport({ ...petition(1), status: "pending", labApprovedAt: "2026-11-02T01:00:00Z" } as unknown as Petition)).toBe(true);
+  });
+
+  it("รายการที่ QC ยังไม่ตัดสินจะไม่ถูกติ๊กผ่าน/ไม่ผ่านในส่วนของ QC", () => {
+    const p = { ...petition(1), status: "pending", labApprovedAt: "2026-11-02T01:00:00Z" } as unknown as Petition;
+    const [sheet] = buildChemAnalysisSheets(p, [page("B1", "35.1")]);
+    expect(sheet.lab.samples[0].ai).toBe("35.1");
+    expect(sheet.qc.passBatches).toBe("");
+    expect(sheet.qc.failBatches).toBe("");
   });
 });
 

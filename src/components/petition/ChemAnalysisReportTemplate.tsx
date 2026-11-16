@@ -23,7 +23,8 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; padding: 0.3mm 0.4mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
 .ca-tbl th { font-weight: 700; }
 .ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 13pt !important; overflow-wrap: normal; }
-.ca-tbl td.ca-cell { font-size: 12pt !important; white-space: nowrap; }
+.ca-tbl td.ca-cell { font-size: 12pt !important; overflow-wrap: anywhere; word-break: normal; }
+.ca-tbl td.ca-cell-long { font-size: 10pt !important; line-height: 1.05 !important; }
 .ca-sign { display: flex; align-items: flex-end; justify-content: flex-end; gap: 1.5mm; margin-top: 1.8mm; white-space: nowrap; }
 .ca-sign .ca-val { flex: 0 0 48mm; text-align: center; }
 .ca-cb { display: inline-block; width: 3.4mm; height: 3.4mm; margin-right: 1.5mm; border: 0.8pt solid #000; vertical-align: -0.6mm; text-align: center; line-height: 3mm; font-weight: 700; }
@@ -46,10 +47,11 @@ function Check({ checked }: { checked: boolean }) {
   return <span className="ca-cb">{checked ? "✓" : ""}</span>;
 }
 
-const SAMPLE_ROWS: Array<{ label: string; key: keyof ChemReportSample }> = [
+const SAMPLE_ROWS: Array<{ label: string; key: keyof ChemReportSample; long?: boolean }> = [
   { label: "1. สารออกฤทธิ์ (%AI)", key: "ai" },
   { label: "2. ความถ่วงจำเพาะ (ถ.พ.)", key: "sg" },
-  { label: "Batch No.", key: "batchNo" },
+  // เลข batch ยาวกว่าความกว้างช่อง (ใบละ 7 ตัวอย่าง) จึงย่อตัวอักษรและให้ตัดบรรทัดในช่องเดิมแทนการล้นทับช่องข้าง ๆ
+  { label: "Batch No.", key: "batchNo", long: true },
   { label: "วันที่ผลิต", key: "productionDate" },
   { label: "ทดสอบครั้งที่", key: "testRound" },
 ];
@@ -89,7 +91,9 @@ function Sheet({ sheet }: { sheet: ChemReportSheet }) {
             {SAMPLE_ROWS.map((row) => (
               <tr key={row.key}>
                 <td className="ca-rowhead">{row.label}</td>
-                {columns.map((sample, index) => <td key={index} className="ca-cell">{sample?.[row.key] ?? ""}</td>)}
+                {columns.map((sample, index) => (
+                  <td key={index} className={row.long ? "ca-cell ca-cell-long" : "ca-cell"}>{sample?.[row.key] ?? ""}</td>
+                ))}
               </tr>
             ))}
           </tbody>

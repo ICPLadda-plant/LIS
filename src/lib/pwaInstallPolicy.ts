@@ -20,15 +20,24 @@ export type PwaInstallPolicyInput = {
   isProductionSession: boolean;
   pathname: string;
   isStandalone: boolean;
+  // เครื่องนี้ติดตั้งแอปไว้แล้ว แต่ผู้ใช้เปิดจากแท็บเบราว์เซอร์
+  isAppInstalled?: boolean;
   isDesktop: boolean;
 };
 
 /**
- * บังคับติดตั้ง LIS เป็นแอปเฉพาะผู้ใช้ฝ่าย Lab/QC ที่เปิดจากแท็บเบราว์เซอร์บนคอม
+ * บังคับติดตั้ง LIS เป็นแอปเฉพาะผู้ใช้ฝ่าย Lab/QC ที่เปิดจากแท็บเบราว์เซอร์บนคอมที่ยังไม่มีแอป
  * คนที่มาจากฝ่ายผลิตไม่ถูกบังคับ แม้จะถือ role ฝั่ง Lab/QC ด้วย
  */
-export function requiresPwaInstall({ user, isProductionSession, pathname, isStandalone, isDesktop }: PwaInstallPolicyInput) {
-  if (!user || isStandalone || !isDesktop) return false;
+export function requiresPwaInstall({
+  user,
+  isProductionSession,
+  pathname,
+  isStandalone,
+  isAppInstalled = false,
+  isDesktop,
+}: PwaInstallPolicyInput) {
+  if (!user || isStandalone || isAppInstalled || !isDesktop) return false;
   if (EXEMPT_PATHS.has(pathname)) return false;
   if (user.approvalStatus && user.approvalStatus !== "approved") return false;
   if (isProductionSession || isProductionDepartment(user.department)) return false;

@@ -28,6 +28,7 @@ describe("requiresPwaInstall", () => {
 
   it("skips installed apps, phones, kiosk pages and unapproved accounts", () => {
     expect(requiresPwaInstall({ ...base, isStandalone: true })).toBe(false);
+    expect(requiresPwaInstall({ ...base, isAppInstalled: true })).toBe(false);
     expect(requiresPwaInstall({ ...base, isDesktop: false })).toBe(false);
     expect(requiresPwaInstall({ ...base, pathname: "/queue/lab" })).toBe(false);
     expect(requiresPwaInstall({ ...base, pathname: "/scanner" })).toBe(false);

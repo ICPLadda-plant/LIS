@@ -260,7 +260,12 @@ for (const side of ['qc', 'lab']) test(side + ' lifecycle archives results, noti
   assert.equal((await invoke(petitions, '/:id/complete', 'post', { side })).statusCode, 409);
   assert.equal((await invoke(results, '/', 'put', { petitionId, itemSeq: 1, parameterId, fieldLabel: 'value', value: 5, sampleRoundId: payload.additionalSampleId })).statusCode, 200);
   assert.equal((await invoke(petitions, '/:id/complete', 'post', { side })).statusCode, 200);
-  if (side === 'lab') assert.equal((await invoke(petitions, '/:id/lab-approve', 'post')).statusCode, 200);
+  if (side === 'lab') {
+    // คนบันทึกผลกับคนออกผลต้องเป็นคนละคน
+    assert.equal((await invoke(petitions, '/:id/lab-approve', 'post')).statusCode, 409);
+    state.labCompletedBy = 'Other Analyst';
+    assert.equal((await invoke(petitions, '/:id/lab-approve', 'post')).statusCode, 200);
+  }
   assert.equal(state.status, 'success');
   assert.deepEqual(state[otherSide + 'CompletedAt'], untouchedCompletion);
   assert.equal(newRound.previousResults[0].values.value, 12);
