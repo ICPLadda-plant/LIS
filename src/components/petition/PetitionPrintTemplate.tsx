@@ -573,11 +573,7 @@ function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgPa
                 <td>{item.testUnit ?? ''}</td>
                 <td>
                   {item.testItems ?? ''}
-                  {(labTestsBySeq[item.seq] ?? []).filter((test, testIndex, all) => all.findIndex((other) => (other.method || other.testItem) === (test.method || test.testItem)) === testIndex).map((test, testIndex) => (
-                    <div key={`lab-test-${testIndex}`} className="pr-note">
-                      {test.method && test.method !== '-' ? test.method.replace(/\s*\n\s*/g, ' ') : test.testItem}
-                    </div>
-                  ))}
+                  {(labTestsBySeq[item.seq] ?? []).length > 0 && <div className="pr-note">วิเคราะห์ %AI</div>}
                   {Object.entries(requestValues).filter(([key, value]) => !key.startsWith('ค่าถพ.\u0000') && key.endsWith(`\u0000${item.batchNo}\u0000${item.sampleName}`) && value !== '').map(([key, value]) => <div key={key} className="pr-note">{key.split('\u0000')[0]}: {String(value)}</div>)}
                 </td>
                 <td>{item.sampleId ?? ''}</td>
