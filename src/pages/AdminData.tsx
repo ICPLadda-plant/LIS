@@ -21,6 +21,7 @@ import {
 } from "@/types/petition.types";
 import { useAccessibleTabs } from "@/hooks/useAccessibleTabs";
 import { rankSearchResults } from "@/lib/searchRanking";
+import DocumentManager from "@/components/lis/DocumentManager";
 
 const EVENT_VARIANT: Record<PetitionAuditEvent, "gray-soft" | "primary-soft" | "yellow-soft" | "blue-soft" | "green-soft" | "red-soft"> = {
   created: "primary-soft",
@@ -339,6 +340,10 @@ const AdminData = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="documents">
+            <DocumentManager />
           </TabsContent>
         </Tabs>
     </AppLayout>
