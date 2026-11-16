@@ -20,7 +20,7 @@ export const COA_REPORT_CSS = `
 .coa-muted { color: #555; }
 .coa-ai-result { position: relative; overflow: hidden; }
 .coa-ai-dots { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.coa-ai-value { position: relative; }
+.coa-ai-value { position: relative; font-weight: 700; text-shadow: -0.3mm 0 #fff, 0.3mm 0 #fff, 0 -0.3mm #fff, 0 0.3mm #fff; }
 .coa-sign { margin-top: 14mm; text-align: center; }
 .coa-line { display: inline-block; min-width: 62mm; border-bottom: 0.8pt dotted #000; }
 .coa-signature-image { display: block; max-width: 62mm; height: 18mm; margin: 0 auto -2mm; object-fit: contain; }
@@ -67,7 +67,7 @@ function AiResultValue({ children }: { children: ReactNode }) {
   const patternId = useId().replace(/:/g, "");
   return <>
     <svg className="coa-ai-dots" aria-hidden="true">
-      <defs><pattern id={patternId} width="8.3" height="8.3" patternUnits="userSpaceOnUse"><circle cx="4.15" cy="4.15" r="0.7" fill="#000" /></pattern></defs>
+      <defs><pattern id={patternId} width="7.5" height="7.5" patternUnits="userSpaceOnUse"><circle cx="3.75" cy="3.75" r="0.5" fill="#666" /></pattern></defs>
       <rect width="100%" height="100%" fill={`url(#${patternId})`} />
     </svg>
     <span className="coa-ai-value">{children}</span>

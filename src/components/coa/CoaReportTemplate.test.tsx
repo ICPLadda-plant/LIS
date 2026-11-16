@@ -57,6 +57,7 @@ describe("CoaReportTemplate", () => {
     expect(screen.queryByText(/10\.1% W\/W%/)).not.toBeInTheDocument();
     expect(screen.getByText("10.1%").closest("td")?.querySelector("svg.coa-ai-dots")).toBeInTheDocument();
     expect(COA_REPORT_CSS).toContain(".coa-ai-dots");
+    expect(COA_REPORT_CSS).toContain("text-shadow:");
   });
 
   it("renders the special GR/WP/SP COA form", () => {
