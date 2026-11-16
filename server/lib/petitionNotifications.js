@@ -139,15 +139,11 @@ function petitionNotices(petition, log) {
   }
 
   switch (log.event) {
-    case 'created': {
-      const roles = [qcTrack ? 'qc' : null, labTrack ? 'lab' : null];
-      const who = petition?.submittedBy?.name || '-';
-      add('new', { roles }, `📋 คำขอใหม่ ${no}`, `ผู้ยื่น: ${who} · ตัวอย่าง: ${itemsSummary(petition)}`);
-      break;
-    }
+    // คำขอที่เพิ่งสร้างยังไม่แจ้ง — แจ้งตอนสแกนรับตัวอย่าง (event 'received') แทน
     case 'received': {
       if (meta.partial || (meta.side !== 'qc' && meta.side !== 'lab')) break;
-      if (meta.side === 'qc') add('received-qc', { roles: ['qc'] }, `📥 QC รับตัวอย่าง ${no}`);
+      const who = petition?.submittedBy?.name || '-';
+      add(`received-${meta.side}`, { roles: [meta.side] }, `📥 ${SIDE_LABELS[meta.side]} รับตัวอย่าง ${no}`, `ผู้ยื่น: ${who} · ตัวอย่าง: ${itemsSummary(petition)}`);
       add('received-requester', { people: submitter }, `📥 ${SIDE_LABELS[meta.side]} รับตัวอย่าง ${no} แล้ว`);
       break;
     }
