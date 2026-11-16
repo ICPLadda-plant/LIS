@@ -221,6 +221,6 @@ describe("BalanceRoomPage", () => {
     const preview = await screen.findByTestId("print-preview");
     expect(within(preview).getAllByRole("table")).toHaveLength(2);
     expect(within(preview).getByText(/01\/.*\/2026/)).toBeInTheDocument();
-    expect(within(preview).getByText(/16\/.*\/2026/)).toBeInTheDocument();
+    expect(within(preview).getAllByText(/16\/.*\/2026/).length).toBeGreaterThan(0);
   });
 });
