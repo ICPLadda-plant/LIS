@@ -31,7 +31,7 @@ export const LAB_REPORT_CSS = `
 .lr-note-ind { margin-left: 12mm; }
 .lr-foot { display: flex; justify-content: space-between; margin-top: 6mm; font-size: 9.5pt; color: #444; }
 @media screen { .lr-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
-.lr-root, .lr-root * { font-size: ${A4_PRINT_FONT_SIZE} !important; }
+.lr-root, .lr-root * { font-size: 10pt !important; }
 .lr-root h1,
 .lr-root h2,
 .lr-root h3,
