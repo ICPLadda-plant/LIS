@@ -18,7 +18,7 @@ export const LAB_REPORT_CSS = `
 .lr-method { white-space: pre-line; }
 .lr-half { width: 50%; }
 .lr-logo { height: 16mm; margin-bottom: 1.5mm; }
-.lr-hd-mid { text-align: center; vertical-align: middle; font-weight: 700; font-size: 13pt; }
+.lr-tbl td.lr-hd-mid { text-align: center; vertical-align: middle; font-weight: 700; font-size: 13pt; }
 .lr-title { text-align: center; font-weight: 700; font-size: 14pt; }
 .lr-results th { text-align: center; background: #f3f3f3; }
 .lr-muted { color: #555; }
