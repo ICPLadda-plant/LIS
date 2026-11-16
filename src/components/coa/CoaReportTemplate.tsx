@@ -17,6 +17,7 @@ export const COA_REPORT_CSS = `
 .coa-center { text-align: center; }
 .coa-right { text-align: right; }
 .coa-muted { color: #555; }
+.coa-ai-result { background-image: radial-gradient(circle, #000 0.35pt, transparent 0.45pt); background-size: 2.2mm 2.2mm; background-position: center; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
 .coa-sign { margin-top: 14mm; text-align: center; }
 .coa-line { display: inline-block; min-width: 62mm; border-bottom: 0.8pt dotted #000; }
 .coa-signature-image { display: block; max-width: 62mm; height: 18mm; margin: 0 auto -2mm; object-fit: contain; }
@@ -75,7 +76,7 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
       <tr key={`${row.testItem}-${index}`}>
         <td>{row.testItem}</td>
         <td>{row.criteria === "-" ? "" : row.criteria}</td>
-        <td><PrintMediaValue value={row.result}>{result}</PrintMediaValue></td>
+        <td className={isAiContentTestItem(row.testItem) ? "coa-ai-result" : undefined}><PrintMediaValue value={row.result}>{result}</PrintMediaValue></td>
       </tr>
     );
   });
@@ -130,7 +131,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
           <tr>
             <td>%AI content (W/W)</td>
             <td>{sample?.aiContentCriteria === "-" ? "" : sample?.aiContentCriteria}</td>
-            <td>{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
+            <td className="coa-ai-result">{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
           </tr>
           <tr>
             <td colSpan={2}>Date of analysis</td>
@@ -191,7 +192,7 @@ function LiquidCoaPage({ page, index }: { page: CoaReportPage; index: number }) 
           <tr>
             <td>%AI content (W/V)</td>
             <td>{sample?.aiContentCriteria === "-" ? "" : sample?.aiContentCriteria}</td>
-            <td>{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
+            <td className="coa-ai-result">{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
           </tr>
           <tr>
             <td colSpan={2}>Density at 30°C (g/cm³)</td>
@@ -256,7 +257,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
           <tr>
             <td>%AI content (W/W)</td>
             <td>{sample?.aiContentCriteria === "-" ? "0.005% ± 0.00125" : sample?.aiContentCriteria}</td>
-            <td>{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
+            <td className="coa-ai-result">{sample?.aiContentResult === "-" ? "" : sample?.aiContentResult}</td>
           </tr>
           <tr>
             <td>Wax block size</td>
@@ -319,7 +320,7 @@ function StandardCoaPage({ page, index }: { page: CoaReportPage; index: number }
             {sample.rows.length ? sample.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 <td>{row.testItem || "-"}</td>
-                <td className="coa-center"><PrintMediaValue value={row.result}>{row.result || "-"}{sample.selectedResultsOnly && !isAiContentTestItem(row.testItem) && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</PrintMediaValue></td>
+                <td className={`coa-center${isAiContentTestItem(row.testItem) ? " coa-ai-result" : ""}`}><PrintMediaValue value={row.result}>{row.result || "-"}{sample.selectedResultsOnly && !isAiContentTestItem(row.testItem) && row.unit && !row.result?.endsWith(row.unit) ? ` ${row.unit}` : ""}</PrintMediaValue></td>
                 <td className="coa-center">{row.criteria || "-"}</td>
                 <td className="coa-center">{row.method || "-"}</td>
               </tr>
