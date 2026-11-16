@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import type React from "react";
 import mammoth from "mammoth";
 import HTMLtoDOCX from "@turbodocx/html-to-docx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,15 +9,28 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, FilePlus, FileUp, Highlighter, Italic,
-  List, ListOrdered, Printer, Redo2, Save, Strikethrough, Table, Trash2, Underline, Undo2, Download, ArrowLeft,
+  List, ListOrdered, Printer, Redo2, Save, Strikethrough, Table, Trash2, Underline, Undo2, Download, ArrowLeft, ExternalLink, Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { Label } from "@/components/ui/label";
+import {
+  DOC_ROLES, DOC_STATUSES, DOC_STATUS_VARIANT, PAPER_MM, PAPER_SIZES, PRINT_STAGES, SYSTEM_DOCS,
+  type DocStatus, type PaperSize,
+} from "@/lib/documentRegistry";
 
-type Doc = { id: string; title: string; html: string; source: "สร้างเอง" | "นำเข้า Word"; updatedAt: string };
+type Doc = {
+  id: string; title: string; html: string; source: "สร้างเอง" | "นำเข้า Word"; updatedAt: string;
+  // ข้อมูลกำกับ (เอกสารเก่าที่บันทึกก่อนมีฟิลด์เหล่านี้จะได้ค่า default จาก withMeta)
+  code: string; rev: string; status: DocStatus; paper: PaperSize; stage: string; printWhen: string;
+  viewers: string[]; managers: string[];
+};
+const DEFAULT_META = { code: "", rev: "", status: "ร่าง" as DocStatus, paper: "A4 แนวตั้ง" as PaperSize, stage: "พิมพ์ตามต้องการ", printWhen: "", viewers: [] as string[], managers: [] as string[] };
+const withMeta = (d: Partial<Doc>): Doc => ({ ...DEFAULT_META, ...d } as Doc);
 
 // ponytail: เก็บใน localStorage (เฉพาะเครื่องนี้, ~5MB). ย้ายไป API server เมื่อต้องแชร์เอกสารข้ามผู้ใช้
 const KEY = "lis.documents";
-const load = (): Doc[] => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } };
+const load = (): Doc[] => { try { return (JSON.parse(localStorage.getItem(KEY) || "[]") as Partial<Doc>[]).map(withMeta); } catch { return []; } };
 
 const FONTS = ["TH Sarabun New", "Angsana New", "Cordia New", "Tahoma", "Arial", "Times New Roman"];
 const SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
@@ -175,10 +189,105 @@ function Ribbon() {
   );
 }
 
+function RoleChips({ value, onChange, label }: { value: string[]; onChange: (v: string[]) => void; label: string }) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <div className="flex flex-wrap gap-1.5">
+        {DOC_ROLES.map((r) => {
+          const on = value.includes(r);
+          return (
+            <Button key={r} type="button" size="sm" variant={on ? "default" : "outline"} className="h-7 px-2 text-xs" aria-pressed={on}
+              onClick={() => onChange(on ? value.filter((x) => x !== r) : [...value, r])}>{r}</Button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MetaPanel({ doc, onChange }: { doc: Doc; onChange: (patch: Partial<Doc>) => void }) {
+  return (
+    <Card className="print:hidden">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base inline-flex items-center gap-2"><Settings2 className="w-4 h-4" />ข้อมูลเอกสาร</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-1.5"><Label htmlFor="doc-code">รหัสเอกสาร</Label>
+          <Input id="doc-code" placeholder="เช่น FM-QP-07-01-003" value={doc.code} onChange={(e) => onChange({ code: e.target.value })} /></div>
+        <div className="space-y-1.5"><Label htmlFor="doc-rev">ฉบับแก้ไข (Rev)</Label>
+          <Input id="doc-rev" placeholder="เช่น R00 (16/11/69)" value={doc.rev} onChange={(e) => onChange({ rev: e.target.value })} /></div>
+        <div className="space-y-1.5"><Label htmlFor="doc-status">สถานะเอกสาร</Label>
+          <select id="doc-status" className={selectCls + " w-full h-10"} value={doc.status} onChange={(e) => onChange({ status: e.target.value as DocStatus })}>
+            {DOC_STATUSES.map((s) => <option key={s}>{s}</option>)}
+          </select></div>
+        <div className="space-y-1.5"><Label htmlFor="doc-paper">ขนาดกระดาษ</Label>
+          <select id="doc-paper" className={selectCls + " w-full h-10"} value={doc.paper} onChange={(e) => onChange({ paper: e.target.value as PaperSize })}>
+            {PAPER_SIZES.map((s) => <option key={s}>{s}</option>)}
+          </select></div>
+        <div className="space-y-1.5"><Label htmlFor="doc-stage">ใช้พิมพ์ขั้นตอนไหน</Label>
+          <select id="doc-stage" className={selectCls + " w-full h-10"} value={doc.stage} onChange={(e) => onChange({ stage: e.target.value })}>
+            {PRINT_STAGES.map((s) => <option key={s}>{s}</option>)}
+          </select></div>
+        <div className="space-y-1.5 sm:col-span-1 lg:col-span-3"><Label htmlFor="doc-when">พิมพ์เมื่อ (เงื่อนไข / สถานะงาน)</Label>
+          <Input id="doc-when" placeholder="เช่น เมื่อคำร้องสถานะ ทดสอบเสร็จสิ้น และ QC Head อนุมัติ" value={doc.printWhen} onChange={(e) => onChange({ printWhen: e.target.value })} /></div>
+        <div className="sm:col-span-2"><RoleChips label="ผู้ที่เห็น / พิมพ์ได้" value={doc.viewers} onChange={(v) => onChange({ viewers: v })} /></div>
+        <div className="sm:col-span-2"><RoleChips label="ผู้จัดการเอกสาร (แก้ไข / อนุมัติ)" value={doc.managers} onChange={(v) => onChange({ managers: v })} /></div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const roleText = (r: string[]) => (r.length ? r.join(", ") : "-");
+
+function SystemDocsTable() {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">เอกสารในระบบ ({SYSTEM_DOCS.length} รายการ)</CardTitle>
+        <p className="text-sm text-muted-foreground">แบบฟอร์มที่ LIS พิมพ์อยู่แล้ว ระบบกรอกข้อมูลให้อัตโนมัติจากหน้าที่ใช้งาน</p>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto rounded-lg border bg-card">
+          <table className="w-full min-w-[960px] text-sm">
+            <thead className="bg-muted text-muted-foreground">
+              <tr className="text-left">
+                <th className="px-3 py-2 font-medium">รหัส / Rev</th>
+                <th className="px-3 py-2 font-medium">ชื่อเอกสาร</th>
+                <th className="px-3 py-2 font-medium">กระดาษ</th>
+                <th className="px-3 py-2 font-medium">พิมพ์ตอน</th>
+                <th className="px-3 py-2 font-medium">สถานะงานที่พิมพ์ได้</th>
+                <th className="px-3 py-2 font-medium">ผู้เห็น</th>
+                <th className="px-3 py-2 font-medium">ผู้จัดการ</th>
+                <th className="px-3 py-2 font-medium">พิมพ์ที่</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {SYSTEM_DOCS.map((d) => (
+                <tr key={d.code + d.name} className="align-top hover:bg-accent">
+                  <td className="px-3 py-2 whitespace-nowrap"><div className="font-medium">{d.code}</div><div className="text-xs text-muted-foreground">{d.rev}</div></td>
+                  <td className="px-3 py-2">{d.name}</td>
+                  <td className="px-3 py-2 whitespace-nowrap"><Badge variant="secondary">{d.paper}</Badge></td>
+                  <td className="px-3 py-2">{d.stage}</td>
+                  <td className="px-3 py-2">{d.status}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{roleText(d.viewers)}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{roleText(d.managers)}</td>
+                  <td className="px-3 py-2">
+                    <Link to={d.page} className="inline-flex items-center gap-1 text-primary hover:underline">{d.pageLabel}<ExternalLink className="w-3 h-3" /></Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DocumentManager() {
   const [docs, setDocs] = useState<Doc[]>(load);
   const [current, setCurrent] = useState<Doc | null>(null);
-  const [title, setTitle] = useState("");
   const editor = useRef<HTMLDivElement>(null);
 
   const save = (next: Doc[]) => {
@@ -186,9 +295,9 @@ export default function DocumentManager() {
     catch { toast.error("บันทึกไม่สำเร็จ พื้นที่เก็บเต็ม"); return false; }
   };
   const upsert = (d: Doc) => save([d, ...docs.filter((x) => x.id !== d.id)]);
-  const open = (d: Doc) => { setCurrent(d); setTitle(d.title); };
   const newDoc = (t: string, html: string, source: Doc["source"]): Doc =>
-    ({ id: crypto.randomUUID(), title: t, html, source, updatedAt: new Date().toISOString() });
+    withMeta({ id: crypto.randomUUID(), title: t, html, source, updatedAt: new Date().toISOString() });
+  const patch = (p: Partial<Doc>) => setCurrent((c) => (c ? { ...c, ...p } : c));
 
   const importWord = async (file?: File) => {
     if (!file) return;
@@ -196,7 +305,7 @@ export default function DocumentManager() {
     try {
       const { value } = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
       const d = newDoc(file.name.replace(/\.docx$/i, ""), value, "นำเข้า Word");
-      upsert(d); open(d); toast.success("นำเข้าเอกสารแล้ว");
+      upsert(d); setCurrent(d); toast.success("นำเข้าแล้ว กรุณากรอกข้อมูลเอกสาร: พิมพ์ตอนไหน ใครเห็น ขนาดกระดาษ");
     } catch { toast.error("แปลงไฟล์ Word ไม่สำเร็จ"); }
   };
 
@@ -208,36 +317,46 @@ export default function DocumentManager() {
   const html = () => editor.current?.innerHTML ?? "";
 
   const exportDocx = async () => {
+    if (!current) return;
+    const mm = PAPER_MM[current.paper];
+    const twip = (v: number) => Math.round((v / 25.4) * 1440);
     try {
       const out = await HTMLtoDOCX(html(), null, {
         font: "TH Sarabun New", fontSize: 32, // half-points = 16pt
-        margins: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+        orientation: mm.w > mm.h ? "landscape" : "portrait",
+        pageSize: { width: twip(mm.w), height: twip(mm.h) },
+        margins: { top: twip(mm.pad), right: twip(mm.pad), bottom: twip(mm.pad), left: twip(mm.pad) },
         table: { row: { cantSplit: true } },
       });
-      download(out instanceof Blob ? out : new Blob([out as BlobPart]), (title || "document") + ".docx");
+      download(out instanceof Blob ? out : new Blob([out as BlobPart]), (current.title || "document") + ".docx");
     } catch { toast.error("ส่งออกไฟล์ Word ไม่สำเร็จ"); }
   };
 
   if (current) {
+    const mm = PAPER_MM[current.paper];
+    const pageStyle = { "--page-w": mm.w + "mm", "--page-h": mm.h + "mm", "--page-pad": mm.pad + "mm" } as React.CSSProperties;
     return (
       <div className="space-y-3 doc-editor-shell">
+        <style>{"@media print { @page { size: " + mm.w + "mm " + mm.h + "mm; margin: 0; } }"}</style>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
           <Button variant="ghost" size="sm" className="gap-1" onClick={() => setCurrent(null)}>
             <ArrowLeft className="w-4 h-4" />รายการเอกสาร
           </Button>
-          <Input aria-label="ชื่อเอกสาร" value={title} onChange={(e) => setTitle(e.target.value)} className="h-8 max-w-sm" />
+          <Input aria-label="ชื่อเอกสาร" value={current.title} onChange={(e) => patch({ title: e.target.value })} className="h-8 max-w-sm" />
+          <Badge variant={DOC_STATUS_VARIANT[current.status]}>{current.status}</Badge>
           <div className="ml-auto flex gap-2">
             <Button size="sm" className="gap-1" onClick={() => {
-              if (upsert({ ...current, title, html: html(), updatedAt: new Date().toISOString() })) toast.success("บันทึกแล้ว");
+              if (upsert({ ...current, html: html(), updatedAt: new Date().toISOString() })) toast.success("บันทึกแล้ว");
             }}><Save className="w-4 h-4" />บันทึก</Button>
             <Button size="sm" variant="outline" className="gap-1" onClick={exportDocx}><Download className="w-4 h-4" />ส่งออก .docx</Button>
             <Button size="sm" variant="outline" className="gap-1" onClick={() => window.print()}><Printer className="w-4 h-4" />พิมพ์</Button>
           </div>
         </div>
+        <MetaPanel doc={current} onChange={patch} />
         <div className="sticky top-0 z-10 print:hidden"><Ribbon /></div>
-        {/* พื้นที่หน้ากระดาษ: ใช้ขนาด A4 จริง (mm) เป็นข้อยกเว้นจาก design.md เพราะต้องเหมือนเอกสารพิมพ์ */}
+        {/* พื้นที่หน้ากระดาษ: ใช้ขนาดกระดาษจริง (mm) เป็นข้อยกเว้นจาก design.md เพราะต้องเหมือนเอกสารพิมพ์ */}
         <div className="overflow-x-auto rounded-lg bg-muted py-6 print:bg-transparent print:p-0">
-          <div ref={editor} key={current.id} contentEditable suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
+          <div ref={editor} key={current.id} style={pageStyle} contentEditable suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
             className="doc-page mx-auto bg-white text-black shadow-md focus:outline-none print:shadow-none"
             dangerouslySetInnerHTML={{ __html: current.html || "<p><br></p>" }} />
         </div>
@@ -246,36 +365,67 @@ export default function DocumentManager() {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <CardTitle className="text-base">เอกสาร ({docs.length} รายการ)</CardTitle>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={() => open(newDoc("เอกสารใหม่", "", "สร้างเอง"))}>
-            <FilePlus className="w-4 h-4" />สร้างเอกสาร
-          </Button>
-          <Button asChild className="gap-2 cursor-pointer">
-            <label>
-              <FileUp className="w-4 h-4" />นำเข้า Word
-              <input type="file" accept=".docx" className="sr-only" onChange={(e) => { importWord(e.target.files?.[0]); e.target.value = ""; }} />
-            </label>
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="divide-y rounded-lg border bg-card">
-          {docs.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">ยังไม่มีเอกสาร กด "นำเข้า Word" เพื่อเริ่มจากไฟล์ที่มีอยู่</p>}
-          {docs.map((d) => (
-            <div key={d.id} className="flex items-center gap-3 px-4 py-2 hover:bg-accent">
-              <button className="flex-1 text-left font-medium" onClick={() => open(d)}>{d.title}</button>
-              <span className="hidden text-xs text-muted-foreground sm:inline">{new Date(d.updatedAt).toLocaleString("th-TH")}</span>
-              <Badge variant="secondary">{d.source}</Badge>
-              <Button variant="ghost" size="icon" aria-label="ลบเอกสาร" onClick={() => remove(d)}>
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <SystemDocsTable />
+      <Card>
+        <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">เอกสารที่สร้าง / นำเข้า ({docs.length} รายการ)</CardTitle>
+            <p className="text-sm text-muted-foreground">นำเข้าไฟล์ Word แล้วกำหนดว่าพิมพ์ตอนไหน ใครเห็น ใครจัดการ และขนาดกระดาษ</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" className="gap-2" onClick={() => setCurrent(newDoc("เอกสารใหม่", "", "สร้างเอง"))}>
+              <FilePlus className="w-4 h-4" />สร้างเอกสาร
+            </Button>
+            <Button asChild className="gap-2 cursor-pointer">
+              <label>
+                <FileUp className="w-4 h-4" />นำเข้า Word
+                <input type="file" accept=".docx" className="sr-only" onChange={(e) => { importWord(e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full min-w-[900px] text-sm">
+              <thead className="bg-muted text-muted-foreground">
+                <tr className="text-left">
+                  <th className="px-3 py-2 font-medium">รหัส / Rev</th>
+                  <th className="px-3 py-2 font-medium">ชื่อเอกสาร</th>
+                  <th className="px-3 py-2 font-medium">สถานะ</th>
+                  <th className="px-3 py-2 font-medium">กระดาษ</th>
+                  <th className="px-3 py-2 font-medium">พิมพ์ตอน</th>
+                  <th className="px-3 py-2 font-medium">ผู้เห็น</th>
+                  <th className="px-3 py-2 font-medium">ผู้จัดการ</th>
+                  <th className="px-3 py-2"><span className="sr-only">จัดการ</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {docs.length === 0 && (
+                  <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">ยังไม่มีเอกสาร กด "นำเข้า Word" เพื่อเริ่มจากไฟล์ที่มีอยู่</td></tr>
+                )}
+                {docs.map((d) => (
+                  <tr key={d.id} className="align-top hover:bg-accent">
+                    <td className="px-3 py-2 whitespace-nowrap"><div className="font-medium">{d.code || "-"}</div><div className="text-xs text-muted-foreground">{d.rev}</div></td>
+                    <td className="px-3 py-2">
+                      <button className="text-left font-medium text-primary hover:underline" onClick={() => setCurrent(d)}>{d.title}</button>
+                      <div className="text-xs text-muted-foreground">{d.source} · {new Date(d.updatedAt).toLocaleString("th-TH")}</div>
+                    </td>
+                    <td className="px-3 py-2"><Badge variant={DOC_STATUS_VARIANT[d.status]}>{d.status}</Badge></td>
+                    <td className="px-3 py-2 whitespace-nowrap"><Badge variant="secondary">{d.paper}</Badge></td>
+                    <td className="px-3 py-2">{d.stage}{d.printWhen && <div className="text-xs text-muted-foreground">{d.printWhen}</div>}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{roleText(d.viewers)}</td>
+                    <td className="px-3 py-2 text-muted-foreground">{roleText(d.managers)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Button variant="ghost" size="icon" aria-label="ลบเอกสาร" onClick={() => remove(d)}><Trash2 className="w-4 h-4" /></Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

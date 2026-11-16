@@ -295,14 +295,14 @@
 
 /* Word-like A4 page for DocumentManager */
 .doc-page {
-  width: 210mm;
-  min-height: 297mm;
-  padding: 25.4mm;
+  width: var(--page-w, 210mm);
+  min-height: var(--page-h, 297mm);
+  padding: var(--page-pad, 25.4mm);
   font-family: "TH Sarabun New", "Sarabun", sans-serif;
   font-size: 16pt;
   line-height: 1.15;
   box-sizing: border-box;
-  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(297mm - 1px), hsl(var(--border)) calc(297mm - 1px), hsl(var(--border)) 297mm);
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--page-h, 297mm) - 1px), hsl(var(--border)) calc(var(--page-h, 297mm) - 1px), hsl(var(--border)) var(--page-h, 297mm));
 }
 .doc-page p { margin: 0 0 0.35em; }
 .doc-page h1 { font-size: 1.5em; font-weight: 700; margin: 0.4em 0; }
@@ -314,7 +314,6 @@
 .doc-page hr { border-top: 1px solid #000; margin: 0.5em 0; }
 .doc-page .page-break { border-top: 1px dashed hsl(var(--border)); margin: 1em 0; }
 @media print {
-  @page { size: A4; margin: 0; }
   body * { visibility: hidden; }
   .doc-page, .doc-page * { visibility: visible; }
   .doc-page { position: absolute; left: 0; top: 0; background-image: none; }
