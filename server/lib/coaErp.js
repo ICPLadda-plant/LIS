@@ -1013,11 +1013,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
       || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
   });
-  const datedStock = stockCandidates.find((row) => {
-    if (!suffixDatedLotFromRow(row)) return false;
-    const productionDate = lotSnapshot(lotFromRow(row), productionDateFromRow(row)).productionDate;
-    return !targetDate || productionDate <= targetDate;
-  }) || stockCandidates.find((row) => suffixDatedLotFromRow(row));
+  const datedStock = stockCandidates.find((row) => suffixDatedLotFromRow(row));
   const newestFgStock = stockCandidates.find((row) => isFgLotDescription(lotFromRow(row)));
   const stock = matchingStock || datedStock || newestFgStock || stockCandidates[0];
   const newestFgLot = newestFgStock

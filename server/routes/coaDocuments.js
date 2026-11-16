@@ -571,21 +571,17 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petit
         const requestBatches = (requestMatch?.items || [])
           .filter((item) => item.batchNo && item.productionDate)
           .sort((left, right) => String(left.batchNo).localeCompare(String(right.batchNo), undefined, { numeric: true }));
-        if (requestBatches.length > 1) {
-          return requestBatches.map((item) => ({
-            ...sample,
-            lotNo: item.lotNo || item.batchNo,
-            batchNo: item.batchNo,
-            productionDate: normalizeIsoDate(item.productionDate),
-          }));
-        }
         const sourceData = sampleFromSources(sampleSource, stockRows, mfRows, requestMatch?.item);
         const resolved = sourceData.sample;
-        const sameProductionBatches = sourceData.stockCandidates
+        const sameProductionBatches = (sourceData.erpLotDescription ? sourceData.stockCandidates : [])
           .filter((candidate) => candidate.productionDate === resolved.productionDate && candidate.batchNo)
           .filter((candidate, index, rows) => rows.findIndex((row) => row.batchNo === candidate.batchNo) === index)
           .sort((left, right) => left.batchNo.localeCompare(right.batchNo, undefined, { numeric: true }));
-        const batches = sameProductionBatches.length > 1 ? sameProductionBatches : [resolved];
+        const batches = sameProductionBatches.length > 1
+          ? sameProductionBatches
+          : requestBatches.length > 1
+            ? requestBatches
+            : [resolved];
         return batches.map((batch) => ({
           ...sample,
           lotNo: batch.lotNo || sample.lotNo,

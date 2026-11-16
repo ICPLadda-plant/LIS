@@ -699,6 +699,30 @@ test('enrichExternalCoaDocumentsWithErpLots keeps every Batch from the same Lot 
   ]);
 });
 
+test('enrichExternalCoaDocumentsWithErpLots reads long Batch values and label date from Lot Description', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO-LABEL-161169', Line: 10000, ItemNo: 'F-TRIF25-1X20',
+    TradeName: 'โซเลต', CommonName: 'TRIFLOXYSTROBIN + TEBUCONAZOLE 25% + 50% WG',
+    ShipmentDate: '2026-11-12', remark: 'COA',
+  }]);
+
+  const [enriched] = router.enrichExternalCoaDocumentsWithErpLots([source], {
+    stockRows: [
+      { item_no: 'F-TRIF25-1X20', 'Lot Description': '26S-TRIF25-2026052501-161169', stock_qty: 10 },
+      { item_no: 'F-TRIF25-1X20', 'Lot Description': '26S-TRIF25-2026082601-161169', stock_qty: 10 },
+      { item_no: 'F-TRIF25-1X20', 'Lot Description': '26S-TRIF25-OLD-121169', stock_qty: 10 },
+    ],
+    mfRows: [],
+  });
+
+  assert.deepEqual(enriched.sampleSnapshots.map((sample) => sample.batchNo), [
+    '2026052501', '2026082601',
+  ]);
+  assert.deepEqual(enriched.sampleSnapshots.map((sample) => sample.productionDate), [
+    '2026-11-16', '2026-11-16',
+  ]);
+});
+
 test('enrichExternalCoaDocumentsWithErpLots prefers production request Batches over RM stock lots', () => {
   const [source] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO-KARAT', Line: 10000, ItemNo: 'F-KRT35-1X20',
