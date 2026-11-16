@@ -132,49 +132,88 @@ test('นำเข้าไฟล์ Word แล้วตารางมาค�
   expect(errors).toEqual([]);
 });
 
-test('แก้ฟอร์มใบคำขอรับบริการ แล้วหน้าพิมพ์คำร้องใช้แม่แบบพร้อมข้อมูลจริง', async ({ page, request }) => {
+test('แก้ฟอร์มใบคำขอรับบริการจากฟอร์มจริง แล้วหน้าพิมพ์คำร้องใช้หน้าตาที่แก้ + ข้อมูลตรงกับฟอร์มเดิมทุกช่อง', async ({ page, request }) => {
   const errors = trackErrors(page);
   const lr = await request.get(API + '/lab-requests?limit=1', { headers: DEV });
   const items = ((await lr.json()) as { items: Array<{ petitionId: string }> }).items ?? [];
   test.skip(items.length === 0, 'ไม่มีคำร้องที่มี lab request ใน DB');
   const petitionId = items[0].petitionId;
 
-  // ไม่ให้ชนแม่แบบจริงของผู้ใช้ที่อาจมีอยู่
-  const existing = await request.get(API + '/documents?templateFor=FM-QP-07-04-001', { headers: DEV });
-  test.skip(((await existing.json()) as { data: unknown[] }).data.length > 0, 'มีแม่แบบ FM-QP-07-04-001 อยู่แล้ว ไม่แตะของจริง');
+  // ไม่แตะแม่แบบจริงของผู้ใช้: ซ่อนแม่แบบ FM-QP-07-04-001 ที่มีอยู่จากรายการ (เฉพาะในเบราว์เซอร์ทดสอบ)
+  // เพื่อให้ "แก้ฟอร์มนี้" สร้างแม่แบบใหม่ของเทสต์ ตอนพิมพ์ระบบเลือกเฉพาะแม่แบบสถานะ "ใช้งาน"
+  const userActive = await request.get(API + '/documents?templateFor=FM-QP-07-04-001&active=1', { headers: DEV });
+  test.skip(((await userActive.json()) as { data: unknown[] }).data.length > 0, 'มีแม่แบบ FM-QP-07-04-001 ที่ใช้งานอยู่จริง ไม่ทดสอบทับ');
+  await page.route(/\/api\/documents$/, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const res = await route.fetch();
+    const json = (await res.json()) as { data: Array<{ templateFor?: string; title: string }> };
+    json.data = json.data.filter((d) => d.templateFor !== 'FM-QP-07-04-001' || d.title.includes(STAMP));
+    return route.fulfill({ response: res, json });
+  });
 
   await page.setViewportSize({ width: 1500, height: 1000 });
   await page.goto(BASE + '/documents');
   await expect(page.getByText(/เอกสารในระบบ/)).toBeVisible({ timeout: 20000 });
   await page.getByRole('row').filter({ hasText: 'FM-QP-07-04-001' }).getByRole('button', { name: 'แก้ฟอร์มนี้' }).click();
-  await expect(page.getByText(/สร้างแม่แบบแล้ว/).first()).toBeVisible();
-  await page.getByLabel('ชื่อเอกสาร').fill('แม่แบบ ' + STAMP);
+  await expect(page.getByText(/สร้างแม่แบบแล้ว/).first()).toBeVisible({ timeout: 15000 });
+
+  // ได้หน้าตาฟอร์มจริง (ไม่ใช่โครงเปล่า): หัวตารางเดิม + ช่องข้อมูลผูกไว้
   const editor = page.getByLabel('เนื้อหาเอกสาร');
-  await expect(editor.locator('[data-fv="petitionNo"]')).toHaveCount(1);
-  await expect(editor.locator('tr[data-fv-repeat="items"]')).toHaveCount(1);
-  await editor.locator('h1').click();
-  await page.keyboard.press('End');
-  await page.keyboard.type(' ' + STAMP);
+  await expect(editor.locator('.pr-page2')).toHaveCount(1);
+  await expect(editor).toContainText('เลขแบช');
+  await expect(editor).toContainText('สำหรับเจ้าหน้าที่');
+  expect(await editor.locator('[data-slot^="e"]').count()).toBeGreaterThan(5);
+  expect(await editor.locator('[data-slot^="c"]').count()).toBeGreaterThan(3);
+  await expect(editor.locator('[data-slot-rows]')).toHaveCount(1);
+
+  // แก้หน้าตา: เปลี่ยนข้อความหัวคอลัมน์
+  await editor.locator('th', { hasText: 'สำหรับเจ้าหน้าที่' }).evaluate((th, stamp) => { th.textContent = 'เจ้าหน้าที่ ' + stamp; }, STAMP);
+  await page.getByLabel('ชื่อเอกสาร').fill('แม่แบบ ' + STAMP);
   await page.getByLabel('สถานะเอกสาร').selectOption('ใช้งาน');
   await page.getByRole('button', { name: 'บันทึก', exact: true }).click();
   await expect(page.getByText('บันทึกแล้ว').first()).toBeVisible();
 
-  await page.route('**/api/print/config', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) }));
   const pRes = await request.get(API + '/petitions/' + petitionId, { headers: DEV });
-  const pBody = (await pRes.json()) as { data?: { petitionNo?: string }; petitionNo?: string };
-  const petitionNo = pBody.data?.petitionNo ?? pBody.petitionNo ?? '';
-  expect(petitionNo).not.toBe('');
+  const petition = (await pRes.json()) as { petitionNo: string };
+  await page.route('**/api/print/config', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) }));
   await page.goto(BASE + '/petition/' + petitionId); // หน้ารายละเอียดคำร้องที่ใช้งานจริง (Timeline)
-  await expect(page.getByRole('heading', { name: petitionNo }).first()).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('heading', { name: petition.petitionNo }).first()).toBeVisible({ timeout: 20000 });
   await page.getByRole('button', { name: /ใบคำขอรับบริการ/ }).first().click();
-  const printed = page.locator('.doc-template-print');
-  await expect(printed).toBeVisible({ timeout: 15000 });
-  await expect(printed).toContainText(STAMP);
-  await expect(printed).toContainText(petitionNo); // ตัวแปรเลขที่คำร้องถูกเติมข้อมูลจริง
-  await expect(printed.locator('[data-fv-repeat]')).toHaveCount(0);
-  await expect(printed.locator('tr')).not.toHaveCount(1); // หัวตาราง + แถวตัวอย่างจริง
-  await expect(page.locator('.pr-page1')).toHaveCount(1); // แผ่นที่ไม่มีแม่แบบยังพิมพ์จากฟอร์มเดิม
-  await expect(page.locator('.pr-page2')).toHaveCount(0);
+
+  const printed = page.locator('.pr-template-pages[data-template-for="page2"]');
+  await expect(printed.locator('.pr-page2').first()).toBeVisible({ timeout: 15000 });
+  await expect(printed).toContainText('เจ้าหน้าที่ ' + STAMP); // หน้าตาที่ผู้ใช้แก้
+  await expect(page.locator('[data-tpl-src="page2"]')).toBeHidden(); // ฟอร์มเดิมซ่อน ใช้เป็นแหล่งข้อมูล
+  await expect(printed.locator('.fv-slot')).toHaveCount(0); // ไม่มีไฮไลต์ติดไปตอนพิมพ์
+
+  // ข้อมูลทุกช่องเท่ากับฟอร์มเดิมของคำร้องนี้ (เทียบทีละแผ่น ทีละช่อง)
+  const diff = await page.evaluate(() => {
+    const out: string[] = [];
+    const sources = Array.from(document.querySelectorAll<HTMLElement>('[data-tpl-src="page2"] > section'));
+    const filled = Array.from(document.querySelectorAll<HTMLElement>('.pr-template-pages[data-template-for="page2"] section.pr-page2'));
+    if (sources.length !== filled.length) out.push('sheets ' + sources.length + ' vs ' + filled.length);
+    sources.forEach((src, s) => {
+      const f = filled[s];
+      if (!f) return;
+      const e = Array.from(src.querySelectorAll('.pr-edit')).map((x) => x.textContent ?? '');
+      f.querySelectorAll<HTMLElement>('[data-slot^="e"]').forEach((el) => {
+        const i = Number(el.dataset.slot!.slice(1));
+        if ((el.textContent ?? '') !== e[i]) out.push('e' + i + ': ' + el.textContent + ' != ' + e[i]);
+      });
+      const c = Array.from(src.querySelectorAll('.pr-toggle')).map((x) => /pr-(cb|rd)-x/.test(x.className));
+      f.querySelectorAll<HTMLElement>('[data-slot^="c"]').forEach((el) => {
+        const i = Number(el.dataset.slot!.slice(1));
+        if (/pr-(cb|rd)-x/.test(el.className) !== c[i]) out.push('c' + i);
+      });
+      const srcRows = src.querySelector('table thead')?.parentElement?.querySelector('tbody')?.textContent;
+      if ((f.querySelector('[data-slot-rows]')?.textContent ?? '') !== srcRows) out.push('rows');
+    });
+    return out;
+  });
+  expect(diff).toEqual([]);
+  // แผ่นที่ 1 ไม่มีแม่แบบ (ใช้งาน) → ยังพิมพ์จากฟอร์มเดิม
+  await expect(page.locator('[data-tpl-src="page1"]')).toHaveCount(0);
+  await expect(page.locator('.pr-page1')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
 

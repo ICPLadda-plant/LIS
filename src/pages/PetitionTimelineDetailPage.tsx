@@ -8,9 +8,7 @@ import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/L
 import ChemAnalysisReportTemplate, { CHEM_ANALYSIS_REPORT_CSS } from "@/components/petition/ChemAnalysisReportTemplate";
 import { buildChemAnalysisSheets, canPrintChemAnalysisReport } from "@/lib/chemAnalysisReport";
 import PetitionPrintTemplate from "@/components/petition/PetitionPrintTemplate";
-import TemplatePrintPage from "@/components/lis/TemplatePrintPage";
-import { useActiveTemplates } from "@/hooks/useActiveTemplates";
-import { petitionTemplateData } from "@/lib/formTemplate";
+import { useServiceRequestTemplates } from "@/hooks/useActiveTemplates";
 import ResultReportPrintTemplate from "@/components/petition/ResultReportPrintTemplate";
 import SampleLabelPrintTemplate from "@/components/petition/SampleLabelPrintTemplate";
 import AdditionalSampleRequests from "@/components/petition/AdditionalSampleRequests";
@@ -227,7 +225,7 @@ export default function PetitionTimelineDetailPage() {
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
   const [servicePrintOpen, setServicePrintOpen] = useState(false);
   // แม่แบบที่แก้ในหน้า "จัดการเอกสาร" (สถานะใช้งาน) แทนแผ่นของใบคำขอรับบริการ
-  const serviceTemplates = useActiveTemplates(["FM-QP-07-01-001", "FM-QP-07-04-001"], servicePrintOpen);
+  const serviceTemplates = useServiceRequestTemplates(servicePrintOpen);
   const [preReportOpen, setPreReportOpen] = useState(false);
   const [finalReportOpen, setFinalReportOpen] = useState(false);
   const [labResultOpen, setLabResultOpen] = useState(false);
@@ -677,8 +675,7 @@ export default function PetitionTimelineDetailPage() {
 
     {labelPrintOpen && <PrintPreviewDialog open={labelPrintOpen} onOpenChange={setLabelPrintOpen} docType="sample-label" department={petition.submittedBy?.department}><SampleLabelPrintTemplate petition={petition} /></PrintPreviewDialog>}
     {servicePrintOpen && serviceLabRequest && <PrintPreviewDialog open={servicePrintOpen} onOpenChange={setServicePrintOpen} docType="service-request"><PetitionPrintTemplate labRequest={serviceLabRequest} petition={petition} qcResults={qcResults} sgParam={sgParameter} requestValues={requestValues} labReportPages={labReportPages}
-      replacePage1={serviceTemplates["FM-QP-07-01-001"] && <TemplatePrintPage template={serviceTemplates["FM-QP-07-01-001"]} data={petitionTemplateData(petition)} />}
-      replacePage2={serviceTemplates["FM-QP-07-04-001"] && <TemplatePrintPage template={serviceTemplates["FM-QP-07-04-001"]} data={petitionTemplateData(petition)} />} /></PrintPreviewDialog>}
+      templates={serviceTemplates} /></PrintPreviewDialog>}
     {preReportOpen && <PrintPreviewDialog open={preReportOpen} onOpenChange={setPreReportOpen} docType="coa" title="Pre Report"><ResultReportPrintTemplate kind="pre" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {finalReportOpen && <PrintPreviewDialog open={finalReportOpen} onOpenChange={setFinalReportOpen} docType="coa" title="Final Report"><ResultReportPrintTemplate kind="final" petition={petition} labRequests={labRequests ?? []} qcResults={qcResults} /></PrintPreviewDialog>}
     {labResultOpen && <PrintPreviewDialog open={labResultOpen} onOpenChange={setLabResultOpen} docType="coa" title="ใบรายงานผลการทดสอบ" css={LAB_REPORT_CSS}><LabResultReportTemplate pages={labResultPrintPages} /></PrintPreviewDialog>}

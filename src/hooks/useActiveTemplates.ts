@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { PaperSize } from "@/lib/documentRegistry";
+import { isSlotTemplate } from "@/lib/systemFormSlots";
 
 export type ActiveTemplate = { id: string; html: string; paper: PaperSize; templateFor: string; title: string };
 
@@ -25,4 +26,11 @@ export function useActiveTemplates(codes: string[], enabled = true) {
     return () => { alive = false; };
   }, [key, enabled]);
   return map;
+}
+
+// ใบคำขอรับบริการ 2 แผ่น → prop templates ของ PetitionPrintTemplate (รับเฉพาะแม่แบบแบบผูกช่อง)
+export function useServiceRequestTemplates(enabled: boolean) {
+  const map = useActiveTemplates(["FM-QP-07-01-001", "FM-QP-07-04-001"], enabled);
+  const pick = (code: string) => (map[code] && isSlotTemplate(map[code].html) ? map[code].html : undefined);
+  return { page1: pick("FM-QP-07-01-001"), page2: pick("FM-QP-07-04-001") };
 }

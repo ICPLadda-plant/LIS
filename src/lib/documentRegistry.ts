@@ -42,7 +42,7 @@ export const SYSTEM_DOCS: SystemDoc[] = [
   { code: "FM-QP-07-01-001", rev: "R02 (16/12/67)", name: "ใบคำร้องขอรับบริการ แผ่นที่ 1", paper: "A4 แนวตั้ง",
     stage: "สร้างคำร้อง / ส่งตัวอย่าง", status: "ตั้งแต่ กำลังส่งตัวอย่าง", viewers: ["ผู้ขอทดสอบ (ฝ่ายผลิต)", "QC", "Lab"], managers: ["QC Head", "Lab Head"],
     page: "/petition", pageLabel: "รายการคำร้อง > รายละเอียด > พิมพ์" },
-  { code: "FM-QP-07-04-001", rev: "R01 (30/05/68)", name: "ใบคำขอรับบริการ", paper: "A4 แนวตั้ง",
+  { code: "FM-QP-07-04-001", rev: "R01 (30/05/68)", name: "ใบคำขอรับบริการ", paper: "A4 แนวนอน",
     stage: "สร้างคำร้อง / ส่งตัวอย่าง", status: "ตั้งแต่ กำลังส่งตัวอย่าง", viewers: ["ผู้ขอทดสอบ (ฝ่ายผลิต)", "QC", "Lab"], managers: ["QC Head", "Lab Head"],
     page: "/petition", pageLabel: "รายการคำร้อง > รายละเอียด > พิมพ์" },
   { code: "F-LAB-01-12", rev: "Rev 00 (02/11/69)", name: "ป้ายนำส่งตัวอย่าง (ปกติ / ปศุสัตว์)", paper: "Sticker",

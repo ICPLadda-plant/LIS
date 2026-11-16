@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { fillSystemPage } from '@/lib/systemFormSlots';
 import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { customerCodeForPetition } from '@/lib/customerCode';
@@ -642,12 +643,27 @@ interface Props {
   requestValues?: Record<string, unknown>;
   /** หน้าใบรายงานผล Lab (เรียงตาม petition.items) ใช้เติมรายการทดสอบ/วิธีทดสอบ */
   labReportPages?: Array<{ rows: LabTestRow[] }>;
-  /** แม่แบบที่ผู้ใช้แก้ในหน้า "จัดการเอกสาร" (สถานะใช้งาน) ใช้แทนแผ่นนั้นของฟอร์มเดิม */
-  replacePage1?: ReactNode;
-  replacePage2?: ReactNode;
+  /** แม่แบบ (HTML ผูกช่อง) ที่ผู้ใช้แก้ในหน้า "จัดการเอกสาร" สถานะใช้งาน — ใช้แทนแผ่นนั้น โดยข้อมูลมาจากฟอร์มเดิม */
+  templates?: { page1?: string; page2?: string };
 }
 
-export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [], replacePage1, replacePage2 }: Props) {
+/**
+ * แสดงแม่แบบของผู้ใช้แทนฟอร์มเดิม: ฟอร์มเดิมถูก render ไว้ใน <div hidden data-tpl-src> ก่อนหน้า
+ * (layout effect ของมันเติมค่าเสร็จก่อน effect ของ component นี้) แล้วคัดลอกค่าตามเลขช่อง
+ */
+function SlotFilledPages({ html, source }: { html: string; source: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const host = ref.current;
+    const root = host?.closest('.pr-root');
+    if (!host || !root) return;
+    const sources = Array.from(root.querySelectorAll<HTMLElement>(`[data-tpl-src="${source}"] > section`));
+    host.innerHTML = sources.map((src) => fillSystemPage(html, src)).join('');
+  });
+  return <div ref={ref} className="pr-template-pages" data-template-for={source} />;
+}
+
+export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [], templates }: Props) {
   const labTestsBySeq: Record<number, LabTestRow[]> = {};
   const labTestsBySample = new Map<string, LabTestRow[]>();
   const sampleKey = (item: PetitionItem) => `${String(item.batchNo ?? '').trim()}|${item.sampleName ?? ''}`;
@@ -671,14 +687,24 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
     <>
       <style>{PRINT_CSS}</style>
       <div className="pr-root">
-        {replacePage1 ?? <PageOne
-          lr={labRequest}
-          customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
-          yearShort={yearShort}
-        />}
-        {replacePage2 ?? sheets.map((rows, index) => (
-          <PageTwo key={index} lr={labRequest} petition={petition} printRows={rows} sheetNo={index + 1} sheetCount={sheets.length} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
-        ))}
+        {(() => {
+          const pageOne = (
+            <PageOne
+              lr={labRequest}
+              customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
+              yearShort={yearShort}
+            />
+          );
+          const pageTwos = sheets.map((rows, index) => (
+            <PageTwo key={index} lr={labRequest} petition={petition} printRows={rows} sheetNo={index + 1} sheetCount={sheets.length} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
+          ));
+          return (
+            <>
+              {templates?.page1 ? <><div hidden data-tpl-src="page1">{pageOne}</div><SlotFilledPages html={templates.page1} source="page1" /></> : pageOne}
+              {templates?.page2 ? <><div hidden data-tpl-src="page2">{pageTwos}</div><SlotFilledPages html={templates.page2} source="page2" /></> : pageTwos}
+            </>
+          );
+        })()}
       </div>
     </>
   );

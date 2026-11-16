@@ -13,9 +13,10 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import {
-  FILL_FIELDS, TEMPLATE_SCHEMAS, fillFieldHtml, hasFillFields, starterTemplateHtml, variableHtml,
-  type TemplateSchema,
+  FILL_FIELDS, fillFieldHtml, hasFillFields,
 } from "@/lib/formTemplate";
+import { SYSTEM_FORM_CAPTURE, captureSystemForm } from "@/lib/systemFormCapture";
+import { isSlotTemplate } from "@/lib/systemFormSlots";
 import FillFormView from "@/components/lis/FillFormView";
 import { Link } from "react-router-dom";
 import { Label } from "@/components/ui/label";
@@ -135,7 +136,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 const selectCls = "h-8 rounded-md border bg-background px-2 text-sm";
 
-function Ribbon({ schema }: { schema?: TemplateSchema }) {
+function Ribbon() {
   return (
     <Tabs defaultValue="home" className="rounded-lg border bg-card">
       <TabsList className="m-1">
@@ -200,24 +201,6 @@ function Ribbon({ schema }: { schema?: TemplateSchema }) {
             }} />
           ))}
         </Group>
-        {schema && (
-          <Group label="ข้อมูลจากระบบ (เติมอัตโนมัติตอนพิมพ์)">
-            <select aria-label="แทรกข้อมูลจากระบบ" className={selectCls} defaultValue="" onChange={(e) => {
-              const v = [...schema.vars, ...schema.itemVars].find((x) => x.key === e.target.value);
-              if (v) exec("insertHTML", variableHtml(v.key, v.label));
-              e.target.value = "";
-            }}>
-              <option value="" disabled>แทรกข้อมูล</option>
-              <optgroup label="ข้อมูลเอกสาร">{schema.vars.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}</optgroup>
-              <optgroup label="ข้อมูลรายตัวอย่าง (ใส่ในแถวรายการ)">{schema.itemVars.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}</optgroup>
-            </select>
-            <Tool label="ตารางรายการตัวอย่าง" onClick={() => {
-              const cols = schema.itemVars.slice(0, 4);
-              exec("insertHTML", "<table><tbody><tr>" + cols.map((c) => "<th>" + c.label + "</th>").join("") + '</tr><tr data-fv-repeat="items">'
-                + cols.map((c) => "<td>" + variableHtml(c.key, c.label) + "</td>").join("") + "</tr></tbody></table><p><br></p>");
-            }} />
-          </Group>
-        )}
         <Group label="อื่น ๆ">
           <Tool label="เส้นคั่น" onClick={() => exec("insertHorizontalRule")} />
           <Tool label="ขึ้นหน้าใหม่" onClick={() => exec("insertHTML", '<div class="page-break" style="page-break-after:always"></div><p><br></p>')} />
@@ -336,7 +319,7 @@ function SystemDocsTable({ onEditTemplate }: { onEditTemplate: (d: SystemDocRow)
                     <Link to={d.page} className="inline-flex items-center gap-1 text-primary hover:underline">{d.pageLabel}<ExternalLink className="w-3 h-3" /></Link>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {TEMPLATE_SCHEMAS[d.code] && (
+                    {SYSTEM_FORM_CAPTURE[d.code] && (
                       <Button size="sm" variant="outline" className="whitespace-nowrap" onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
                     )}
                   </td>
@@ -408,12 +391,24 @@ export default function DocumentManager() {
   const editTemplate = async (sd: SystemDocRow) => {
     const existing = docs.find((d) => d.templateFor === sd.code);
     if (existing) return open(existing);
+    let html: string;
+    try { html = await captureSystemForm(sd.code); }
+    catch (e) { return toast.error("เปิดฟอร์มระบบไม่สำเร็จ: " + errMsg(e)); }
     const d = withMeta({
       id: "", title: "แม่แบบ " + sd.name, source: "สร้างเอง", updatedAt: new Date().toISOString(), canEdit: true,
       code: sd.code, rev: sd.rev, paper: sd.paper, stage: sd.stage, printWhen: sd.status, templateFor: sd.code,
     });
-    const html = starterTemplateHtml(sd.name, sd.code, sd.rev, TEMPLATE_SCHEMAS[sd.code]);
     if (await persist(d, html)) toast.success('สร้างแม่แบบแล้ว ตั้งสถานะเป็น "ใช้งาน" เมื่อพร้อมให้ระบบพิมพ์ด้วยแม่แบบนี้');
+  };
+
+  // แม่แบบรุ่นแรก (ยังไม่ผูกช่อง) หรืออยากเริ่มใหม่: ดึงหน้าตาฟอร์มระบบล่าสุดมาแทนเนื้อหา
+  const resetFromSystem = async () => {
+    if (!current?.templateFor) return;
+    if (!confirm("แทนเนื้อหาด้วยฟอร์มปัจจุบันของระบบ? สิ่งที่แก้ไว้ในแม่แบบนี้จะหายไป")) return;
+    try {
+      const html = await captureSystemForm(current.templateFor);
+      if (await persist(current, html)) toast.success("ดึงฟอร์มจากระบบแล้ว");
+    } catch (e) { toast.error("ดึงฟอร์มจากระบบไม่สำเร็จ: " + errMsg(e)); }
   };
 
   const open = async (d: Doc) => {
@@ -460,7 +455,9 @@ export default function DocumentManager() {
 
   if (current) {
     const mm = PAPER_MM[current.paper];
-    const pageStyle = { "--page-w": mm.w + "mm", "--page-h": mm.h + "mm", "--page-pad": mm.pad + "mm" } as React.CSSProperties;
+    // ฟอร์มระบบมีขอบกระดาษของตัวเองใน section แล้ว
+    const pad = isSlotTemplate(current.html || "") ? 0 : mm.pad;
+    const pageStyle = { "--page-w": mm.w + "mm", "--page-h": mm.h + "mm", "--page-pad": pad + "mm" } as React.CSSProperties;
     return (
       <div className="space-y-3 doc-editor-shell">
         <style>{"@media print { @page { size: " + mm.w + "mm " + mm.h + "mm; margin: 0; } }"}</style>
@@ -488,11 +485,19 @@ export default function DocumentManager() {
         </div>
         {!fillMode && <MetaPanel doc={current} onChange={patch} roles={roles} />}
         {current.templateFor && !fillMode && (
-          <p className="text-sm text-muted-foreground print:hidden">
-            แม่แบบนี้ใช้แทนฟอร์ม {current.templateFor} เมื่อสถานะเป็น "ใช้งาน" — ช่อง {"{{ ... }}"} ระบบจะเติมข้อมูลจริงตอนพิมพ์ แถวที่มีตัวแปรรายตัวอย่างจะถูกคัดลอกตามจำนวนตัวอย่าง
-          </p>
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 text-sm print:hidden">
+            {isSlotTemplate(current.html || "") ? (
+              <p className="flex-1 text-muted-foreground">
+                แม่แบบนี้ใช้แทนฟอร์ม {current.templateFor} เมื่อสถานะเป็น "ใช้งาน" ช่องที่ไฮไลต์คือข้อมูลที่ระบบเติมจากคำร้องจริงตอนพิมพ์
+                แก้ข้อความ ตาราง หรือย้ายช่องได้ แต่อย่าลบช่องที่ไฮไลต์ ถ้าไม่อยากให้ข้อมูลนั้นหาย
+              </p>
+            ) : (
+              <p className="flex-1 text-destructive">แม่แบบนี้สร้างจากแบบเก่า ยังไม่ผูกข้อมูลกับฟอร์มระบบ ระบบจะไม่ใช้ตอนพิมพ์ กดปุ่มด้านขวาเพื่อดึงฟอร์มจริงมาแก้</p>
+            )}
+            {current.canEdit && <Button size="sm" variant="outline" onClick={resetFromSystem}>ดึงฟอร์มจากระบบใหม่</Button>}
+          </div>
         )}
-        {current.canEdit && !fillMode && <div className="sticky top-0 z-10 print:hidden"><Ribbon schema={current.templateFor ? TEMPLATE_SCHEMAS[current.templateFor] : undefined} /></div>}
+        {current.canEdit && !fillMode && <div className="sticky top-0 z-10 print:hidden"><Ribbon /></div>}
         {/* พื้นที่หน้ากระดาษ: ใช้ขนาดกระดาษจริง (mm) เป็นข้อยกเว้นจาก design.md เพราะต้องเหมือนเอกสารพิมพ์ */}
         <div className="overflow-x-auto rounded-lg bg-muted py-6 print:bg-transparent print:p-0">
           {fillMode ? <FillFormView html={current.html} style={pageStyle} /> : <div ref={editor} key={current.id || "new"} style={pageStyle} contentEditable={!!current.canEdit} suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
