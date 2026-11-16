@@ -13,6 +13,26 @@ type Doc = { id: string; title: string; html: string; source: "สร้าง�
 const KEY = "lis.documents";
 const load = (): Doc[] => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } };
 
+
+const TOOLS: [string, string, string?][] = [
+  ["bold", "B"], ["italic", "I"], ["underline", "U"],
+  ["formatBlock", "H1", "h1"], ["formatBlock", "H2", "h2"], ["formatBlock", "ปกติ", "p"],
+  ["insertUnorderedList", "• รายการ"], ["insertOrderedList", "1. รายการ"],
+  ["justifyLeft", "ชิดซ้าย"], ["justifyCenter", "กึ่งกลาง"], ["justifyRight", "ชิดขวา"],
+  ["undo", "เลิกทำ"], ["redo", "ทำซ้ำ"],
+];
+// ponytail: execCommand เป็น API เก่าแต่ทุกเบราว์เซอร์ยังรองรับ; เปลี่ยนเป็น editor library เมื่อต้องการ track changes/ตารางขั้นสูง
+const exec = (cmd: string, val?: string) => document.execCommand(cmd, false, val);
+
+const exportWord = (title: string, html: string) => {
+  const blob = new Blob([`<html><head><meta charset="utf-8"></head><body>${html}</body></html>`], { type: "application/msword" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${title || "document"}.doc`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
 export default function DocumentManager() {
   const [docs, setDocs] = useState<Doc[]>(load);
   const [current, setCurrent] = useState<Doc | null>(null);
@@ -83,10 +103,17 @@ export default function DocumentManager() {
               upsert({ ...current, html, updatedAt: new Date().toISOString() });
               toast.success("บันทึกแล้ว");
             }}>บันทึก</Button>
+            <Button variant="outline" onClick={() => exportWord(current.title, document.getElementById("doc-editor")?.innerHTML ?? "")}>ส่งออก Word</Button>
+            <Button variant="outline" onClick={() => window.print()}>พิมพ์</Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            <div role="toolbar" aria-label="เครื่องมือจัดรูปแบบ" className="flex flex-wrap gap-1 rounded-lg border bg-muted p-1">
+              {TOOLS.map(([cmd, label, val]) => (
+                <Button key={label} type="button" size="sm" variant="ghost" onMouseDown={(e) => { e.preventDefault(); exec(cmd, val); }}>{label}</Button>
+              ))}
+            </div>
             <div id="doc-editor" contentEditable suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
-              className="prose max-w-none min-h-64 rounded-lg border bg-card p-4 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="prose max-w-none min-h-[60vh] rounded-lg border bg-card p-8 focus:outline-none focus:ring-2 focus:ring-primary"
               dangerouslySetInnerHTML={{ __html: current.html }} />
           </CardContent>
         </Card>

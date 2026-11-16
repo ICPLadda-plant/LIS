@@ -7,7 +7,6 @@ import {
   Database,
   Activity,
   History,
-  FileText,
 } from "lucide-react";
 
 export type TabDef = {
@@ -46,7 +45,6 @@ export const TAB_REGISTRY: Record<string, TabDef[]> = {
     { key: "database", label: "ฐานข้อมูลผลลัพธ์", icon: Database },
     { key: "activelog", label: "Active Log", icon: Activity },
     { key: "auditlog", label: "Audit Log", icon: History },
-    { key: "documents", label: "จัดการเอกสาร", icon: FileText },
   ],
   // server ตรวจ deny token เดียวกันที่ server/lib/qcApprovalAccess.js (อนุมัติรายรายการ / Final Result)
   "/qc-approval": [
