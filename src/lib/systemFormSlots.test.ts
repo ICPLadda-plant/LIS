@@ -18,12 +18,15 @@ describe("system form slots", () => {
   it("ผูกช่องแล้วเติมข้อมูลจริงได้ครบ แม้ผู้ใช้แก้หน้าตา", () => {
     const tpl = annotateSystemPage(page("ตัวอย่าง", false, ["a"]));
     expect(isSlotTemplate(tpl)).toBe(true);
-    expect(tpl).not.toContain("contenteditable");
+    expect(tpl).not.toContain('contenteditable="true"');
+    expect(tpl).toContain('data-slot="e0" contenteditable="false"'.replace(' contenteditable="false"', "")); // มีเลขช่อง
+    expect((tpl.match(/contenteditable="false"/g) ?? []).length).toBe(3); // ช่องข้อความ + กล่องติ๊ก 2 = ก้อนเดียว ลบทั้งก้อนได้
     expect(tpl).not.toContain("scale(0.8)");
     // ผู้ใช้แก้: เพิ่มหัวข้อ + เปลี่ยนสีหัวตาราง
     const edited = "<h1>หัวใหม่</h1>" + tpl.replace("<th>ชื่อ</th>", '<th style="color:red">ชื่อตัวอย่าง</th>');
     const out = document.createElement("div");
     out.innerHTML = fillSystemPage(edited, page("สมชาย", true, ["A-1", "A-2"]));
+    expect(out.innerHTML).not.toContain("contenteditable");
     expect(out.querySelector("h1")!.textContent).toBe("หัวใหม่");
     expect(out.querySelector("[data-slot=e0]")!.textContent).toBe("สมชาย");
     expect(out.querySelector("[data-slot=e0]")!.classList.contains("fv-slot")).toBe(false);
