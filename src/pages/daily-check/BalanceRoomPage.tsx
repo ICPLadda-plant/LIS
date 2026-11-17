@@ -463,9 +463,6 @@ const BalanceRoomPage = () => {
               <Button variant="success" className="gap-2" onClick={handleExport} disabled={exporting}>
                 <FileSpreadsheet className="h-4 w-4" /> {exporting ? "กำลัง Export..." : "Export Excel"}
               </Button>
-              <Button variant="outline" className="gap-2" onClick={() => setConfigWeight(scale.controlWeight)}>
-                <Settings2 className="h-4 w-4" /> ตั้งค่าค่า Control
-              </Button>
             </div>
           </div>
         </CardContent>
