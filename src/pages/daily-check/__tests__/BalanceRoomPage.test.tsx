@@ -185,6 +185,10 @@ describe("BalanceRoomPage", () => {
     baselineValues.forEach((value, index) => {
       fireEvent.change(screen.getByLabelText(`ค่าบันทึกที่ ${index + 1}`), { target: { value: String(value) } });
     });
+    fireEvent.blur(screen.getByLabelText("ค่าบันทึกที่ 1"));
+    expect(screen.getByLabelText("ค่าบันทึกที่ 1")).toHaveValue("10.00");
+    expect(screen.getByLabelText("น้ำหนักตุ้ม Daily check (g)")).toHaveValue("10.00");
+    expect(screen.getByLabelText("MPE (g)")).toHaveValue("0.50");
     fireEvent.click(screen.getByRole("button", { name: "บันทึกค่า Control" }));
 
     await waitFor(() => expect(apiMock.updateBalanceControlConfig).toHaveBeenCalledTimes(1));

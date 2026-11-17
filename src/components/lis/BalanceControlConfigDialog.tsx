@@ -37,12 +37,15 @@ interface FormState {
   model: string;
 }
 
-const numText = (value: number | null | undefined) => (value == null ? "" : String(value));
+const numText = (value: number | null | undefined, digits: number) => (value == null ? "" : value.toFixed(digits));
+const normalizedNumberText = (value: string, digits: number) => value.trim() !== "" && Number.isFinite(Number(value))
+  ? Number(value).toFixed(digits)
+  : value;
 
-const toForm = (config: BalanceControlConfig): FormState => ({
-  baselineValues: Array.from({ length: 20 }, (_, index) => numText(config.baselineValues?.[index])),
-  nominal: numText(config.nominal),
-  mpe: numText(config.mpe),
+const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
+  baselineValues: Array.from({ length: 20 }, (_, index) => numText(config.baselineValues?.[index], digits)),
+  nominal: numText(config.nominal, digits),
+  mpe: numText(config.mpe, digits),
   weightCode: config.weightCode,
   updatedDate: config.updatedDate,
   brand: config.brand,
@@ -68,11 +71,11 @@ export default function BalanceControlConfigDialog({
   digits,
 }: BalanceControlConfigDialogProps) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState<FormState>(() => toForm(config));
+  const [form, setForm] = useState<FormState>(() => toForm(config, scale.decimals));
 
   useEffect(() => {
-    if (open) setForm(toForm(config));
-  }, [open, config]);
+    if (open) setForm(toForm(config, scale.decimals));
+  }, [open, config, scale.decimals]);
 
   const baselineValues = form.baselineValues.map(Number);
   const baselineComplete = form.baselineValues.every((value) => value.trim() !== "" && Number.isFinite(Number(value)));
@@ -102,6 +105,8 @@ export default function BalanceControlConfigDialog({
 
   const setField = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  const normalizeField = (field: "nominal" | "mpe") => () =>
+    setForm((prev) => ({ ...prev, [field]: normalizedNumberText(prev[field], scale.decimals) }));
 
   const handleSave = () => {
     const error = validateBalanceControlInput(input);
@@ -116,6 +121,11 @@ export default function BalanceControlConfigDialog({
     setForm((prev) => ({
       ...prev,
       baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? limitDecimalPlaces(event.target.value, scale.decimals) : value),
+    }));
+  const normalizeBaselineValue = (index: number) => () =>
+    setForm((prev) => ({
+      ...prev,
+      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? normalizedNumberText(value, scale.decimals) : value),
     }));
 
   const previewItems = [
@@ -148,6 +158,7 @@ export default function BalanceControlConfigDialog({
                     inputMode="decimal"
                     value={value}
                     onChange={setBaselineValue(index)}
+                    onBlur={normalizeBaselineValue(index)}
                     aria-label={`ค่าบันทึกที่ ${index + 1}`}
                   />
                 </div>
@@ -166,11 +177,11 @@ export default function BalanceControlConfigDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-nominal">น้ำหนักตุ้ม Daily check (g)</Label>
-              <Input id="bcc-nominal" inputMode="decimal" value={form.nominal} onChange={setField("nominal")} />
+              <Input id="bcc-nominal" inputMode="decimal" value={form.nominal} onChange={setField("nominal")} onBlur={normalizeField("nominal")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-mpe">MPE (g)</Label>
-              <Input id="bcc-mpe" inputMode="decimal" value={form.mpe} onChange={setField("mpe")} />
+              <Input id="bcc-mpe" inputMode="decimal" value={form.mpe} onChange={setField("mpe")} onBlur={normalizeField("mpe")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-weight">รหัสตุ้มน้ำหนัก</Label>
