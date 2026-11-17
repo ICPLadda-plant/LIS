@@ -181,6 +181,20 @@ export function formatThaiMonth(month: string): string {
   return name ? `${name} ${Number(match[1]) + 543}` : month;
 }
 
+export function controlUpdateDueDate(updatedDate: string): Date | null {
+  if (!DATE_RE.test(updatedDate)) return null;
+  const [year, month, day] = updatedDate.split("-").map(Number);
+  const targetMonth = month + 2;
+  const lastDay = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, targetMonth, Math.min(day, lastDay)));
+}
+
+export function isControlUpdateDue(updatedDate: string, now = new Date()): boolean {
+  const dueDate = controlUpdateDueDate(updatedDate);
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return dueDate != null && today >= dueDate.getTime();
+}
+
 export interface ControlSeriesRecord {
   date: string;
   avg100: number;

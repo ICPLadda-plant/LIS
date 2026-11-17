@@ -20,6 +20,7 @@ export const BALANCE_CONTROL_REPORT_CSS = `
 body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr, .bcr * { font-family: ${A4_PRINT_FONT_FAMILY}; box-sizing: border-box; }
 .bcr { color: #000; background: #fff; border: 2px solid #000; display: flex; flex-direction: column; min-height: 1084px; font-size: 11pt; line-height: 1.1; padding: 8px 8px 6px; }
+.bcr + .bcr { break-before: page; }
 .bcr h1, .bcr h2, .bcr .bcr-strong { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; }
 .bcr .bcr-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; }
 .bcr .bcr-head img { position: absolute; left: 0; top: 0; height: 44px; width: auto; }
@@ -54,9 +55,11 @@ export interface BalanceControlReportProps {
   month: string;
   printedBy: string;
   printedAt: string;
+  pageNumber?: number;
+  totalPages?: number;
 }
 
-const resultMark = (record: DailyCheckRecord | null, controlWeight: 10 | 100) => {
+const resultMark = (record: DailyCheckRecord | null, controlWeight: number) => {
   const status = controlWeight === 10 ? record?.status10 ?? record?.status : record?.status100 ?? record?.status;
   if (status === "pass") return "√";
   if (status === "fail") return "X";
@@ -80,6 +83,8 @@ export default function BalanceControlReport({
   month,
   printedBy,
   printedAt,
+  pageNumber = 1,
+  totalPages = 1,
 }: BalanceControlReportProps) {
   const printedDate = printedAt ? `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}` : "";
   const table = (points: MonthlyPoint<DailyCheckRecord>[]) => (
@@ -108,15 +113,15 @@ export default function BalanceControlReport({
       <tbody>
         {points.map((point) => {
           const record = point.record;
-          const weights = scale.controlWeight === 10 ? record?.weights10 : record?.weights100;
+          const weights = config.nominal === 10 ? record?.weights10 : record?.weights100;
           return (
             <tr key={point.date}>
               <td>{fmtDate(point.date)}</td>
               <td>{weightText(weights, 0, scale.decimals)}</td>
               <td>{weightText(weights, 1, scale.decimals)}</td>
               <td>{weightText(weights, 2, scale.decimals)}</td>
-              <td>{record ? formatControlNumber(scale.controlWeight === 10 ? record.avg10 : record.avg100, scale.decimals) : ""}</td>
-              <td>{resultMark(record, scale.controlWeight)}</td>
+              <td>{record ? formatControlNumber(config.nominal === 10 ? record.avg10 : record.avg100, scale.decimals) : ""}</td>
+              <td>{resultMark(record, config.nominal)}</td>
               <td />
               <td>{record?.recorder ?? ""}</td>
             </tr>
@@ -143,7 +148,7 @@ export default function BalanceControlReport({
         <span>รหัสตุ้มน้ำหนัก :</span>
         <span className="bcr-fill">{config.weightCode}</span>
         <span style={{ gridColumn: "span 2" }}>น้ำหนักตุ้ม Daily check :</span>
-        <span className="bcr-fill">{scale.controlWeight}</span>
+        <span className="bcr-fill">{config.nominal}</span>
         <span>g</span>
       </div>
 
@@ -201,7 +206,7 @@ export default function BalanceControlReport({
           {printedBy ? `พิมพ์โดย ${printedBy} ` : ""}
           {printedDate}
         </span>
-        <span>P1/1</span>
+        <span>P{pageNumber}/{totalPages}</span>
       </footer>
     </section>
   );

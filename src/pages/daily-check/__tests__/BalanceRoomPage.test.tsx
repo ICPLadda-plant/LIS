@@ -219,8 +219,20 @@ describe("BalanceRoomPage", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /Print/ }));
     const preview = await screen.findByTestId("print-preview");
-    expect(within(preview).getAllByRole("table")).toHaveLength(2);
-    expect(within(preview).getByText(/01\/.*\/2026/)).toBeInTheDocument();
+    expect(within(preview).getAllByRole("table")).toHaveLength(4);
+    expect(within(preview).getByText("P1/2")).toBeInTheDocument();
+    expect(within(preview).getByText("P2/2")).toBeInTheDocument();
+    expect(within(preview).getAllByText(/01\/.*\/2026/).length).toBeGreaterThan(0);
     expect(within(preview).getAllByText(/16\/.*\/2026/).length).toBeGreaterThan(0);
+  });
+
+  it("shows edit controls and warns when control values are three months old", async () => {
+    apiMock.getBalanceControlConfigs.mockResolvedValue([
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.01, mpe: 0.5, updatedDate: "2026-08-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.01, mpe: 0.5, updatedDate: "2026-08-17" },
+    ]);
+    renderPage();
+    expect(await screen.findByText(/ครบ 3 เดือนแล้ว/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /แก้ไขค่า Control/ })).toHaveLength(2);
   });
 });

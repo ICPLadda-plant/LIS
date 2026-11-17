@@ -6,11 +6,13 @@ import {
   chartDomain,
   classifyPoint,
   computeLimits,
+  controlUpdateDueDate,
   countByStatus,
   displayDigits,
   formatSd,
   formatThaiMonth,
   getBalanceControlConfig,
+  isControlUpdateDue,
   limitDecimalPlaces,
   monthlyStats,
   monthRange,
@@ -164,5 +166,15 @@ describe("config defaults / validation", () => {
     expect(validateBalanceControlInput({ mean: 100, sd: 1, baselineValues: baselineValues.slice(0, 19) })).toBe(
       "กรอกค่าบันทึกให้ครบ 20 ค่า",
     );
+  });
+});
+
+describe("control update due date", () => {
+  it("ครบกำหนดเมื่อผ่านวันที่ปรับปรุง 3 เดือน", () => {
+    expect(controlUpdateDueDate("2026-08-17")?.toISOString().slice(0, 10)).toBe("2026-11-17");
+    expect(controlUpdateDueDate("2026-01-31")?.toISOString().slice(0, 10)).toBe("2026-04-30");
+    expect(isControlUpdateDue("2026-08-17", new Date("2026-11-17T00:00:00"))).toBe(true);
+    expect(isControlUpdateDue("2026-08-18", new Date("2026-11-17T23:59:59"))).toBe(false);
+    expect(isControlUpdateDue("", new Date("2026-11-17T00:00:00"))).toBe(false);
   });
 });

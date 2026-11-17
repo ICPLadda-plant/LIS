@@ -45,6 +45,7 @@ import {
   limitDecimalPlaces,
   formatThaiMonth,
   getBalanceControlConfig,
+  isControlUpdateDue,
   monthRange,
   monthlyStats,
   type ControlPointStatus,
@@ -208,6 +209,7 @@ const BalanceRoomPage = () => {
     { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts },
   ].sort((a, b) => a.weight - b.weight);
   const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
+  const duePanels = chartPanels.filter((panel) => isControlUpdateDue(panel.config.updatedDate));
 
   const createMutation = useMutation({
     mutationFn: api.createDailyCheck,
@@ -464,6 +466,22 @@ const BalanceRoomPage = () => {
         </Alert>
       )}
 
+      {duePanels.length > 0 && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>ครบ 3 เดือนแล้ว กรุณาอัปเดตค่า Control ใหม่สำหรับตุ้ม {duePanels.map((panel) => `${panel.weight} g`).join(" และ ")}</span>
+            <div className="flex flex-wrap gap-2">
+              {duePanels.map((panel) => (
+                <Button key={panel.weight} type="button" variant="outline" size="sm" onClick={() => setConfigWeight(panel.weight)}>
+                  แก้ไข {panel.weight} g
+                </Button>
+              ))}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* สถานะวันนี้ของทุกเครื่อง — คลิกเพื่อเลือกเครื่อง */}
       <section className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -621,10 +639,14 @@ const BalanceRoomPage = () => {
                     <p className="text-xs text-muted-foreground">ค่าเฉลี่ยรายวันและเส้น Control ของเกณฑ์นี้</p>
                   </div>
                   {panel.limits ? (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {isControlUpdateDue(panel.config.updatedDate) && <Badge variant="yellow-soft">ครบกำหนดอัปเดต</Badge>}
                       <Badge variant="green-soft">ในเกณฑ์ {panel.counts.in}</Badge>
                       <Badge variant="yellow-soft">เกิน 2SD {panel.counts.warning}</Badge>
                       <Badge variant="red-soft">เกิน 3SD {panel.counts.out}</Badge>
+                      <Button variant="outline" size="sm" className="ml-1 h-7 gap-1 px-2" onClick={() => setConfigWeight(panel.weight)}>
+                        <Settings2 className="h-3.5 w-3.5" /> แก้ไขค่า Control
+                      </Button>
                     </div>
                   ) : null}
                 </div>
@@ -743,17 +765,22 @@ const BalanceRoomPage = () => {
           docType="daily-check-report"
           css={BALANCE_CONTROL_REPORT_CSS}
         >
-          <BalanceControlReport
-            scale={scale}
-            config={config}
-            limits={limits}
-            series={series}
-            domain={domain}
-            digits={digits}
-            month={month}
-            printedBy={user?.name ?? user?.email ?? ""}
-            printedAt={printedAt || new Date().toISOString()}
-          />
+          {chartPanels.map((panel, index) => (
+            <BalanceControlReport
+              key={panel.weight}
+              scale={scale}
+              config={panel.config}
+              limits={panel.limits}
+              series={panel.series}
+              domain={panel.domain}
+              digits={panel.digits}
+              month={month}
+              printedBy={user?.name ?? user?.email ?? ""}
+              printedAt={printedAt || new Date().toISOString()}
+              pageNumber={index + 1}
+              totalPages={chartPanels.length}
+            />
+          ))}
         </PrintPreviewDialog>
       )}
 
