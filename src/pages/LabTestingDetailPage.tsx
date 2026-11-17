@@ -26,7 +26,7 @@ import { normalizeRoles } from '@/lib/roles';
 import { isAssignedTo } from '@/lib/assignment';
 import { labReceivedAt, labReceivedBy } from '@/lib/receiveStatus';
 import { useConfirm } from '@/context/ConfirmDialog';
-import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, isLabelToleranceAbnormal } from '@/lib/parameterValidation';
+import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, resolveLabLabelTolerance, isLabLabelToleranceAbnormal } from '@/lib/parameterValidation';
 import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
@@ -845,7 +845,7 @@ export default function LabTestingDetailPage() {
     const unitValues = unit.field.multiple ? readMultiple(src, unit.key) : [src[unit.key]];
     return unitValues.filter((v) => {
       if (v == null || v === '') return false;
-      if (unit.labelTolerance) return isLabelToleranceAbnormal(unit.labelTolerance.std, unit.labelTolerance.rawSpec, v);
+      if (unit.labelTolerance) return isLabLabelToleranceAbnormal(unit.labelTolerance.std, unit.labelTolerance.rawSpec, v);
       return isFieldAbnormal(field, v);
     }).length;
   };
@@ -1440,7 +1440,7 @@ export default function LabTestingDetailPage() {
                                 : undefined;
                               const labelToleranceInfo = unit.labelTolerance
                                 ? (() => {
-                                    const rv = resolveLabelTolerance(unit.labelTolerance.std, unit.labelTolerance.rawSpec, srcValues[unit.key]);
+                                    const rv = resolveLabLabelTolerance(unit.labelTolerance.std, unit.labelTolerance.rawSpec, srcValues[unit.key]);
                                     return {
                                       criteriaText: formatLabLabelToleranceRange(rv, unit.field.unit ?? ''),
                                       badge: labelToleranceBadge(rv.status, rv.center),
@@ -1746,7 +1746,7 @@ export default function LabTestingDetailPage() {
                               const outputResult = isOutputMode ? resolveConditionalOutput(unit.field, condCtx) : null;
                               const labelToleranceInfo = unit.labelTolerance
                                 ? (() => {
-                                    const rv = resolveLabelTolerance(unit.labelTolerance.std, unit.labelTolerance.rawSpec, srcValues[unit.key]);
+                                    const rv = resolveLabLabelTolerance(unit.labelTolerance.std, unit.labelTolerance.rawSpec, srcValues[unit.key]);
                                     return {
                                       criteriaText: formatLabLabelToleranceRange(rv, unit.field.unit ?? ''),
                                       badge: labelToleranceBadge(rv.status, rv.center),

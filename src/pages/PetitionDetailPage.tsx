@@ -36,6 +36,7 @@ import {
 import PetitionView from '@/components/petition/PetitionView';
 import { DevStatusStepper } from '@/components/petition/DevStatusStepper';
 import PetitionPrintTemplate from '@/components/petition/PetitionPrintTemplate';
+import { useServiceRequestTemplates } from '@/hooks/useActiveTemplates';
 import ResultReportPrintTemplate from '@/components/petition/ResultReportPrintTemplate';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
 import SampleLabelPrintTemplate from '@/components/petition/SampleLabelPrintTemplate';
@@ -181,6 +182,8 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
   const [deleting, setDeleting] = useState(false);
   const autoPrintDone = useRef(false);
   const [printOpen, setPrintOpen] = useState(false);
+  // แม่แบบที่แก้ในหน้า "จัดการเอกสาร" (สถานะใช้งาน) แทนแผ่นของใบคำร้อง
+  const petitionTemplates = useServiceRequestTemplates(printOpen);
   const [labelPrintOpen, setLabelPrintOpen] = useState(false);
   const [preReportOpen, setPreReportOpen] = useState(false);
   const [finalReportOpen, setFinalReportOpen] = useState(false);
@@ -645,7 +648,10 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
 
               {serviceLabRequest && (
                 <PrintPreviewDialog open={printOpen} onOpenChange={setPrintOpen} docType="service-request">
-                  <PetitionPrintTemplate labRequest={serviceLabRequest} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labReportPages={labReportPages} />
+                  <PetitionPrintTemplate
+                    labRequest={serviceLabRequest} petition={data} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labReportPages={labReportPages}
+                    templates={petitionTemplates}
+                  />
                 </PrintPreviewDialog>
               )}
               {data && (

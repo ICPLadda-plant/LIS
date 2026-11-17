@@ -2,6 +2,22 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const OPENAI_VISION_MODEL = process.env.OPENAI_VISION_MODEL || OPENAI_MODEL;
 
+// OCR (reading text from images) goes through the 9router OpenAI-compatible gateway.
+const OCR_API_BASE_URL = (process.env.OCR_API_BASE_URL || 'https://9router-plant.icpladda.com/v1').replace(/\/+$/, '');
+
+function getOcrConfig() {
+  return {
+    baseUrl: OCR_API_BASE_URL,
+    apiKey: process.env.OCR_API_KEY || '',
+    model: process.env.OCR_MODEL || '',
+  };
+}
+
+function isOcrConfigured() {
+  const { apiKey, model } = getOcrConfig();
+  return Boolean(apiKey && model);
+}
+
 function isOpenAIConfigured() {
   return Boolean(OPENAI_API_KEY);
 }
@@ -87,16 +103,17 @@ async function generateJSON(prompt, options = {}) {
 }
 
 async function generateJSONFromImage(prompt, imageDataUrl, options = {}) {
-  if (!OPENAI_API_KEY) throw new Error('OPENAI_API_KEY not configured');
+  const ocr = getOcrConfig();
+  if (!ocr.apiKey || !ocr.model) throw new Error('OCR_API_KEY / OCR_MODEL not configured');
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(`${ocr.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      Authorization: `Bearer ${ocr.apiKey}`,
     },
     body: JSON.stringify({
-      model: options.model || OPENAI_VISION_MODEL,
+      model: options.model || ocr.model,
       messages: [
         ...(options.system ? [{ role: 'system', content: options.system }] : []),
         {
@@ -115,13 +132,14 @@ async function generateJSONFromImage(prompt, imageDataUrl, options = {}) {
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
-    throw new Error(`OpenAI request failed: ${response.status} ${errText}`);
+    throw new Error(`OCR request failed: ${response.status} ${errText}`);
   }
 
   const json = await response.json();
   const content = json.choices?.[0]?.message?.content;
-  if (!content) throw new Error('OpenAI returned empty content');
-  return JSON.parse(content);
+  if (!content) throw new Error('OCR returned empty content');
+  // Some gateway models wrap JSON in markdown fences; strip them before parsing.
+  return JSON.parse(String(content).replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, ''));
 }
 
 // Non-streaming plain-text completion. Returns the assistant message text (or '').
@@ -155,4 +173,4 @@ async function generateText(prompt, options = {}) {
   return json.choices?.[0]?.message?.content ?? '';
 }
 
-module.exports = { isOpenAIConfigured, generateStream, generateJSON, generateJSONFromImage, generateText, OPENAI_MODEL };
+module.exports = { isOpenAIConfigured, isOcrConfigured, getOcrConfig, generateStream, generateJSON, generateJSONFromImage, generateText, OPENAI_MODEL };

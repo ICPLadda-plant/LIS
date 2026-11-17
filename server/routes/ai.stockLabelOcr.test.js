@@ -3,6 +3,7 @@ const mockIsOpenAIConfigured = jest.fn();
 
 jest.mock('../lib/openaiClient', () => ({
   isOpenAIConfigured: () => mockIsOpenAIConfigured(),
+  isOcrConfigured: () => mockIsOpenAIConfigured(),
   generateStream: jest.fn(),
   generateJSON: jest.fn(),
   generateJSONFromImage: (...args) => mockGenerateJSONFromImage(...args),
@@ -54,7 +55,7 @@ describe('stock label OCR route', () => {
     await handler({ body: { imageDataUrl: 'data:image/jpeg;base64,abc' } }, res);
 
     expect(res.statusCode).toBe(503);
-    expect(res.body).toEqual({ error: 'OpenAI API key ไม่ได้ตั้งค่า' });
+    expect(res.body).toEqual({ error: 'OCR ยังไม่ได้ตั้งค่า OCR_API_KEY / OCR_MODEL' });
   });
 
   test('normalizes OCR candidates to stock label digits', async () => {

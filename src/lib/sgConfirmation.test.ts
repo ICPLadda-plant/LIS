@@ -34,16 +34,11 @@ describe("sgConfirmation", () => {
     expect(itemNeedsSgConfirmation({ ...waterItem, sendToQc: false })).toBe(false);
   });
 
-  it("holds the Lab track until QC confirms the ถพ. value", () => {
+  it("sends water samples to Lab right away without waiting for the ถพ. value", () => {
     const pending = petition();
-    expect(isLabAwaitingSgConfirmation(pending)).toBe(true);
-    expect(isVisibleInAssignQueue(pending)).toBe(false);
-    expect(labTrackStatusBadge(pending).label).toBe("รอยืนยันค่า ถพ.");
-
-    const confirmed = petition({ items: [{ ...waterItem, sgConfirmedAt: "2026-11-01T02:00:00.000Z" }] });
-    expect(isLabAwaitingSgConfirmation(confirmed)).toBe(false);
-    expect(isVisibleInAssignQueue(confirmed)).toBe(true);
-    expect(labTrackStatusBadge(confirmed).label).toBe("รอรับ");
+    expect(isLabAwaitingSgConfirmation(pending)).toBe(false);
+    expect(isVisibleInAssignQueue(pending)).toBe(true);
+    expect(labTrackStatusBadge(pending).label).toBe("รอรับ");
   });
 
   it("does not pull back Lab work that already started", () => {

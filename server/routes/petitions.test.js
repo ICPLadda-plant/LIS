@@ -93,7 +93,7 @@ test('GET / filters assigned petitions by current assignee before pagination', a
   }
 });
 
-test('GET / awaitingQcApproval returns petitions after either track confirms results', async () => {
+test('GET / awaitingQcApproval returns petitions after QC confirms or Lab head issues results', async () => {
   const originals = {
     petitionFind: Petition.find,
     petitionCountDocuments: Petition.countDocuments,
@@ -120,7 +120,7 @@ test('GET / awaitingQcApproval returns petitions after either track confirms res
     assert.deepEqual(findQuery.status, { $nin: ['approved', 'rejected'] });
     assert.deepEqual(findQuery.$or, [
       { qcCompletedAt: { $ne: null } },
-      { labCompletedAt: { $ne: null } },
+      { labCompletedAt: { $ne: null }, labApprovedAt: { $ne: null } },
     ]);
   } finally {
     Petition.find = originals.petitionFind;
