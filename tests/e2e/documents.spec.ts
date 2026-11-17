@@ -7,6 +7,11 @@ const BASE = 'http://localhost:8000/LIS';
 const API = 'http://localhost:3001/api';
 const DEV = { 'x-lis-user': 'e2e.dev@icpladda.com' };
 const STAMP = 'E2E-' + Date.now();
+// เอกสารที่เทสต์สร้างผ่านปุ่ม "แก้ฟอร์มนี้" (ชื่อเริ่มต้นไม่มี STAMP) — ลบใน afterAll แม้เทสต์พังกลางทาง
+const createdIds: string[] = [];
+const trackCreated = (page: Page) =>
+  page.waitForResponse((r) => r.url().endsWith('/api/documents') && r.request().method() === 'POST')
+    .then(async (r) => { const id = ((await r.json()) as { data: { id: string } }).data.id; createdIds.push(id); return id; });
 
 function trackErrors(page: Page) {
   const errors: string[] = [];
@@ -18,9 +23,8 @@ test.afterAll(async ({ request }) => {
   // ลบเอกสารทดสอบทุกตัวที่ชื่อขึ้นต้นด้วย STAMP
   const res = await request.get(API + '/documents', { headers: DEV });
   const list = ((await res.json()) as { data: Array<{ id: string; title: string }> }).data;
-  for (const d of list.filter((x) => x.title.includes(STAMP) || x.title.startsWith('แม่แบบ ') && x.title.includes(STAMP))) {
-    await request.delete(API + '/documents/' + d.id, { headers: DEV });
-  }
+  const ids = new Set([...createdIds, ...list.filter((x) => x.title.includes(STAMP)).map((x) => x.id)]);
+  for (const id of ids) await request.delete(API + '/documents/' + id, { headers: DEV });
 });
 
 test('สร้าง แก้ บันทึก เปิดใหม่ กรอกฟอร์ม ส่งออก และลบเอกสาร', async ({ page }) => {
@@ -156,7 +160,9 @@ test('แก้ฟอร์มใบคำขอรับบริการจ�
   await expect(page.getByText(/เอกสารในระบบ/)).toBeVisible({ timeout: 20000 });
   const editBtn = page.getByRole('row').filter({ hasText: 'FM-QP-07-04-001' }).getByRole('button', { name: 'แก้ฟอร์มนี้' });
   await expect(editBtn).toBeEnabled(); // รอรายการแม่แบบโหลดเสร็จ
+  const created3 = trackCreated(page);
   await editBtn.click();
+  await created3;
   await expect(page.getByText(/สร้างแม่แบบแล้ว/).first()).toBeVisible({ timeout: 15000 });
 
   // ได้หน้าตาฟอร์มจริง (ไม่ใช่โครงเปล่า): หัวตารางเดิม + ช่องข้อมูลผูกไว้
@@ -170,6 +176,15 @@ test('แก้ฟอร์มใบคำขอรับบริการจ�
 
   // แก้หน้าตา: เปลี่ยนข้อความหัวคอลัมน์
   await editor.locator('th', { hasText: 'สำหรับเจ้าหน้าที่' }).evaluate((th, stamp) => { th.textContent = 'เจ้าหน้าที่ ' + stamp; }, STAMP);
+  // เพิ่มช่องข้อมูลจากระบบซ้ำอีกที่ + ช่องกรอกของผู้ใช้ ท้ายหัวเรื่อง "ใบคำขอรับบริการ"
+  const e0Before = await editor.locator('[data-slot="e0"]').count();
+  await editor.locator('.pr-p2-title b').click();
+  await page.getByRole('tab', { name: 'แทรก' }).click();
+  await page.getByLabel('แทรกช่องข้อมูลจากระบบ').selectOption('e0');
+  page.once('dialog', (d) => d.accept('ผู้ตรวจ'));
+  await page.getByRole('button', { name: 'ช่องข้อความ', exact: true }).click();
+  await expect(editor.locator('[data-slot="e0"]')).toHaveCount(e0Before + 1);
+  await expect(editor.locator('[data-ff]')).toHaveCount(1);
   await page.getByLabel('ชื่อเอกสาร').fill('แม่แบบ ' + STAMP);
   await page.getByLabel('สถานะเอกสาร').selectOption('ใช้งาน');
   await page.getByRole('button', { name: 'บันทึก', exact: true }).click();
@@ -187,6 +202,13 @@ test('แก้ฟอร์มใบคำขอรับบริการจ�
   await expect(printed).toContainText('เจ้าหน้าที่ ' + STAMP); // หน้าตาที่ผู้ใช้แก้
   await expect(page.locator('[data-tpl-src="page2"]')).toBeHidden(); // ฟอร์มเดิมซ่อน ใช้เป็นแหล่งข้อมูล
   await expect(printed.locator('.fv-slot')).toHaveCount(0); // ไม่มีไฮไลต์ติดไปตอนพิมพ์
+  await expect(printed).not.toContainText('[ผู้ตรวจ]'); // ช่องกรอกพิมพ์เป็นเส้นให้เขียน
+  await expect(printed.locator('[aria-label="ผู้ตรวจ"]').first()).toHaveClass(/pr-line/);
+  // ช่อง e0 ทุกตัว (รวมตัวที่แทรกเพิ่ม) ได้ค่าเดียวกับช่องแรกของฟอร์มเดิม
+  const e0Real = (await page.locator('[data-tpl-src="page2"] .pr-edit').first().textContent()) ?? '';
+  const e0Printed = await printed.locator('section.pr-page2').first().locator('[data-slot="e0"]').allTextContents();
+  expect(e0Printed.length).toBe(e0Before + 1);
+  expect(new Set(e0Printed)).toEqual(new Set([e0Real]));
 
   // ข้อมูลทุกช่องเท่ากับฟอร์มเดิมของคำร้องนี้ (เทียบทีละแผ่น ทีละช่อง)
   const diff = await page.evaluate(() => {
@@ -294,9 +316,9 @@ test('แก้แม่แบบฟอร์มระบบ: หน้าไม
     await page.goto(BASE + '/documents');
     const editBtn = page.getByRole('row').filter({ hasText: 'FM-QP-07-01-001' }).getByRole('button', { name: 'แก้ฟอร์มนี้' });
     await expect(editBtn).toBeEnabled({ timeout: 20000 });
-    const created = page.waitForResponse((r) => r.url().endsWith('/api/documents') && r.request().method() === 'POST');
+    const created = trackCreated(page);
     await editBtn.click();
-    createdId = ((await (await created).json()) as { data: { id: string } }).data.id;
+    createdId = await created;
     const editor = page.getByLabel('เนื้อหาเอกสาร');
     await expect(editor.locator('.pr-page1')).toHaveCount(1);
 
@@ -333,14 +355,25 @@ test('แก้แม่แบบฟอร์มระบบ: หน้าไม
     await page.keyboard.press('Delete');
     await expect(slots).toHaveCount(before - 2);
 
+    // แทรกช่องข้อมูลจากระบบกลับ (แท็บแทรก) ที่ท้ายหัวเรื่อง
+    await expect(editor.locator('.pr-p1-title')).toHaveCount(1); // เปลี่ยนขนาดแล้วไม่ทิ้งหัวเรื่องว่างซ้ำไว้
+    await editor.locator('.pr-p1-title').click();
+    await page.getByRole('tab', { name: 'แทรก' }).click();
+    const picker = page.getByLabel('แทรกช่องข้อมูลจากระบบ');
+    await expect(picker.locator('option')).not.toHaveCount(1); // มีรายการช่องให้เลือก
+    const firstSlot = await picker.locator('optgroup[label="ช่องข้อความ"] option').first().getAttribute('value');
+    await picker.selectOption(firstSlot!);
+    await expect(slots).toHaveCount(before - 1);
+    await expect(editor.locator('.pr-p1-title [data-slot="' + firstSlot + '"]')).toHaveCount(1); // แทรกตรงตำแหน่งที่คลิก
+
     await page.getByLabel('ชื่อเอกสาร').fill(STAMP + ' ลบช่อง');
     await page.getByRole('button', { name: 'บันทึก', exact: true }).click();
     await expect(page.getByText('บันทึกแล้ว').first()).toBeVisible();
     const saved = (await (await request.get(API + '/documents/' + createdId, { headers: DEV })).json()) as { data: { html: string } };
-    expect((saved.data.html.match(/data-slot="e\d+"/g) ?? []).length).toBe(before - 2);
+    expect((saved.data.html.match(/data-slot="e\d+"/g) ?? []).length).toBe(before - 1);
     expect(saved.data.html).toContain('20pt');
     expect(errors).toEqual([]);
   } finally {
-    if (createdId) await request.delete(API + '/documents/' + createdId, { headers: DEV });
+    void createdId; // ลบใน afterAll (finally ที่นี่ไม่ทันเมื่อ timeout)
   }
 });

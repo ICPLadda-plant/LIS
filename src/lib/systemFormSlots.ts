@@ -7,6 +7,32 @@ import { solveFitScale } from "@/lib/printFit";
 
 const EDIT = ".pr-edit";
 const TOGGLE = ".pr-toggle";
+
+export type SlotInfo = { slot: string; kind: "e" | "c"; label: string; sample: string; className: string; style: string };
+
+// ชื่อช่องสำหรับให้ผู้ใช้เลือก: ข้อความก่อนหน้า (ช่องข้อมูล เช่น "โทรศัพท์ :") หรือข้อความถัดไป (กล่องติ๊ก เช่น "1.1 ลูกค้ามาเอง")
+function nearbyText(el: Element, dir: "before" | "after"): string {
+  const block = el.closest("div, td, th, p, li, section") ?? el.parentElement;
+  if (!block) return "";
+  const range = el.ownerDocument.createRange();
+  // หยุดที่ช่องข้างเคียงในบล็อกเดียวกัน — ชื่อช่องคือข้อความระหว่างช่อง เช่น "โทรศัพท์ : [..] E-mail : [..]"
+  const others = Array.from(block.querySelectorAll(EDIT + ", " + TOGGLE)).filter((x) => x !== el);
+  const isBefore = (x: Element) => !!(x.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+  if (dir === "before") {
+    const prev = others.filter(isBefore).pop();
+    if (prev) range.setStartAfter(prev); else range.setStart(block, 0);
+    range.setEndBefore(el);
+  } else {
+    const next = others.find((x) => !isBefore(x));
+    range.setStartAfter(el);
+    if (next) range.setEndBefore(next); else range.setEnd(block, block.childNodes.length);
+  }
+  const frag = range.cloneContents();
+  frag.querySelectorAll(EDIT).forEach((x) => x.remove()); // ไม่เอาค่าของช่องข้างเคียงมาปน
+  const text = (frag.textContent ?? "").replace(/\s+/g, " ").trim();
+  const cut = dir === "before" ? text.slice(-28) : text.slice(0, 28);
+  return cut.replace(/^[\s:(/)]+|[\s:(/)]+$/g, "").trim();
+}
 const rowBodies = (root: ParentNode) =>
   Array.from(root.querySelectorAll("table")).filter((t) => t.tHead).map((t) => t.tBodies[0]).filter(Boolean) as HTMLTableSectionElement[];
 
@@ -17,10 +43,12 @@ export function annotateSystemPage(section: HTMLElement): string {
     el.dataset.slot = "e" + i;
     el.classList.add("fv-slot");
     el.removeAttribute("spellcheck");
+    el.dataset.slotLabel = nearbyText(section.querySelectorAll(EDIT)[i], "before") || "ช่องข้อมูล " + (i + 1);
   });
   page.querySelectorAll<HTMLElement>(TOGGLE).forEach((el, i) => {
     el.dataset.slot = "c" + i;
     ["role", "tabindex", "aria-checked"].forEach((a) => el.removeAttribute(a));
+    el.dataset.slotLabel = nearbyText(section.querySelectorAll(TOGGLE)[i], "after") || "กล่องติ๊ก " + (i + 1);
   });
   lockSlots(page);
   rowBodies(page).forEach((tb, i) => { tb.dataset.slotRows = String(i); });
@@ -34,6 +62,27 @@ export function annotateSystemPage(section: HTMLElement): string {
 }
 
 export const isSlotTemplate = (html: string) => html.includes("data-slot=");
+
+/** รายการช่องทั้งหมดของฟอร์มระบบ (จากแม่แบบที่เพิ่ง capture) สำหรับให้ผู้ใช้แทรกกลับ/เพิ่มซ้ำ */
+export function slotCatalog(templateHtml: string): SlotInfo[] {
+  const doc = new DOMParser().parseFromString("<div id=root>" + templateHtml + "</div>", "text/html");
+  return Array.from(doc.querySelectorAll<HTMLElement>("[data-slot]")).map((el) => ({
+    slot: el.dataset.slot!,
+    kind: el.dataset.slot![0] as "e" | "c",
+    label: el.dataset.slotLabel || el.dataset.slot!,
+    sample: (el.textContent ?? "").trim(),
+    className: el.className.replace(/\b(slot-selected|pr-cb-x|pr-rd-x)\b/g, "").trim(),
+    style: el.getAttribute("style") ?? "",
+  }));
+}
+
+const escAttr = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+
+/** HTML ของช่องที่แทรกเพิ่ม — เลขช่องเดียวกับฟอร์มเดิม ระบบจึงเติมข้อมูลจริงให้ตอนพิมพ์ */
+export function slotHtml(info: SlotInfo): string {
+  return '<span class="' + escAttr(info.className) + '" style="' + escAttr(info.style) + '" data-slot="' + info.slot
+    + '" data-slot-label="' + escAttr(info.label) + '" contenteditable="false">' + (info.kind === "e" ? escAttr(info.sample) : "") + "</span>";
+}
 
 /** ช่องผูกข้อมูลเป็นก้อนเดียว (แก้ข้อความข้างในไม่ได้ แต่เลือก/ลบ/ย้ายทั้งก้อนได้) — ใช้กับแม่แบบที่บันทึกไว้ก่อนหน้าด้วย */
 export function lockSlots(root: ParentNode) {
@@ -89,6 +138,19 @@ export function fillSystemPage(templateHtml: string, source: HTMLElement): strin
   root.querySelectorAll<HTMLElement>("[data-slot-rows]").forEach((tb) => {
     const src = bodies[Number(tb.dataset.slotRows)];
     if (src) tb.innerHTML = src.innerHTML;
+  });
+  // ช่องกรอกที่ผู้ใช้เพิ่ม (data-ff): พิมพ์เป็นเส้นประให้เขียน/พิมพ์เติมในหน้าตัวอย่างก่อนพิมพ์ได้ — ไม่ใช่ข้อความ [ชื่อช่อง]
+  root.querySelectorAll<HTMLElement>("[data-ff]").forEach((el) => {
+    const blank = doc.createElement("span");
+    if (el.dataset.ff === "checkbox") {
+      blank.className = "pr-cb pr-toggle";
+    } else {
+      blank.className = "pr-line pr-edit";
+      blank.setAttribute("contenteditable", "true");
+      blank.style.minWidth = el.dataset.ff === "textarea" ? "12cm" : el.dataset.ff === "signature" ? "5cm" : "3cm";
+    }
+    blank.setAttribute("aria-label", el.dataset.ffLabel ?? "");
+    el.replaceWith(blank);
   });
   return root.innerHTML;
 }

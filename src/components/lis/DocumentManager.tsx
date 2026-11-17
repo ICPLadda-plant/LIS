@@ -15,8 +15,9 @@ import { api } from "@/lib/api";
 import {
   FILL_FIELDS, fillFieldHtml, hasFillFields,
 } from "@/lib/formTemplate";
-import { SYSTEM_FORM_CAPTURE, captureSystemForm } from "@/lib/systemFormCapture";
-import { isSlotTemplate, lockSlots, refitBoxes } from "@/lib/systemFormSlots";
+import { SYSTEM_FORM_CAPTURE, captureSystemForm, systemFormCatalog } from "@/lib/systemFormCapture";
+import { captureOtherForm, hasOtherFormCapture } from "@/lib/otherFormCapture";
+import { isSlotTemplate, lockSlots, refitBoxes, slotHtml, type SlotInfo } from "@/lib/systemFormSlots";
 import FillFormView from "@/components/lis/FillFormView";
 import { Link } from "react-router-dom";
 import { Label } from "@/components/ui/label";
@@ -105,8 +106,21 @@ const setSize = (pt: number) => {
   const range = sel.getRangeAt(0);
   const span = document.createElement("span");
   span.style.fontSize = pt + "pt";
+  const host = range.commonAncestorContainer instanceof Element ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+  const isEmpty = (el: Element) => !el.textContent && !el.querySelector("img, br, [data-slot], [data-ff]") && !el.matches("img, br, [data-slot], [data-ff], .pr-cb, .pr-rd, .pr-line");
+  const emptyBefore = new Set(host ? Array.from(host.querySelectorAll("*")).filter(isEmpty) : []);
   span.appendChild(range.extractContents());
   range.insertNode(span);
+  // extractContents ทิ้งแท็กที่ว่างลง (เช่น <b></b>, div หัวเรื่องเดิม) ไว้ข้างหลัง — ลบเฉพาะที่ว่างเพราะครั้งนี้
+  // แท็กที่ฟอร์มตั้งใจเว้นว่าง (ช่องติ๊ก เส้นประ ตัวเว้นระยะ) ไม่แตะ
+  host?.querySelectorAll("*").forEach((el) => {
+    if (el !== span && !span.contains(el) && !emptyBefore.has(el) && isEmpty(el)) el.remove();
+  });
+  // เลือกข้อความที่เพิ่งเปลี่ยนขนาดไว้ ให้กดเปลี่ยนต่อได้และ Ribbon แสดงค่าใหม่
+  const next = document.createRange();
+  next.selectNodeContents(span);
+  sel.removeAllRanges();
+  sel.addRange(next);
 };
 
 const currentCell = () => {
@@ -170,7 +184,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 const selectCls = "h-8 rounded-md border bg-background px-2 text-sm";
 
-function Ribbon() {
+function Ribbon({ slots }: { slots?: SlotInfo[] }) {
   const [cur, setCur] = useSelectionFont();
   const fonts = cur.font && !FONTS.includes(cur.font) ? [cur.font, ...FONTS] : FONTS;
   const sizes = cur.size && !SIZES.map(String).includes(cur.size) ? [...SIZES.map(String), cur.size].sort((a, b) => +a - +b) : SIZES.map(String);
@@ -234,11 +248,31 @@ function Ribbon() {
           <Tool label="ลบคอลัมน์" onClick={tableOps.delCol} />
           <Tool label="ลบตาราง" onClick={tableOps.delTable} />
         </Group>
+        {slots && (
+          <Group label="ช่องข้อมูลจากระบบ (เติมจากคำร้องจริงตอนพิมพ์)">
+            <select aria-label="แทรกช่องข้อมูลจากระบบ" className={selectCls + " w-72"} value="" onChange={(e) => {
+              const info = slots.find((x) => x.slot === e.target.value);
+              if (!info) return;
+              restoreSelection();
+              exec("insertHTML", slotHtml(info) + "&nbsp;");
+            }}>
+              <option value="" disabled>เลือกช่องที่จะแทรก</option>
+              <optgroup label="ช่องข้อความ">
+                {slots.filter((x) => x.kind === "e").map((x) => (
+                  <option key={x.slot} value={x.slot}>{x.label}{x.sample ? " — ตัวอย่าง: " + x.sample.slice(0, 30) : ""}</option>
+                ))}
+              </optgroup>
+              <optgroup label="กล่องติ๊ก">
+                {slots.filter((x) => x.kind === "c").map((x) => <option key={x.slot} value={x.slot}>☐ {x.label}</option>)}
+              </optgroup>
+            </select>
+          </Group>
+        )}
         <Group label="ช่องกรอก (ให้คนกรอกตอนพิมพ์)">
           {FILL_FIELDS.map((f) => (
             <Tool key={f.type} label={f.label} onClick={() => {
               const label = window.prompt("ชื่อช่อง เช่น ชื่อผู้รับ, วันที่รับ", f.label.replace("ช่อง", ""));
-              if (label) exec("insertHTML", fillFieldHtml(f.type, label.trim()));
+              if (label) { restoreSelection(); exec("insertHTML", fillFieldHtml(f.type, label.trim())); }
             }} />
           ))}
         </Group>
@@ -322,6 +356,13 @@ function MetaPanel({ doc, onChange, roles }: { doc: Doc; onChange: (patch: Parti
 
 type SystemDocRow = (typeof SYSTEM_DOCS)[number];
 const sysRoleText = (r: string[]) => (r.length ? r.join(", ") : "-");
+// รหัสผูกแม่แบบ: ฟอร์มที่ไม่มีรหัส ("-") ใช้ชื่อเอกสารแทน กันชนกัน
+const sysKey = (d: SystemDocRow) => (d.code && d.code !== "-" ? d.code : d.name);
+const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+// โครงเริ่มต้นสำหรับฟอร์มที่ยังดึงหน้าตาจากระบบไม่ได้ — แก้ต่อใน editor ได้ทั้งหมด
+const skeletonHtml = (d: SystemDocRow) =>
+  '<table style="width:100%;border-collapse:collapse" border="1"><tr><td style="padding:6px"><b>' + escHtml(d.name) + "</b></td>" +
+  '<td style="padding:6px;width:35%">รหัส: ' + escHtml(d.code) + "<br>Rev: " + escHtml(d.rev) + "</td></tr></table><p><br></p><p>เนื้อหาฟอร์ม</p>";
 
 // busy = รายการแม่แบบยังโหลดไม่เสร็จ/กำลังสร้าง — กันกดแล้วสร้างแม่แบบซ้ำทั้งที่มีอยู่แล้ว
 function SystemDocsTable({ onEditTemplate, busy }: { onEditTemplate: (d: SystemDocRow) => void; busy: boolean }) {
@@ -361,9 +402,7 @@ function SystemDocsTable({ onEditTemplate, busy }: { onEditTemplate: (d: SystemD
                     <Link to={d.page} className="inline-flex items-center gap-1 text-primary hover:underline">{d.pageLabel}<ExternalLink className="w-3 h-3" /></Link>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {SYSTEM_FORM_CAPTURE[d.code] && (
-                      <Button size="sm" variant="outline" className="whitespace-nowrap" disabled={busy} onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
-                    )}
+                    <Button size="sm" variant="outline" className="whitespace-nowrap" disabled={busy} onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
                   </td>
                 </tr>
               ))}
@@ -384,6 +423,15 @@ export default function DocumentManager() {
   const [saving, setSaving] = useState(false);
   const [fillMode, setFillMode] = useState(false);
   const [selSlot, setSelSlot] = useState<HTMLElement | null>(null);
+  const [slotList, setSlotList] = useState<SlotInfo[] | undefined>(undefined);
+  const sysCode = current?.templateFor && SYSTEM_FORM_CAPTURE[current.templateFor] && isSlotTemplate(current.html || "") ? current.templateFor : "";
+  useEffect(() => {
+    setSlotList(undefined);
+    if (!sysCode) return;
+    let alive = true;
+    systemFormCatalog(sysCode).then((list) => alive && setSlotList(list)).catch(() => alive && setSlotList([]));
+    return () => { alive = false; };
+  }, [sysCode]);
   const editor = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -432,14 +480,20 @@ export default function DocumentManager() {
 
   // แก้ฟอร์มระบบ: เปิดแม่แบบที่มีอยู่ หรือสร้างใหม่จากแม่แบบเริ่มต้น
   const editTemplate = async (sd: SystemDocRow) => {
-    const existing = docs.find((d) => d.templateFor === sd.code);
+    const key = sysKey(sd);
+    const existing = docs.find((d) => d.templateFor === key);
     if (existing) return open(existing);
     let html: string;
-    try { html = await captureSystemForm(sd.code); }
-    catch (e) { return toast.error("เปิดฟอร์มระบบไม่สำเร็จ: " + errMsg(e)); }
+    if (SYSTEM_FORM_CAPTURE[key]) {
+      try { html = await captureSystemForm(key); }
+      catch (e) { return toast.error("เปิดฟอร์มระบบไม่สำเร็จ: " + errMsg(e)); }
+    } else {
+      try { html = await captureOtherForm(key); }
+      catch { html = skeletonHtml(sd); }
+    }
     const d = withMeta({
       id: "", title: "แม่แบบ " + sd.name, source: "สร้างเอง", updatedAt: new Date().toISOString(), canEdit: true,
-      code: sd.code, rev: sd.rev, paper: sd.paper, stage: sd.stage, printWhen: sd.status, templateFor: sd.code,
+      code: sd.code, rev: sd.rev, paper: sd.paper, stage: sd.stage, printWhen: sd.status, templateFor: key,
     });
     if (await persist(d, html)) toast.success('สร้างแม่แบบแล้ว ตั้งสถานะเป็น "ใช้งาน" เมื่อพร้อมให้ระบบพิมพ์ด้วยแม่แบบนี้');
   };
@@ -449,7 +503,7 @@ export default function DocumentManager() {
     if (!current?.templateFor) return;
     if (!confirm("แทนเนื้อหาด้วยฟอร์มปัจจุบันของระบบ? สิ่งที่แก้ไว้ในแม่แบบนี้จะหายไป")) return;
     try {
-      const html = await captureSystemForm(current.templateFor);
+      const html = SYSTEM_FORM_CAPTURE[current.templateFor] ? await captureSystemForm(current.templateFor) : await captureOtherForm(current.templateFor);
       if (await persist(current, html)) toast.success("ดึงฟอร์มจากระบบแล้ว");
     } catch (e) { toast.error("ดึงฟอร์มจากระบบไม่สำเร็จ: " + errMsg(e)); }
   };
@@ -459,6 +513,14 @@ export default function DocumentManager() {
       const res = await api.get<Envelope<Doc>>("/documents/" + d.id);
       const doc = withMeta(body(res));
       setFillMode(false);
+      // แม่แบบโครงเปล่ารุ่นก่อน → เปลี่ยนเป็นหน้าตาฟอร์มจริงของระบบให้อัตโนมัติ
+      if (doc.templateFor && hasOtherFormCapture(doc.templateFor) && doc.canEdit && (doc.html || "").includes("<p>เนื้อหาฟอร์ม</p>")) {
+        try {
+          const html = await captureOtherForm(doc.templateFor);
+          if (await persist(doc, html)) toast.success("อัปเดตแม่แบบเป็นหน้าตาฟอร์มจริงของระบบแล้ว");
+          return;
+        } catch (e) { toast.error("ดึงฟอร์มจากระบบไม่สำเร็จ: " + errMsg(e)); }
+      }
       // แม่แบบรุ่นแรก (โครงเปล่า ไม่ผูกช่อง) ระบบไม่ใช้ตอนพิมพ์ — เปลี่ยนเป็นหน้าตาฟอร์มจริงให้อัตโนมัติ
       if (doc.templateFor && SYSTEM_FORM_CAPTURE[doc.templateFor] && doc.canEdit && !isSlotTemplate(doc.html || "")) {
         try {
@@ -561,12 +623,13 @@ export default function DocumentManager() {
           </div>
         </div>
         {!fillMode && <MetaPanel doc={current} onChange={patch} roles={roles} />}
-        {current.templateFor && !fillMode && (
+        {current.templateFor && SYSTEM_FORM_CAPTURE[current.templateFor] && !fillMode && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 text-sm print:hidden">
             {isSlotTemplate(current.html || "") ? (
               <p className="flex-1 text-muted-foreground">
                 แม่แบบนี้ใช้แทนฟอร์ม {current.templateFor} เมื่อสถานะเป็น "ใช้งาน" ช่องที่ไฮไลต์คือข้อมูลที่ระบบเติมจากคำร้องจริงตอนพิมพ์
                 แก้ข้อความ ตาราง ฟอนต์ได้ ถ้าไม่ต้องการช่องไหน คลิกช่องนั้นแล้วกด Delete หรือปุ่ม "ลบช่องนี้"
+                เพิ่มช่องได้ที่แท็บ "แทรก": "ช่องข้อมูลจากระบบ" (ระบบเติมให้) หรือ "ช่องกรอก" (เป็นเส้นให้เขียนตอนพิมพ์)
               </p>
             ) : (
               <p className="flex-1 text-destructive">แม่แบบนี้สร้างจากแบบเก่า ยังไม่ผูกข้อมูลกับฟอร์มระบบ ระบบจะไม่ใช้ตอนพิมพ์ กดปุ่มด้านขวาเพื่อดึงฟอร์มจริงมาแก้</p>
@@ -574,9 +637,15 @@ export default function DocumentManager() {
             {current.canEdit && <Button size="sm" variant="outline" onClick={resetFromSystem}>ดึงฟอร์มจากระบบใหม่</Button>}
           </div>
         )}
+        {current.templateFor && !SYSTEM_FORM_CAPTURE[current.templateFor] && hasOtherFormCapture(current.templateFor) && !fillMode && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 text-sm print:hidden">
+            <p className="flex-1 text-muted-foreground">แม่แบบนี้เริ่มจากหน้าตาฟอร์ม {current.templateFor} ของระบบ แก้และบันทึกได้ทั้งหมด</p>
+            {current.canEdit && <Button size="sm" variant="outline" onClick={resetFromSystem}>ดึงฟอร์มจากระบบใหม่</Button>}
+          </div>
+        )}
         {current.canEdit && !fillMode && (
           <div className="sticky top-0 z-10 space-y-2 print:hidden">
-            <Ribbon />
+            <Ribbon slots={slotList} />
             {selSlot && (
               <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm shadow-sm">
                 <span className="text-muted-foreground">
