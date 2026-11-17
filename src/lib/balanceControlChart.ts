@@ -1,6 +1,6 @@
-// Quality Control Chart ของเครื่องชั่ง (Daily check ด้วยตุ้ม 100 g)
+// Quality Control Chart ของเครื่องชั่ง (Daily check ด้วยตุ้มที่กำหนดต่อเครื่อง)
 // - ค่า Control (Mean / STD) ตั้งต่อเครื่อง → คำนวณเส้น UWL/LWL (±2SD) และ UCL/LCL (±3SD)
-// - ค่าที่ได้ของแต่ละวัน = avg100 ของการบันทึกล่าสุดในวันนั้น แล้วนำมาเทียบกับเส้นควบคุม
+// - ค่าที่ได้ของแต่ละวัน = ค่าเฉลี่ยของตุ้มที่กำหนดต่อเครื่องจากการบันทึกล่าสุดในวันนั้น
 // ฝั่ง server (server/routes/balanceControlConfig.js) ใช้ default และข้อความ validate ชุดเดียวกัน
 
 export interface BalanceScale {
@@ -12,14 +12,18 @@ export interface BalanceScale {
   model: string;
   /** ความละเอียดของเครื่อง (จำนวนตำแหน่งทศนิยม) */
   decimals: number;
+  /** ตุ้มน้ำหนักที่นำมาสร้าง Control Chart */
+  controlWeight: 10 | 100;
+  /** ตุ้มน้ำหนักหลักที่บันทึกในช่องเดิมของระบบ (weights100) */
+  primaryCalibrationWeight: 100 | 500;
 }
 
 export const BALANCE_SCALES: BalanceScale[] = [
-  { id: "scale-1", code: "LD-005", name: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง", model: "Balance A", decimals: 2 },
-  { id: "scale-2", code: "LD-006", name: "LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง", model: "Balance B", decimals: 4 },
-  { id: "scale-3", code: "LD-021", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C", decimals: 5 },
-  { id: "scale-4", code: "LD-047", name: "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance D", decimals: 5 },
-  { id: "scale-5", code: "LD-048", name: "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance E", decimals: 5 },
+  { id: "scale-1", code: "LD-005", name: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง", model: "Balance A", decimals: 2, controlWeight: 10, primaryCalibrationWeight: 500 },
+  { id: "scale-2", code: "LD-006", name: "LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง", model: "Balance B", decimals: 4, controlWeight: 100, primaryCalibrationWeight: 100 },
+  { id: "scale-3", code: "LD-021", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C", decimals: 5, controlWeight: 100, primaryCalibrationWeight: 100 },
+  { id: "scale-4", code: "LD-047", name: "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance D", decimals: 5, controlWeight: 100, primaryCalibrationWeight: 100 },
+  { id: "scale-5", code: "LD-048", name: "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance E", decimals: 5, controlWeight: 100, primaryCalibrationWeight: 100 },
 ];
 
 export const balanceScaleTypeLabel = (scale: BalanceScale) => `เครื่องชั่งดิจิตอล ${scale.decimals} ตำแหน่ง`;
@@ -33,6 +37,7 @@ export interface BalanceControlConfig {
   nominal: number;
   mean: number | null;
   sd: number | null;
+  baselineValues?: number[];
   mpe: number | null;
   /** วันที่ปรับปรุงค่า Control (YYYY-MM-DD) หรือ "" */
   updatedDate: string;
@@ -45,6 +50,7 @@ export interface BalanceControlConfigInput {
   nominal?: number | null;
   mean: number;
   sd: number;
+  baselineValues?: number[];
   mpe?: number | null;
   updatedDate?: string;
 }
@@ -57,15 +63,19 @@ const DEFAULT_SCALE_META = [
   { scaleId: "scale-5", brand: "Sartorius", model: "MCE225P-3S00-D" },
 ];
 
-export const BALANCE_CONTROL_DEFAULTS: BalanceControlConfig[] = DEFAULT_SCALE_META.map((meta) => ({
-  ...meta,
-  weightCode: "",
-  nominal: 100,
-  mean: null,
-  sd: null,
-  mpe: 0.5,
-  updatedDate: "",
-}));
+export const BALANCE_CONTROL_DEFAULTS: BalanceControlConfig[] = DEFAULT_SCALE_META.flatMap((meta) => {
+  const scale = BALANCE_SCALES.find((item) => item.id === meta.scaleId);
+  return [scale?.primaryCalibrationWeight ?? 100, 10].map((nominal) => ({
+    ...meta,
+    weightCode: "",
+    nominal,
+    mean: null,
+    sd: null,
+    baselineValues: [],
+    mpe: 0.5,
+    updatedDate: "",
+  }));
+});
 
 const isFiniteNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
@@ -74,17 +84,20 @@ const isFiniteNumber = (value: unknown): value is number =>
 export function getBalanceControlConfig(
   configs: BalanceControlConfig[] | undefined,
   scaleId: string,
+  nominal?: number,
 ): BalanceControlConfig {
+  const targetNominal = nominal ?? BALANCE_SCALES.find((scale) => scale.id === scaleId)?.controlWeight ?? 100;
   return (
-    configs?.find((config) => config.scaleId === scaleId) ??
-    BALANCE_CONTROL_DEFAULTS.find((config) => config.scaleId === scaleId) ?? {
+    configs?.find((config) => config.scaleId === scaleId && config.nominal === targetNominal) ??
+    BALANCE_CONTROL_DEFAULTS.find((config) => config.scaleId === scaleId && config.nominal === targetNominal) ?? {
       scaleId,
       brand: "",
       model: "",
       weightCode: "",
-      nominal: 100,
+      nominal: targetNominal,
       mean: null,
       sd: null,
+      baselineValues: [],
       mpe: null,
       updatedDate: "",
     }
@@ -105,7 +118,7 @@ export function computeLimits(
   mean: number | null | undefined,
   sd: number | null | undefined,
 ): ControlLimits | null {
-  if (!isFiniteNumber(mean) || !isFiniteNumber(sd) || sd <= 0) return null;
+  if (!isFiniteNumber(mean) || !isFiniteNumber(sd) || sd < 0) return null;
   return {
     mean,
     sd,
@@ -168,9 +181,24 @@ export function formatThaiMonth(month: string): string {
   return name ? `${name} ${Number(match[1]) + 543}` : month;
 }
 
+export function controlUpdateDueDate(updatedDate: string): Date | null {
+  if (!DATE_RE.test(updatedDate)) return null;
+  const [year, month, day] = updatedDate.split("-").map(Number);
+  const targetMonth = month + 2;
+  const lastDay = new Date(Date.UTC(year, targetMonth + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, targetMonth, Math.min(day, lastDay)));
+}
+
+export function isControlUpdateDue(updatedDate: string, now = new Date()): boolean {
+  const dueDate = controlUpdateDueDate(updatedDate);
+  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return dueDate != null && today >= dueDate.getTime();
+}
+
 export interface ControlSeriesRecord {
   date: string;
   avg100: number;
+  avg10?: number;
   checkedAt: string;
 }
 
@@ -184,12 +212,13 @@ export interface MonthlyPoint<R extends ControlSeriesRecord = ControlSeriesRecor
 const timeOf = (iso: string) => Date.parse(iso) || 0;
 
 /** 1 จุดต่อวันของเดือน (ใช้การบันทึกล่าสุดของวัน); วันไม่มีข้อมูล value = null */
-export function buildMonthlySeries<R extends ControlSeriesRecord>(records: R[], month: string): MonthlyPoint<R>[] {
+export function buildMonthlySeries<R extends ControlSeriesRecord>(records: R[], month: string, controlWeight: 10 | 100 = 100): MonthlyPoint<R>[] {
   const range = monthRange(month);
   if (!range) return [];
   const latestByDate = new Map<string, R>();
   for (const record of records) {
-    if (!record?.date?.startsWith(`${month}-`) || !isFiniteNumber(record.avg100)) continue;
+    const value = controlWeight === 10 ? record.avg10 : record.avg100;
+    if (!record?.date?.startsWith(`${month}-`) || !isFiniteNumber(value)) continue;
     const previous = latestByDate.get(record.date);
     if (!previous || timeOf(record.checkedAt) > timeOf(previous.checkedAt)) latestByDate.set(record.date, record);
   }
@@ -197,8 +226,13 @@ export function buildMonthlySeries<R extends ControlSeriesRecord>(records: R[], 
   return Array.from({ length: days }, (_, index) => {
     const date = `${month}-${String(index + 1).padStart(2, "0")}`;
     const record = latestByDate.get(date) ?? null;
-    return { day: index + 1, date, value: record ? record.avg100 : null, record };
+    return { day: index + 1, date, value: record ? (controlWeight === 10 ? record.avg10 ?? null : record.avg100) : null, record };
   });
+}
+
+/** เลือกค่าจริงตามลำดับวันไม่เกินจำนวนที่กำหนด สำหรับสร้าง baseline Control Chart */
+export function controlBaselineValues(series: MonthlyPoint[], limit = 20): number[] {
+  return series.flatMap((point) => point.value == null ? [] : [point.value]).slice(0, limit);
 }
 
 /** ค่าเฉลี่ยและ SD แบบ sample (n − 1) เหมือน STDEV ใน Excel */
@@ -237,19 +271,18 @@ export function chartDomain(
   return [min - pad, max + pad];
 }
 
-/** จำนวนทศนิยมที่แสดงค่า Control: อย่างน้อย 4 ตำแหน่ง หรือเท่าความละเอียดเครื่อง */
+/** ค่า Control แสดงอย่างน้อย 4 ตำแหน่งเพื่อให้เห็นความต่างของ ±2SD/±3SD */
 export function controlDigits(scaleDecimals: number): number {
   return Math.max(scaleDecimals, 4);
 }
 
-/**
- * ทศนิยมที่ใช้แสดงค่า Control/ค่าที่ได้: อย่างน้อย controlDigits และละเอียดพอให้เห็นระยะ 1SD
- * เช่น SD 0.0000476 → 6 ตำแหน่ง (ไม่งั้น UWL/LWL/UCL/LCL จะปัดเป็นเลขเดียวกัน)
- */
-export function displayDigits(scaleDecimals: number, sd: number | null | undefined): number {
-  const base = controlDigits(scaleDecimals);
-  if (!isFiniteNumber(sd) || sd <= 0) return base;
-  return Math.min(8, Math.max(base, Math.ceil(-Math.log10(sd)) + 1));
+export function displayDigits(scaleDecimals: number, _sd: number | null | undefined): number {
+  return controlDigits(scaleDecimals);
+}
+
+export function limitDecimalPlaces(value: string, digits: number): string {
+  const decimalIndex = value.indexOf(".");
+  return decimalIndex < 0 ? value : value.slice(0, decimalIndex + digits + 1);
 }
 
 export function formatControlNumber(value: number | null | undefined, digits: number): string {
@@ -268,12 +301,15 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** ข้อความเดียวกับ validate() ฝั่ง server */
 export function validateBalanceControlInput(input: BalanceControlConfigInput): string | null {
-  const { mean, sd, nominal, mpe, updatedDate } = input;
+  const { mean, sd, baselineValues, nominal, mpe, updatedDate } = input;
   if (!isFiniteNumber(mean)) return "ค่า Mean ต้องเป็นตัวเลข";
   if (!isFiniteNumber(sd)) return "ค่า STD ต้องเป็นตัวเลข";
-  if (sd <= 0) return "ค่า STD ต้องมากกว่า 0";
+  if (sd < 0) return "ค่า STD ต้องไม่ติดลบ";
   if (nominal != null && (!isFiniteNumber(nominal) || nominal <= 0)) return "น้ำหนักตุ้มต้องมากกว่า 0";
   if (mpe != null && (!isFiniteNumber(mpe) || mpe < 0)) return "ค่า MPE ต้องไม่ติดลบ";
   if (updatedDate && !DATE_RE.test(updatedDate)) return "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD";
+  if (!Array.isArray(baselineValues) || baselineValues.length !== 20 || !baselineValues.every(isFiniteNumber)) {
+    return "กรอกค่าบันทึกให้ครบ 20 ค่า";
+  }
   return null;
 }

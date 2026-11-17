@@ -45,6 +45,7 @@ router.post('/', async (req, res) => {
   try {
     const {
       scaleId, scaleName, model,
+      date,
       weights100, weights10,
       avg100, avg10,
       status100, status10,
@@ -59,17 +60,26 @@ router.post('/', async (req, res) => {
         !Array.isArray(weights10) || weights10.length !== 3) {
       return res.status(400).json({ error: 'weights100 และ weights10 ต้องเป็น array 3 ค่า' });
     }
-    if (typeof avg100 !== 'number' || typeof avg10 !== 'number') {
-      return res.status(400).json({ error: 'avg100 และ avg10 ต้องเป็นตัวเลข' });
+    if (![...weights100, ...weights10].every((value) => Number.isFinite(Number(value)) && Number(value) > 0)) {
+      return res.status(400).json({ error: 'ค่าน้ำหนักทุกค่าต้องเป็นตัวเลขที่มากกว่า 0' });
+    }
+    if (![avg100, avg10].every((value) => Number.isFinite(value) && value > 0)) {
+      return res.status(400).json({ error: 'avg100 และ avg10 ต้องเป็นตัวเลขที่มากกว่า 0' });
     }
     if (!recorder || !String(recorder).trim()) {
       return res.status(400).json({ error: 'recorder ต้องระบุ' });
+    }
+    const recordDate = date == null ? todayStr() : String(date);
+    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(recordDate) ? new Date(`${recordDate}T00:00:00`) : null;
+    const [recordYear, recordMonth, recordDay] = recordDate.split('-').map(Number);
+    if (!parsedDate || Number.isNaN(parsedDate.getTime()) || parsedDate.getFullYear() !== recordYear || parsedDate.getMonth() + 1 !== recordMonth || parsedDate.getDate() !== recordDay || recordDate > todayStr()) {
+      return res.status(400).json({ error: 'วันที่บันทึกไม่ถูกต้องหรือเป็นวันที่ในอนาคต' });
     }
 
     const overall = (status100 === 'pass' && status10 === 'pass') ? 'pass' : 'fail';
 
     const now = new Date();
-    const period = getDailyCheckPeriod(now) || undefined;
+    const period = recordDate === todayStr() ? getDailyCheckPeriod(now) || undefined : undefined;
 
     const created = await DailyCheck.create({
       scaleId, scaleName, model: model || '',
@@ -81,7 +91,7 @@ router.post('/', async (req, res) => {
       recorder: String(recorder).trim(),
       recorderId: recorderId || '',
       recorderEmail: recorderEmail || '',
-      date: todayStr(),
+      date: recordDate,
       period,
       checkedAt: now,
     });
