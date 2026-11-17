@@ -129,6 +129,7 @@ function matchLabParametersForItem(
   item: PetitionItem,
   params: ParameterItem[],
   itemGroupIds: string[] = [],
+  densitySources: DensitySource[] = [],
 ): ParameterItem[] {
   const matched = matchParametersForItem(
     item,
@@ -140,7 +141,7 @@ function matchLabParametersForItem(
     },
   );
   // รายการที่ส่ง Lab อย่างเดียว → ยืมพารามิเตอร์ ถพ. จากรายการส่ง QC ที่เป็นตัวอย่าง/batch เดียวกัน
-  const sibling = densitySourceItem(petition, item);
+  const sibling = densitySourceItem(petition, item, densitySources)?.item;
   if (!sibling || isResearchAndDevelopmentPetition(petition)) return matched;
   const extra = matchParametersForItem(sibling, params, itemGroupIds, { petitionCategory: getPetitionCategory(petition) })
     .filter((p) => hasSpecificGravityParam([p]) && !matched.some((m) => m._id === p._id));
@@ -152,25 +153,33 @@ function sameSampleKey(item: PetitionItem) {
   return batch ? batch + '|' + (item.commonName ?? item.sampleName ?? '').trim().toLowerCase() : '';
 }
 
+// รายการส่ง QC ที่ batch เดียวกันแต่ถูกแยกไปอยู่อีกคำร้อง พร้อมผล ถพ. ของคำร้องนั้น
+type DensitySource = { item: PetitionItem; results: QCTestResult[]; external?: boolean };
+
 // QC กรอกค่า ถพ. ไว้ที่รายการส่ง QC ส่วนรายการที่ส่ง Lab อย่างเดียวไม่มีผล QC ของตัวเอง
-function densitySourceItem(petition: Petition, item: PetitionItem): PetitionItem | undefined {
+// หาในคำร้องเดียวกันก่อน ถ้าไม่มีจึงใช้คำร้องอื่นที่ batch เดียวกัน (เลือกอันที่มีผล ถพ. แล้ว)
+function densitySourceItem(petition: Petition, item: PetitionItem, external: DensitySource[] = []): DensitySource | undefined {
   if (shouldSendItemToQc(item)) return undefined;
   const key = sameSampleKey(item);
   if (!key) return undefined;
-  return (petition.items ?? []).find((other) => other.seq !== item.seq && shouldSendItemToQc(other) && sameSampleKey(other) === key);
+  const local = (petition.items ?? []).find((other) => other.seq !== item.seq && shouldSendItemToQc(other) && sameSampleKey(other) === key);
+  if (local) return { item: local, results: [] };
+  const candidates = external.filter((source) => sameSampleKey(source.item) === key);
+  return candidates.find((source) => source.results.length > 0) ?? candidates[0];
 }
 
-function withSiblingDensityResults(petition: Petition | null | undefined, results: QCTestResult[], params: ParameterItem[]): QCTestResult[] {
+function withSiblingDensityResults(petition: Petition | null | undefined, results: QCTestResult[], params: ParameterItem[], densitySources: DensitySource[] = []): QCTestResult[] {
   if (!petition) return results;
   const sgIds = new Set(params.filter((p) => hasSpecificGravityParam([p])).map((p) => String(p._id)));
   const extra: QCTestResult[] = [];
   (petition.items ?? []).forEach((item) => {
-    const sibling = densitySourceItem(petition, item);
-    if (!sibling) return;
-    results.forEach((row) => {
-      if (row.itemSeq !== sibling.seq || !sgIds.has(String(row.parameterId))) return;
+    const source = densitySourceItem(petition, item, densitySources);
+    if (!source) return;
+    (source.external ? source.results : results).forEach((row) => {
+      if (row.itemSeq !== source.item.seq || !sgIds.has(String(row.parameterId))) return;
       if (results.some((r) => r.itemSeq === item.seq && String(r.parameterId) === String(row.parameterId))) return;
-      extra.push({ ...row, itemSeq: item.seq });
+      if (extra.some((r) => r.itemSeq === item.seq && String(r.parameterId) === String(row.parameterId))) return;
+      extra.push({ ...row, petitionId: petition._id, itemSeq: item.seq });
     });
   });
   return [...results, ...extra];
@@ -482,6 +491,7 @@ export default function LabTestingDetailPage() {
   });
 
   const [allParameters, setAllParameters] = useState<ParameterItem[]>([]);
+  const [densitySources, setDensitySources] = useState<DensitySource[]>([]);
   // parameter trigger รอบตรวจซ้ำทุกฝั่ง — ตัวอบอาจเป็น QC ที่ไม่ได้แชร์ให้ Lab แต่ Lab ต้องตรวจ %AI ซ้ำ
   const [phaseTriggerParameters, setPhaseTriggerParameters] = useState<ParameterItem[]>([]);
   // Instrument sources (config) → lookup by key for the "ดึงค่า" pull button.
@@ -572,7 +582,7 @@ export default function LabTestingDetailPage() {
     const load = ++resultLoad.current;
     return api.getQCResults(petitionId).then((allResults) => {
       if (load !== resultLoad.current) return;
-      const results = withSiblingDensityResults(petition, currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters), allParameters);
+      const results = withSiblingDensityResults(petition, currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters), allParameters, densitySources);
       setSavedResults(results);
       const v: Record<string, Record<string, unknown>> = {};
       const v2: Record<string, Record<string, unknown>> = {};
@@ -603,7 +613,42 @@ export default function LabTestingDetailPage() {
       setSaveStatesPhase2(s2);
       setLoadedResultsKey(resultsKey);
     }).catch(() => {});
-  }, [roundRequests, allParameters, resultsKey, petition]);
+  }, [roundRequests, allParameters, resultsKey, petition, densitySources]);
+
+  // รายการส่ง Lab อย่างเดียวที่ไม่มีรายการส่ง QC ในคำร้องนี้ → หาคำร้องอื่นที่ batch เดียวกัน
+  // เพื่อใช้ค่า ถพ. ที่ QC กรอกไว้ (ไม่งั้น %AI จะคำนวณด้วย ถพ. = 1.00)
+  const densityLookupKey = useMemo(() => {
+    if (!petition || isResearchAndDevelopmentPetition(petition)) return '';
+    const batches = (petition.items ?? [])
+      .filter((item) => !shouldSendItemToQc(item) && sameSampleKey(item) && !densitySourceItem(petition, item))
+      .map((item) => (item.batchNo ?? '').trim());
+    return [...new Set(batches)].sort().join('\n');
+  }, [petition]);
+  const petitionId = petition?._id;
+  useEffect(() => {
+    if (!petitionId || !densityLookupKey || !allParameters.length) {
+      setDensitySources((prev) => (prev.length ? [] : prev));
+      return;
+    }
+    let alive = true;
+    const sgIds = allParameters.filter((p) => hasSpecificGravityParam([p])).map((p) => String(p._id));
+    void (async () => {
+      const petitions = (await Promise.all(densityLookupKey.split('\n').map((batch) => api.getPetitionsByBatch(batch, petitionId))))
+        .flat()
+        .filter((other, index, list) => other._id !== petitionId && list.findIndex((p) => p._id === other._id) === index);
+      const ids = petitions.map((other) => other._id);
+      const results = ids.length && sgIds.length ? await api.getQCResultsByPetitions(ids, sgIds).catch(() => []) : [];
+      const sources: DensitySource[] = petitions.flatMap((other) => (other.items ?? [])
+        .filter((item) => shouldSendItemToQc(item))
+        .map((item) => ({
+          item,
+          external: true,
+          results: results.filter((row) => row.petitionId === other._id && row.itemSeq === item.seq),
+        })));
+      if (alive) setDensitySources(sources);
+    })().catch(() => { if (alive) setDensitySources([]); });
+    return () => { alive = false; };
+  }, [petitionId, densityLookupKey, allParameters]);
 
   useEffect(() => {
     if (!id || !allParameters.length) return;
@@ -613,7 +658,7 @@ export default function LabTestingDetailPage() {
 
   const pendingDensity = !!petition && !isResearchAndDevelopmentPetition(petition) &&
     (petition.items ?? []).filter(shouldSendItemToLab).some((item) => {
-      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
       // ตัวอย่างที่ไม่มีพารามิเตอร์ ถพ. → Lab กรอกได้ทันที โดยใช้ ถพ. = 1.00
       if (!hasSpecificGravityParam(matched)) return false;
       // %AI คำนวณจากค่า ถพ. → ถ้ายังไม่มีค่า ถพ. ที่บันทึกไว้ของรายการนี้ ห้ามกรอกผล
@@ -820,10 +865,10 @@ export default function LabTestingDetailPage() {
     : (petition.items ?? []).filter((it) => shouldSendItemToLab(it));
   const labItems = mergeQcLabDuplicateItems(petition, allLabBatchItems);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
-    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((param) => param.scope === 'lab'),
+    matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
   );
   const hasAllLabOwnedParams = hasLabOwnedParams && labItems.every((item) =>
-    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((param) => param.scope === 'lab'),
+    matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
   );
 
   // 2-phase support: does any matched parameter use hasPhases?
@@ -852,7 +897,7 @@ export default function LabTestingDetailPage() {
   // ต้องกรอกค่าก่อนอบ (Phase 1) ของรายการให้ครบก่อนเริ่มจับเวลาตัว trigger เช่น อบ 14 วัน
   const phaseTriggerReasonFor = (item: PetitionItem): string | undefined =>
     phaseTriggerBlockedReason(missingValuesBeforePhaseTrigger(
-      matchLabParametersForItem(petition, item, allParameters, idsFor(item)).filter((param) => param.scope === 'lab'),
+      matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).filter((param) => param.scope === 'lab'),
       (param) => {
         const k = resultKey(item.seq, param._id!);
         return param.multiEntry ? getEntryValues({ entries: entriesByKey[k] }, param) : [values[k] ?? {}];
@@ -947,7 +992,7 @@ export default function LabTestingDetailPage() {
   const countAbnormal = (): number => {
     let count = 0;
     labItems.forEach((item) => {
-      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
       matched.forEach((param) => {
         if (param.scope !== 'lab') return; // skip read-only shared QC params
         count += countAbnormalForParam(item, param);
@@ -963,7 +1008,7 @@ export default function LabTestingDetailPage() {
     labItems.forEach((item) => {
       const phaseToCheck = effectivePhaseForItem(item);
       const phaseValues = valuesForPhase(phaseToCheck);
-      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
       matched.forEach((param) => {
         if (param.scope !== 'lab') return; // only validate Lab-owned params
         const k = resultKey(item.seq, param._id!);
@@ -1259,7 +1304,7 @@ export default function LabTestingDetailPage() {
 
         {/* Each Lab item */}
         {labItems.map((item) => {
-          const matchedParams = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+          const matchedParams = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
           const round = sampleRoundFor(petition, 'lab', item.seq);
           const itemCurrentPhase = (round ?? petition).currentPhase ?? 1;
           const effectivePhase = effectivePhaseForItem(item);
@@ -1981,7 +2026,7 @@ export default function LabTestingDetailPage() {
           key={petition._id}
           petition={petition}
           side="lab"
-          items={labItems.filter((item) => matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((parameter) => parameter.scope === 'lab'))}
+          items={labItems.filter((item) => matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((parameter) => parameter.scope === 'lab'))}
           open={additionalSampleOpen}
           onOpenChange={setAdditionalSampleOpen}
           beforeSubmit={autosaves.flush}

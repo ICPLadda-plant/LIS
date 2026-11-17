@@ -658,6 +658,27 @@ router.get('/batch-exists', async (req, res) => {
 });
 
 // GET /api/petitions/scan/:code
+// GET /api/petitions/by-batch?batchNo=X&exclude=id → คำร้องอื่นที่มี batch เดียวกัน
+// หน้า Lab ใช้หาค่า ถพ. จากรายการส่ง QC ที่ถูกแยกไปอยู่อีกคำร้อง
+router.get('/by-batch', async (req, res) => {
+  try {
+    const batchNo = String(req.query.batchNo || '').trim();
+    if (!batchNo) return res.json([]);
+    const exclude = String(req.query.exclude || '').trim();
+    const rx = new RegExp('^\\s*' + batchNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i');
+    const filter = { 'items.batchNo': rx, status: { $ne: 'deleted' } };
+    if (exclude && /^[a-f0-9]{24}$/i.test(exclude)) filter._id = { $ne: exclude };
+    const rows = await Petition.find(filter)
+      .select('_id petitionNo status createdAt items.seq items.batchNo items.commonName items.sampleName items.sendToQc items.sendToLab')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
 // GET /api/petitions/lab-free-assign → สถานะโหมดมอบหมายอิสระ (หมดเวลาแล้วถือว่าปิด)
 // ต้องอยู่ก่อน GET /:id ไม่งั้น "lab-free-assign" จะถูกตีความเป็นเลขคำร้อง
 router.get('/lab-free-assign', async (_req, res) => {

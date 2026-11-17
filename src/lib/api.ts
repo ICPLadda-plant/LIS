@@ -1046,6 +1046,15 @@ export const api = {
       throw error;
     }
   },
+  // คำร้องอื่นที่มี batch เดียวกัน (หา ค่า ถพ. จากรายการส่ง QC ที่อยู่คนละคำร้อง)
+  getPetitionsByBatch: async (batchNo: string, excludeId?: string) => {
+    const qs = new URLSearchParams({ batchNo, ...(excludeId ? { exclude: excludeId } : {}) }).toString();
+    try {
+      return await request<import("@/types/petition.types").Petition[]>(`/petitions/by-batch?${qs}`);
+    } catch {
+      return [] as import("@/types/petition.types").Petition[];
+    }
+  },
 
   // Methods (admin-managed method registry)
   getMethods: () => request<MethodDoc[]>("/methods"),
