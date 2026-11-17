@@ -98,6 +98,8 @@ const calcAvg = (vals: readonly string[]): number | null => {
 const evaluate = (avg: number, target: number): "pass" | "fail" =>
   Math.abs(avg - target) <= TOLERANCE ? "pass" : "fail";
 
+const isPositiveWeight = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) > 0;
+
 /** เลขพร้อมเครื่องหมาย เช่น +0.000012 / −1.25 */
 const signed = (value: number, digits: number) => {
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
@@ -271,7 +273,7 @@ const BalanceRoomPage = () => {
         reader.readAsDataURL(file);
       });
       const result = await readBalanceDisplayValueFromImage(imageDataUrl);
-      if (!result.value || !Number.isFinite(Number(result.value))) {
+      if (!result.value || !isPositiveWeight(result.value)) {
         toast.error(result.error || "อ่านค่าจากหน้าจอไม่ได้ กรุณาถ่ายให้ตรงและชัดขึ้น");
         return;
       }
@@ -288,6 +290,10 @@ const BalanceRoomPage = () => {
     const r = getDraft(id);
     if (r.weights100.some(v => !v) || r.weights10.some(v => !v)) {
       toast.error("กรุณากรอกค่าน้ำหนักให้ครบทั้ง 6 ค่า");
+      return;
+    }
+    if (![...r.weights100, ...r.weights10].every(isPositiveWeight)) {
+      toast.error("ค่าน้ำหนักต้องเป็นตัวเลขที่มากกว่า 0");
       return;
     }
     if (!user?.name) {
@@ -347,6 +353,7 @@ const BalanceRoomPage = () => {
   // มีผลวันนี้แล้วและยังไม่ได้เริ่มกรอกใหม่ → แสดงผลที่บันทึกไว้
   const showResult = !!todayRec && !drafts[scale.id];
   const savingThisScale = createMutation.isPending && createMutation.variables?.scaleId === scale.id;
+  const hasInvalidWeight = [...draft.weights100, ...draft.weights10].some(value => value !== "" && !isPositiveWeight(value));
 
   // ค่าปัจจุบัน (กำลังกรอก หรือผลที่บันทึกแล้ววันนี้) เทียบกับเส้น Control
   const compareValue = scale.controlWeight === 10
@@ -389,8 +396,12 @@ const BalanceRoomPage = () => {
                 placeholder={showResult && savedWeights ? String(savedWeights[i] ?? "") : `ครั้งที่ ${i + 1}`}
                 value={weights[i]}
                 onChange={e => updateWeight(scale.id, type, i, e.target.value)}
+                onWheel={e => e.currentTarget.blur()}
+                min={10 ** -scale.decimals}
+                aria-invalid={weights[i] !== "" && (!isPositiveWeight(weights[i]) || Math.abs(Number(weights[i]) - nominalWeight) > TOLERANCE)}
+                title={weights[i] !== "" && !isPositiveWeight(weights[i]) ? "ค่าน้ำหนักต้องมากกว่า 0" : undefined}
                 disabled={createMutation.isPending}
-                className="h-9 min-w-0 text-sm tabular-nums"
+                className="h-9 min-w-0 text-sm tabular-nums aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive"
               />
               <Button
                 type="button"
@@ -607,7 +618,7 @@ const BalanceRoomPage = () => {
                 <RotateCcw className="h-4 w-4" /> บันทึกซ้ำ
               </Button>
             ) : (
-              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending}>
+              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight}>
                 <CheckCircle2 className="h-4 w-4" />
                 {savingThisScale ? "กำลังบันทึก..." : "บันทึกผล Calibrate"}
               </Button>

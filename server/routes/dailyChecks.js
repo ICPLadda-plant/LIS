@@ -59,8 +59,11 @@ router.post('/', async (req, res) => {
         !Array.isArray(weights10) || weights10.length !== 3) {
       return res.status(400).json({ error: 'weights100 และ weights10 ต้องเป็น array 3 ค่า' });
     }
-    if (typeof avg100 !== 'number' || typeof avg10 !== 'number') {
-      return res.status(400).json({ error: 'avg100 และ avg10 ต้องเป็นตัวเลข' });
+    if (![...weights100, ...weights10].every((value) => Number.isFinite(Number(value)) && Number(value) > 0)) {
+      return res.status(400).json({ error: 'ค่าน้ำหนักทุกค่าต้องเป็นตัวเลขที่มากกว่า 0' });
+    }
+    if (![avg100, avg10].every((value) => Number.isFinite(value) && value > 0)) {
+      return res.status(400).json({ error: 'avg100 และ avg10 ต้องเป็นตัวเลขที่มากกว่า 0' });
     }
     if (!recorder || !String(recorder).trim()) {
       return res.status(400).json({ error: 'recorder ต้องระบุ' });

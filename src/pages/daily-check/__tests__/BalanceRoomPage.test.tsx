@@ -106,6 +106,18 @@ describe("BalanceRoomPage", () => {
     expect(screen.getAllByRole("button", { name: /ถ่ายรูปอ่านค่าน้ำหนัก/ })).toHaveLength(6);
   });
 
+  it("marks invalid weights, blocks saving, and ignores mouse wheel changes", () => {
+    renderPage();
+    const input = screen.getAllByPlaceholderText("ครั้งที่ 1")[0];
+    input.focus();
+    fireEvent.change(input, { target: { value: "-0.09" } });
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: /บันทึกผล Calibrate/ })).toBeDisabled();
+    fireEvent.wheel(input);
+    expect(input).not.toHaveFocus();
+    expect(apiMock.createDailyCheck).not.toHaveBeenCalled();
+  });
+
   it("fills the selected weight with the value read from a photo", async () => {
     const { container } = renderPage();
     fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 500 กรัม ครั้งที่ 1" }));

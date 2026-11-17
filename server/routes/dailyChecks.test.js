@@ -62,4 +62,12 @@ describe('POST /daily-checks', () => {
     expect(res.status).toHaveBeenCalledWith(201);
     expect(mockDailyCheckCreate.mock.calls[0][0].period).toBe('morning');
   });
+
+  test('rejects zero and negative weight values', async () => {
+    const res = mockResponse();
+    await postHandler({ body: { ...validBody(), weights10: ['-0.09', '10.01', '10.01'] } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'ค่าน้ำหนักทุกค่าต้องเป็นตัวเลขที่มากกว่า 0' });
+    expect(mockDailyCheckCreate).not.toHaveBeenCalled();
+  });
 });
