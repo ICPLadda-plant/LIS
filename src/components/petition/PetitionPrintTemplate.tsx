@@ -832,8 +832,9 @@ const PRINT_CSS = `
   margin-top: 2pt; text-align: center;
 }
 .pr-fill-row { display: flex; align-items: baseline; gap: 4pt; width: 100%; }
+.pr-fill-row > :not(.pr-line-fill) { flex: 0 0 auto; }
 .pr-line-fill {
-  flex: 1 1 auto;
+  flex: 1 1 0; min-width: 0;
   border-bottom: 0.4pt dotted #000;
   padding: 0 3pt; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
