@@ -133,11 +133,11 @@ describe("BalanceRoomPage", () => {
     ]);
     renderPage();
 
-    expect((await screen.findAllByText("10.00")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("0.00").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("10.000")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.004").length).toBeGreaterThan(0);
     // UWL = Mean + 2SD, LCL = Mean − 3SD (ไม่ใช่ค่า LCL ที่ผิดในชีต Excel)
-    expect(screen.getAllByText("10.01").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("9.99").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("10.008").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("9.988").length).toBeGreaterThan(0);
     expect(screen.queryByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).not.toBeInTheDocument();
   });
 
@@ -146,7 +146,7 @@ describe("BalanceRoomPage", () => {
       { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, mpe: 0.5, updatedDate: "" },
     ]);
     renderPage();
-    await screen.findAllByText("10.00");
+    await screen.findAllByText("10.000");
 
     const [first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
     const [second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");

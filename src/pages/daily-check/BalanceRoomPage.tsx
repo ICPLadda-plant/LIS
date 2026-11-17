@@ -354,7 +354,7 @@ const BalanceRoomPage = () => {
     : (showResult ? todayRec?.avg100 ?? null : calcAvg(draft.weights100));
   const compareStatus = classifyPoint(compareValue, limits);
 
-  const fmt = (value: number | null | undefined) => formatControlNumber(value, digits);
+  const fmt = (value: number | null | undefined) => formatControlNumber(value, scale.decimals);
 
   const infoItems = [
     { label: "รหัสเครื่องมือ", value: scale.code },
@@ -752,7 +752,7 @@ const BalanceRoomPage = () => {
                   return (
                     <tr key={point.date} className="hover:bg-accent">
                       <td className="px-3 py-2">{fmtDate(point.date)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatControlNumber(point.value, historyPanel.digits)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatControlNumber(point.value, scale.decimals)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {historyPanel.limits ? signed(point.value - historyPanel.limits.mean, historyPanel.digits) : "—"}
                       </td>
