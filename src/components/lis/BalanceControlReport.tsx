@@ -150,8 +150,7 @@ export default function BalanceControlReport({
         <span>รหัสตุ้มน้ำหนัก :</span>
         <span className="bcr-fill">{config.weightCode}</span>
         <span className="bcr-daily-label">น้ำหนักตุ้ม Daily check :</span>
-        <span className="bcr-fill bcr-daily-value">{config.nominal}</span>
-        <span>g</span>
+        <span className="bcr-fill bcr-daily-value">{config.nominal} g</span>
       </div>
 
       <div className="bcr-tables">
