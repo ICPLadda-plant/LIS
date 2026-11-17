@@ -8,6 +8,34 @@ const dist = resolve(root, "dist");
 // จนกว่าตัวเช็ค build จะโหลดหน้าใหม่ให้ ไฟล์ที่เก่ากว่านี้จะถูกลบทิ้ง
 const KEEP_PREVIOUS_ASSETS_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Windows คืน EPERM/EBUSY/EACCES เวลา rename โฟลเดอร์ที่มีโปรแกรมถือไฟล์อยู่ชั่วคราว
+// (Defender/indexer สแกนไฟล์ใหม่ หรือ web server เปิดไฟล์ค้าง) จึงลองซ้ำก่อน
+// ถ้ายังไม่ได้ให้ copy แล้วลบต้นทางแทน
+const RETRYABLE = new Set(["EPERM", "EBUSY", "EACCES", "ENOTEMPTY"]);
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+function moveSync(from, to) {
+  let lastError;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    try {
+      renameSync(from, to);
+      return;
+    } catch (error) {
+      if (!RETRYABLE.has(error.code)) throw error;
+      lastError = error;
+      sleepSync(200 * (attempt + 1));
+    }
+  }
+  try {
+    cpSync(from, to, { recursive: true, force: true });
+    rmSync(from, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    console.warn(`rename failed (${lastError.code}), copied instead: ${from} -> ${to}`);
+  } catch {
+    throw lastError;
+  }
+}
+
 if (!existsSync(dist)) {
   throw new Error("dist directory does not exist. Run vite build first.");
 }
@@ -54,9 +82,9 @@ try {
     const target = resolve(root, entry);
     const stagedTarget = resolve(staging, entry);
     const backupTarget = resolve(backup, entry);
-    if (existsSync(target)) renameSync(target, backupTarget);
+    if (existsSync(target)) moveSync(target, backupTarget);
     movedTargets.push({ target, backupTarget });
-    renameSync(stagedTarget, target);
+    moveSync(stagedTarget, target);
   }
 
   // index.html is always the Vite development template; production is app.html.
@@ -66,10 +94,10 @@ try {
   console.log("Built files deployed atomically: production entry → app.html, index.html kept as dev template.");
 } catch (error) {
   for (const { target, backupTarget } of movedTargets.reverse()) {
-    if (existsSync(target)) rmSync(target, { recursive: true, force: true });
-    if (existsSync(backupTarget)) renameSync(backupTarget, target);
+    if (existsSync(target)) rmSync(target, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    if (existsSync(backupTarget)) moveSync(backupTarget, target);
   }
-  rmSync(staging, { recursive: true, force: true });
-  rmSync(backup, { recursive: true, force: true });
+  rmSync(staging, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  rmSync(backup, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   throw error;
 }

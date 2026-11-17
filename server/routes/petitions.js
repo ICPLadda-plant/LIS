@@ -322,7 +322,8 @@ router.get('/', async (req, res) => {
       const completedTrack = {
         $or: [
           { qcCompletedAt: { $ne: null } },
-          { labCompletedAt: { $ne: null } },
+          // ผล Lab เข้าคิว QC เมื่อหัวหน้า Lab ออกผลแล้ว
+          { labCompletedAt: { $ne: null }, labApprovedAt: { $ne: null } },
         ],
       };
       if (q.$or) {
@@ -1259,6 +1260,11 @@ router.patch('/:id/deliver', serializePetitionWrite(async (req, res) => {
     if (req.body?.additionalSampleId || req.body?.additionalSampleCode) return await changeAdditionalSampleState(req, res, before, 'deliver');
     if (pendingAdditionalSamples(before).length) return res.status(409).json({ error: { message: 'กรุณาสแกน QR ใบนำส่งตัวอย่างเพิ่มของรอบนี้' } });
     if (before.additionalSampleRequests?.length) return res.status(409).json({ error: { message: 'คำขอนี้นำส่งแล้ว กรุณาใช้ QR รอบตัวอย่างเพิ่ม' } });
+    // สแกนส่งซ้ำหลัง QC/Lab รับตัวอย่างแล้ว ต้องไม่ถอยสถานะกลับเป็น sampleSent
+    // (เคยทำให้ใบที่กำลังทดสอบหลุดจากคิว Lab/อนุมัติผล เช่น P-2611-0027)
+    if (!['deliveringQC', 'sampleSent'].includes(before.status)) {
+      return res.status(409).json({ error: { message: 'คำขอนี้รับตัวอย่างแล้ว ไม่ต้องสแกนส่งซ้ำ', code: 'ALREADY_RECEIVED' } });
+    }
     const update = { status: 'sampleSent' };
     if (req.body?.deliveredBy?.name) update.deliveredBy = await resolveEmployeeActor(req.body.deliveredBy);
     if (!before.sampleSentAt) update.sampleSentAt = new Date();

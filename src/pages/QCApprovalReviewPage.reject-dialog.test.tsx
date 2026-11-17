@@ -108,6 +108,7 @@ const basePetition = {
   routeTargets: ["qc", "lab"],
   qcCompletedAt: "2026-07-13T00:30:00.000Z",
   labCompletedAt: "2026-07-13T01:30:00.000Z",
+  labApprovedAt: "2026-07-13T02:00:00.000Z",
   submittedBy: { name: "ผู้ยื่น A", submittedAt: "2026-07-13T00:00:00.000Z" },
   items: [{ seq: 1, sampleName: "ตัวอย่าง A", batchNo: "RM-1", sampleId: "S-1", sendToQc: true, sendToLab: true }],
   createdAt: "2026-07-13T00:00:00.000Z",

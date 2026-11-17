@@ -50,7 +50,11 @@ function labTrackStarted(petition: SgPetition): boolean {
  * Lab ยังรับ/มอบหมายงานคำร้องนี้ไม่ได้ เพราะมีตัวอย่างกลุ่มน้ำที่ส่ง Lab แต่ QC ยังไม่ยืนยันค่า ถพ.
  * งานที่ Lab รับหรือเริ่มไปแล้วไม่ถูกดึงกลับ
  */
+// ปิดการรอยืนยันค่า ถพ. — คำร้องที่ส่ง Lab ไป Lab ทันที ไม่ต้องรอ QC ยืนยันค่า ถพ.
+export const LAB_WAITS_FOR_SG_CONFIRMATION = false;
+
 export function isLabAwaitingSgConfirmation(petition: SgPetition | null | undefined): boolean {
+  if (!LAB_WAITS_FOR_SG_CONFIRMATION) return false;
   if (!petition || !Array.isArray(petition.items)) return false;
   if (isResearchAndDevelopmentPetition(petition as Petition) || !requiresQcTrack(petition)) return false;
   if (labTrackStarted(petition)) return false;
