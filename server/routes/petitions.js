@@ -337,7 +337,8 @@ router.get('/', async (req, res) => {
     if (req.query.awaitingLabApproval === 'true') {
       q.labCompletedAt = { $ne: null };
       q.labApprovedAt = null;
-      q.status = 'inProgress';
+      // Lab ส่งผลแล้ว = รออนุมัติ ไม่ว่า status หลักจะค้างที่ sampleSent/received (เช่นใบที่ QC อนุมัติไปก่อน)
+      q.status = { $nin: ['approved', 'rejected'] };
     }
     if (req.query.labApproved === 'true') {
       q.labApprovedAt = { $ne: null };
