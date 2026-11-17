@@ -27,10 +27,14 @@ describe("computeLimits", () => {
     expect(limits.lcl).toBeCloseTo(99.9995772, 7);
   });
 
+  it("คำนวณเส้นเท่ากับ Mean เมื่อ SD เป็นศูนย์", () => {
+    expect(computeLimits(100, 0)).toEqual({ mean: 100, sd: 0, uwl: 100, lwl: 100, ucl: 100, lcl: 100 });
+  });
+
   it("คืน null เมื่อยังไม่ได้ตั้งค่าหรือ SD ไม่ถูกต้อง", () => {
     expect(computeLimits(null, 0.1)).toBeNull();
     expect(computeLimits(100, null)).toBeNull();
-    expect(computeLimits(100, 0)).toBeNull();
+    expect(computeLimits(100, -0.1)).toBeNull();
   });
 });
 
@@ -150,7 +154,7 @@ describe("config defaults / validation", () => {
   it("ตรวจค่าที่กรอกด้วยข้อความเดียวกับ server", () => {
     expect(validateBalanceControlInput({ mean: NaN, sd: 1 })).toBe("ค่า Mean ต้องเป็นตัวเลข");
     expect(validateBalanceControlInput({ mean: 100, sd: NaN })).toBe("ค่า STD ต้องเป็นตัวเลข");
-    expect(validateBalanceControlInput({ mean: 100, sd: 0 })).toBe("ค่า STD ต้องมากกว่า 0");
+    expect(validateBalanceControlInput({ mean: 100, sd: -1 })).toBe("ค่า STD ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0 })).toBe("น้ำหนักตุ้มต้องมากกว่า 0");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, mpe: -1 })).toBe("ค่า MPE ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, updatedDate: "26/10/2569" })).toBe(

@@ -86,7 +86,6 @@ router.put('/:scaleId', async (req, res) => {
       return res.status(400).json({ error: 'น้ำหนักตุ้มไม่ตรงกับเครื่องชั่ง' });
     }
     const { mean, sd } = baselineStats(body.baselineValues);
-    if (sd <= 0) return res.status(400).json({ error: 'ค่า STD ต้องมากกว่า 0' });
     const control = {
       brand: str(body.brand) || def.brand,
       model: str(body.model) || def.model,

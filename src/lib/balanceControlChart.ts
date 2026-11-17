@@ -118,7 +118,7 @@ export function computeLimits(
   mean: number | null | undefined,
   sd: number | null | undefined,
 ): ControlLimits | null {
-  if (!isFiniteNumber(mean) || !isFiniteNumber(sd) || sd <= 0) return null;
+  if (!isFiniteNumber(mean) || !isFiniteNumber(sd) || sd < 0) return null;
   return {
     mean,
     sd,
@@ -290,7 +290,7 @@ export function validateBalanceControlInput(input: BalanceControlConfigInput): s
   const { mean, sd, baselineValues, nominal, mpe, updatedDate } = input;
   if (!isFiniteNumber(mean)) return "ค่า Mean ต้องเป็นตัวเลข";
   if (!isFiniteNumber(sd)) return "ค่า STD ต้องเป็นตัวเลข";
-  if (sd <= 0) return "ค่า STD ต้องมากกว่า 0";
+  if (sd < 0) return "ค่า STD ต้องไม่ติดลบ";
   if (nominal != null && (!isFiniteNumber(nominal) || nominal <= 0)) return "น้ำหนักตุ้มต้องมากกว่า 0";
   if (mpe != null && (!isFiniteNumber(mpe) || mpe < 0)) return "ค่า MPE ต้องไม่ติดลบ";
   if (updatedDate && !DATE_RE.test(updatedDate)) return "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD";

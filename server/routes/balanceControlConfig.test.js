@@ -98,10 +98,10 @@ describe('PUT /balance-control-config/:scaleId', () => {
     expect(res.json.mock.calls[0][0].data).toMatchObject({ scaleId: 'scale-2', mean: baselineMean, sd: baselineSd, baselineValues, updatedDate: '2026-10-26' });
   });
 
-  it('rejects 20 identical values because STD is zero', async () => {
+  it('upserts 20 identical values with zero STD', async () => {
     const res = mockResponse();
     await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 10, baselineValues: Array(20).fill(10) } }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'ค่า STD ต้องมากกว่า 0' });
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json.mock.calls[0][0].data).toMatchObject({ scaleId: 'scale-1', mean: 10, sd: 0 });
   });
 });
