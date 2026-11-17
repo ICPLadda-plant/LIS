@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { isAiContentTestItem, resolveAiToleranceCriteria } from "@/lib/aiToleranceCriteria";
+import { formatCoaAiResult } from "@/lib/coaAiResult";
 import { aiContentTestItemForCommonName, isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { productionDateFromLotNo } from "@/lib/coaLot";
 import type { CoaDocument, CoaResultSnapshot, CoaSampleSnapshot } from "@/types/coa.types";
@@ -31,7 +32,7 @@ function formFromRows(rows: CoaResultSnapshot[], commonName?: string): ResultFor
     aiCriteria: resolveAiToleranceCriteria(commonName, ai?.criteria) || "",
     density: density?.result || "",
     waxBlockCriteria: isBromadiolone(commonName) ? density?.criteria && density.criteria !== "-" ? density.criteria : "5.88 gm ± 5%" : "",
-    aiResult: ai?.result || "",
+    aiResult: formatCoaAiResult(ai?.result),
     appearance: appearance?.criteria && appearance.criteria !== "-" ? appearance.criteria : appearance?.result?.toLowerCase() !== "conform" ? appearance?.result || "" : "",
   };
 }
@@ -51,7 +52,7 @@ function rowsFromForm(itemSeq: number, form: ResultForm, commonName?: string): C
   const bromadiolone = isBromadiolone(commonName);
   const rows: CoaResultSnapshot[] = [
     { itemSeq, testItem: "Appearance", result: "Conform", criteria: form.appearance.trim(), method: "Visual", unit: "" },
-    { itemSeq, testItem: aiContentTestItemForCommonName(commonName), result: ai && !/%$/.test(ai) ? `${ai}%` : ai, criteria: form.aiCriteria.trim(), unit: "%", method: "" },
+    { itemSeq, testItem: aiContentTestItemForCommonName(commonName), result: formatCoaAiResult(ai), criteria: form.aiCriteria.trim(), unit: "%", method: "" },
     { itemSeq, testItem: bromadiolone ? "Wax block size" : "Density at 30°C (g/cm³)", result: form.density.trim(), criteria: bromadiolone ? form.waxBlockCriteria.trim() : "-", unit: bromadiolone ? "g" : "g/cm³", method: bromadiolone ? "" : "DMA 501" },
     { itemSeq, testItem: "Date of analysis", result: form.analysisDate.trim(), criteria: "-", unit: "", method: "" },
   ];
@@ -106,7 +107,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
     if (!active || !labAi.data?.ai) return;
     setForms((current) => {
       const value = current[active.itemSeq] || emptyResultForm();
-      return { ...current, [active.itemSeq]: { ...value, aiResult: value.aiResult || labAi.data.ai?.result || "", analysisDate: value.analysisDate || labAi.data.analysisDate || "", aiCriteria: resolveAiToleranceCriteria(active.commonName, value.aiCriteria || labAi.data.ai?.criteria) || value.aiCriteria } };
+      return { ...current, [active.itemSeq]: { ...value, aiResult: value.aiResult || formatCoaAiResult(labAi.data.ai?.result), analysisDate: value.analysisDate || labAi.data.analysisDate || "", aiCriteria: resolveAiToleranceCriteria(active.commonName, value.aiCriteria || labAi.data.ai?.criteria) || value.aiCriteria } };
     });
   }, [active, labAi.data]);
 
@@ -131,7 +132,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
         "sampleName", "ชื่อการค้า *", "text"], ["commonName", "ชื่อสามัญ *", "text"], ["batchNo", "Batch No. *", "text"], ["productionDate", "วันที่ผลิต *", "date"], ["lotNo", "Lot No.", "text"], ["manufacturer", "ผู้ผลิต", "text"],
       ] as Array<[keyof CoaSampleSnapshot, string, string]>).map(([key, label, type]) => <div key={key} className="space-y-1"><Label htmlFor={`manual-${active.itemSeq}-${key}`}>{label}</Label><Input id={`manual-${active.itemSeq}-${key}`} type={type} value={String(active[key] || "")} onChange={(event) => updateSample(key, event.target.value)} /></div>)}</div>
       <div className="space-y-3"><h2 className="text-base font-semibold text-foreground">ผลทดสอบ</h2><p className="text-sm text-muted-foreground">ระบบค้นหา Batch ตรงก่อน แล้วใช้ Batch ก่อนหน้าหรือใกล้ที่สุดเมื่อไม่พบผล</p>
-        <div className="grid gap-3 sm:grid-cols-2">{fields(active.commonName).map(([key, label, type]) => <div key={key} className="space-y-1"><Label htmlFor={`manual-result-${active.itemSeq}-${key}`}>{label} *</Label><Input id={`manual-result-${active.itemSeq}-${key}`} type={type} value={form[key]} onChange={(event) => updateForm(key, event.target.value)} /></div>)}</div>
+        <div className="grid gap-3 sm:grid-cols-2">{fields(active.commonName).map(([key, label, type]) => <div key={key} className="space-y-1"><Label htmlFor={`manual-result-${active.itemSeq}-${key}`}>{label} *</Label><Input id={`manual-result-${active.itemSeq}-${key}`} type={type} value={form[key]} onChange={(event) => updateForm(key, event.target.value)} onBlur={() => key === "aiResult" && updateForm(key, formatCoaAiResult(form[key]))} /></div>)}</div>
         {labAi.isFetching && <p className="text-sm text-muted-foreground">กำลังค้นหาผลวิเคราะห์ของ Batch นี้...</p>}{labAi.data?.match?.batchNo && <p className="text-sm text-muted-foreground">ใช้ผลวิเคราะห์จาก Batch {labAi.data.match.batchNo}</p>}
       </div>
     </div>}

@@ -92,7 +92,7 @@ describe("CoaManualDialog", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() => expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("10.1%"));
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("10.10%"));
     expect(screen.queryByLabelText("Density at 30°C (g/cm³) *")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "บันทึกร่าง COA" }));

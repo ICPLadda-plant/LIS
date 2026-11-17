@@ -42,7 +42,7 @@ function renderDialog(currentRequest: CoaDocument = request) {
 describe("CoaCreateDialog", () => {
   it("prefills fixed COA fields from Lab and saves edited values", async () => {
     renderDialog();
-    expect(await screen.findByLabelText("% AI *")).toHaveValue("48.1%");
+    expect(await screen.findByLabelText("% AI *")).toHaveValue("48.10%");
     expect(screen.getByLabelText("เกณฑ์ความคลาดเคลื่อน")).toHaveValue("48% ± 2.40");
     expect(screen.getByLabelText("Appearance")).toHaveValue("Clear liquid");
     expect(screen.getByLabelText("Density at 30°C (g/cm³)")).toHaveValue("1.120");
@@ -62,7 +62,7 @@ describe("CoaCreateDialog", () => {
       sampleSnapshots: [expect.objectContaining({ itemSeq: 1, sampleName: "Trade A", batchNo: "B-2", productionDate: "2026-09-01" })],
       resultSnapshots: [
         { itemSeq: 1, testItem: "Appearance", result: "Conform", criteria: "Clear liquid" },
-        { itemSeq: 1, testItem: "%AI content", result: "48.3%", criteria: "48% ± 2.40", unit: "%" },
+        { itemSeq: 1, testItem: "%AI content", result: "48.30%", criteria: "48% ± 2.40", unit: "%" },
         { itemSeq: 1, testItem: "Density at 30°C (g/cm³)", result: "1.120", unit: "g/cm³" },
         { itemSeq: 1, testItem: "Date of analysis", result: "2026-09-05" },
       ],
@@ -99,7 +99,7 @@ describe("CoaCreateDialog", () => {
     renderDialog(erpRequest);
     expect(await screen.findByText(/จับคู่กับคำร้อง P-1/)).toBeInTheDocument();
     expect(await screen.findByLabelText("ชื่อการค้า *")).toHaveValue("Trade ERP");
-    expect(await screen.findByDisplayValue("48.1%")).toBeInTheDocument();
+    expect(await screen.findByDisplayValue("48.10%")).toBeInTheDocument();
     expect(screen.getByLabelText("Appearance")).toHaveValue("เม็ดยาสีแดง");
     fireEvent.click(screen.getByRole("button", { name: "สร้างร่าง COA" }));
     await waitFor(() => expect(mocks.createManual).toHaveBeenCalled());
@@ -133,7 +133,7 @@ describe("CoaCreateDialog", () => {
       sampleSnapshots: [expect.objectContaining({ sampleName: "Trade ERP", batchNo: "B-9", productionDate: "2026-09-01" })],
       resultSnapshots: [
         { itemSeq: 10000, testItem: "Appearance", result: "Conform", criteria: "เม็ดยาสีแดง" },
-        { itemSeq: 10000, testItem: "%AI content", result: "48.1%", criteria: "48% ± 2.40", unit: "%" },
+        { itemSeq: 10000, testItem: "%AI content", result: "48.10%", criteria: "48% ± 2.40", unit: "%" },
       ],
       externalCoaRequest: { saleOrderNo: "SO1", line: 10000, itemNo: "FC-1" },
     }));

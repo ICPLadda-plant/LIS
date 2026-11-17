@@ -189,7 +189,7 @@ describe("CoaCenterPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "สถานะ ขอ COA" }));
     fireEvent.change(screen.getByPlaceholderText("ค้นหา COA / คำร้อง"), { target: { value: "P-2608-0004" } });
     fireEvent.click(await screen.findByRole("button", { name: "สร้าง COA P-2608-0004" }));
-    await screen.findByDisplayValue("48.1%");
+    await screen.findByDisplayValue("48.10%");
     fireEvent.click(screen.getByRole("button", { name: "สร้างร่าง COA" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "สถานะ ดำเนินการแล้ว" })).toHaveAttribute("aria-pressed", "true");
@@ -545,7 +545,7 @@ describe("CoaCenterPage", () => {
 
     await waitFor(() => expect(screen.getByLabelText("Batch No. *")).toHaveValue("FG260902-008"));
     expect(screen.getByLabelText("วันที่ผลิต *")).toHaveValue("2026-09-02");
-    expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%");
+    expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.31%");
     expect(screen.getByText("แบบฟอร์ม: WG / WP / ST / GR / DS / SP / SG / GB")).toBeInTheDocument();
 
     fireEvent.change(within(screen.getByRole("dialog")).getByRole("combobox"), {
@@ -597,11 +597,11 @@ describe("CoaCenterPage", () => {
       form: { template: "grWpSp", aiCriteria: "25% ± 1.30", needsDensity: false }, warnings: [],
       dataSources: { erp: true, stock: false, mf: false, lab: true, density: false },
     });
-    await waitFor(() => expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%"));
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.31%"));
 
     resolveOldLookup?.({ batchNo: "OLD-BATCH", commonName: "THIAMETHOXAM 25% WG", ai: null, analysisDate: "", match: null });
     await waitFor(() => expect(api.getCoaLabAiByBatch).toHaveBeenCalledWith(expect.objectContaining({ batchNo: "NEW-BATCH" })));
-    expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.305%");
+    expect(screen.getByLabelText("%AI content (W/W) *")).toHaveValue("24.31%");
   });
 
   it("refreshes %AI from the entered batch in real time", async () => {

@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { FilePlus2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { isAiContentTestItem, resolveAiToleranceCriteria } from "@/lib/aiToleranceCriteria";
+import { formatCoaAiResult } from "@/lib/coaAiResult";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,7 +65,7 @@ function coaDefaults(options: CoaSourceResult[], commonName?: string, erpAppeara
   const density = options.find((option) => option.kind === "density")
     ?? options.find((option) => option.kind === "result" && /density/i.test(option.testItem ?? ""));
   return {
-    aiResult: ai?.result ?? "",
+    aiResult: formatCoaAiResult(ai?.result),
     aiCriteria: resolveAiToleranceCriteria(commonName, ai?.criteria) || "",
     appearance: erpAppearance || physical?.suggestedEnglish || physical?.result || "",
     density: density?.result ?? "",
@@ -78,7 +79,7 @@ function coaRows(itemSeq: number, form: Record<CoaField, string>): CoaResultSnap
   const ai = value("aiResult");
   return [
     { itemSeq, testItem: "Appearance", result: value("appearance") && "Conform", criteria: value("appearance") },
-    { itemSeq, testItem: "%AI content", result: /^\d+(\.\d+)?$/.test(ai) ? `${ai}%` : ai, criteria: value("aiCriteria"), unit: "%" },
+    { itemSeq, testItem: "%AI content", result: formatCoaAiResult(ai), criteria: value("aiCriteria"), unit: "%" },
     { itemSeq, testItem: "Density at 30°C (g/cm³)", result: value("density"), unit: "g/cm³" },
     { itemSeq, testItem: "Date of analysis", result: value("analysisDate") },
   ].filter((row) => row.result);
@@ -266,6 +267,9 @@ export default function CoaCreateDialog({
                 const { value } = event.target;
                 if (isCoaField(field)) setCoaEdits((current) => ({ ...current, [sample.itemSeq]: { ...current[sample.itemSeq], [field]: value } }));
                 else setSampleEdits((current) => ({ ...current, [sample.itemSeq]: { ...current[sample.itemSeq], [field]: value } }));
+              }}
+              onBlur={() => {
+                if (field === "aiResult") setCoaEdits((current) => ({ ...current, [sample.itemSeq]: { ...current[sample.itemSeq], [field]: formatCoaAiResult(fieldValue(sample, field)) } }));
               }}
             />
           </div>
