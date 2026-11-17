@@ -56,6 +56,7 @@ vi.mock("@/hooks/usePetition", () => ({
           submittedBy: { name: "ผู้ยื่น B" },
           qcCompletedAt: "2026-08-05T01:00:00.000Z",
           labCompletedAt: "2026-08-05T02:00:00.000Z",
+          labApprovedAt: "2026-08-05T03:00:00.000Z",
           items: [{ seq: 1, sampleName: "ตัวอย่าง B", sendToQc: true, sendToLab: true }],
           createdAt: "2026-08-05T00:00:00.000Z",
           updatedAt: "2026-08-05T00:00:00.000Z",

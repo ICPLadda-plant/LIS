@@ -138,7 +138,8 @@ export default function QCApprovalReviewPage() {
   }, [petition, groups]);
 
   const isClosed = petition ? ["approved", "rejected"].includes(petition.status) : true;
-  const trackDone = (s: ApprovalSide) => Boolean(s === "qc" ? petition?.qcCompletedAt : petition?.labCompletedAt);
+  // ฝั่ง Lab ต้องให้หัวหน้า Lab ออกผลก่อน QC จึงยืนยันได้
+  const trackDone = (s: ApprovalSide) => Boolean(s === "qc" ? petition?.qcCompletedAt : petition?.labCompletedAt && petition?.labApprovedAt);
   const canDecide = (s: ApprovalSide) => !isClosed && trackDone(s) && allowedSides.includes(s);
   /** ฝั่งที่ผู้ใช้กดผ่าน/ไม่ผ่านได้ตอนนี้ (ยืนยันผลแล้วและยังมีรายการรอ) */
   const decidableSides = SIDES.filter((s) => canDecide(s) && side[s].pending.length > 0);
