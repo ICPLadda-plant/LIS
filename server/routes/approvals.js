@@ -85,9 +85,10 @@ router.post('/petitions/:id/items', serializePetitionWrite(async (req, res) => {
     const petition = await Petition.findById(req.params.id);
     if (!petition) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
     if (CLOSED.includes(petition.status)) return res.status(409).json({ error: { message: 'คำร้องนี้ปิดแล้ว' } });
-    const trackDone = side === 'qc' ? petition.qcCompletedAt : petition.labCompletedAt;
+    // ฝั่ง Lab: QC ยืนยันผลได้หลังหัวหน้า Lab ออกผลแล้วเท่านั้น
+    const trackDone = side === 'qc' ? petition.qcCompletedAt : (petition.labCompletedAt && petition.labApprovedAt);
     if (!trackDone) {
-      return res.status(409).json({ error: { message: side === 'lab' ? 'Lab ยังไม่ยืนยันผล' : 'QC ยังไม่ยืนยันผล' } });
+      return res.status(409).json({ error: { message: side === 'lab' ? (petition.labCompletedAt ? 'หัวหน้า Lab ยังไม่ออกผล' : 'Lab ยังไม่ยืนยันผล') : 'QC ยังไม่ยืนยันผล' } });
     }
 
     const seen = new Set();

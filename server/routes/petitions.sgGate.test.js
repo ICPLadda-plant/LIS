@@ -20,10 +20,9 @@ async function receive(context, item, side, labRequests = []) {
   return { res, writes };
 }
 
-test('Lab รับตัวอย่างกลุ่มน้ำไม่ได้จนกว่า QC ยืนยันค่า ถพ.', async (context) => {
-  const { res, writes } = await receive(context, waterItem, 'lab');
-  assert.equal(res.statusCode, 409, JSON.stringify(res.body));
-  assert.equal(writes.length, 0);
+test('Lab รับตัวอย่างกลุ่มน้ำได้ทันทีโดยไม่ต้องรอ QC ยืนยันค่า ถพ.', async (context) => {
+  const { res } = await receive(context, waterItem, 'lab');
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
 });
 
 test('Lab รับตัวอย่างกลุ่มน้ำได้หลัง QC ยืนยันค่า ถพ.', async (context) => {

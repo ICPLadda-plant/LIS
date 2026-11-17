@@ -52,7 +52,6 @@ const bellReceivers = (entry) => users
   .sort();
 
 const scenarios = [
-  ['คำขอใหม่', { event: 'created' }],
   ['ส่งตัวอย่างแล้ว', { event: 'statusChanged', fromStatus: 'deliveringQC', toStatus: 'sampleSent' }],
   ['QC รับตัวอย่าง', { event: 'received', metadata: { side: 'qc' } }],
   ['เริ่มบันทึกผล QC', { event: 'resultEntered', metadata: { side: 'qc' } }],

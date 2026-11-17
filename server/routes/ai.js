@@ -4,7 +4,7 @@ const QCTestResult = require('../models/QCTestResult');
 const { zScore, linearRegression, consecutiveStreak } = require('../lib/smartRules');
 const Petition = require('../models/Petition');
 const DailyCheck = require('../models/DailyCheck');
-const { isOpenAIConfigured, generateStream, generateJSON, generateJSONFromImage } = require('../lib/openaiClient');
+const { isOpenAIConfigured, isOcrConfigured, generateStream, generateJSON, generateJSONFromImage } = require('../lib/openaiClient');
 const Parameter = require('../models/Parameter');
 
 const STOCK_LABEL_OCR_SYSTEM = `คุณอ่านข้อความจากรูปฉลากหรือบางส่วนของสติ๊กเกอร์ขวด stock ในห้องแล็บ
@@ -370,7 +370,7 @@ router.post('/stock-label-ocr', async (req, res) => {
     if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl required' });
     if (!isSupportedImageDataUrl(imageDataUrl)) return res.status(400).json({ error: 'unsupported image data URL' });
     if (imageDataUrl.length > 9_500_000) return res.status(413).json({ error: 'image too large' });
-    if (!isOpenAIConfigured()) return res.status(503).json({ error: 'OpenAI API key ไม่ได้ตั้งค่า' });
+    if (!isOcrConfigured()) return res.status(503).json({ error: 'OCR ยังไม่ได้ตั้งค่า OCR_API_KEY / OCR_MODEL' });
 
     const generated = await generateJSONFromImage(
       'อ่านข้อความเลขใต้ QR หรือ Code ใต้ QR บนสติ๊กเกอร์ขวด stock จากรูปนี้ เห็นแค่บางส่วนของฉลากก็ได้ แล้วคืนเฉพาะเลข Code ที่เป็นไปได้',
@@ -395,7 +395,7 @@ router.post('/balance-display-ocr', async (req, res) => {
     if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl required' });
     if (!isSupportedImageDataUrl(imageDataUrl)) return res.status(400).json({ error: 'unsupported image data URL' });
     if (imageDataUrl.length > 9_500_000) return res.status(413).json({ error: 'image too large' });
-    if (!isOpenAIConfigured()) return res.status(503).json({ error: 'OpenAI API key ไม่ได้ตั้งค่า' });
+    if (!isOcrConfigured()) return res.status(503).json({ error: 'OCR ยังไม่ได้ตั้งค่า OCR_API_KEY / OCR_MODEL' });
 
     const generated = await generateJSONFromImage(
       'อ่านค่าตัวเลขน้ำหนักหลักจากหน้าจอเครื่องชั่งในรูปนี้',

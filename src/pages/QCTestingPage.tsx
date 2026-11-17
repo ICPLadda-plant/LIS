@@ -35,7 +35,7 @@ import { rankSearchResults } from '@/lib/searchRanking';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
 
-type QcTab = 'pending' | 'done';
+type QcTab = 'pending' | 'done' | 'tomorrow';
 
 /** คีย์วันที่ตามเวลาเครื่อง (YYYY-MM-DD) ใช้เทียบกับวันที่ที่เลือก */
 function localDateKey(value: Date | string | null | undefined): string | null {
@@ -120,6 +120,10 @@ export default function QCTestingPage() {
   const donePetitions = datedPetitions.filter((p) => !!p.qcCompletedAt);
   const waitingPetitions = datedPetitions.filter((p) => !p.qcCompletedAt);
   const shownPetitions = tab === 'done' ? donePetitions : waitingPetitions;
+  // ponytail: ยังไม่มีวันนัดส่งตัวอย่าง จึงใช้วันครบกำหนดเฟส 2 แทน; ถ้า backend มีวันนัดส่งให้เปลี่ยนมาใช้ฟิลด์นั้น
+  const tomorrowKey = localDateKey(new Date(Date.now() + 86_400_000));
+  const tomorrowPetitions = petitions.filter((p) => localDateKey(p.phase2DueAt) === tomorrowKey);
+  const tabPetitions = tab === 'tomorrow' ? tomorrowPetitions : shownPetitions;
 
   // Bulk-fetch abnormal flag for petitions that may have results
   // (sampleSent has no results yet, so skip it)
@@ -248,7 +252,7 @@ export default function QCTestingPage() {
             การทดสอบ QC
           </span>
         }
-        description={`${shownPetitions.length} รายการ`}
+        description={`${tabPetitions.length} รายการ`}
         actions={
           <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
             <QrCode className="h-4 w-4" />
@@ -321,19 +325,23 @@ export default function QCTestingPage() {
             เสร็จแล้ว
             <Badge variant="gray-soft" className="px-1.5 py-0 font-normal">{donePetitions.length}</Badge>
           </TabsTrigger>
+          <TabsTrigger value="tomorrow" className="gap-1.5">
+            มาพรุ่งนี้
+            <Badge variant="gray-soft" className="px-1.5 py-0 font-normal">{tomorrowPetitions.length}</Badge>
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
       <DataTable
         columns={columns}
-        data={shownPetitions}
+        data={tabPetitions}
         rowKey={(p) => p._id}
         isLoading={loading || staleReceivedLoading}
         rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
         onRowClick={(p) => {
           if (qcReceivedAt(p)) navigate(`/qc-testing/${p._id}`);
         }}
-        emptyTitle={tab === 'done' ? 'ไม่มีคำร้องที่ตรวจเสร็จแล้ว' : 'ไม่มีคำร้องที่รอตรวจ'}
+        emptyTitle={tab === 'done' ? 'ไม่มีคำร้องที่ตรวจเสร็จแล้ว' : tab === 'tomorrow' ? 'ไม่มีรายการที่จะมาพรุ่งนี้' : 'ไม่มีคำร้องที่รอตรวจ'}
       />
     </div>
     <QrReceiveModal

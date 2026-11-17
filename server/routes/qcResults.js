@@ -125,10 +125,20 @@ router.get("/testers", async (req, res) => {
     const ids = raw.split(",").map((s) => s.trim()).filter(Boolean);
     if (ids.length === 0) return res.json({});
 
-    const docs = await QCTestResult.find(
+    let docs = await QCTestResult.find(
       { petitionId: { $in: ids } },
-      { petitionId: 1, enteredBy: 1, updatedBy: 1 }
+      { petitionId: 1, parameterId: 1, enteredBy: 1, updatedBy: 1 }
     ).lean();
+
+    // ?scope=lab → เฉพาะผลของ parameter ฝั่ง Lab และแสดงคนบันทึกผล (enteredBy)
+    // เพื่อไม่ให้ชื่อ QC หรือแอดมินที่เปิดดู/แก้ภายหลังปนในหน้าอนุมัติผล Lab
+    const labOnly = req.query.scope === "lab";
+    if (labOnly) {
+      const paramIds = [...new Set(docs.map((d) => d.parameterId).filter((id) => mongoose.isValidObjectId(id)))];
+      const labParams = await Parameter.find({ _id: { $in: paramIds }, scope: "lab" }, { _id: 1 }).lean();
+      const labSet = new Set(labParams.map((p) => String(p._id)));
+      docs = docs.filter((d) => labSet.has(String(d.parameterId)));
+    }
 
     const map = {};
     for (const id of ids) map[id] = [];
@@ -139,7 +149,9 @@ router.get("/testers", async (req, res) => {
     // Matches what the detail page displays per field, so list ↔ detail are consistent.
     for (const d of docs) {
       const pid = d.petitionId;
-      const name = d.updatedBy?.name || d.enteredBy?.name;
+      const name = labOnly
+        ? d.enteredBy?.name || d.updatedBy?.name
+        : d.updatedBy?.name || d.enteredBy?.name;
       if (name && !seen[pid].has(name)) {
         seen[pid].add(name);
         map[pid].push(name);

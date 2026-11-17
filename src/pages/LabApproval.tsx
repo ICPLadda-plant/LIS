@@ -69,7 +69,7 @@ const LabApproval = () => {
     }
     const ids = petitions.map((p) => p._id);
     let alive = true;
-    fetch(`${API_BASE}/qc-results/testers?petitionIds=${encodeURIComponent(ids.join(","))}`, {
+    fetch(`${API_BASE}/qc-results/testers?scope=lab&petitionIds=${encodeURIComponent(ids.join(","))}`, {
       cache: "no-store",
     })
       .then((r) => (r.ok ? r.json() : {}))

@@ -103,12 +103,12 @@ export function sideApprovalState(petition: ApprovalPetition, side: ApprovalSide
       acceptedOos,
     };
   }
-  const done = side === "qc" ? petition.qcCompletedAt : petition.labCompletedAt;
+  const done = side === "qc" ? petition.qcCompletedAt : petition.labCompletedAt && petition.labApprovedAt;
   if (!done) {
     const returned = items.some((item) => itemSideStatus(petition, item, side) === "rejected");
-    return returned
-      ? { kind: "returned", label: `ไม่ผ่าน — รอ ${side === "qc" ? "QC" : "Lab"} ทดสอบใหม่`, total, pending }
-      : { kind: "waiting-result", label: side === "qc" ? "รอผล QC" : "รอผล Lab", total, pending };
+    if (returned) return { kind: "returned", label: `ไม่ผ่าน — รอ ${side === "qc" ? "QC" : "Lab"} ทดสอบใหม่`, total, pending };
+    const label = side === "qc" ? "รอผล QC" : petition.labCompletedAt ? "รอหัวหน้า Lab ออกผล" : "รอผล Lab";
+    return { kind: "waiting-result", label, total, pending };
   }
   return { kind: "pending", label: "รออนุมัติ", total, pending };
 }

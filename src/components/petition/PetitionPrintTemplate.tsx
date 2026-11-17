@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { fillSystemPage, refitBoxes } from '@/lib/systemFormSlots';
 import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { customerCodeForPetition } from '@/lib/customerCode';
@@ -140,17 +141,6 @@ function PageOne({ lr, customerCode, yearShort }: { lr: LabRequest; customerCode
           <EditableText className="pr-line pr-line-sm" value={customerCode ? `${customerCode}/${yearShort}` : ''} />
         </div>
 
-        <div className="pr-p1-notify">
-          <div className="pr-p1-notify-line">
-            ห้องปฏิบัติการได้รับแจ้งการทบทวนข้อตกลงการบริการทดสอบทางโทรศัพท์, อีเมล์&nbsp;&nbsp;
-            <CB /> ใช่&nbsp;&nbsp;<CB /> ไม่ใช่
-          </div>
-          <div className="pr-p1-notify-line">
-            ลงชื่อ <Line width="4cm" /> ผู้แจ้ง&nbsp;&nbsp;
-            <Line width="4cm" /> ผู้รับแจ้ง
-          </div>
-        </div>
-
         <table className="pr-p1-table">
           <thead>
             <tr>
@@ -162,6 +152,13 @@ function PageOne({ lr, customerCode, yearShort }: { lr: LabRequest; customerCode
               </th>
               <th className="pr-p1-head-r">
                 <div className="pr-center"><b>สำหรับหัวหน้าห้องปฏิบัติการ</b></div>
+                <div className="pr-center" style={{ fontWeight: 'normal' }}>ห้องปฏิบัติการได้รับแจ้งการทบทวนข้อตกลงการบริการทดสอบ</div>
+                <div style={{ fontWeight: 'normal', textAlign: 'left' }}>
+                  ทางโทรศัพท์, อีเมล์&nbsp;&nbsp;&nbsp;&nbsp;<CB /> ใช่&nbsp;&nbsp;&nbsp;&nbsp;<CB /> ไม่ใช่
+                </div>
+                <div style={{ fontWeight: 'normal', textAlign: 'left' }}>
+                  ลงชื่อ <Line width="3cm" /> ผู้แจ้ง <Line width="3cm" /> ผู้รับแจ้ง
+                </div>
               </th>
             </tr>
           </thead>
@@ -573,11 +570,7 @@ function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgPa
                 <td>{item.testUnit ?? ''}</td>
                 <td>
                   {item.testItems ?? ''}
-                  {(labTestsBySeq[item.seq] ?? []).filter((test, testIndex, all) => all.findIndex((other) => (other.method || other.testItem) === (test.method || test.testItem)) === testIndex).map((test, testIndex) => (
-                    <div key={`lab-test-${testIndex}`} className="pr-note">
-                      {test.method && test.method !== '-' ? test.method.replace(/\s*\n\s*/g, ' ') : test.testItem}
-                    </div>
-                  ))}
+                  {(labTestsBySeq[item.seq] ?? []).length > 0 && <div className="pr-note">วิเคราะห์ %AI</div>}
                   {Object.entries(requestValues).filter(([key, value]) => !key.startsWith('ค่าถพ.\u0000') && key.endsWith(`\u0000${item.batchNo}\u0000${item.sampleName}`) && value !== '').map(([key, value]) => <div key={key} className="pr-note">{key.split('\u0000')[0]}: {String(value)}</div>)}
                 </td>
                 <td>{item.sampleId ?? ''}</td>
@@ -650,9 +643,28 @@ interface Props {
   requestValues?: Record<string, unknown>;
   /** หน้าใบรายงานผล Lab (เรียงตาม petition.items) ใช้เติมรายการทดสอบ/วิธีทดสอบ */
   labReportPages?: Array<{ rows: LabTestRow[] }>;
+  /** แม่แบบ (HTML ผูกช่อง) ที่ผู้ใช้แก้ในหน้า "จัดการเอกสาร" สถานะใช้งาน — ใช้แทนแผ่นนั้น โดยข้อมูลมาจากฟอร์มเดิม */
+  templates?: { page1?: string; page2?: string };
 }
 
-export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [] }: Props) {
+/**
+ * แสดงแม่แบบของผู้ใช้แทนฟอร์มเดิม: ฟอร์มเดิมถูก render ไว้ใน <div hidden data-tpl-src> ก่อนหน้า
+ * (layout effect ของมันเติมค่าเสร็จก่อน effect ของ component นี้) แล้วคัดลอกค่าตามเลขช่อง
+ */
+function SlotFilledPages({ html, source }: { html: string; source: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const host = ref.current;
+    const root = host?.closest('.pr-root');
+    if (!host || !root) return;
+    const sources = Array.from(root.querySelectorAll<HTMLElement>(`[data-tpl-src="${source}"] > section`));
+    host.innerHTML = sources.map((src) => fillSystemPage(html, src)).join('');
+    refitBoxes(host);
+  });
+  return <div ref={ref} className="pr-template-pages" data-template-for={source} />;
+}
+
+export default function PetitionPrintTemplate({ labRequest, petition, qcResults = [], sgParam = null, requestValues = {}, labReportPages = [], templates }: Props) {
   const labTestsBySeq: Record<number, LabTestRow[]> = {};
   const labTestsBySample = new Map<string, LabTestRow[]>();
   const sampleKey = (item: PetitionItem) => `${String(item.batchNo ?? '').trim()}|${item.sampleName ?? ''}`;
@@ -676,14 +688,24 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
     <>
       <style>{PRINT_CSS}</style>
       <div className="pr-root">
-        <PageOne
-          lr={labRequest}
-          customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
-          yearShort={yearShort}
-        />
-        {sheets.map((rows, index) => (
-          <PageTwo key={index} lr={labRequest} petition={petition} printRows={rows} sheetNo={index + 1} sheetCount={sheets.length} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
-        ))}
+        {(() => {
+          const pageOne = (
+            <PageOne
+              lr={labRequest}
+              customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
+              yearShort={yearShort}
+            />
+          );
+          const pageTwos = sheets.map((rows, index) => (
+            <PageTwo key={index} lr={labRequest} petition={petition} printRows={rows} sheetNo={index + 1} sheetCount={sheets.length} qcResults={qcResults} sgParam={sgParam} requestValues={requestValues} labTestsBySeq={labTestsBySeq} />
+          ));
+          return (
+            <>
+              {templates?.page1 ? <><div hidden data-tpl-src="page1">{pageOne}</div><SlotFilledPages html={templates.page1} source="page1" /></> : pageOne}
+              {templates?.page2 ? <><div hidden data-tpl-src="page2">{pageTwos}</div><SlotFilledPages html={templates.page2} source="page2" /></> : pageTwos}
+            </>
+          );
+        })()}
       </div>
     </>
   );
@@ -794,13 +816,6 @@ const PRINT_CSS = `
 .pr-p1-title { font-size: 14pt; margin: 2pt 0 3pt; }
 .pr-p1-meta-row { text-align: right; font-size: 11pt; line-height: 1.25; }
 
-.pr-p1-notify {
-  border: 0.6pt solid #000;
-  padding: 3pt 6pt;
-  margin: 4pt 0 0;
-  font-size: 10.5pt;
-}
-.pr-p1-notify-line { line-height: 1.5; }
 
 .pr-p1-table {
   width: 100%; border-collapse: collapse; table-layout: fixed;
@@ -817,8 +832,9 @@ const PRINT_CSS = `
   margin-top: 2pt; text-align: center;
 }
 .pr-fill-row { display: flex; align-items: baseline; gap: 4pt; width: 100%; }
+.pr-fill-row > :not(.pr-line-fill) { flex: 0 0 auto; }
 .pr-line-fill {
-  flex: 1 1 auto;
+  flex: 1 1 0; min-width: 0;
   border-bottom: 0.4pt dotted #000;
   padding: 0 3pt; line-height: 1;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
