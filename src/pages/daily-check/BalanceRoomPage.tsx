@@ -493,13 +493,13 @@ const BalanceRoomPage = () => {
       )}
 
       {duePanels.length > 0 && (
-        <Alert>
+        <Alert className="border-destructive bg-destructive text-destructive-foreground [&>svg]:text-destructive-foreground">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
             <span>ครบ 3 เดือนแล้ว กรุณาอัปเดตค่า Control ใหม่สำหรับตุ้ม {duePanels.map((panel) => `${panel.weight} g`).join(" และ ")}</span>
             <div className="flex flex-wrap gap-2">
               {duePanels.map((panel) => (
-                <Button key={panel.weight} type="button" variant="outline" size="sm" onClick={() => setConfigWeight(panel.weight)}>
+                <Button key={panel.weight} type="button" variant="outline" size="sm" className="border-destructive-foreground/60 bg-transparent text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground" onClick={() => setConfigWeight(panel.weight)}>
                   แก้ไข {panel.weight} g
                 </Button>
               ))}

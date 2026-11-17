@@ -254,7 +254,7 @@ describe("BalanceRoomPage", () => {
       { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.01, mpe: 0.5, updatedDate: "2026-08-17" },
     ]);
     renderPage();
-    expect(await screen.findByText(/ครบ 3 เดือนแล้ว/)).toBeInTheDocument();
+    expect((await screen.findByText(/ครบ 3 เดือนแล้ว/)).closest('[role="alert"]')).toHaveClass("bg-destructive");
     expect(screen.getAllByText("อัปเดตล่าสุด: 17/08/2026 · ครบกำหนด: พฤศจิกายน 2569")).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: /แก้ไขค่า Control/ })).toHaveLength(2);
   });
