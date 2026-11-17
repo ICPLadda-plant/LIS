@@ -16,6 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
@@ -134,6 +135,7 @@ const BalanceRoomPage = () => {
   const [printOpen, setPrintOpen] = useState(false);
   const [printedAt, setPrintedAt] = useState("");
   const [configWeight, setConfigWeight] = useState<number | null>(null);
+  const [weightInfoOpen, setWeightInfoOpen] = useState(false);
   const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
   const [recordDate, setRecordDate] = useState(todayStr);
   const [exporting, setExporting] = useState(false);
@@ -482,6 +484,9 @@ const BalanceRoomPage = () => {
               />
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => setWeightInfoOpen(true)}>
+                <Scale className="h-4 w-4" /> รหัสตุ้มน้ำหนัก
+              </Button>
               <Button className="gap-2" onClick={handlePrint}>
                 <Printer className="h-4 w-4" /> Print
               </Button>
@@ -860,6 +865,28 @@ const BalanceRoomPage = () => {
           ))}
         </PrintPreviewDialog>
       )}
+
+      <Dialog open={weightInfoOpen} onOpenChange={setWeightInfoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ข้อมูลตุ้มน้ำหนักที่ใช้ — {scale.code}</DialogTitle>
+            <DialogDescription>รหัสตุ้มน้ำหนักสำหรับ Daily Check และ Control Chart</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {chartPanels.map((panel) => (
+              <div key={panel.weight} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</p>
+                  <p className="text-sm text-muted-foreground">รหัส: {panel.config.weightCode || "—"}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setWeightInfoOpen(false); setConfigWeight(panel.weight); }}>
+                  แก้ไขข้อมูล
+                </Button>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <BalanceControlConfigDialog
         open={configWeight != null}
