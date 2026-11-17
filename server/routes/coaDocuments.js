@@ -58,6 +58,10 @@ const DEFAULT_COA_REQUESTS_WEBHOOK_URL = 'https://n8n-plant.icpladda.com/webhook
 const COA_REQUESTS_WEBHOOK_URL = process.env.COA_REQUESTS_WEBHOOK_URL || DEFAULT_COA_REQUESTS_WEBHOOK_URL;
 const COA_REQUESTS_WEBHOOK_TIMEOUT_MS = Number(process.env.COA_REQUESTS_WEBHOOK_TIMEOUT_MS || 8000);
 const EXTERNAL_COA_STATUS = 'requested';
+// ponytail: ERP COA webhook has no label production date; remove this correction when ERP exposes that field.
+const EXTERNAL_LABEL_PRODUCTION_DATES = new Map([
+  ['SO26110076:10000', '2026-11-16'],
+]);
 
 function objectId(id) {
   if (!mongoose.Types.ObjectId.isValid(id)) throw new Error('Invalid id');
@@ -458,7 +462,8 @@ function externalCoaRowToDocument(row) {
   const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
   const lotDescription = externalCoaLotDescription(row);
   const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']) || lotDescription;
-  const productionDate = externalCoaProductionDate(row)
+  const productionDate = EXTERNAL_LABEL_PRODUCTION_DATES.get(`${saleOrderNo}:${itemSeq}`)
+    || externalCoaProductionDate(row)
     || lotSnapshot(lotNo).productionDate
     || lotSnapshot(lotDescription).productionDate
     || '';

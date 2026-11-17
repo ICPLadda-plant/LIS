@@ -656,6 +656,7 @@ function cleanLegacyBatch(value) {
 
 function legacyIdentityText(value) {
   return text(value).toUpperCase()
+    .replace(/\bTRIFLOXYSTRONIN\b/g, 'TRIFLOXYSTROBIN')
     .replace(/\bBENSOATE\b/g, 'BENZOATE')
     .replace(/\bANILOPHOS\b/g, 'ANILOFOS')
     .replace(/\bHYDROCHLORIDE\b/g, 'HCL')

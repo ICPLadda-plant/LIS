@@ -105,6 +105,21 @@ test('legacy Lab matching accepts established product-name aliases', () => {
     '2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR',
     'Anilophos 1.5+2,4-D BE3.76 %GR',
   ) >= 0.75);
+  assert.ok(legacyProductMatchScore(
+    'TRIFLOXYSTROBIN + TEBUCONAZOLE 25% + 50% WG',
+    'Trifloxystrobin 25%+Tebuconazole 50% WG',
+  ) >= 0.75);
+  assert.equal(findBestLegacyLabResult([{
+    sample_name: 'Trifloxystrobin 25%+Tebuconazole 50% WG',
+    batch_no: '2026052501', production_date: '22/07/2569', test_date: '14/08/2569',
+    tests: [
+      { test_name: 'Trifloxystronin', result: '24.73 % W/W', criteria: '23.5-26.5' },
+      { test_name: 'Tebuconazole', result: '52.26 % W/W', criteria: '47.5-52.5' },
+    ],
+  }], {
+    sampleSnapshots: [{ commonName: 'TRIFLOXYSTROBIN + TEBUCONAZOLE 25% + 50% WG' }],
+    externalCoaRequest: { packingSize: '24*250 g', shipmentDate: '2026-11-09' },
+  })?.batchNo, '2026052501');
 });
 
 test('legacy Lab matching uses package type to choose the compatible formulation', () => {

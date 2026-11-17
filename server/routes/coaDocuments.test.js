@@ -531,6 +531,15 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   assert.equal(docs[0].externalCoaRequest.appearance, 'เม็ดยาสีแดง');
 });
 
+test('externalCoaRowsToDocuments applies the confirmed label production date', () => {
+  const [doc] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26110076', Line: 10000, ItemNo: 'FC-HODEN-250X24',
+    ProductionDate: '2026-11-12', remark: 'COA',
+  }]);
+
+  assert.equal(doc.sampleSnapshots[0].productionDate, '2026-11-16');
+});
+
 test('externalCoaRowsToDocuments keeps separate requests when the outstanding quantity changes', () => {
   const base = { SaleOrderNo: 'SO-LATEST', Line: 10000, ItemNo: 'F-1' };
   const removed = router.externalCoaRowsToDocuments([
