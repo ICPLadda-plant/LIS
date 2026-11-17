@@ -720,6 +720,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(input),
     }).then((r) => r.data),
+  // รหัสตุ้มผูกกับขนาดตุ้ม ใช้ร่วมกันทุกเครื่องชั่ง
+  updateBalanceWeightCode: (nominal: number, weightCode: string) =>
+    request<{ data: { nominal: number; weightCode: string } }>(`/balance-control-config/weight-code/${nominal}`, {
+      method: "PUT",
+      body: JSON.stringify({ weightCode }),
+    }).then((r) => r.data),
 
   // ── Document number config (petition / sampleReceipt / labRequest formats) ──
   getDocumentNumberConfigs: () =>

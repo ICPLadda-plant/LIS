@@ -46,7 +46,6 @@ export interface BalanceControlConfig {
 export interface BalanceControlConfigInput {
   brand?: string;
   model?: string;
-  weightCode?: string;
   nominal?: number | null;
   mean: number;
   sd: number;

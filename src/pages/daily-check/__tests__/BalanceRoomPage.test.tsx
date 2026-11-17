@@ -15,6 +15,7 @@ const apiMock = vi.hoisted(() => ({
   createDailyCheck: vi.fn(),
   getBalanceControlConfigs: vi.fn().mockResolvedValue([]),
   updateBalanceControlConfig: vi.fn(),
+  updateBalanceWeightCode: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -157,20 +158,26 @@ describe("BalanceRoomPage", () => {
     expect(screen.queryByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).not.toBeInTheDocument();
   });
 
-  it("shows the weight codes used by the selected balance", async () => {
+  it("edits the weight code bound to each weight size", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
       { scaleId: "scale-1", brand: "", model: "", weightCode: "W-10", nominal: 10, mean: 10, sd: 0.01, mpe: 0.5, updatedDate: "2026-11-17" },
       { scaleId: "scale-1", brand: "", model: "", weightCode: "W-500", nominal: 500, mean: 500, sd: 0.01, mpe: 0.5, updatedDate: "2026-11-17" },
     ]);
+    apiMock.updateBalanceWeightCode.mockResolvedValue({ nominal: 10, weightCode: "W-11" });
     renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: /รหัสตุ้มน้ำหนัก/ }));
     expect(await screen.findByRole("heading", { name: /ข้อมูลตุ้มน้ำหนักที่ใช้/ })).toBeInTheDocument();
-    expect(screen.getByText("รหัส: W-10")).toBeInTheDocument();
-    expect(screen.getByText("รหัส: W-500")).toBeInTheDocument();
+    expect(screen.getByLabelText("รหัสตุ้ม 10 g")).toHaveValue("W-10");
+    expect(screen.getByLabelText("รหัสตุ้ม 500 g")).toHaveValue("W-500");
+
+    fireEvent.change(screen.getByLabelText("รหัสตุ้ม 10 g"), { target: { value: "W-11" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "บันทึก" })[0]);
+    await waitFor(() => expect(apiMock.updateBalanceWeightCode).toHaveBeenCalledWith(10, "W-11"));
+
     fireEvent.change(screen.getByLabelText("เพิ่มขนาดตุ้ม (g)"), { target: { value: "250" } });
     fireEvent.click(screen.getByRole("button", { name: "เพิ่มขนาดตุ้ม" }));
-    expect(await screen.findByRole("heading", { name: /ตุ้ม 250 g/ })).toBeInTheDocument();
+    await waitFor(() => expect(apiMock.updateBalanceWeightCode).toHaveBeenCalledWith(250, ""));
   });
 
   it("compares the current LD-005 10 g average with the control lines", async () => {

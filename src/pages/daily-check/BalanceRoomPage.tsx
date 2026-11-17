@@ -138,6 +138,7 @@ const BalanceRoomPage = () => {
   const [configWeight, setConfigWeight] = useState<number | null>(null);
   const [weightInfoOpen, setWeightInfoOpen] = useState(false);
   const [newWeight, setNewWeight] = useState("");
+  const [weightCodeDrafts, setWeightCodeDrafts] = useState<Record<number, string>>({});
   const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
   const [recordDate, setRecordDate] = useState(todayStr);
   const [exporting, setExporting] = useState(false);
@@ -235,6 +236,21 @@ const BalanceRoomPage = () => {
   const historyPanel = chartPanels.find((panel) => panel.weight === historyWeight) ?? chartPanels[0];
   const recordedPoints = historyPanel.series.filter((point): point is RecordedPoint => point.record != null && point.value != null);
   const duePanels = chartPanels.filter((panel) => isControlUpdateDue(panel.config.updatedDate));
+
+  const weightCodeMutation = useMutation({
+    mutationFn: ({ nominal, weightCode }: { nominal: number; weightCode: string }) =>
+      api.updateBalanceWeightCode(nominal, weightCode),
+    onSuccess: (_data, vars) => {
+      toast.success(`บันทึกรหัสตุ้ม ${vars.nominal} g แล้ว`);
+      setWeightCodeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[vars.nominal];
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: ["balance-control-config"] });
+    },
+    onError: (err: Error) => toast.error(err.message || "บันทึกรหัสตุ้มไม่สำเร็จ"),
+  });
 
   const createMutation = useMutation({
     mutationFn: api.createDailyCheck,
@@ -874,18 +890,26 @@ const BalanceRoomPage = () => {
       <Dialog open={weightInfoOpen} onOpenChange={setWeightInfoOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>ข้อมูลตุ้มน้ำหนักที่ใช้ — {scale.code}</DialogTitle>
-            <DialogDescription>รหัสตุ้มน้ำหนักสำหรับ Daily Check และ Control Chart</DialogDescription>
+            <DialogTitle>ข้อมูลตุ้มน้ำหนักที่ใช้</DialogTitle>
+            <DialogDescription>รหัสตุ้มผูกกับขนาดตุ้ม ใช้ร่วมกันทุกเครื่องชั่ง</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             {weightConfigs.map((weightConfig) => (
-              <div key={weightConfig.nominal} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">ตุ้ม {weightConfig.nominal} g</p>
-                  <p className="text-sm text-muted-foreground">รหัส: {weightConfig.weightCode || "—"}</p>
+              <div key={weightConfig.nominal} className="flex items-end justify-between gap-3 rounded-lg border bg-card p-3">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor={`weight-code-${weightConfig.nominal}`}>รหัสตุ้ม {weightConfig.nominal} g</Label>
+                  <Input
+                    id={`weight-code-${weightConfig.nominal}`}
+                    value={weightCodeDrafts[weightConfig.nominal] ?? weightConfig.weightCode}
+                    onChange={(event) => setWeightCodeDrafts((prev) => ({ ...prev, [weightConfig.nominal]: event.target.value }))}
+                  />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => { setWeightInfoOpen(false); setConfigWeight(weightConfig.nominal); }}>
-                  แก้ไขข้อมูล
+                <Button
+                  size="sm"
+                  disabled={weightCodeMutation.isPending || (weightCodeDrafts[weightConfig.nominal] ?? weightConfig.weightCode).trim() === weightConfig.weightCode}
+                  onClick={() => weightCodeMutation.mutate({ nominal: weightConfig.nominal, weightCode: (weightCodeDrafts[weightConfig.nominal] ?? "").trim() })}
+                >
+                  บันทึก
                 </Button>
               </div>
             ))}
@@ -898,7 +922,7 @@ const BalanceRoomPage = () => {
                 type="button"
                 className="gap-2"
                 disabled={!Number.isInteger(Number(newWeight)) || Number(newWeight) <= 0 || weightConfigs.some((item) => item.nominal === Number(newWeight))}
-                onClick={() => { setWeightInfoOpen(false); setConfigWeight(Number(newWeight)); setNewWeight(""); }}
+                onClick={() => { weightCodeMutation.mutate({ nominal: Number(newWeight), weightCode: "" }); setNewWeight(""); }}
               >
                 <Plus className="h-4 w-4" /> เพิ่มขนาดตุ้ม
               </Button>

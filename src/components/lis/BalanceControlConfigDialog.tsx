@@ -31,7 +31,6 @@ interface FormState {
   baselineValues: string[];
   nominal: string;
   mpe: string;
-  weightCode: string;
   updatedDate: string;
   brand: string;
   model: string;
@@ -46,7 +45,6 @@ const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
   baselineValues: Array.from({ length: 20 }, (_, index) => numText(config.baselineValues?.[index], digits)),
   nominal: numText(config.nominal, digits),
   mpe: numText(config.mpe, digits),
-  weightCode: config.weightCode,
   updatedDate: config.updatedDate,
   brand: config.brand,
   model: config.model,
@@ -86,7 +84,6 @@ export default function BalanceControlConfigDialog({
     baselineValues: baselineComplete ? baselineValues : [],
     nominal: parseOptional(form.nominal),
     mpe: parseOptional(form.mpe),
-    weightCode: form.weightCode.trim(),
     updatedDate: form.updatedDate,
     brand: form.brand.trim(),
     model: form.model.trim(),
@@ -182,10 +179,6 @@ export default function BalanceControlConfigDialog({
             <div className="space-y-1.5">
               <Label htmlFor="bcc-mpe">MPE (g)</Label>
               <Input id="bcc-mpe" inputMode="decimal" value={form.mpe} onChange={setField("mpe")} onBlur={normalizeField("mpe")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="bcc-weight">รหัสตุ้มน้ำหนัก</Label>
-              <Input id="bcc-weight" value={form.weightCode} onChange={setField("weightCode")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-updated">วันที่ปรับปรุงค่า Control</Label>

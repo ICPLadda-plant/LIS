@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const BalanceControlConfig = require('../models/BalanceControlConfig');
+const BalanceWeightCode = require('../models/BalanceWeightCode');
 
 // Mirror of src/lib/balanceControlChart.ts BALANCE_CONTROL_DEFAULTS.
 // mean/sd = null จนกว่าผู้ใช้จะตั้งค่า Control ของเครื่องนั้น
@@ -14,13 +15,13 @@ const SCALE_DEFAULTS = [
 const ALLOWED_IDS = SCALE_DEFAULTS.map((d) => d.scaleId);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function pick(doc, def, nominal) {
+function pick(doc, def, nominal, weightCodes) {
   const saved = doc?.controls?.[String(nominal)] || (doc?.nominal === nominal ? doc : null);
   return {
     scaleId: def.scaleId,
     brand: saved?.brand || doc?.brand || def.brand,
     model: saved?.model || doc?.model || def.model,
-    weightCode: saved?.weightCode || '',
+    weightCode: weightCodes.get(nominal) || '',
     nominal,
     mean: typeof saved?.mean === 'number' ? saved.mean : null,
     sd: typeof saved?.sd === 'number' ? saved.sd : null,
@@ -59,17 +60,41 @@ const str = (v) => (typeof v === 'string' ? v.trim() : '');
 // GET /api/balance-control-config — always returns all 5 scales (DB doc or default).
 router.get('/', async (req, res) => {
   try {
-    const docs = await BalanceControlConfig.find().lean();
+    const [docs, codes] = await Promise.all([
+      BalanceControlConfig.find().lean(),
+      BalanceWeightCode.find().lean(),
+    ]);
+    const weightCodes = new Map(codes.map((c) => [c.nominal, c.weightCode]));
     const byId = new Map(docs.map((d) => [d.scaleId, d]));
     const data = SCALE_DEFAULTS.flatMap((def) => {
       const d = byId.get(def.scaleId);
       const weights = [...new Set([
         ...def.weights,
+        ...weightCodes.keys(),
         ...Object.keys(d?.controls || {}).map(Number).filter((weight) => Number.isInteger(weight) && weight > 0),
       ])];
-      return weights.map((nominal) => pick(d, def, nominal));
+      return weights.map((nominal) => pick(d, def, nominal, weightCodes));
     });
     res.json({ data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/balance-control-config/weight-code/:nominal — รหัสตุ้มผูกกับขนาดตุ้ม ใช้ร่วมทุกเครื่อง
+router.put('/weight-code/:nominal', async (req, res) => {
+  try {
+    const nominal = Number(req.params.nominal);
+    if (!Number.isInteger(nominal) || nominal <= 0) {
+      return res.status(400).json({ error: 'น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0' });
+    }
+    const weightCode = str(req.body?.weightCode);
+    await BalanceWeightCode.findOneAndUpdate(
+      { nominal },
+      { $set: { nominal, weightCode } },
+      { new: true, upsert: true },
+    ).lean();
+    res.json({ data: { nominal, weightCode } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -92,7 +117,6 @@ router.put('/:scaleId', async (req, res) => {
     const control = {
       brand: str(body.brand) || def.brand,
       model: str(body.model) || def.model,
-      weightCode: str(body.weightCode),
       nominal,
       mean,
       sd,
