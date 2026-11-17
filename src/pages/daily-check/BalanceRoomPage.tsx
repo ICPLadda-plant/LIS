@@ -121,6 +121,7 @@ const BalanceRoomPage = () => {
   const [printedAt, setPrintedAt] = useState("");
   const [configWeight, setConfigWeight] = useState<number | null>(null);
   const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
+  const [recordDate, setRecordDate] = useState(todayStr);
   const [exporting, setExporting] = useState(false);
   const [cameraTarget, setCameraTarget] = useState<{ type: "100" | "10"; index: number } | null>(null);
   const [readingPhoto, setReadingPhoto] = useState(false);
@@ -224,6 +225,7 @@ const BalanceRoomPage = () => {
       else toast.warning(`${name} ไม่ผ่านการ Calibrate`);
 
       queryClient.invalidateQueries({ queryKey: ["daily-checks"] });
+      setMonth(vars.date.slice(0, 7));
       // เคลียร์ draft ของ scale นั้น — watcher จะปลดแจ้งเตือนเองเมื่อครบ
       setDrafts(prev => {
         const c = { ...prev };
@@ -288,6 +290,10 @@ const BalanceRoomPage = () => {
 
   const handleCheck = (id: string) => {
     const r = getDraft(id);
+    if (!recordDate) {
+      toast.error("กรุณาเลือกวันที่บันทึก");
+      return;
+    }
     if (r.weights100.some(v => !v) || r.weights10.some(v => !v)) {
       toast.error("กรุณากรอกค่าน้ำหนักให้ครบทั้ง 6 ค่า");
       return;
@@ -311,6 +317,7 @@ const BalanceRoomPage = () => {
     createMutation.mutate({
       scaleId: id,
       scaleName: target.name,
+      date: recordDate,
       model: target.model,
       weights100: r.weights100,
       weights10: r.weights10,
@@ -571,6 +578,18 @@ const BalanceRoomPage = () => {
             )}
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="balance-record-date">วันที่บันทึก</Label>
+              <Input
+                id="balance-record-date"
+                type="date"
+                value={recordDate}
+                max={todayStr()}
+                required
+                onChange={event => setRecordDate(event.target.value)}
+              />
+              {recordDate !== todayStr() && <p className="text-xs text-muted-foreground">กำลังบันทึกข้อมูลย้อนหลัง</p>}
+            </div>
             {weightBlock("10")}
             {weightBlock("100")}
 

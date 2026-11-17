@@ -81,6 +81,7 @@ describe("BalanceRoomPage", () => {
 
     expect(screen.queryByText("นอกเวลาบันทึก")).not.toBeInTheDocument();
     expect(screen.getByText(/บันทึกได้ทุกเวลา/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("วันที่บันทึก"), { target: { value: "2026-11-12" } });
 
     const [first10, first500] = screen.getAllByPlaceholderText("ครั้งที่ 1");
     const [second10, second500] = screen.getAllByPlaceholderText("ครั้งที่ 2");
@@ -96,6 +97,7 @@ describe("BalanceRoomPage", () => {
     expect(apiMock.createDailyCheck.mock.calls[0][0]).toMatchObject({
       scaleId: "scale-1",
       scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
+      date: "2026-11-12",
       avg100: 500.01,
       status100: "pass",
     });

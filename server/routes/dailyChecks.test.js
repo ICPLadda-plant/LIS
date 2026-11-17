@@ -70,4 +70,17 @@ describe('POST /daily-checks', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'ค่าน้ำหนักทุกค่าต้องเป็นตัวเลขที่มากกว่า 0' });
     expect(mockDailyCheckCreate).not.toHaveBeenCalled();
   });
+
+  test('saves a selected past date and rejects future dates', async () => {
+    jest.useFakeTimers({ now: new Date(2026, 10, 17, 9, 0) });
+    const pastRes = mockResponse();
+    await postHandler({ body: { ...validBody(), date: '2026-11-12' } }, pastRes);
+    expect(mockDailyCheckCreate.mock.calls[0][0]).toMatchObject({ date: '2026-11-12', period: undefined });
+
+    mockDailyCheckCreate.mockClear();
+    const futureRes = mockResponse();
+    await postHandler({ body: { ...validBody(), date: '2026-11-18' } }, futureRes);
+    expect(futureRes.status).toHaveBeenCalledWith(400);
+    expect(mockDailyCheckCreate).not.toHaveBeenCalled();
+  });
 });
