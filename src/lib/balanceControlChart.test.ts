@@ -11,6 +11,7 @@ import {
   formatSd,
   formatThaiMonth,
   getBalanceControlConfig,
+  limitDecimalPlaces,
   monthlyStats,
   monthRange,
   validateBalanceControlInput,
@@ -127,12 +128,13 @@ describe("chartDomain / formatSd", () => {
     expect(formatSd(null)).toBe("—");
   });
 
-  it("เพิ่มทศนิยมให้พอเห็นระยะ 1SD", () => {
-    expect(displayDigits(2, null)).toBe(4);
+  it("แสดงทศนิยมไม่เกินความละเอียดเครื่องชั่ง", () => {
+    expect(displayDigits(2, null)).toBe(2);
     expect(displayDigits(5, null)).toBe(5);
-    expect(displayDigits(2, 0.01)).toBe(4);
-    expect(displayDigits(5, 0.0000476)).toBe(6);
-    expect(displayDigits(5, 1e-12)).toBe(8);
+    expect(displayDigits(2, 0.01)).toBe(2);
+    expect(displayDigits(5, 0.0000476)).toBe(5);
+    expect(displayDigits(5, 1e-12)).toBe(5);
+    expect(limitDecimalPlaces("10.009", 2)).toBe("10.00");
   });
 });
 

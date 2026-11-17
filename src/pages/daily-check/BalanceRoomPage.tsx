@@ -42,7 +42,7 @@ import {
   currentMonthStr,
   displayDigits,
   formatControlNumber,
-  formatSd,
+  limitDecimalPlaces,
   formatThaiMonth,
   getBalanceControlConfig,
   monthRange,
@@ -233,13 +233,14 @@ const BalanceRoomPage = () => {
 
   const updateWeight = (id: string, type: "100" | "10", index: number, value: string) => {
     const r = getDraft(id);
+    const limitedValue = limitDecimalPlaces(value, scale.decimals);
     if (type === "100") {
       const w = [...r.weights100] as [string, string, string];
-      w[index] = value;
+      w[index] = limitedValue;
       setDrafts(prev => ({ ...prev, [id]: { ...r, weights100: w, status100: "", status10: "", checkedAt: undefined } }));
     } else {
       const w = [...r.weights10] as [string, string, string];
-      w[index] = value;
+      w[index] = limitedValue;
       setDrafts(prev => ({ ...prev, [id]: { ...r, weights10: w, status100: "", status10: "", checkedAt: undefined } }));
     }
   };
@@ -630,7 +631,7 @@ const BalanceRoomPage = () => {
                 <dl className="grid grid-cols-3 gap-x-4 gap-y-2 border-y py-2 sm:grid-cols-6">
                   {[
                     ["Mean", formatControlNumber(panel.limits?.mean, panel.digits)],
-                    ["STD", formatSd(panel.limits?.sd ?? panel.config.sd)],
+                    ["STD", formatControlNumber(panel.limits?.sd ?? panel.config.sd, panel.digits)],
                     ["UWL", formatControlNumber(panel.limits?.uwl, panel.digits)],
                     ["LWL", formatControlNumber(panel.limits?.lwl, panel.digits)],
                     ["UCL", formatControlNumber(panel.limits?.ucl, panel.digits)],

@@ -257,19 +257,18 @@ export function chartDomain(
   return [min - pad, max + pad];
 }
 
-/** จำนวนทศนิยมที่แสดงค่า Control: อย่างน้อย 4 ตำแหน่ง หรือเท่าความละเอียดเครื่อง */
+/** จำนวนทศนิยมที่แสดงค่า Control ต้องไม่เกินความละเอียดของเครื่อง */
 export function controlDigits(scaleDecimals: number): number {
-  return Math.max(scaleDecimals, 4);
+  return scaleDecimals;
 }
 
-/**
- * ทศนิยมที่ใช้แสดงค่า Control/ค่าที่ได้: อย่างน้อย controlDigits และละเอียดพอให้เห็นระยะ 1SD
- * เช่น SD 0.0000476 → 6 ตำแหน่ง (ไม่งั้น UWL/LWL/UCL/LCL จะปัดเป็นเลขเดียวกัน)
- */
-export function displayDigits(scaleDecimals: number, sd: number | null | undefined): number {
-  const base = controlDigits(scaleDecimals);
-  if (!isFiniteNumber(sd) || sd <= 0) return base;
-  return Math.min(8, Math.max(base, Math.ceil(-Math.log10(sd)) + 1));
+export function displayDigits(scaleDecimals: number, _sd: number | null | undefined): number {
+  return controlDigits(scaleDecimals);
+}
+
+export function limitDecimalPlaces(value: string, digits: number): string {
+  const decimalIndex = value.indexOf(".");
+  return decimalIndex < 0 ? value : value.slice(0, decimalIndex + digits + 1);
 }
 
 export function formatControlNumber(value: number | null | undefined, digits: number): string {

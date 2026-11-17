@@ -17,7 +17,7 @@ import { api } from "@/lib/api";
 import {
   computeLimits,
   formatControlNumber,
-  formatSd,
+  limitDecimalPlaces,
   monthlyStats,
   validateBalanceControlInput,
   type BalanceControlConfig,
@@ -115,7 +115,7 @@ export default function BalanceControlConfigDialog({
   const setBaselineValue = (index: number) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({
       ...prev,
-      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? event.target.value : value),
+      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? limitDecimalPlaces(event.target.value, scale.decimals) : value),
     }));
 
   const previewItems = [
@@ -162,7 +162,7 @@ export default function BalanceControlConfigDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-sd">STD (g)</Label>
-              <Input id="bcc-sd" value={formatSd(stats.sd)} readOnly className="bg-muted/40" />
+              <Input id="bcc-sd" value={formatControlNumber(stats.sd, digits)} readOnly className="bg-muted/40" />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-nominal">น้ำหนักตุ้ม Daily check (g)</Label>

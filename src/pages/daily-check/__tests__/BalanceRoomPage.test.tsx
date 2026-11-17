@@ -114,7 +114,7 @@ describe("BalanceRoomPage", () => {
     fireEvent.change(fileInput!, { target: { files: [new File(["image"], "balance.jpg", { type: "image/jpeg" })] } });
 
     await waitFor(() => expect(readBalanceDisplayValueFromImageMock).toHaveBeenCalled());
-    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[1]).toHaveValue(100.012);
+    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[1]).toHaveValue(100.01);
   });
 
   it("shows the control values and limits from the saved config", async () => {
@@ -133,11 +133,11 @@ describe("BalanceRoomPage", () => {
     ]);
     renderPage();
 
-    expect(await screen.findByText("10.0000")).toBeInTheDocument();
-    expect(screen.getByText("0.00400")).toBeInTheDocument();
+    expect((await screen.findAllByText("10.00")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.00").length).toBeGreaterThan(0);
     // UWL = Mean + 2SD, LCL = Mean − 3SD (ไม่ใช่ค่า LCL ที่ผิดในชีต Excel)
-    expect(screen.getByText("10.0080")).toBeInTheDocument();
-    expect(screen.getByText("9.9880")).toBeInTheDocument();
+    expect(screen.getAllByText("10.01").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("9.99").length).toBeGreaterThan(0);
     expect(screen.queryByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).not.toBeInTheDocument();
   });
 
@@ -146,12 +146,12 @@ describe("BalanceRoomPage", () => {
       { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, mpe: 0.5, updatedDate: "" },
     ]);
     renderPage();
-    await screen.findByText("10.0000");
+    await screen.findAllByText("10.00");
 
     const [first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
     const [second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
     const [third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
-    [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.004" } }));
+    [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.01" } }));
 
     expect(screen.getByText("เกิน 3SD (นอกเกณฑ์)")).toBeInTheDocument();
   });
@@ -167,7 +167,7 @@ describe("BalanceRoomPage", () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "ตั้งค่า 10 g" }));
 
-    const baselineValues = Array.from({ length: 20 }, (_, index) => 10 + index / 1000);
+    const baselineValues = Array.from({ length: 20 }, (_, index) => 10 + index / 100);
     baselineValues.forEach((value, index) => {
       fireEvent.change(screen.getByLabelText(`ค่าบันทึกที่ ${index + 1}`), { target: { value: String(value) } });
     });
@@ -176,7 +176,7 @@ describe("BalanceRoomPage", () => {
     await waitFor(() => expect(apiMock.updateBalanceControlConfig).toHaveBeenCalledTimes(1));
     const [, input] = apiMock.updateBalanceControlConfig.mock.calls[0];
     expect(input.baselineValues).toEqual(baselineValues);
-    expect(input.mean).toBeCloseTo(10.0095);
+    expect(input.mean).toBeCloseTo(10.095);
     expect(input.sd).toBeGreaterThan(0);
   });
 
