@@ -1667,7 +1667,7 @@ test('ERP autofill averages duplicate legacy Lab results and excludes the named 
     });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '51.3 %W/V');
+    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '51.30 %W/V');
     assert.equal(res.body.results.find((row) => row.testItem === 'Date of analysis').result, '2026-09-18');
     assert.equal(res.body.dataSources.lab, true);
     assert.equal(res.body.dataSources.legacyLab, true);

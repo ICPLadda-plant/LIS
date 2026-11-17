@@ -231,11 +231,50 @@ test('legacy Lab excludes the named submitter and averages duplicate AI and dens
     },
   ], 'OMETHOATE 50% W/V SL');
 
-  assert.equal(result.ai.result, '51.3 %W/V');
+  assert.equal(result.ai.result, '51.30 %W/V');
   assert.equal(result.ai.valueCount, 2);
   assert.equal(result.density, '0.951');
   assert.equal(result.analysisDate, '2026-09-17');
   assert.equal(result.rows[0].criteria, '50% ± 2.50');
+});
+
+test('legacy Lab averages P1 and P2 but excludes after-drying results', () => {
+  const commonName = 'TRIFLOXYSTROBIN + TEBUCONAZOLE 25% + 50% WG';
+  const rows = [
+    {
+      customer_name: 'คลังสินค้า', sample_name: 'Trifloxystrobin 25%+Tebuconazole 50% WG',
+      batch_no: '2026052501 P1', production_date: '22/07/2569', test_date: '22/07/2569',
+      tests: [
+        { test_name: 'Trifloxystronin', result: '25.16 % W/W' },
+        { test_name: 'Tebuconazole', result: '50.59 % W/W' },
+      ],
+    },
+    {
+      customer_name: 'คลังสินค้า', sample_name: 'Trifloxystrobin 25%+Tebuconazole 50% WG',
+      batch_no: '2026052501 P2', production_date: '22/07/2569', test_date: '22/07/2569',
+      tests: [
+        { test_name: 'Trifloxystronin', result: '25.61 % W/W' },
+        { test_name: 'Tebuconazole', result: '51.55 % W/W' },
+      ],
+    },
+    {
+      customer_name: 'QC', note: 'หลังอบ', sample_name: 'Trifloxystrobin 25%+Tebuconazole 50% WG',
+      batch_no: '2026052501', production_date: '22/07/2569', test_date: '14/08/2569',
+      tests: [
+        { test_name: 'Trifloxystronin', result: '24.73 % W/W' },
+        { test_name: 'Tebuconazole', result: '52.26 % W/W' },
+      ],
+    },
+  ];
+  const source = {
+    sampleSnapshots: [{ commonName }],
+    externalCoaRequest: { packingSize: '24*250 g', shipmentDate: '2026-11-09' },
+  };
+  const match = findBestLegacyLabResult(rows, source);
+  const result = resultRowsFromLegacyLabs(match.matchingRows, commonName);
+
+  assert.equal(match.matchingRows.length, 2);
+  assert.equal(result.ai.result, 'Trifloxystronin: 25.39 % W/W / Tebuconazole: 51.07 % W/W');
 });
 
 test('legacy Lab fallback fills placeholder values without replacing live results', () => {

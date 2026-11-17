@@ -45,6 +45,10 @@ function isExcludedResultSubmitter(value) {
   return normalizeText(value).replace(/\s+/g, '').includes(EXCLUDED_RESULT_SUBMITTER);
 }
 
+function isAfterDryingLegacyResult(row) {
+  return /หลังอบ|after\s*dry/i.test(text(row?.note));
+}
+
 function rowsFromPayload(payload) {
   if (Array.isArray(payload)) return payload.filter((row) => row && typeof row === 'object');
   if (!payload || typeof payload !== 'object') return [];
@@ -770,7 +774,9 @@ function findBestLegacyLabResult(rows, source, sample = {}) {
     source?.externalCoaRequest?.shipmentDate || source?.externalCoaRequest?.saleOrderDate,
   );
   const targetTime = targetDate ? Date.parse(`${targetDate}T00:00:00.000Z`) : Number.NaN;
-  let candidates = (rows || []).filter((row) => !isExcludedResultSubmitter(row?.customer_name)).map((row) => {
+  let candidates = (rows || []).filter((row) => (
+    !isExcludedResultSubmitter(row?.customer_name) && !isAfterDryingLegacyResult(row)
+  )).map((row) => {
     const score = legacyProductMatchScore(commonName, row?.sample_name);
     const productionDate = normalizeIsoDate(row?.production_date);
     const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
@@ -884,15 +890,15 @@ function averagedLegacyResult(entries) {
   if (!entries.length) return '';
   if (entries.length === 1 || entries.some((entry) => entry.numeric === null)) return entries[0].raw;
   const average = entries.reduce((sum, entry) => sum + entry.numeric, 0) / entries.length;
-  const maxDecimals = Math.max(...entries.map((entry) => entry.decimals));
-  const precision = Math.min(10, maxDecimals + Math.ceil(Math.log10(entries.length)));
-  const formatted = average.toFixed(precision).replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+  const formatted = (Math.round(average * 100 + 1e-9) / 100).toFixed(2);
   const suffix = entries.map((entry) => entry.suffix).find(Boolean) || '%';
   return `${formatted}${suffix ? ` ${suffix}` : ''}`;
 }
 
 function resultRowsFromLegacyLabs(rows, commonName) {
-  const eligibleRows = (rows || []).filter((row) => !isExcludedResultSubmitter(row?.customer_name));
+  const eligibleRows = (rows || []).filter((row) => (
+    !isExcludedResultSubmitter(row?.customer_name) && !isAfterDryingLegacyResult(row)
+  ));
   const testGroups = new Map();
   const densityReadings = [];
   for (const row of eligibleRows) {
