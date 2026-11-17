@@ -59,6 +59,7 @@ interface ChartDatum {
   day: number;
   date: string;
   value: number | null;
+  rawValue: number | null;
 }
 
 interface DotRenderProps {
@@ -89,7 +90,7 @@ function ControlTooltip({
 }) {
   const datum = payload?.[0]?.payload;
   if (!active || !datum || datum.value == null) return null;
-  const status = classifyPoint(datum.value, limits);
+  const status = classifyPoint(datum.rawValue, limits);
   return (
     <div className="rounded-lg border bg-background px-3 py-2 text-xs shadow-md">
       <p className="font-medium text-foreground">วันที่ {fmtDate(datum.date)}</p>
@@ -122,12 +123,18 @@ export default function BalanceControlChart({
   className,
 }: BalanceControlChartProps) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
-  const data: ChartDatum[] = series.map((point) => ({ day: point.day, date: point.date, value: point.value }));
+  const round = (value: number) => Number(value.toFixed(digits));
+  const data: ChartDatum[] = series.map((point) => ({
+    day: point.day,
+    date: point.date,
+    value: point.value == null ? null : round(point.value),
+    rawValue: point.value,
+  }));
   const tickFont = fixed ? 15 : 11;
 
   const renderDot = (props: DotRenderProps): ReactElement => {
     const key = props.key ?? `dot-${props.index ?? 0}`;
-    const value = props.payload?.value;
+    const value = props.payload?.rawValue;
     if (props.cx == null || props.cy == null || value == null) return <g key={key} />;
     const status = classifyPoint(value, limits);
     return (
@@ -179,11 +186,11 @@ export default function BalanceControlChart({
 
   if (limits) {
     elements.push(
-      referenceLine("ucl", limits.ucl, palette.controlLine, "UCL", "2 4"),
-      referenceLine("uwl", limits.uwl, palette.warningLine, "UWL", "6 4"),
-      referenceLine("mean", limits.mean, palette.mean, "Mean"),
-      referenceLine("lwl", limits.lwl, palette.warningLine, "LWL", "6 4"),
-      referenceLine("lcl", limits.lcl, palette.controlLine, "LCL", "2 4"),
+      referenceLine("ucl", round(limits.ucl), palette.controlLine, "UCL", "2 4"),
+      referenceLine("uwl", round(limits.uwl), palette.warningLine, "UWL", "6 4"),
+      referenceLine("mean", round(limits.mean), palette.mean, "Mean"),
+      referenceLine("lwl", round(limits.lwl), palette.warningLine, "LWL", "6 4"),
+      referenceLine("lcl", round(limits.lcl), palette.controlLine, "LCL", "2 4"),
     );
   }
 
