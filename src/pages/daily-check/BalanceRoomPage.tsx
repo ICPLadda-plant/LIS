@@ -3,32 +3,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
-  ArrowDownToLine,
-  ArrowUpToLine,
   CheckCircle2,
   Camera,
-  ChevronsDown,
-  ChevronsUp,
   FileSpreadsheet,
   Printer,
   RotateCcw,
   Scale,
   Settings2,
-  Sigma,
-  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import StatCard from "@/components/lis/StatCard";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import BalanceControlChart, { BalanceControlLegend } from "@/components/lis/BalanceControlChart";
-import BalanceControlConfigDialog, { type BalanceControlSuggestion } from "@/components/lis/BalanceControlConfigDialog";
+import BalanceControlConfigDialog from "@/components/lis/BalanceControlConfigDialog";
 import BalanceControlReport, { BALANCE_CONTROL_REPORT_CSS } from "@/components/lis/BalanceControlReport";
 import { api, type DailyCheckRecord } from "@/lib/api";
 import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTrend } from "@/lib/aiApi";
@@ -45,13 +38,16 @@ import {
   chartDomain,
   classifyPoint,
   computeLimits,
+  controlBaselineValues,
   countByStatus,
   currentMonthStr,
+  controlUpdateDueDate,
   displayDigits,
   formatControlNumber,
-  formatSd,
+  limitDecimalPlaces,
   formatThaiMonth,
   getBalanceControlConfig,
+  isControlUpdateDue,
   monthRange,
   monthlyStats,
   type ControlPointStatus,
@@ -82,6 +78,14 @@ const STATUS_BADGE: Record<ControlPointStatus, NonNullable<BadgeProps["variant"]
   out: "red-soft",
 };
 
+const SCALE_CARD_COLORS = [
+  "border-sky-200 bg-sky-50/70 hover:bg-sky-100/70",
+  "border-violet-200 bg-violet-50/70 hover:bg-violet-100/70",
+  "border-teal-200 bg-teal-50/70 hover:bg-teal-100/70",
+  "border-amber-200 bg-amber-50/70 hover:bg-amber-100/70",
+  "border-rose-200 bg-rose-50/70 hover:bg-rose-100/70",
+];
+
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -104,10 +108,17 @@ const calcAvg = (vals: readonly string[]): number | null => {
 const evaluate = (avg: number, target: number): "pass" | "fail" =>
   Math.abs(avg - target) <= TOLERANCE ? "pass" : "fail";
 
+const isPositiveWeight = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) > 0;
+
 /** เลขพร้อมเครื่องหมาย เช่น +0.000012 / −1.25 */
 const signed = (value: number, digits: number) => {
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   return `${sign}${Math.abs(value).toFixed(digits)}`;
+};
+
+const controlDueMonth = (updatedDate: string) => {
+  const dueDate = controlUpdateDueDate(updatedDate);
+  return dueDate ? formatThaiMonth(dueDate.toISOString().slice(0, 7)) : "—";
 };
 
 const BalanceRoomPage = () => {
@@ -123,7 +134,10 @@ const BalanceRoomPage = () => {
   const [month, setMonth] = useState(() => currentMonthStr());
   const [printOpen, setPrintOpen] = useState(false);
   const [printedAt, setPrintedAt] = useState("");
-  const [configOpen, setConfigOpen] = useState(false);
+  const [configWeight, setConfigWeight] = useState<number | null>(null);
+  const [weightInfoOpen, setWeightInfoOpen] = useState(false);
+  const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
+  const [recordDate, setRecordDate] = useState(todayStr);
   const [exporting, setExporting] = useState(false);
   const [cameraTarget, setCameraTarget] = useState<{ type: "100" | "10"; index: number } | null>(null);
   const [readingPhoto, setReadingPhoto] = useState(false);
@@ -131,6 +145,8 @@ const BalanceRoomPage = () => {
 
   const scale = BALANCE_SCALES.find(s => s.id === selectedScaleId) ?? BALANCE_SCALES[0];
   const typeLabel = balanceScaleTypeLabel(scale);
+
+  useEffect(() => setHistoryWeight(scale.controlWeight), [scale.controlWeight]);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,25 +196,40 @@ const BalanceRoomPage = () => {
     return map;
   }, [todayRecords, currentPeriod]);
 
-  const config = getBalanceControlConfig(controlConfigs, scale.id);
-  const limits = useMemo(() => computeLimits(config.mean, config.sd), [config.mean, config.sd]);
-  const digits = displayDigits(scale.decimals, config.sd);
-  const series = useMemo(() => buildMonthlySeries(monthRecords ?? [], month), [monthRecords, month]);
+  const config = getBalanceControlConfig(controlConfigs, scale.id, scale.controlWeight);
+  const series = useMemo(() => buildMonthlySeries(monthRecords ?? [], month, scale.controlWeight), [monthRecords, month, scale.controlWeight]);
   const values = useMemo(() => series.map(point => point.value), [series]);
+  const baselineValues = useMemo(() => controlBaselineValues(series, 20), [series]);
+  const baselineStats = useMemo(() => monthlyStats(baselineValues), [baselineValues]);
+  const savedLimits = useMemo(() => computeLimits(config.mean, config.sd), [config.mean, config.sd]);
+  const limits = useMemo(
+    () => savedLimits ?? (baselineStats.n === 20 ? computeLimits(baselineStats.mean, baselineStats.sd) : null),
+    [baselineStats, savedLimits],
+  );
+  const digits = displayDigits(scale.decimals, limits?.sd ?? config.sd);
   const domain = useMemo(() => chartDomain(limits, values), [limits, values]);
   const stats = useMemo(() => monthlyStats(values), [values]);
   const counts = useMemo(() => countByStatus(values, limits), [values, limits]);
-  const recordedPoints = useMemo(
-    () => series.filter((point): point is RecordedPoint => point.record != null && point.value != null),
-    [series],
-  );
-  const suggestion = useMemo<BalanceControlSuggestion | null>(
-    () =>
-      stats.n >= 2 && stats.mean != null && stats.sd != null
-        ? { n: stats.n, mean: stats.mean, sd: stats.sd, monthLabel: formatThaiMonth(month) }
-        : null,
-    [stats, month],
-  );
+  const otherWeight = scale.controlWeight === 10 ? scale.primaryCalibrationWeight : 10;
+  const otherConfig = getBalanceControlConfig(controlConfigs, scale.id, otherWeight);
+  const otherSeries = buildMonthlySeries(monthRecords ?? [], month, otherWeight === 10 ? 10 : 100);
+  const otherValues = otherSeries.map((point) => point.value);
+  const otherBaselineStats = monthlyStats(controlBaselineValues(otherSeries, 20));
+  const otherSavedLimits = computeLimits(otherConfig.mean, otherConfig.sd);
+  const otherLimits = otherSavedLimits
+    ?? (otherBaselineStats.n === 20 ? computeLimits(otherBaselineStats.mean, otherBaselineStats.sd) : null);
+  const otherDigits = displayDigits(scale.decimals, otherLimits?.sd ?? otherConfig.sd);
+  const otherDomain = chartDomain(otherLimits, otherValues);
+  const otherStats = monthlyStats(otherValues);
+  const otherCounts = countByStatus(otherValues, otherLimits);
+  const chartPanels = [
+    { weight: scale.controlWeight, config, series, limits, domain, digits, stats, baselineStats, counts },
+    { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts },
+  ].sort((a, b) => a.weight - b.weight);
+  const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
+  const historyPanel = chartPanels.find((panel) => panel.weight === historyWeight) ?? chartPanels[0];
+  const recordedPoints = historyPanel.series.filter((point): point is RecordedPoint => point.record != null && point.value != null);
+  const duePanels = chartPanels.filter((panel) => isControlUpdateDue(panel.config.updatedDate));
 
   const createMutation = useMutation({
     mutationFn: api.createDailyCheck,
@@ -210,6 +241,7 @@ const BalanceRoomPage = () => {
       else toast.warning(`${name} ไม่ผ่านการ Calibrate`);
 
       queryClient.invalidateQueries({ queryKey: ["daily-checks"] });
+      setMonth(vars.date.slice(0, 7));
       // เคลียร์ draft ของ scale นั้น — watcher จะปลดแจ้งเตือนเองเมื่อครบ
       setDrafts(prev => {
         const c = { ...prev };
@@ -224,13 +256,14 @@ const BalanceRoomPage = () => {
 
   const updateWeight = (id: string, type: "100" | "10", index: number, value: string) => {
     const r = getDraft(id);
+    const limitedValue = limitDecimalPlaces(value, scale.decimals);
     if (type === "100") {
       const w = [...r.weights100] as [string, string, string];
-      w[index] = value;
+      w[index] = limitedValue;
       setDrafts(prev => ({ ...prev, [id]: { ...r, weights100: w, status100: "", status10: "", checkedAt: undefined } }));
     } else {
       const w = [...r.weights10] as [string, string, string];
-      w[index] = value;
+      w[index] = limitedValue;
       setDrafts(prev => ({ ...prev, [id]: { ...r, weights10: w, status100: "", status10: "", checkedAt: undefined } }));
     }
   };
@@ -258,7 +291,7 @@ const BalanceRoomPage = () => {
         reader.readAsDataURL(file);
       });
       const result = await readBalanceDisplayValueFromImage(imageDataUrl);
-      if (!result.value || !Number.isFinite(Number(result.value))) {
+      if (!result.value || !isPositiveWeight(result.value)) {
         toast.error(result.error || "อ่านค่าจากหน้าจอไม่ได้ กรุณาถ่ายให้ตรงและชัดขึ้น");
         return;
       }
@@ -273,8 +306,16 @@ const BalanceRoomPage = () => {
 
   const handleCheck = (id: string) => {
     const r = getDraft(id);
+    if (!recordDate) {
+      toast.error("กรุณาเลือกวันที่บันทึก");
+      return;
+    }
     if (r.weights100.some(v => !v) || r.weights10.some(v => !v)) {
       toast.error("กรุณากรอกค่าน้ำหนักให้ครบทั้ง 6 ค่า");
+      return;
+    }
+    if (![...r.weights100, ...r.weights10].every(isPositiveWeight)) {
+      toast.error("ค่าน้ำหนักต้องเป็นตัวเลขที่มากกว่า 0");
       return;
     }
     if (!user?.name) {
@@ -292,12 +333,13 @@ const BalanceRoomPage = () => {
     createMutation.mutate({
       scaleId: id,
       scaleName: target.name,
+      date: recordDate,
       model: target.model,
       weights100: r.weights100,
       weights10: r.weights10,
       avg100,
       avg10,
-      status100: evaluate(avg100, 100),
+      status100: evaluate(avg100, target.primaryCalibrationWeight),
       status10: evaluate(avg10, 10),
       tolerance: TOLERANCE,
       recorder: user.name,
@@ -334,23 +376,32 @@ const BalanceRoomPage = () => {
   // มีผลวันนี้แล้วและยังไม่ได้เริ่มกรอกใหม่ → แสดงผลที่บันทึกไว้
   const showResult = !!todayRec && !drafts[scale.id];
   const savingThisScale = createMutation.isPending && createMutation.variables?.scaleId === scale.id;
+  const hasInvalidWeight = [...draft.weights100, ...draft.weights10].some(value => value !== "" && !isPositiveWeight(value));
 
   // ค่าปัจจุบัน (กำลังกรอก หรือผลที่บันทึกแล้ววันนี้) เทียบกับเส้น Control
-  const compareValue = showResult ? todayRec?.avg100 ?? null : calcAvg(draft.weights100);
+  const compareValue = scale.controlWeight === 10
+    ? (showResult ? todayRec?.avg10 ?? null : calcAvg(draft.weights10))
+    : (showResult ? todayRec?.avg100 ?? null : calcAvg(draft.weights100));
   const compareStatus = classifyPoint(compareValue, limits);
 
-  const fmt = (value: number | null | undefined) => formatControlNumber(value, digits);
+  const fmt = (value: number | null | undefined) => formatControlNumber(value, scale.decimals);
+  const formatReading = (value: string | number | null | undefined) => {
+    const numeric = Number(value);
+    return value == null || value === "" || !Number.isFinite(numeric) ? "—" : formatControlNumber(numeric, scale.decimals);
+  };
 
   const infoItems = [
     { label: "รหัสเครื่องมือ", value: scale.code },
     { label: "ยี่ห้อ", value: config.brand || "—" },
     { label: "รุ่น", value: config.model || "—" },
     { label: "รหัสตุ้มน้ำหนัก", value: config.weightCode || "—" },
-    { label: "น้ำหนักตุ้ม", value: `${config.nominal} g` },
+    { label: "ตุ้ม Calibration", value: `10 g และ ${scale.primaryCalibrationWeight} g` },
+    { label: "น้ำหนักตุ้ม Control Chart", value: `${scale.controlWeight} g` },
     { label: "ประจำเดือน/ปี", value: formatThaiMonth(month) },
   ];
 
   const weightBlock = (type: "100" | "10") => {
+    const nominalWeight = type === "100" ? scale.primaryCalibrationWeight : 10;
     const weights = type === "100" ? draft.weights100 : draft.weights10;
     const savedWeights = type === "100" ? todayRec?.weights100 : todayRec?.weights10;
     const savedStatus = type === "100" ? todayRec?.status100 : todayRec?.status10;
@@ -358,7 +409,7 @@ const BalanceRoomPage = () => {
     return (
       <div>
         <label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-          น้ำหนักมาตรฐาน {type} g (3 ครั้ง)
+          น้ำหนักมาตรฐาน {nominalWeight} g (3 ครั้ง)
           {showResult && savedStatus === "pass" && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
           {showResult && savedStatus === "fail" && <span className="text-xs text-destructive">ไม่ผ่าน</span>}
         </label>
@@ -367,20 +418,24 @@ const BalanceRoomPage = () => {
             <div key={i} className="flex min-w-0 gap-1">
               <Input
                 type="number"
-                step="0.001"
+                step={10 ** -scale.decimals}
                 inputMode="decimal"
                 placeholder={showResult && savedWeights ? String(savedWeights[i] ?? "") : `ครั้งที่ ${i + 1}`}
                 value={weights[i]}
                 onChange={e => updateWeight(scale.id, type, i, e.target.value)}
+                onWheel={e => e.currentTarget.blur()}
+                min={10 ** -scale.decimals}
+                aria-invalid={weights[i] !== "" && (!isPositiveWeight(weights[i]) || Math.abs(Number(weights[i]) - nominalWeight) > TOLERANCE)}
+                title={weights[i] !== "" && !isPositiveWeight(weights[i]) ? "ค่าน้ำหนักต้องมากกว่า 0" : undefined}
                 disabled={createMutation.isPending}
-                className="h-9 min-w-0 text-sm tabular-nums"
+                className="h-9 min-w-0 text-sm tabular-nums aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 className="h-9 w-9 shrink-0"
-                aria-label={`ถ่ายรูปอ่านค่าน้ำหนัก ${type} กรัม ครั้งที่ ${i + 1}`}
+                aria-label={`ถ่ายรูปอ่านค่าน้ำหนัก ${nominalWeight} กรัม ครั้งที่ ${i + 1}`}
                 onClick={() => openWeightCamera(type, i)}
                 disabled={createMutation.isPending || readingPhoto}
               >
@@ -391,7 +446,7 @@ const BalanceRoomPage = () => {
         </div>
         {showResult && savedAvg != null && (
           <p className={cn("mt-1 text-xs", savedStatus === "pass" ? "text-green-600" : "text-destructive")}>
-            ค่าเฉลี่ย: {savedAvg.toFixed(4)} g {savedStatus === "pass" ? "อยู่ในเกณฑ์" : "เกินเกณฑ์"} (±{TOLERANCE}g)
+            ค่าเฉลี่ย: {savedAvg.toFixed(scale.decimals)} g {savedStatus === "pass" ? "อยู่ในเกณฑ์" : "เกินเกณฑ์"} (±{TOLERANCE}g)
           </p>
         )}
       </div>
@@ -416,21 +471,6 @@ const BalanceRoomPage = () => {
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="space-y-1">
-              <Label htmlFor="balance-scale" className="text-xs text-muted-foreground">เครื่องชั่ง</Label>
-              <Select value={selectedScaleId} onValueChange={setSelectedScaleId}>
-                <SelectTrigger id="balance-scale" className="sm:w-72">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BALANCE_SCALES.map(s => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {`${s.code} · ${balanceScaleTypeLabel(s)}`}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
               <Label htmlFor="balance-month" className="text-xs text-muted-foreground">ประจำเดือน</Label>
               <Input
                 id="balance-month"
@@ -444,14 +484,14 @@ const BalanceRoomPage = () => {
               />
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => setWeightInfoOpen(true)}>
+                <Scale className="h-4 w-4" /> รหัสตุ้มน้ำหนัก
+              </Button>
               <Button className="gap-2" onClick={handlePrint}>
                 <Printer className="h-4 w-4" /> Print
               </Button>
               <Button variant="success" className="gap-2" onClick={handleExport} disabled={exporting}>
                 <FileSpreadsheet className="h-4 w-4" /> {exporting ? "กำลัง Export..." : "Export Excel"}
-              </Button>
-              <Button variant="outline" className="gap-2" onClick={() => setConfigOpen(true)}>
-                <Settings2 className="h-4 w-4" /> ตั้งค่าค่า Control
               </Button>
             </div>
           </div>
@@ -462,6 +502,22 @@ const BalanceRoomPage = () => {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{consecutiveAlert.message}</AlertDescription>
+        </Alert>
+      )}
+
+      {duePanels.length > 0 && (
+        <Alert className="border-destructive bg-destructive text-destructive-foreground [&>svg]:text-destructive-foreground">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>ครบ 3 เดือนแล้ว กรุณาอัปเดตค่า Control ใหม่สำหรับตุ้ม {duePanels.map((panel) => `${panel.weight} g`).join(" และ ")}</span>
+            <div className="flex flex-wrap gap-2">
+              {duePanels.map((panel) => (
+                <Button key={panel.weight} type="button" variant="outline" size="sm" className="border-destructive-foreground/60 bg-transparent text-destructive-foreground hover:bg-destructive-foreground/10 hover:text-destructive-foreground" onClick={() => setConfigWeight(panel.weight)}>
+                  แก้ไข {panel.weight} g
+                </Button>
+              ))}
+            </div>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -479,7 +535,7 @@ const BalanceRoomPage = () => {
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-          {BALANCE_SCALES.map(s => {
+          {BALANCE_SCALES.map((s, index) => {
             const rec = latestByScale[s.id];
             const active = s.id === scale.id;
             return (
@@ -489,7 +545,8 @@ const BalanceRoomPage = () => {
                 aria-pressed={active}
                 onClick={() => setSelectedScaleId(s.id)}
                 className={cn(
-                  "flex w-full flex-col gap-1.5 rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:bg-accent",
+                  "flex w-full flex-col gap-1.5 rounded-lg border p-3 text-left shadow-sm transition-colors",
+                  SCALE_CARD_COLORS[index % SCALE_CARD_COLORS.length],
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active && "border-primary ring-1 ring-primary",
                 )}
@@ -525,28 +582,6 @@ const BalanceRoomPage = () => {
         </CardContent>
       </Card>
 
-      {/* ค่า Control */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
-        <StatCard
-          icon={Target}
-          variant="blue"
-          label="MEAN"
-          value={fmt(limits?.mean)}
-          sublabel={config.updatedDate ? `ปรับปรุง ${fmtDate(config.updatedDate)}` : "ค่า Control"}
-        />
-        <StatCard
-          icon={Sigma}
-          variant="neutral"
-          label="STD"
-          value={formatSd(config.sd)}
-          sublabel={limits ? `2SD ${formatSd(2 * limits.sd)} · 3SD ${formatSd(3 * limits.sd)}` : undefined}
-        />
-        <StatCard icon={ArrowUpToLine} variant="green" label="UWL" value={fmt(limits?.uwl)} sublabel="Mean + 2SD" />
-        <StatCard icon={ArrowDownToLine} variant="green" label="LWL" value={fmt(limits?.lwl)} sublabel="Mean − 2SD" />
-        <StatCard icon={ChevronsUp} variant="amber" label="UCL" value={fmt(limits?.ucl)} sublabel="Mean + 3SD" />
-        <StatCard icon={ChevronsDown} variant="amber" label="LCL" value={fmt(limits?.lcl)} sublabel="Mean − 3SD" />
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-3">
         {/* ฟอร์มบันทึกของเครื่องที่เลือก */}
         <Card>
@@ -567,18 +602,30 @@ const BalanceRoomPage = () => {
             )}
           </CardHeader>
           <CardContent className="space-y-4">
-            {weightBlock("100")}
+            <div className="space-y-1.5">
+              <Label htmlFor="balance-record-date">วันที่บันทึก</Label>
+              <Input
+                id="balance-record-date"
+                type="date"
+                value={recordDate}
+                max={todayStr()}
+                required
+                onChange={event => setRecordDate(event.target.value)}
+              />
+              {recordDate !== todayStr() && <p className="text-xs text-muted-foreground">กำลังบันทึกข้อมูลย้อนหลัง</p>}
+            </div>
             {weightBlock("10")}
+            {weightBlock("100")}
 
             <div className="rounded-md border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground">เทียบกับเส้น Control (ตุ้ม 100 g)</p>
+              <p className="text-xs font-medium text-muted-foreground">เทียบกับเส้น Control (ตุ้ม {scale.controlWeight} g)</p>
               {!limits ? (
                 <p className="mt-1 text-sm text-muted-foreground">
                   ยังไม่มีค่า Mean / STD ของเครื่องนี้ — กดปุ่มตั้งค่าเพื่อเริ่มเทียบกับกราฟ
                 </p>
               ) : compareValue == null ? (
                 <p className="mt-1 text-sm text-muted-foreground">
-                  กรอกค่าตุ้ม 100 g ให้ครบ 3 ครั้ง ระบบจะเทียบกับเส้น Control ให้ทันที
+                  กรอกค่าตุ้ม {scale.controlWeight} g ให้ครบ 3 ครั้ง ระบบจะเทียบกับเส้น Control ให้ทันที
                 </p>
               ) : (
                 <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
@@ -611,7 +658,7 @@ const BalanceRoomPage = () => {
                 <RotateCcw className="h-4 w-4" /> บันทึกซ้ำ
               </Button>
             ) : (
-              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending}>
+              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight}>
                 <CheckCircle2 className="h-4 w-4" />
                 {savingThisScale ? "กำลังบันทึก..." : "บันทึกผล Calibrate"}
               </Button>
@@ -627,64 +674,118 @@ const BalanceRoomPage = () => {
 
         {/* กราฟควบคุมคุณภาพ */}
         <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-col gap-3 space-y-0 pb-3 sm:flex-row sm:items-start sm:justify-between">
+          <CardHeader className="pb-3">
             <div className="space-y-1">
               <CardTitle className="text-base">กราฟควบคุมคุณภาพ (Control Chart)</CardTitle>
               <CardDescription>
-                ค่าเฉลี่ยตุ้ม {config.nominal} g รายวันของ {scale.code} — {formatThaiMonth(month)}
+                แยกตามตุ้ม Calibration ทั้ง 2 เกณฑ์ของ {scale.code} — {formatThaiMonth(month)}
               </CardDescription>
             </div>
-            {limits && (
-              <div className="flex flex-wrap gap-1.5">
-                <Badge variant="green-soft">ในเกณฑ์ {counts.in}</Badge>
-                <Badge variant="yellow-soft">เกิน 2SD {counts.warning}</Badge>
-                <Badge variant="red-soft">เกิน 3SD {counts.out}</Badge>
-              </div>
-            )}
           </CardHeader>
-          <CardContent className="space-y-3">
-            {limits && domain ? (
-              <>
-                <BalanceControlChart series={series} limits={limits} domain={domain} digits={digits} />
-                <BalanceControlLegend />
-                <p className="text-center text-xs text-muted-foreground">
-                  {stats.n > 0
-                    ? `ข้อมูลจริงเดือนนี้ ${stats.n} วัน · Mean ${fmt(stats.mean)} · SD ${formatSd(stats.sd)}`
-                    : "ยังไม่มีการบันทึกในเดือนนี้"}
-                </p>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-4 py-12 text-center">
-                <Activity className="h-8 w-8 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-foreground">ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้</p>
-                  <p className="text-sm text-muted-foreground">
-                    กรอก Mean และ STD จากผลการสอบเทียบ เพื่อสร้างเส้น UWL/LWL (±2SD) และ UCL/LCL (±3SD)
-                  </p>
+          <CardContent className="grid gap-4 xl:grid-cols-2">
+            {chartPanels.map((panel) => (
+              <section key={panel.weight} className="space-y-3 rounded-lg border bg-card p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</h3>
+                    <p className="text-xs text-muted-foreground">ค่าเฉลี่ยรายวันและเส้น Control ของเกณฑ์นี้</p>
+                    <p className="text-xs text-muted-foreground">
+                      อัปเดตล่าสุด: {panel.config.updatedDate ? fmtDate(panel.config.updatedDate) : "—"} · ครบกำหนด: {controlDueMonth(panel.config.updatedDate)}
+                    </p>
+                  </div>
+                  {panel.limits ? (
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {isControlUpdateDue(panel.config.updatedDate) && <Badge variant="yellow-soft">ครบกำหนดอัปเดต</Badge>}
+                      <Badge variant="green-soft">ในเกณฑ์ {panel.counts.in}</Badge>
+                      <Badge variant="yellow-soft">เกิน 2SD {panel.counts.warning}</Badge>
+                      <Badge variant="red-soft">เกิน 3SD {panel.counts.out}</Badge>
+                      <Button variant="outline" size="sm" className="ml-1 h-7 gap-1 px-2" onClick={() => setConfigWeight(panel.weight)}>
+                        <Settings2 className="h-3.5 w-3.5" /> แก้ไขค่า Control
+                      </Button>
+                    </div>
+                  ) : null}
                 </div>
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setConfigOpen(true)}>
-                  <Settings2 className="h-4 w-4" /> ตั้งค่าค่า Control
-                </Button>
-              </div>
-            )}
+                <dl className="grid grid-cols-3 gap-x-4 gap-y-2 border-y py-2 sm:grid-cols-6">
+                  {[
+                    ["Mean", formatControlNumber(panel.limits?.mean, panel.digits)],
+                    ["STD", formatControlNumber(panel.limits?.sd ?? panel.config.sd, panel.digits)],
+                    ["UWL", formatControlNumber(panel.limits?.uwl, panel.digits)],
+                    ["LWL", formatControlNumber(panel.limits?.lwl, panel.digits)],
+                    ["UCL", formatControlNumber(panel.limits?.ucl, panel.digits)],
+                    ["LCL", formatControlNumber(panel.limits?.lcl, panel.digits)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-0 text-center">
+                      <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+                      <dd className="truncate text-sm font-semibold tabular-nums text-foreground">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {panel.domain ? (
+                  <>
+                    <BalanceControlChart series={panel.series} limits={panel.limits} domain={panel.domain} digits={panel.digits} className="h-[280px]" />
+                    {panel.limits ? (
+                      <BalanceControlLegend controlWeight={panel.weight} />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed px-3 py-3 text-center sm:flex-row">
+                        <p className="text-sm text-muted-foreground">กราฟมีข้อมูลแล้ว แต่ยังไม่มีเส้น Mean/UWL/LWL/UCL/LCL</p>
+                        <Button variant="outline" size="sm" className="shrink-0 gap-2" onClick={() => setConfigWeight(panel.weight)}>
+                          <Settings2 className="h-4 w-4" /> ตั้งค่า {panel.weight} g
+                        </Button>
+                      </div>
+                    )}
+                    <p className="text-center text-xs text-muted-foreground">
+                      ข้อมูล {panel.stats.n} วัน · baseline {panel.baselineStats.n}/20 ค่า
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-4 py-10 text-center">
+                    <Activity className="h-7 w-7 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">ยังไม่มีข้อมูลหรือค่า Control สำหรับตุ้ม {panel.weight} g</p>
+                    <Button variant="outline" size="sm" className="gap-2" onClick={() => setConfigWeight(panel.weight)}>
+                      <Settings2 className="h-4 w-4" /> ตั้งค่า {panel.weight} g
+                    </Button>
+                  </div>
+                )}
+              </section>
+            ))}
           </CardContent>
         </Card>
       </div>
 
       {/* ตารางบันทึกรายวันของเดือน */}
       <section className="space-y-2">
-        <div>
-          <h3 className="text-base font-semibold text-foreground">บันทึกรายวัน — {formatThaiMonth(month)}</h3>
-          <p className="text-sm text-muted-foreground">
-            ใช้ผลการบันทึกล่าสุดของแต่ละวัน (ค่าเฉลี่ยตุ้ม 100 g) เทียบกับเส้น Control
-          </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">บันทึกรายวัน — {formatThaiMonth(month)}</h3>
+            <p className="text-sm text-muted-foreground">
+              ใช้ผลการบันทึกล่าสุดของแต่ละวัน (ค่าเฉลี่ยตุ้ม {historyPanel.weight} g) เทียบกับเส้น Control
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2" aria-label="เลือกน้ำหนักสำหรับบันทึกรายวัน">
+            {chartPanels.map((panel) => (
+              <Button
+                key={panel.weight}
+                type="button"
+                size="sm"
+                variant={historyPanel.weight === panel.weight ? "default" : "outline"}
+                aria-pressed={historyPanel.weight === panel.weight}
+                aria-label={`แสดงบันทึกตุ้ม ${panel.weight} g`}
+                onClick={() => setHistoryWeight(panel.weight)}
+              >
+                ตุ้ม {panel.weight} g
+              </Button>
+            ))}
+          </div>
         </div>
         <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-muted text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">วันที่</th>
-                <th className="px-3 py-2 text-right font-medium">ค่าที่ได้ (g)</th>
+                <th className="px-3 py-2 text-right font-medium">ครั้งที่ 1</th>
+                <th className="px-3 py-2 text-right font-medium">ครั้งที่ 2</th>
+                <th className="px-3 py-2 text-right font-medium">ครั้งที่ 3</th>
+                <th className="px-3 py-2 text-right font-medium">ค่าเฉลี่ย (g)</th>
                 <th className="px-3 py-2 text-right font-medium">ส่วนต่างจาก Mean</th>
                 <th className="px-3 py-2 text-left font-medium">สถานะ Control</th>
                 <th className="px-3 py-2 text-left font-medium">ผล Calibrate</th>
@@ -695,19 +796,26 @@ const BalanceRoomPage = () => {
             <tbody className="divide-y">
               {recordedPoints.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
                     {monthLoading ? "กำลังโหลดข้อมูล..." : "ยังไม่มีการบันทึกของเครื่องนี้ในเดือนที่เลือก"}
                   </td>
                 </tr>
               ) : (
                 recordedPoints.map(point => {
-                  const status = classifyPoint(point.value, limits);
+                  const status = classifyPoint(point.value, historyPanel.limits);
+                  const calibrateStatus = historyPanel.weight === 10
+                    ? point.record.status10 ?? point.record.status
+                    : point.record.status100 ?? point.record.status;
+                  const readings = historyPanel.weight === 10 ? point.record.weights10 : point.record.weights100;
                   return (
                     <tr key={point.date} className="hover:bg-accent">
                       <td className="px-3 py-2">{fmtDate(point.date)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmt(point.value)}</td>
+                      {[0, 1, 2].map(index => (
+                        <td key={index} className="px-3 py-2 text-right tabular-nums">{formatReading(readings[index])}</td>
+                      ))}
+                      <td className="px-3 py-2 text-right tabular-nums">{formatControlNumber(point.value, scale.decimals)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {limits ? signed(point.value - limits.mean, digits) : "—"}
+                        {historyPanel.limits ? signed(point.value - historyPanel.limits.mean, historyPanel.digits) : "—"}
                       </td>
                       <td className="px-3 py-2">
                         {status ? (
@@ -717,8 +825,8 @@ const BalanceRoomPage = () => {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <Badge variant={point.record.status === "pass" ? "green-soft" : "red-soft"}>
-                          {point.record.status === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
+                        <Badge variant={calibrateStatus === "pass" ? "green-soft" : "red-soft"}>
+                          {calibrateStatus === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
                         </Badge>
                       </td>
                       <td className="px-3 py-2">{point.record.recorder}</td>
@@ -739,27 +847,53 @@ const BalanceRoomPage = () => {
           docType="daily-check-report"
           css={BALANCE_CONTROL_REPORT_CSS}
         >
-          <BalanceControlReport
-            scale={scale}
-            config={config}
-            limits={limits}
-            series={series}
-            domain={domain}
-            digits={digits}
-            month={month}
-            printedBy={user?.name ?? user?.email ?? ""}
-            printedAt={printedAt || new Date().toISOString()}
-          />
+          {chartPanels.map((panel, index) => (
+            <BalanceControlReport
+              key={panel.weight}
+              scale={scale}
+              config={panel.config}
+              limits={panel.limits}
+              series={panel.series}
+              domain={panel.domain}
+              digits={panel.digits}
+              month={month}
+              printedBy={user?.name ?? user?.email ?? ""}
+              printedAt={printedAt || new Date().toISOString()}
+              pageNumber={index + 1}
+              totalPages={chartPanels.length}
+            />
+          ))}
         </PrintPreviewDialog>
       )}
 
+      <Dialog open={weightInfoOpen} onOpenChange={setWeightInfoOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ข้อมูลตุ้มน้ำหนักที่ใช้ — {scale.code}</DialogTitle>
+            <DialogDescription>รหัสตุ้มน้ำหนักสำหรับ Daily Check และ Control Chart</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {chartPanels.map((panel) => (
+              <div key={panel.weight} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</p>
+                  <p className="text-sm text-muted-foreground">รหัส: {panel.config.weightCode || "—"}</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setWeightInfoOpen(false); setConfigWeight(panel.weight); }}>
+                  แก้ไขข้อมูล
+                </Button>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <BalanceControlConfigDialog
-        open={configOpen}
-        onOpenChange={setConfigOpen}
+        open={configWeight != null}
+        onOpenChange={(open) => { if (!open) setConfigWeight(null); }}
         scale={scale}
-        config={config}
-        digits={digits}
-        suggestion={suggestion}
+        config={activePanel.config}
+        digits={activePanel.digits}
       />
     </div>
   );

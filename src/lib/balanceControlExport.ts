@@ -246,7 +246,7 @@ export function buildBalanceChartSvg(
   }
 
   const legend: Array<{ label: string; stroke?: string; dash?: string; dot?: string }> = [
-    { label: "ค่าที่ได้ (เฉลี่ยตุ้ม 100 g)", stroke: c.value, dot: c.value },
+    { label: "ค่าที่ได้ (ค่าเฉลี่ยรายวัน)", stroke: c.value, dot: c.value },
     { label: "Mean", stroke: c.mean },
     { label: "UWL / LWL (±2SD)", stroke: c.warningLine, dash: "6 4" },
     { label: "UCL / LCL (±3SD)", stroke: c.controlLine, dash: "2 4" },
@@ -339,7 +339,7 @@ function buildFormSheet(workbook: Workbook, input: BalanceControlExportInput, lo
   put(ws, "A4", "รหัสตุ้มน้ำหนัก  : ", { bold: true });
   put(ws, "C4", config.weightCode ?? "", { bold: true, horizontal: "center", border: { top: THIN, bottom: THIN } });
   put(ws, "E4", "น้ำหนักตุ้ม Daily check  :", { bold: true });
-  put(ws, "H4", isNum(config.nominal) ? config.nominal : "", { bold: true, horizontal: "center", border: { bottom: THIN } });
+  put(ws, "H4", scale.controlWeight, { bold: true, horizontal: "center", border: { bottom: THIN } });
   put(ws, "I4", "g", { bold: true });
   ws.getRow(5).height = 12;
 
@@ -384,20 +384,21 @@ function buildFormSheet(workbook: Workbook, input: BalanceControlExportInput, lo
     });
     put(ws, `A${rowNumber}`, ddmmBE(point.date), { horizontal: "center", border: border("A") });
     ["B", "C", "D"].forEach((column, weightIndex) => {
-      const weight = Number(record?.weights100?.[weightIndex]);
-      const hasWeight = record?.weights100?.[weightIndex] !== undefined && record?.weights100?.[weightIndex] !== "";
+      const weights = scale.controlWeight === 10 ? record?.weights10 : record?.weights100;
+      const weight = Number(weights?.[weightIndex]);
+      const hasWeight = weights?.[weightIndex] !== undefined && weights?.[weightIndex] !== "";
       put(ws, `${column}${rowNumber}`, hasWeight && isNum(weight) ? weight : null, {
         horizontal: "center",
         border: border(column),
         numFmt: valueFmt,
       });
     });
-    put(ws, `E${rowNumber}`, formula(`IFERROR(AVERAGE(B${rowNumber}:D${rowNumber}),"")`, record ? record.avg100 : ""), {
+    put(ws, `E${rowNumber}`, formula(`IFERROR(AVERAGE(B${rowNumber}:D${rowNumber}),"")`, record ? (scale.controlWeight === 10 ? record.avg10 : record.avg100) : ""), {
       horizontal: "center",
       border: border("E"),
       numFmt: valueFmt,
     });
-    const result = record?.status100 ?? record?.status;
+    const result = scale.controlWeight === 10 ? record?.status10 ?? record?.status : record?.status100 ?? record?.status;
     put(ws, `F${rowNumber}`, result === "pass" ? "∕" : result === "fail" ? "X" : null, {
       horizontal: "center",
       border: border("F"),
@@ -475,7 +476,7 @@ function buildControlSheet(workbook: Workbook, input: BalanceControlExportInput)
   put(ws, "B1", isNum(mean) ? mean : null, center({ numFmt: limitFmt, border: { bottom: THIN } }));
   put(ws, "C1", "STD", center());
   put(ws, "D1", isNum(sd) ? sd : null, center({ numFmt: "0.0000000", border: { bottom: THIN } }));
-  put(ws, "F1", isNum(config.nominal) ? config.nominal : null, center({ numFmt: valueFmt }));
+  put(ws, "F1", scale.controlWeight, center({ numFmt: valueFmt }));
   put(ws, "H1", "Update ", center());
   put(ws, "I1", ddmmBE(config.updatedDate), center());
 

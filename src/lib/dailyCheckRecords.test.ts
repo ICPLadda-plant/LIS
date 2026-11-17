@@ -86,7 +86,7 @@ describe("daily check record rows", () => {
       instrumentName: "เครื่องชั่ง 1",
       status: "normal",
     });
-    expect(rows[1].readings).toContainEqual({ key: "avg100", label: "เฉลี่ย 100g", value: "100.0002", unit: "g" });
+    expect(rows[1].readings).toContainEqual({ key: "avg100", label: "เฉลี่ย 500g", value: "100.0002", unit: "g" });
   });
 
   it("filters normalized rows by room, instrument, status, and period", () => {

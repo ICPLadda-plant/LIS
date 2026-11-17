@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest";
 import {
   BALANCE_CONTROL_DEFAULTS,
   buildMonthlySeries,
+  controlBaselineValues,
   chartDomain,
   classifyPoint,
   computeLimits,
+  controlUpdateDueDate,
   countByStatus,
   displayDigits,
   formatSd,
   formatThaiMonth,
   getBalanceControlConfig,
+  isControlUpdateDue,
+  limitDecimalPlaces,
   monthlyStats,
   monthRange,
   validateBalanceControlInput,
@@ -25,10 +29,14 @@ describe("computeLimits", () => {
     expect(limits.lcl).toBeCloseTo(99.9995772, 7);
   });
 
+  it("คำนวณเส้นเท่ากับ Mean เมื่อ SD เป็นศูนย์", () => {
+    expect(computeLimits(100, 0)).toEqual({ mean: 100, sd: 0, uwl: 100, lwl: 100, ucl: 100, lcl: 100 });
+  });
+
   it("คืน null เมื่อยังไม่ได้ตั้งค่าหรือ SD ไม่ถูกต้อง", () => {
     expect(computeLimits(null, 0.1)).toBeNull();
     expect(computeLimits(100, null)).toBeNull();
-    expect(computeLimits(100, 0)).toBeNull();
+    expect(computeLimits(100, -0.1)).toBeNull();
   });
 });
 
@@ -74,6 +82,18 @@ describe("buildMonthlySeries", () => {
     expect(buildMonthlySeries([], "2028-02")).toHaveLength(29);
     expect(buildMonthlySeries([], "2026-13")).toEqual([]);
   });
+
+  it("LD-005 ใช้ค่าเฉลี่ยตุ้ม 10 g และเลือก baseline 20 ค่าแรก", () => {
+    const records = Array.from({ length: 22 }, (_, index) => ({
+      date: `2026-11-${String(index + 1).padStart(2, "0")}`,
+      avg100: 100 + index,
+      avg10: 10 + index / 100,
+      checkedAt: `2026-11-${String(index + 1).padStart(2, "0")}T08:00:00.000Z`,
+    }));
+    const series = buildMonthlySeries(records, "2026-11", 10);
+    expect(series[0].value).toBe(10);
+    expect(controlBaselineValues(series)).toEqual(Array.from({ length: 20 }, (_, index) => 10 + index / 100));
+  });
 });
 
 describe("monthRange / formatThaiMonth", () => {
@@ -114,32 +134,47 @@ describe("chartDomain / formatSd", () => {
     expect(formatSd(null)).toBe("—");
   });
 
-  it("เพิ่มทศนิยมให้พอเห็นระยะ 1SD", () => {
+  it("แสดงทศนิยมไม่เกินความละเอียดเครื่องชั่ง", () => {
     expect(displayDigits(2, null)).toBe(4);
     expect(displayDigits(5, null)).toBe(5);
     expect(displayDigits(2, 0.01)).toBe(4);
-    expect(displayDigits(5, 0.0000476)).toBe(6);
-    expect(displayDigits(5, 1e-12)).toBe(8);
+    expect(displayDigits(5, 0.0000476)).toBe(5);
+    expect(displayDigits(5, 1e-12)).toBe(5);
+    expect(limitDecimalPlaces("10.009", 2)).toBe("10.00");
   });
 });
 
 describe("config defaults / validation", () => {
-  it("มีค่าเริ่มต้นครบ 5 เครื่องและยังไม่มีค่า Control", () => {
-    expect(BALANCE_CONTROL_DEFAULTS.map((config) => config.scaleId)).toEqual([
-      "scale-1", "scale-2", "scale-3", "scale-4", "scale-5",
-    ]);
-    expect(getBalanceControlConfig(undefined, "scale-1")).toMatchObject({ mean: null, sd: null, nominal: 100 });
+  const baselineValues = Array.from({ length: 20 }, (_, index) => 100 + index / 1000);
+  it("มีค่าเริ่มต้นครบ 2 ตุ้มต่อเครื่องและยังไม่มีค่า Control", () => {
+    expect(BALANCE_CONTROL_DEFAULTS).toHaveLength(10);
+    expect(BALANCE_CONTROL_DEFAULTS.filter((config) => config.scaleId === "scale-1").map((config) => config.nominal)).toEqual([500, 10]);
+    expect(getBalanceControlConfig(undefined, "scale-1")).toMatchObject({ mean: null, sd: null, nominal: 10 });
+    expect(getBalanceControlConfig(undefined, "scale-1", 500)).toMatchObject({ mean: null, sd: null, nominal: 500 });
   });
 
   it("ตรวจค่าที่กรอกด้วยข้อความเดียวกับ server", () => {
     expect(validateBalanceControlInput({ mean: NaN, sd: 1 })).toBe("ค่า Mean ต้องเป็นตัวเลข");
     expect(validateBalanceControlInput({ mean: 100, sd: NaN })).toBe("ค่า STD ต้องเป็นตัวเลข");
-    expect(validateBalanceControlInput({ mean: 100, sd: 0 })).toBe("ค่า STD ต้องมากกว่า 0");
+    expect(validateBalanceControlInput({ mean: 100, sd: -1 })).toBe("ค่า STD ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0 })).toBe("น้ำหนักตุ้มต้องมากกว่า 0");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, mpe: -1 })).toBe("ค่า MPE ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, updatedDate: "26/10/2569" })).toBe(
       "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD",
     );
-    expect(validateBalanceControlInput({ mean: 99.99972, sd: 0.0000476, mpe: 0.5, updatedDate: "2026-10-26" })).toBeNull();
+    expect(validateBalanceControlInput({ mean: 99.99972, sd: 0.0000476, baselineValues, mpe: 0.5, updatedDate: "2026-10-26" })).toBeNull();
+    expect(validateBalanceControlInput({ mean: 100, sd: 1, baselineValues: baselineValues.slice(0, 19) })).toBe(
+      "กรอกค่าบันทึกให้ครบ 20 ค่า",
+    );
+  });
+});
+
+describe("control update due date", () => {
+  it("ครบกำหนดเมื่อผ่านวันที่ปรับปรุง 3 เดือน", () => {
+    expect(controlUpdateDueDate("2026-08-17")?.toISOString().slice(0, 10)).toBe("2026-11-17");
+    expect(controlUpdateDueDate("2026-01-31")?.toISOString().slice(0, 10)).toBe("2026-04-30");
+    expect(isControlUpdateDue("2026-08-17", new Date("2026-11-17T00:00:00"))).toBe(true);
+    expect(isControlUpdateDue("2026-08-18", new Date("2026-11-17T23:59:59"))).toBe(false);
+    expect(isControlUpdateDue("", new Date("2026-11-17T00:00:00"))).toBe(false);
   });
 });
