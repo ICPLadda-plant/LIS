@@ -930,7 +930,10 @@ function resultRowsFromLegacyLabs(rows, commonName) {
     if (!value) return '';
     return groups.length > 1 ? `${text(entries[0].test?.test_name)}: ${value}` : value;
   }).filter(Boolean).join(' / ');
-  const result = joinGroups((entries) => averagedLegacyResult(entries.map((entry) => entry.value)));
+  const result = groups
+    .map((entries) => averagedLegacyResult(entries.map((entry) => entry.value)))
+    .filter(Boolean)
+    .join(' / ');
   const criteria = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.criteria))?.test?.criteria));
   const method = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.method))?.test?.method));
   const valueCount = groups.reduce((sum, entries) => sum + entries.length, 0);
