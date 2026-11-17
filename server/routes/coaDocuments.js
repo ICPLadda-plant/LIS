@@ -1005,6 +1005,9 @@ router.get('/', async (req, res) => {
     const externalItemNos = [...new Set(externalRows
       .map((row) => row.externalCoaRequest?.itemNo)
       .filter(Boolean))];
+    const productionLabRequests = productionPetitions.length
+      ? await labRequestsForPetitionIds(productionPetitions.map((petition) => petition._id))
+      : [];
     const externalCoaHistory = externalItemNos.length
       ? await CoaDocument.find({
         'sampleSnapshots.sampleId': { $in: externalItemNos },
@@ -1012,7 +1015,7 @@ router.get('/', async (req, res) => {
       }).sort({ updatedAt: -1 }).limit(500).lean()
       : [];
     const externalRowsWithCurrentBatch = enrichExternalCoaDocumentsWithHistory(
-      enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences, productionPetitions),
+      enrichExternalCoaDocumentsWithErpLots(externalRows, erpReferences, productionPetitions, productionLabRequests),
       externalCoaHistory,
     );
     const enrichedExternalRows = await enrichExternalCoaDocumentsWithDensity(externalRowsWithCurrentBatch).catch((error) => {

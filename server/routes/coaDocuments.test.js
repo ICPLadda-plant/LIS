@@ -734,16 +734,19 @@ test('enrichExternalCoaDocumentsWithErpLots uses the single matching label produ
     items: [{
       seq: 1, itemNo: 'FC-HODEN-250X24', sampleName: 'โฮลเดน',
       commonName: 'TRIFLOXYSTROBIN + TEBUCONAZOLE 25% + 50% WG',
-      batchNo: '2026052501', productionDate: '2026-11-16',
+      productionDate: '2026-11-16',
     }],
   };
+  const labRequests = [{
+    petitionId: 'petition-holden', sampleSeq: 1, batchNo: '2026052501',
+  }];
 
   const [enriched] = router.enrichExternalCoaDocumentsWithErpLots([source], {
     stockRows: [],
     mfRows: [{
       item_no: 'FC-HODEN-250X24', prod_order_no: 'MF26110140', create_date: '2026-11-12',
     }],
-  }, [petition]);
+  }, [petition], labRequests);
 
   assert.equal(enriched.sampleSnapshots[0].batchNo, '2026052501');
   assert.equal(enriched.sampleSnapshots[0].productionDate, '2026-11-16');
