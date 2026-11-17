@@ -723,6 +723,32 @@ test('enrichExternalCoaDocumentsWithErpLots reads long Batch values and label da
   ]);
 });
 
+test('enrichExternalCoaDocumentsWithErpLots uses the single matching label production date', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26110076', Line: 10000, ItemNo: 'FC-HODEN-250X24',
+    TradeName: 'โฮลเดน', CommonName: 'TRIFLOXYSTROBIN + TEBUCONAZOLE 25% + 50% WG',
+    ShipmentDate: '2026-11-09', remark: 'COA',
+  }]);
+  const petition = {
+    _id: 'petition-holden', updatedAt: '2026-11-16',
+    items: [{
+      seq: 1, itemNo: 'FC-HODEN-250X24', sampleName: 'โฮลเดน',
+      commonName: 'TRIFLOXYSTROBIN + TEBUCONAZOLE 25% + 50% WG',
+      batchNo: '2026052501', productionDate: '2026-11-16',
+    }],
+  };
+
+  const [enriched] = router.enrichExternalCoaDocumentsWithErpLots([source], {
+    stockRows: [],
+    mfRows: [{
+      item_no: 'FC-HODEN-250X24', prod_order_no: 'MF26110140', create_date: '2026-11-12',
+    }],
+  }, [petition]);
+
+  assert.equal(enriched.sampleSnapshots[0].batchNo, '2026052501');
+  assert.equal(enriched.sampleSnapshots[0].productionDate, '2026-11-16');
+});
+
 test('enrichExternalCoaDocumentsWithErpLots prefers production request Batches over RM stock lots', () => {
   const [source] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO-KARAT', Line: 10000, ItemNo: 'F-KRT35-1X20',

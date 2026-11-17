@@ -579,7 +579,7 @@ function enrichExternalCoaDocumentsWithErpLots(documents, references = {}, petit
           .sort((left, right) => left.batchNo.localeCompare(right.batchNo, undefined, { numeric: true }));
         const batches = sameProductionBatches.length > 1
           ? sameProductionBatches
-          : requestBatches.length > 1
+          : requestBatches.length
             ? requestBatches
             : [resolved];
         return batches.map((batch) => ({
