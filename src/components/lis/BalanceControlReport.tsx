@@ -27,9 +27,8 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-head h1 { margin: 0; font-size: 16pt; }
 .bcr .bcr-info { display: grid; grid-template-columns: auto 105px auto 1fr auto 115px; column-gap: 6px; row-gap: 4px; margin: 2px 0 8px; font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; font-size: 13pt; align-items: end; }
 .bcr .bcr-fill { border-bottom: 1px solid #000; text-align: center; min-height: 1.2em; padding: 0 4px; }
-.bcr .bcr-brand-label { text-align: right; }
-.bcr .bcr-brand-value { text-align: left; }
-.bcr .bcr-daily-label { grid-column: 3; text-align: right; }
+.bcr .bcr-info-pair { grid-column: span 2; display: flex; align-items: end; gap: 6px; }
+.bcr .bcr-brand-value { flex: 1; text-align: left; }
 .bcr .bcr-daily-group { display: flex; align-items: end; gap: 4px; justify-self: start; }
 .bcr .bcr-daily-value { width: 70px; }
 .bcr table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -146,16 +145,20 @@ export default function BalanceControlReport({
       <div className="bcr-info">
         <span>รหัสเครื่องมือ :</span>
         <span className="bcr-fill">{scale.code}</span>
-        <span className="bcr-brand-label">ยี่ห้อ :</span>
-        <span className="bcr-fill bcr-brand-value">{config.brand}</span>
+        <span className="bcr-info-pair">
+          <span>ยี่ห้อ :</span>
+          <span className="bcr-fill bcr-brand-value">{config.brand}</span>
+        </span>
         <span>รุ่น :</span>
         <span className="bcr-fill">{config.model || scale.model}</span>
         <span>รหัสตุ้มน้ำหนัก :</span>
         <span className="bcr-fill">{config.weightCode}</span>
-        <span className="bcr-daily-label">น้ำหนักตุ้ม Daily check :</span>
-        <span className="bcr-daily-group">
-          <span className="bcr-fill bcr-daily-value">{config.nominal}</span>
-          <span>g</span>
+        <span className="bcr-info-pair">
+          <span>น้ำหนักตุ้ม Daily check :</span>
+          <span className="bcr-daily-group">
+            <span className="bcr-fill bcr-daily-value">{config.nominal}</span>
+            <span>g</span>
+          </span>
         </span>
       </div>
 
