@@ -279,6 +279,15 @@ export function displayDigits(scaleDecimals: number, _sd: number | null | undefi
   return controlDigits(scaleDecimals);
 }
 
+/** ทศนิยมน้อยที่สุด (ไม่ต่ำกว่า minDigits, ไม่เกิน 8) ที่ทำให้ค่าทุกตัวอ่านไม่ซ้ำกัน */
+export function axisTickDigits(values: number[], minDigits: number): number {
+  const nums = values.filter(isFiniteNumber);
+  for (let digits = minDigits; digits < 8; digits += 1) {
+    if (new Set(nums.map((value) => value.toFixed(digits))).size === nums.length) return digits;
+  }
+  return 8;
+}
+
 export function limitDecimalPlaces(value: string, digits: number): string {
   const decimalIndex = value.indexOf(".");
   return decimalIndex < 0 ? value : value.slice(0, decimalIndex + digits + 1);

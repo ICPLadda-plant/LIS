@@ -5,6 +5,7 @@ import { fmtDate } from "@/lib/dailyCheckFormat";
 import { cn } from "@/lib/utils";
 import {
   CONTROL_STATUS_LABEL,
+  axisTickDigits,
   classifyPoint,
   formatControlNumber,
   type ControlLimits,
@@ -130,19 +131,15 @@ export default function BalanceControlChart({
     rawValue: point.value,
   }));
   const tickFont = fixed ? 18 : 11;
-  // จุดและเส้นวางตามค่าจริง ปัดเฉพาะตอนแสดงผล — กันทศนิยมน้อย ๆ ทำให้ ±2SD/±3SD ทับกัน
   const tickValues = [
     domain[0],
     ...(limits ? [limits.lcl, limits.lwl, limits.mean, limits.uwl, limits.ucl] : []),
     domain[1],
   ].sort((a, b) => a - b);
-  const seenTickLabels = new Set<string>();
-  const yTicks = tickValues.filter((value) => {
-    const label = value.toFixed(digits);
-    if (seenTickLabels.has(label)) return false;
-    seenTickLabels.add(label);
-    return true;
-  });
+  // แกน Y เพิ่มทศนิยมเท่าที่จำเป็นให้เส้น Mean/UWL/UCL/LWL/LCL ไม่อ่านเป็นค่าเดียวกัน
+  // (ค่าจุดและตารางยังใช้ digits ตามความละเอียดของเครื่อง)
+  const axisDigits = axisTickDigits(tickValues, digits);
+  const yTicks = tickValues;
 
   const renderDot = (props: DotRenderProps): ReactElement => {
     const key = props.key ?? `dot-${props.index ?? 0}`;
@@ -189,10 +186,10 @@ export default function BalanceControlChart({
       domain={domain}
       allowDataOverflow
       ticks={yTicks}
-      tickFormatter={(value: number) => value.toFixed(digits)}
+      tickFormatter={(value: number) => value.toFixed(axisDigits)}
       tick={{ fontSize: tickFont, fill: palette.axis }}
       tickLine={false}
-      width={digits >= 5 ? 88 : 76}
+      width={axisDigits >= 5 ? 88 : 76}
     />,
   ];
 

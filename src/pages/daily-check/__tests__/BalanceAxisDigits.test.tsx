@@ -20,7 +20,7 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { name: "Dev",
 describe("LD-005 axis digits", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("renders every axis tick with two decimals", async () => {
+  it("keeps point values at two decimals while the axis stays readable", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
       { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 9.9995, sd: 0.0051, mpe: 0.5, updatedDate: "2026-11-17" },
     ]);
@@ -33,10 +33,11 @@ describe("LD-005 axis digits", () => {
         <BalanceRoomPage />
       </QueryClientProvider>,
     );
+    // ตาราง/สรุปใช้ 2 ตำแหน่ง ส่วนแกน Y ขยายทศนิยมจนเส้น Control ไม่ซ้ำกัน
     await findAllByText("10.00");
-    const long = Array.from(container.querySelectorAll("text"))
+    const ticks = Array.from(container.querySelectorAll("svg.recharts-surface text"))
       .map((n) => n.textContent ?? "")
-      .filter((t) => /^\d+\.\d{3,}$/.test(t));
-    expect(long).toEqual([]);
+      .filter((t) => /^\d+\.\d+$/.test(t));
+    expect(new Set(ticks).size).toBe(ticks.length);
   });
 });
