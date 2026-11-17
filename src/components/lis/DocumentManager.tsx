@@ -15,8 +15,8 @@ import { api } from "@/lib/api";
 import {
   FILL_FIELDS, fillFieldHtml, hasFillFields,
 } from "@/lib/formTemplate";
-import { SYSTEM_FORM_CAPTURE, captureSystemForm } from "@/lib/systemFormCapture";
-import { isSlotTemplate, lockSlots, refitBoxes } from "@/lib/systemFormSlots";
+import { SYSTEM_FORM_CAPTURE, captureSystemForm, systemFormCatalog } from "@/lib/systemFormCapture";
+import { isSlotTemplate, lockSlots, refitBoxes, slotHtml, type SlotInfo } from "@/lib/systemFormSlots";
 import FillFormView from "@/components/lis/FillFormView";
 import { Link } from "react-router-dom";
 import { Label } from "@/components/ui/label";
@@ -105,8 +105,21 @@ const setSize = (pt: number) => {
   const range = sel.getRangeAt(0);
   const span = document.createElement("span");
   span.style.fontSize = pt + "pt";
+  const host = range.commonAncestorContainer instanceof Element ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+  const isEmpty = (el: Element) => !el.textContent && !el.querySelector("img, br, [data-slot], [data-ff]") && !el.matches("img, br, [data-slot], [data-ff], .pr-cb, .pr-rd, .pr-line");
+  const emptyBefore = new Set(host ? Array.from(host.querySelectorAll("*")).filter(isEmpty) : []);
   span.appendChild(range.extractContents());
   range.insertNode(span);
+  // extractContents ทิ้งแท็กที่ว่างลง (เช่น <b></b>, div หัวเรื่องเดิม) ไว้ข้างหลัง — ลบเฉพาะที่ว่างเพราะครั้งนี้
+  // แท็กที่ฟอร์มตั้งใจเว้นว่าง (ช่องติ๊ก เส้นประ ตัวเว้นระยะ) ไม่แตะ
+  host?.querySelectorAll("*").forEach((el) => {
+    if (el !== span && !span.contains(el) && !emptyBefore.has(el) && isEmpty(el)) el.remove();
+  });
+  // เลือกข้อความที่เพิ่งเปลี่ยนขนาดไว้ ให้กดเปลี่ยนต่อได้และ Ribbon แสดงค่าใหม่
+  const next = document.createRange();
+  next.selectNodeContents(span);
+  sel.removeAllRanges();
+  sel.addRange(next);
 };
 
 const currentCell = () => {
@@ -170,7 +183,7 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 
 const selectCls = "h-8 rounded-md border bg-background px-2 text-sm";
 
-function Ribbon() {
+function Ribbon({ slots }: { slots?: SlotInfo[] }) {
   const [cur, setCur] = useSelectionFont();
   const fonts = cur.font && !FONTS.includes(cur.font) ? [cur.font, ...FONTS] : FONTS;
   const sizes = cur.size && !SIZES.map(String).includes(cur.size) ? [...SIZES.map(String), cur.size].sort((a, b) => +a - +b) : SIZES.map(String);
@@ -234,11 +247,31 @@ function Ribbon() {
           <Tool label="ลบคอลัมน์" onClick={tableOps.delCol} />
           <Tool label="ลบตาราง" onClick={tableOps.delTable} />
         </Group>
+        {slots && (
+          <Group label="ช่องข้อมูลจากระบบ (เติมจากคำร้องจริงตอนพิมพ์)">
+            <select aria-label="แทรกช่องข้อมูลจากระบบ" className={selectCls + " w-72"} value="" onChange={(e) => {
+              const info = slots.find((x) => x.slot === e.target.value);
+              if (!info) return;
+              restoreSelection();
+              exec("insertHTML", slotHtml(info) + "&nbsp;");
+            }}>
+              <option value="" disabled>เลือกช่องที่จะแทรก</option>
+              <optgroup label="ช่องข้อความ">
+                {slots.filter((x) => x.kind === "e").map((x) => (
+                  <option key={x.slot} value={x.slot}>{x.label}{x.sample ? " — ตัวอย่าง: " + x.sample.slice(0, 30) : ""}</option>
+                ))}
+              </optgroup>
+              <optgroup label="กล่องติ๊ก">
+                {slots.filter((x) => x.kind === "c").map((x) => <option key={x.slot} value={x.slot}>☐ {x.label}</option>)}
+              </optgroup>
+            </select>
+          </Group>
+        )}
         <Group label="ช่องกรอก (ให้คนกรอกตอนพิมพ์)">
           {FILL_FIELDS.map((f) => (
             <Tool key={f.type} label={f.label} onClick={() => {
               const label = window.prompt("ชื่อช่อง เช่น ชื่อผู้รับ, วันที่รับ", f.label.replace("ช่อง", ""));
-              if (label) exec("insertHTML", fillFieldHtml(f.type, label.trim()));
+              if (label) { restoreSelection(); exec("insertHTML", fillFieldHtml(f.type, label.trim())); }
             }} />
           ))}
         </Group>
@@ -384,6 +417,15 @@ export default function DocumentManager() {
   const [saving, setSaving] = useState(false);
   const [fillMode, setFillMode] = useState(false);
   const [selSlot, setSelSlot] = useState<HTMLElement | null>(null);
+  const [slotList, setSlotList] = useState<SlotInfo[] | undefined>(undefined);
+  const sysCode = current?.templateFor && SYSTEM_FORM_CAPTURE[current.templateFor] && isSlotTemplate(current.html || "") ? current.templateFor : "";
+  useEffect(() => {
+    setSlotList(undefined);
+    if (!sysCode) return;
+    let alive = true;
+    systemFormCatalog(sysCode).then((list) => alive && setSlotList(list)).catch(() => alive && setSlotList([]));
+    return () => { alive = false; };
+  }, [sysCode]);
   const editor = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -567,6 +609,7 @@ export default function DocumentManager() {
               <p className="flex-1 text-muted-foreground">
                 แม่แบบนี้ใช้แทนฟอร์ม {current.templateFor} เมื่อสถานะเป็น "ใช้งาน" ช่องที่ไฮไลต์คือข้อมูลที่ระบบเติมจากคำร้องจริงตอนพิมพ์
                 แก้ข้อความ ตาราง ฟอนต์ได้ ถ้าไม่ต้องการช่องไหน คลิกช่องนั้นแล้วกด Delete หรือปุ่ม "ลบช่องนี้"
+                เพิ่มช่องได้ที่แท็บ "แทรก": "ช่องข้อมูลจากระบบ" (ระบบเติมให้) หรือ "ช่องกรอก" (เป็นเส้นให้เขียนตอนพิมพ์)
               </p>
             ) : (
               <p className="flex-1 text-destructive">แม่แบบนี้สร้างจากแบบเก่า ยังไม่ผูกข้อมูลกับฟอร์มระบบ ระบบจะไม่ใช้ตอนพิมพ์ กดปุ่มด้านขวาเพื่อดึงฟอร์มจริงมาแก้</p>
@@ -576,7 +619,7 @@ export default function DocumentManager() {
         )}
         {current.canEdit && !fillMode && (
           <div className="sticky top-0 z-10 space-y-2 print:hidden">
-            <Ribbon />
+            <Ribbon slots={slotList} />
             {selSlot && (
               <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm shadow-sm">
                 <span className="text-muted-foreground">

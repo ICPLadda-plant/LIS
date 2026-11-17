@@ -2,7 +2,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import PetitionPrintTemplate from "@/components/petition/PetitionPrintTemplate";
 import { api } from "@/lib/api";
-import { annotateSystemPage } from "@/lib/systemFormSlots";
+import { annotateSystemPage, slotCatalog, type SlotInfo } from "@/lib/systemFormSlots";
 import type { LabRequest } from "@/types/labRequest.types";
 import type { Petition } from "@/types/petition.types";
 
@@ -46,4 +46,15 @@ export async function captureSystemForm(code: string): Promise<string> {
     root.unmount();
     host.remove();
   }
+}
+
+const catalogCache = new Map<string, Promise<SlotInfo[]>>();
+/** ช่องทั้งหมดของฟอร์มระบบ (ชื่อ + ค่าตัวอย่าง) สำหรับเมนู "แทรกช่องข้อมูลจากระบบ" — render ครั้งเดียวต่อฟอร์ม */
+export function systemFormCatalog(code: string): Promise<SlotInfo[]> {
+  if (!catalogCache.has(code)) {
+    const p = captureSystemForm(code).then(slotCatalog);
+    p.catch(() => catalogCache.delete(code));
+    catalogCache.set(code, p);
+  }
+  return catalogCache.get(code)!;
 }
