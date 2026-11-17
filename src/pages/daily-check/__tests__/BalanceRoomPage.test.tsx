@@ -72,6 +72,8 @@ describe("BalanceRoomPage", () => {
       "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง",
       "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง",
     ].forEach(name => expect(screen.getByText(name)).toBeInTheDocument());
+    expect(screen.getByText("LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง").closest("button")).toHaveClass("bg-sky-50/70");
+    expect(screen.getByText("LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง").closest("button")).toHaveClass("bg-violet-50/70");
     expect(screen.queryByText("เครื่องชั่ง 1")).not.toBeInTheDocument();
   });
 

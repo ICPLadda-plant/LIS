@@ -77,6 +77,14 @@ const STATUS_BADGE: Record<ControlPointStatus, NonNullable<BadgeProps["variant"]
   out: "red-soft",
 };
 
+const SCALE_CARD_COLORS = [
+  "border-sky-200 bg-sky-50/70 hover:bg-sky-100/70",
+  "border-violet-200 bg-violet-50/70 hover:bg-violet-100/70",
+  "border-teal-200 bg-teal-50/70 hover:bg-teal-100/70",
+  "border-amber-200 bg-amber-50/70 hover:bg-amber-100/70",
+  "border-rose-200 bg-rose-50/70 hover:bg-rose-100/70",
+];
+
 const todayStr = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -522,7 +530,7 @@ const BalanceRoomPage = () => {
           </div>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
-          {BALANCE_SCALES.map(s => {
+          {BALANCE_SCALES.map((s, index) => {
             const rec = latestByScale[s.id];
             const active = s.id === scale.id;
             return (
@@ -532,7 +540,8 @@ const BalanceRoomPage = () => {
                 aria-pressed={active}
                 onClick={() => setSelectedScaleId(s.id)}
                 className={cn(
-                  "flex w-full flex-col gap-1.5 rounded-lg border bg-card p-3 text-left shadow-sm transition-colors hover:bg-accent",
+                  "flex w-full flex-col gap-1.5 rounded-lg border p-3 text-left shadow-sm transition-colors",
+                  SCALE_CARD_COLORS[index % SCALE_CARD_COLORS.length],
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active && "border-primary ring-1 ring-primary",
                 )}
