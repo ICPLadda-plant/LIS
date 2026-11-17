@@ -131,6 +131,11 @@ export default function BalanceControlChart({
     rawValue: point.value,
   }));
   const tickFont = fixed ? 15 : 11;
+  const yTicks = Array.from(new Set([
+    round(domain[0]),
+    ...(limits ? [limits.lcl, limits.lwl, limits.mean, limits.uwl, limits.ucl].map(round) : []),
+    round(domain[1]),
+  ])).sort((a, b) => a - b);
 
   const renderDot = (props: DotRenderProps): ReactElement => {
     const key = props.key ?? `dot-${props.index ?? 0}`;
@@ -176,7 +181,7 @@ export default function BalanceControlChart({
       key="y"
       domain={domain}
       allowDataOverflow
-      tickCount={7}
+      ticks={yTicks}
       tickFormatter={(value: number) => value.toFixed(digits)}
       tick={{ fontSize: tickFont, fill: palette.axis }}
       tickLine={false}
