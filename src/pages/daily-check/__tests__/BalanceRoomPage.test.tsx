@@ -203,6 +203,10 @@ describe("BalanceRoomPage", () => {
     renderPage();
 
     expect(await screen.findAllByText(/กราฟมีข้อมูลแล้ว แต่ยังไม่มีเส้น Mean/)).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 10 g" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" }));
+    expect(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("cell", { name: "500.00" })).toBeInTheDocument();
   });
 
   it("loads the selected scale records for the current month", async () => {

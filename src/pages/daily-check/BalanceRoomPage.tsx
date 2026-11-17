@@ -118,6 +118,7 @@ const BalanceRoomPage = () => {
   const [printOpen, setPrintOpen] = useState(false);
   const [printedAt, setPrintedAt] = useState("");
   const [configWeight, setConfigWeight] = useState<number | null>(null);
+  const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
   const [exporting, setExporting] = useState(false);
   const [cameraTarget, setCameraTarget] = useState<{ type: "100" | "10"; index: number } | null>(null);
   const [readingPhoto, setReadingPhoto] = useState(false);
@@ -125,6 +126,8 @@ const BalanceRoomPage = () => {
 
   const scale = BALANCE_SCALES.find(s => s.id === selectedScaleId) ?? BALANCE_SCALES[0];
   const typeLabel = balanceScaleTypeLabel(scale);
+
+  useEffect(() => setHistoryWeight(scale.controlWeight), [scale.controlWeight]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,10 +191,6 @@ const BalanceRoomPage = () => {
   const domain = useMemo(() => chartDomain(limits, values), [limits, values]);
   const stats = useMemo(() => monthlyStats(values), [values]);
   const counts = useMemo(() => countByStatus(values, limits), [values, limits]);
-  const recordedPoints = useMemo(
-    () => series.filter((point): point is RecordedPoint => point.record != null && point.value != null),
-    [series],
-  );
   const otherWeight = scale.controlWeight === 10 ? scale.primaryCalibrationWeight : 10;
   const otherConfig = getBalanceControlConfig(controlConfigs, scale.id, otherWeight);
   const otherSeries = buildMonthlySeries(monthRecords ?? [], month, otherWeight === 10 ? 10 : 100);
@@ -209,6 +208,8 @@ const BalanceRoomPage = () => {
     { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts },
   ].sort((a, b) => a.weight - b.weight);
   const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
+  const historyPanel = chartPanels.find((panel) => panel.weight === historyWeight) ?? chartPanels[0];
+  const recordedPoints = historyPanel.series.filter((point): point is RecordedPoint => point.record != null && point.value != null);
   const duePanels = chartPanels.filter((panel) => isControlUpdateDue(panel.config.updatedDate));
 
   const createMutation = useMutation({
@@ -699,11 +700,28 @@ const BalanceRoomPage = () => {
 
       {/* ตารางบันทึกรายวันของเดือน */}
       <section className="space-y-2">
-        <div>
-          <h3 className="text-base font-semibold text-foreground">บันทึกรายวัน — {formatThaiMonth(month)}</h3>
-          <p className="text-sm text-muted-foreground">
-            ใช้ผลการบันทึกล่าสุดของแต่ละวัน (ค่าเฉลี่ยตุ้ม {scale.controlWeight} g) เทียบกับเส้น Control
-          </p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-foreground">บันทึกรายวัน — {formatThaiMonth(month)}</h3>
+            <p className="text-sm text-muted-foreground">
+              ใช้ผลการบันทึกล่าสุดของแต่ละวัน (ค่าเฉลี่ยตุ้ม {historyPanel.weight} g) เทียบกับเส้น Control
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2" aria-label="เลือกน้ำหนักสำหรับบันทึกรายวัน">
+            {chartPanels.map((panel) => (
+              <Button
+                key={panel.weight}
+                type="button"
+                size="sm"
+                variant={historyPanel.weight === panel.weight ? "default" : "outline"}
+                aria-pressed={historyPanel.weight === panel.weight}
+                aria-label={`แสดงบันทึกตุ้ม ${panel.weight} g`}
+                onClick={() => setHistoryWeight(panel.weight)}
+              >
+                ตุ้ม {panel.weight} g
+              </Button>
+            ))}
+          </div>
         </div>
         <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
           <table className="w-full text-sm">
@@ -727,13 +745,16 @@ const BalanceRoomPage = () => {
                 </tr>
               ) : (
                 recordedPoints.map(point => {
-                  const status = classifyPoint(point.value, limits);
+                  const status = classifyPoint(point.value, historyPanel.limits);
+                  const calibrateStatus = historyPanel.weight === 10
+                    ? point.record.status10 ?? point.record.status
+                    : point.record.status100 ?? point.record.status;
                   return (
                     <tr key={point.date} className="hover:bg-accent">
                       <td className="px-3 py-2">{fmtDate(point.date)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmt(point.value)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatControlNumber(point.value, historyPanel.digits)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {limits ? signed(point.value - limits.mean, digits) : "—"}
+                        {historyPanel.limits ? signed(point.value - historyPanel.limits.mean, historyPanel.digits) : "—"}
                       </td>
                       <td className="px-3 py-2">
                         {status ? (
@@ -743,8 +764,8 @@ const BalanceRoomPage = () => {
                         )}
                       </td>
                       <td className="px-3 py-2">
-                        <Badge variant={point.record.status === "pass" ? "green-soft" : "red-soft"}>
-                          {point.record.status === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
+                        <Badge variant={calibrateStatus === "pass" ? "green-soft" : "red-soft"}>
+                          {calibrateStatus === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
                         </Badge>
                       </td>
                       <td className="px-3 py-2">{point.record.recorder}</td>
