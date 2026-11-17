@@ -43,6 +43,19 @@ export function labelReceiptProgress(petition: Petition, side: SampleLabelSide):
   return { received: labels.filter((label) => label.received).length, total: labels.length };
 }
 
+/** รับป้ายของฝั่งนี้ไปแล้วอย่างน้อยหนึ่งป้าย (ยังไม่ครบ) — เปิดงานกรอกผลของป้ายที่รับแล้วได้ */
+export function hasPartialLabelReceipt(petition: Petition, side: SampleLabelSide): boolean {
+  return !!labelReceiptProgress(petition, side)?.received;
+}
+
+/** ตัวอย่างรายการนี้ยังรอสแกนรับป้ายของฝั่งนี้ → ยังกรอกผลไม่ได้ */
+export function isItemLabelPending(petition: Petition, item: Petition['items'][number], side: SampleLabelSide): boolean {
+  const labels = labelReceiptChoices(petition, side);
+  if (!labels) return false;
+  const label = labels.find((entry) => entry.key === sampleLabelGroupKey(item));
+  return !!label && !label.received;
+}
+
 /** ข้อความหลังรับรอบนี้: รับครบแล้ว หรือยังรอป้ายที่เหลือ */
 export function labelReceiptStatus(labels: SideLabel[], keys: string[]): { complete: boolean; text: string } {
   const after = labels.filter((label) => label.received || keys.includes(label.key)).length;

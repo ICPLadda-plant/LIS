@@ -1388,6 +1388,8 @@ function petitionQuery(id) {
 }
 
 function labNotReceived(doc) {
+  // รับทีละป้าย: รับไปแล้วบางป้ายก็เริ่มงานกรอกผลของป้ายนั้นได้
+  if ((doc.labelReceipts ?? []).some((receipt) => receipt.side === 'lab')) return false;
   return !doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt);
 }
 

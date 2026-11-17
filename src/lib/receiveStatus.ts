@@ -1,7 +1,7 @@
 import type { Petition, PetitionStatus } from '@/types/petition.types';
 import { statusBadge, toneBadge, type StatusBadge, type PetitionStatusStep } from './statusBadge';
 import { isLabAwaitingSgConfirmation, SG_PENDING_LABEL } from './sgConfirmation';
-import { labelReceiptProgress } from './labelReceipt';
+import { hasPartialLabelReceipt, labelReceiptProgress } from './labelReceipt';
 
 /**
  * Per-side receive status (Lab / QC), with legacy backward-compat.
@@ -39,6 +39,11 @@ export function labReceivedAt(p: ReceiveFields): string | null | undefined {
 
 export function labReceivedBy(p: ReceiveFields): string | undefined {
   return p.labReceivedBy ?? (isLegacyReceived(p) ? p.receivedBy : undefined);
+}
+
+/** Lab รับตัวอย่างแล้ว หรือรับทีละป้ายไปแล้วบางป้าย — เข้าไปเริ่มงาน/กรอกผลของป้ายที่รับแล้วได้ */
+export function labWorkReceived(p: ReceiveFields): boolean {
+  return !!labReceivedAt(p) || hasPartialLabelReceipt(p as unknown as Petition, 'lab');
 }
 
 export function qcReceivedAt(p: ReceiveFields): string | null | undefined {
@@ -79,7 +84,7 @@ export function labTrackStatusBadge(p: ReceiveFields & { status: PetitionStatus 
   if (p.labCompletedAt) return toneBadge('warning', 'เจ้าหน้าที่บันทึกผลแล้วรออนุมัติ');
   // caller บางจุดส่งมาเฉพาะ field รับตัวอย่าง (ไม่มี items) — helper คืน false เองเมื่อไม่มี items
   if (isLabAwaitingSgConfirmation(p as unknown as Petition)) return toneBadge('warning', SG_PENDING_LABEL);
-  if (!labReceivedAt(p)) return waitingReceiveBadge(p, 'lab');
+  if (!labReceivedAt(p) && (!p.assignedTo || !labWorkReceived(p))) return waitingReceiveBadge(p, 'lab');
   if (!p.assignedTo) return toneBadge('info', 'Lab รับงานแล้ว รอ assign');
   if (!isLabWorkAccepted(p)) return toneBadge('warning', 'Lab มอบหมายงานแล้ว รอเจ้าหน้าที่รับ');
   return toneBadge('info', 'เจ้าหน้าที่กำลังดำเนินการวิเคราะห์');
