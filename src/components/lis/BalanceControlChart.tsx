@@ -123,7 +123,7 @@ export default function BalanceControlChart({
 }: BalanceControlChartProps) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
   const data: ChartDatum[] = series.map((point) => ({ day: point.day, date: point.date, value: point.value }));
-  const tickFont = fixed ? 13 : 11;
+  const tickFont = fixed ? 15 : 11;
 
   const renderDot = (props: DotRenderProps): ReactElement => {
     const key = props.key ?? `dot-${props.index ?? 0}`;

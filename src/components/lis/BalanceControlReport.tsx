@@ -27,16 +27,18 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-head h1 { margin: 0; font-size: 16pt; }
 .bcr .bcr-info { display: grid; grid-template-columns: auto 105px auto 1fr auto 115px; column-gap: 6px; row-gap: 4px; margin: 2px 0 8px; font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; font-size: 13pt; align-items: end; }
 .bcr .bcr-fill { border-bottom: 1px solid #000; text-align: center; min-height: 1.2em; padding: 0 4px; }
+.bcr .bcr-daily-label { grid-column: 3; text-align: right; }
+.bcr .bcr-daily-value { justify-self: start; width: 70px; }
 .bcr table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .bcr .bcr-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .bcr .bcr-table { border: 2px solid #000; }
 .bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 12pt; line-height: 1; height: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bcr .bcr-table th { font-weight: 400; white-space: normal; overflow: visible; text-overflow: clip; }
+.bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
 .bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 365px; padding: 6px 4px 4px; }
-.bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 13pt; }
-.bcr .bcr-chart-limits { display: flex; justify-content: space-around; margin-top: 2px; font-size: 10pt; }
+.bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 15pt; }
+.bcr .bcr-chart-limits { display: flex; justify-content: space-around; margin-top: 2px; font-size: 12pt; }
 .bcr .bcr-empty { border: 1px dashed #000; display: flex; min-height: 330px; align-items: center; justify-content: center; text-align: center; font-size: 12pt; }
 .bcr .bcr-sign { display: flex; justify-content: space-around; gap: 24px; margin-top: 10px; font-size: 10pt; }
 .bcr .bcr-sign span { display: inline-block; border-bottom: 1px solid #000; min-width: 220px; }
@@ -90,14 +92,14 @@ export default function BalanceControlReport({
   const table = (points: MonthlyPoint<DailyCheckRecord>[]) => (
     <table className="bcr-table">
       <colgroup>
-        <col style={{ width: "16%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "14%" }} />
-        <col style={{ width: "10%" }} />
+        <col style={{ width: "15%" }} />
         <col style={{ width: "12%" }} />
-        <col style={{ width: "14%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "13%" }} />
+        <col style={{ width: "9%" }} />
+        <col style={{ width: "12%" }} />
+        <col style={{ width: "15%" }} />
       </colgroup>
       <thead>
         <tr>
@@ -147,8 +149,8 @@ export default function BalanceControlReport({
         <span className="bcr-fill">{config.model || scale.model}</span>
         <span>รหัสตุ้มน้ำหนัก :</span>
         <span className="bcr-fill">{config.weightCode}</span>
-        <span style={{ gridColumn: "span 2" }}>น้ำหนักตุ้ม Daily check :</span>
-        <span className="bcr-fill">{config.nominal}</span>
+        <span className="bcr-daily-label">น้ำหนักตุ้ม Daily check :</span>
+        <span className="bcr-fill bcr-daily-value">{config.nominal}</span>
         <span>g</span>
       </div>
 
