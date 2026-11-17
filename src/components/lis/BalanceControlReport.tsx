@@ -7,9 +7,9 @@ import {
   type ControlLimits,
   type MonthlyPoint,
 } from "@/lib/balanceControlChart";
-import { BALANCE_CHART_TITLE, BALANCE_FORM_CODE, BALANCE_FORM_TITLE } from "@/lib/balanceControlExport";
+import { BALANCE_CHART_TITLE, BALANCE_FORM_CODE, BALANCE_FORM_TITLE, ddmmBE } from "@/lib/balanceControlExport";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
-import { fmtDate, fmtTime } from "@/lib/dailyCheckFormat";
+import { fmtDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
 // รายงานพิมพ์ Daily check เครื่องชั่ง ตามแบบฟอร์ม FM-WI-06-04-001-R00 (A4 แนวตั้ง)
@@ -35,6 +35,7 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .bcr .bcr-table { border: 2px solid #000; }
 .bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 12pt; line-height: 1; height: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcr .bcr-table tr.bcr-off td { background: #e5e5e5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
@@ -60,6 +61,8 @@ export interface BalanceControlReportProps {
   printedAt: string;
   pageNumber?: number;
   totalPages?: number;
+  /** วันหยุดอื่นนอกจากวันอาทิตย์ (YYYY-MM-DD) — ระบายสีเทาเพราะไม่ได้ทำงาน */
+  holidayDates?: ReadonlySet<string>;
 }
 
 const resultMark = (record: DailyCheckRecord | null, controlWeight: number) => {
@@ -88,6 +91,7 @@ export default function BalanceControlReport({
   printedAt,
   pageNumber = 1,
   totalPages = 1,
+  holidayDates,
 }: BalanceControlReportProps) {
   const printedDate = printedAt ? `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}` : "";
   const table = (points: MonthlyPoint<DailyCheckRecord>[]) => (
@@ -118,8 +122,8 @@ export default function BalanceControlReport({
           const record = point.record;
           const weights = config.nominal === 10 ? record?.weights10 : record?.weights100;
           return (
-            <tr key={point.date}>
-              <td>{fmtDate(point.date)}</td>
+            <tr key={point.date} className={isSunday(point.date) || holidayDates?.has(point.date) ? "bcr-off" : undefined}>
+              <td>{ddmmBE(point.date)}</td>
               <td>{weightText(weights, 0, scale.decimals)}</td>
               <td>{weightText(weights, 1, scale.decimals)}</td>
               <td>{weightText(weights, 2, scale.decimals)}</td>

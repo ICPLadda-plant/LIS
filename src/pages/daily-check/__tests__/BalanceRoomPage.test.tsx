@@ -16,6 +16,8 @@ const apiMock = vi.hoisted(() => ({
   getBalanceControlConfigs: vi.fn().mockResolvedValue([]),
   updateBalanceControlConfig: vi.fn(),
   updateBalanceWeightCode: vi.fn(),
+  getDailyCheckHolidays: vi.fn().mockResolvedValue([]),
+  setDailyCheckHoliday: vi.fn(),
 }));
 
 vi.mock("@/lib/api", () => ({
@@ -55,6 +57,7 @@ describe("BalanceRoomPage", () => {
     state.period = "morning";
     apiMock.getDailyChecks.mockResolvedValue([]);
     apiMock.getBalanceControlConfigs.mockResolvedValue([]);
+    apiMock.getDailyCheckHolidays.mockResolvedValue([]);
     readBalanceDisplayValueFromImageMock.mockResolvedValue({ value: "100.012" });
   });
 
@@ -84,7 +87,9 @@ describe("BalanceRoomPage", () => {
 
     expect(screen.queryByText("นอกเวลาบันทึก")).not.toBeInTheDocument();
     expect(screen.getByText(/บันทึกได้ทุกเวลา/)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("วันที่บันทึก"), { target: { value: "2026-11-12" } });
+    // เลือกวันที่ย้อนหลังจากปฏิทิน (วันที่ 12 ของเดือนปัจจุบัน)
+    fireEvent.click(screen.getByRole("button", { name: /วันที่บันทึก|\d+ [ก-๙.]+ \d{4}/ }));
+    fireEvent.click(await screen.findByRole("gridcell", { name: "12" }));
 
     const [first10, first500] = screen.getAllByPlaceholderText("ครั้งที่ 1");
     const [second10, second500] = screen.getAllByPlaceholderText("ครั้งที่ 2");
@@ -100,7 +105,7 @@ describe("BalanceRoomPage", () => {
     expect(apiMock.createDailyCheck.mock.calls[0][0]).toMatchObject({
       scaleId: "scale-1",
       scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
-      date: "2026-11-12",
+      date: `${currentMonthStr()}-12`,
       avg100: 500.01,
       status100: "pass",
     });
@@ -270,8 +275,9 @@ describe("BalanceRoomPage", () => {
     expect(within(preview).getAllByRole("table")).toHaveLength(4);
     expect(within(preview).getByText("P1/2")).toBeInTheDocument();
     expect(within(preview).getByText("P2/2")).toBeInTheDocument();
-    expect(within(preview).getAllByText(/01\/.*\/2026/).length).toBeGreaterThan(0);
-    expect(within(preview).getAllByText(/16\/.*\/2026/).length).toBeGreaterThan(0);
+    // รายงานใช้ วว/ดด/พ.ศ.
+    expect(within(preview).getAllByText(/^01\/\d{2}\/2569$/).length).toBeGreaterThan(0);
+    expect(within(preview).getAllByText(/^16\/\d{2}\/2569$/).length).toBeGreaterThan(0);
   });
 
   it("shows edit controls and warns when control values are three months old", async () => {
@@ -281,7 +287,24 @@ describe("BalanceRoomPage", () => {
     ]);
     renderPage();
     expect((await screen.findByText(/ครบ 3 เดือนแล้ว/)).closest('[role="alert"]')).toHaveClass("bg-destructive");
-    expect(screen.getAllByText("อัปเดตล่าสุด: 17/08/2026 · ครบกำหนด: พฤศจิกายน 2569")).toHaveLength(2);
+    expect(screen.getAllByText("อัปเดตล่าสุด: 17 ส.ค. 2569 · ครบกำหนด: พฤศจิกายน 2569")).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: /แก้ไขค่า Control/ })).toHaveLength(2);
+  });
+
+  it("greys out Sundays and marked holidays in the print report", async () => {
+    const month = currentMonthStr();
+    const [year, monthNumber] = month.split("-").map(Number);
+    const dayOf = (day: number) => `${month}-${String(day).padStart(2, "0")}`;
+    const beDate = (day: number) => `${String(day).padStart(2, "0")}/${String(monthNumber).padStart(2, "0")}/${year + 543}`;
+    const sunday = [1, 2, 3, 4, 5, 6, 7].find((day) => new Date(year, monthNumber - 1, day).getDay() === 0)!;
+    const workday = sunday === 1 ? 2 : 1;
+    const holiday = sunday + 10;
+    apiMock.getDailyCheckHolidays.mockResolvedValue([{ date: dayOf(holiday) }]);
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Print/ }));
+    const preview = await screen.findByTestId("print-preview");
+    await waitFor(() => expect(within(preview).getAllByText(beDate(holiday))[0].closest("tr")).toHaveClass("bcr-off"));
+    expect(within(preview).getAllByText(beDate(sunday))[0].closest("tr")).toHaveClass("bcr-off");
+    expect(within(preview).getAllByText(beDate(workday))[0].closest("tr")).not.toHaveClass("bcr-off");
   });
 });

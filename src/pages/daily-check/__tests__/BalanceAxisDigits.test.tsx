@@ -9,6 +9,8 @@ const apiMock = vi.hoisted(() => ({
   getBalanceControlConfigs: vi.fn().mockResolvedValue([]),
   updateBalanceControlConfig: vi.fn(),
   updateBalanceWeightCode: vi.fn(),
+  getDailyCheckHolidays: vi.fn().mockResolvedValue([]),
+  setDailyCheckHoliday: vi.fn(),
 }));
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("@/lib/aiApi", () => ({

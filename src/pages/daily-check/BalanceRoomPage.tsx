@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
+  CalendarIcon,
   CheckCircle2,
   Camera,
   FileSpreadsheet,
@@ -13,10 +14,14 @@ import {
   Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { th } from "date-fns/locale";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +34,7 @@ import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTr
 import { useAuth } from "@/context/AuthContext";
 import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
 import { formatDate } from "@/lib/dateTime";
-import { fmtDate, fmtTime } from "@/lib/dailyCheckFormat";
+import { fmtThaiDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { exportBalanceControlExcel } from "@/lib/balanceControlExport";
 import {
   BALANCE_SCALES,
@@ -138,6 +143,7 @@ const BalanceRoomPage = () => {
   const [printedAt, setPrintedAt] = useState("");
   const [configWeight, setConfigWeight] = useState<number | null>(null);
   const [weightInfoOpen, setWeightInfoOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
   const [newWeight, setNewWeight] = useState("");
   const [weightCodeDrafts, setWeightCodeDrafts] = useState<Record<number, string>>({});
   const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
@@ -186,6 +192,23 @@ const BalanceRoomPage = () => {
     queryFn: () =>
       range ? api.getDailyChecks({ from: range.from, to: range.to, scaleId: selectedScaleId }) : Promise.resolve([]),
     enabled: !!range,
+  });
+
+  // วันหยุดอื่นของเดือนที่เลือก (วันอาทิตย์คำนวณจากวันที่เอง ไม่ต้องเก็บ)
+  const { data: holidays } = useQuery({
+    queryKey: ["daily-check-holidays", month],
+    queryFn: () => (range ? api.getDailyCheckHolidays(range) : Promise.resolve([])),
+    enabled: !!range,
+  });
+  const holidayDates = useMemo(() => new Set((holidays ?? []).map((item) => item.date)), [holidays]);
+
+  const holidayMutation = useMutation({
+    mutationFn: ({ date, holiday }: { date: string; holiday: boolean }) => api.setDailyCheckHoliday(date, holiday),
+    onSuccess: (_data, vars) => {
+      toast.success(vars.holiday ? `ทำเครื่องหมายวันหยุด ${fmtThaiDate(vars.date)} แล้ว` : `ยกเลิกวันหยุด ${fmtThaiDate(vars.date)} แล้ว`);
+      queryClient.invalidateQueries({ queryKey: ["daily-check-holidays"] });
+    },
+    onError: (err: Error) => toast.error(err.message || "บันทึกวันหยุดไม่สำเร็จ"),
   });
 
   const latestByScale = useMemo(() => {
@@ -382,7 +405,7 @@ const BalanceRoomPage = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportBalanceControlExcel({ scale, config, limits, series, month });
+      await exportBalanceControlExcel({ scale, config, limits, series, month, holidayDates });
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : "Export Excel ไม่สำเร็จ");
     } finally {
@@ -626,15 +649,43 @@ const BalanceRoomPage = () => {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="balance-record-date">วันที่บันทึก</Label>
-              <Input
-                id="balance-record-date"
-                type="date"
-                value={recordDate}
-                max={todayStr()}
-                required
-                onChange={event => setRecordDate(event.target.value)}
-              />
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button id="balance-record-date" type="button" variant="outline" className="w-full justify-start gap-2 font-normal">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    {fmtThaiDate(recordDate)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={th}
+                    formatters={{ formatCaption: (date) => formatThaiMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`) }}
+                    selected={recordDate ? new Date(`${recordDate}T00:00:00`) : undefined}
+                    defaultMonth={recordDate ? new Date(`${recordDate}T00:00:00`) : new Date()}
+                    disabled={{ after: new Date() }}
+                    onSelect={(date) => {
+                      if (!date) return;
+                      setRecordDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
+                      setDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               {recordDate !== todayStr() && <p className="text-xs text-muted-foreground">กำลังบันทึกข้อมูลย้อนหลัง</p>}
+              {isSunday(recordDate) ? (
+                <p className="text-xs text-muted-foreground">วันอาทิตย์ — ปกติไม่ได้ทำงาน</p>
+              ) : (
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <Checkbox
+                    checked={holidayDates.has(recordDate)}
+                    disabled={holidayMutation.isPending}
+                    onCheckedChange={(checked) => holidayMutation.mutate({ date: recordDate, holiday: checked === true })}
+                  />
+                  วันหยุด (ไม่ได้ทำงาน)
+                </label>
+              )}
             </div>
             {weightBlock("10")}
             {weightBlock("100")}
@@ -712,7 +763,7 @@ const BalanceRoomPage = () => {
                     <h3 className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</h3>
                     <p className="text-xs text-muted-foreground">ค่าเฉลี่ยรายวันและเส้น Control ของเกณฑ์นี้</p>
                     <p className="text-xs text-muted-foreground">
-                      อัปเดตล่าสุด: {panel.config.updatedDate ? fmtDate(panel.config.updatedDate) : "—"} · ครบกำหนด: {controlDueMonth(panel.config.updatedDate)}
+                      อัปเดตล่าสุด: {panel.config.updatedDate ? fmtThaiDate(panel.config.updatedDate) : "—"} · ครบกำหนด: {controlDueMonth(panel.config.updatedDate)}
                     </p>
                   </div>
                   {panel.limits ? (
@@ -830,8 +881,8 @@ const BalanceRoomPage = () => {
                     : point.record.status100 ?? point.record.status;
                   const readings = historyPanel.weight === 10 ? point.record.weights10 : point.record.weights100;
                   return (
-                    <tr key={point.date} className="hover:bg-accent">
-                      <td className="px-3 py-2">{fmtDate(point.date)}</td>
+                    <tr key={point.date} className={cn("hover:bg-accent", (isSunday(point.date) || holidayDates.has(point.date)) && "bg-muted/60")}>
+                      <td className="px-3 py-2">{fmtThaiDate(point.date)}</td>
                       {[0, 1, 2].map(index => (
                         <td key={index} className="px-3 py-2 text-right tabular-nums">{formatReading(readings[index])}</td>
                       ))}
@@ -879,6 +930,7 @@ const BalanceRoomPage = () => {
               domain={panel.domain}
               digits={panel.digits}
               month={month}
+              holidayDates={holidayDates}
               printedBy={user?.name ?? user?.email ?? ""}
               printedAt={printedAt || new Date().toISOString()}
               pageNumber={index + 1}
