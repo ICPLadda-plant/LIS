@@ -46,6 +46,14 @@ describe('GET /balance-control-config', () => {
     expect(data.find((item) => item.scaleId === 'scale-2' && item.nominal === 100)).toMatchObject({ weightCode: 'GL55-11006', mean: 99.99972, sd: 0.0000476 });
     expect(data[0].mean).toBeNull();
   });
+
+  it('returns additional saved weight sizes', async () => {
+    mockFind.mockResolvedValue([{ scaleId: 'scale-1', controls: { 250: { weightCode: 'W-250', nominal: 250 } } }]);
+    const res = mockResponse();
+    await getHandler({}, res);
+    const { data } = res.json.mock.calls[0][0];
+    expect(data.find((item) => item.scaleId === 'scale-1' && item.nominal === 250)).toMatchObject({ weightCode: 'W-250' });
+  });
 });
 
 describe('PUT /balance-control-config/:scaleId', () => {
@@ -64,6 +72,7 @@ describe('PUT /balance-control-config/:scaleId', () => {
   it.each([
     [{ baselineValues: baselineValues.slice(0, 19) }, 'กรอกค่าบันทึกให้ครบ 20 ค่า'],
     [{ baselineValues: [...baselineValues.slice(0, 19), 'abc'] }, 'กรอกค่าบันทึกให้ครบ 20 ค่า'],
+    [{ baselineValues, nominal: 0.5 }, 'น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0'],
     [{ baselineValues, updatedDate: '26/10/2569' }, 'วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD'],
   ])('rejects invalid body %j', async (body, message) => {
     const res = mockResponse();
@@ -72,11 +81,11 @@ describe('PUT /balance-control-config/:scaleId', () => {
     expect(res.json).toHaveBeenCalledWith({ error: message });
   });
 
-  it('rejects a control weight that does not belong to the scale', async () => {
+  it('accepts an additional positive integer weight size', async () => {
     const res = mockResponse();
-    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 100, baselineValues } }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'น้ำหนักตุ้มไม่ตรงกับเครื่องชั่ง' });
+    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 250, baselineValues } }, res);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(mockFindOneAndUpdate.mock.calls[0][1].$set['controls.250']).toMatchObject({ nominal: 250 });
   });
 
   it('upserts valid control values', async () => {

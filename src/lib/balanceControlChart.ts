@@ -305,7 +305,9 @@ export function validateBalanceControlInput(input: BalanceControlConfigInput): s
   if (!isFiniteNumber(mean)) return "ค่า Mean ต้องเป็นตัวเลข";
   if (!isFiniteNumber(sd)) return "ค่า STD ต้องเป็นตัวเลข";
   if (sd < 0) return "ค่า STD ต้องไม่ติดลบ";
-  if (nominal != null && (!isFiniteNumber(nominal) || nominal <= 0)) return "น้ำหนักตุ้มต้องมากกว่า 0";
+  if (nominal != null && (!isFiniteNumber(nominal) || nominal <= 0 || !Number.isInteger(nominal))) {
+    return "น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0";
+  }
   if (mpe != null && (!isFiniteNumber(mpe) || mpe < 0)) return "ค่า MPE ต้องไม่ติดลบ";
   if (updatedDate && !DATE_RE.test(updatedDate)) return "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD";
   if (!Array.isArray(baselineValues) || baselineValues.length !== 20 || !baselineValues.every(isFiniteNumber)) {

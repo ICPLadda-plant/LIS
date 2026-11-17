@@ -38,7 +38,9 @@ function validate(body) {
   if (!Array.isArray(baselineValues) || baselineValues.length !== 20 || !baselineValues.every(isNum)) {
     return 'กรอกค่าบันทึกให้ครบ 20 ค่า';
   }
-  if (nominal != null && (!isNum(nominal) || nominal <= 0)) return 'น้ำหนักตุ้มต้องมากกว่า 0';
+  if (nominal != null && (!isNum(nominal) || nominal <= 0 || !Number.isInteger(nominal))) {
+    return 'น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0';
+  }
   if (mpe != null && (!isNum(mpe) || mpe < 0)) return 'ค่า MPE ต้องไม่ติดลบ';
   if (updatedDate && (typeof updatedDate !== 'string' || !DATE_RE.test(updatedDate))) {
     return 'วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD';
@@ -61,7 +63,11 @@ router.get('/', async (req, res) => {
     const byId = new Map(docs.map((d) => [d.scaleId, d]));
     const data = SCALE_DEFAULTS.flatMap((def) => {
       const d = byId.get(def.scaleId);
-      return def.weights.map((nominal) => pick(d, def, nominal));
+      const weights = [...new Set([
+        ...def.weights,
+        ...Object.keys(d?.controls || {}).map(Number).filter((weight) => Number.isInteger(weight) && weight > 0),
+      ])];
+      return weights.map((nominal) => pick(d, def, nominal));
     });
     res.json({ data });
   } catch (err) {
@@ -82,9 +88,6 @@ router.put('/:scaleId', async (req, res) => {
 
     const def = SCALE_DEFAULTS.find((d) => d.scaleId === scaleId);
     const nominal = body.nominal ?? def.weights[0];
-    if (!def.weights.includes(nominal)) {
-      return res.status(400).json({ error: 'น้ำหนักตุ้มไม่ตรงกับเครื่องชั่ง' });
-    }
     const { mean, sd } = baselineStats(body.baselineValues);
     const control = {
       brand: str(body.brand) || def.brand,

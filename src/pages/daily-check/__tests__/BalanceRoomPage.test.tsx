@@ -168,6 +168,9 @@ describe("BalanceRoomPage", () => {
     expect(await screen.findByRole("heading", { name: /ข้อมูลตุ้มน้ำหนักที่ใช้/ })).toBeInTheDocument();
     expect(screen.getByText("รหัส: W-10")).toBeInTheDocument();
     expect(screen.getByText("รหัส: W-500")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("เพิ่มขนาดตุ้ม (g)"), { target: { value: "250" } });
+    fireEvent.click(screen.getByRole("button", { name: "เพิ่มขนาดตุ้ม" }));
+    expect(await screen.findByRole("heading", { name: /ตุ้ม 250 g/ })).toBeInTheDocument();
   });
 
   it("compares the current LD-005 10 g average with the control lines", async () => {

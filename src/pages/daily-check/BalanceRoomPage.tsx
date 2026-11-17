@@ -7,6 +7,7 @@ import {
   Camera,
   FileSpreadsheet,
   Printer,
+  Plus,
   RotateCcw,
   Scale,
   Settings2,
@@ -136,6 +137,7 @@ const BalanceRoomPage = () => {
   const [printedAt, setPrintedAt] = useState("");
   const [configWeight, setConfigWeight] = useState<number | null>(null);
   const [weightInfoOpen, setWeightInfoOpen] = useState(false);
+  const [newWeight, setNewWeight] = useState("");
   const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
   const [recordDate, setRecordDate] = useState(todayStr);
   const [exporting, setExporting] = useState(false);
@@ -226,7 +228,10 @@ const BalanceRoomPage = () => {
     { weight: scale.controlWeight, config, series, limits, domain, digits, stats, baselineStats, counts },
     { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts },
   ].sort((a, b) => a.weight - b.weight);
-  const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
+  const activeConfig = getBalanceControlConfig(controlConfigs, scale.id, configWeight ?? chartPanels[0].weight);
+  const activeDigits = displayDigits(scale.decimals, activeConfig.sd);
+  const weightConfigs = (controlConfigs?.filter((item) => item.scaleId === scale.id) ?? chartPanels.map((panel) => panel.config))
+    .sort((a, b) => a.nominal - b.nominal);
   const historyPanel = chartPanels.find((panel) => panel.weight === historyWeight) ?? chartPanels[0];
   const recordedPoints = historyPanel.series.filter((point): point is RecordedPoint => point.record != null && point.value != null);
   const duePanels = chartPanels.filter((panel) => isControlUpdateDue(panel.config.updatedDate));
@@ -873,17 +878,31 @@ const BalanceRoomPage = () => {
             <DialogDescription>รหัสตุ้มน้ำหนักสำหรับ Daily Check และ Control Chart</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            {chartPanels.map((panel) => (
-              <div key={panel.weight} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
+            {weightConfigs.map((weightConfig) => (
+              <div key={weightConfig.nominal} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
                 <div>
-                  <p className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</p>
-                  <p className="text-sm text-muted-foreground">รหัส: {panel.config.weightCode || "—"}</p>
+                  <p className="text-sm font-semibold text-foreground">ตุ้ม {weightConfig.nominal} g</p>
+                  <p className="text-sm text-muted-foreground">รหัส: {weightConfig.weightCode || "—"}</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => { setWeightInfoOpen(false); setConfigWeight(panel.weight); }}>
+                <Button variant="outline" size="sm" onClick={() => { setWeightInfoOpen(false); setConfigWeight(weightConfig.nominal); }}>
                   แก้ไขข้อมูล
                 </Button>
               </div>
             ))}
+            <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-end">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="new-balance-weight">เพิ่มขนาดตุ้ม (g)</Label>
+                <Input id="new-balance-weight" type="number" min="1" step="1" inputMode="numeric" value={newWeight} onChange={(event) => setNewWeight(event.target.value)} />
+              </div>
+              <Button
+                type="button"
+                className="gap-2"
+                disabled={!Number.isInteger(Number(newWeight)) || Number(newWeight) <= 0 || weightConfigs.some((item) => item.nominal === Number(newWeight))}
+                onClick={() => { setWeightInfoOpen(false); setConfigWeight(Number(newWeight)); setNewWeight(""); }}
+              >
+                <Plus className="h-4 w-4" /> เพิ่มขนาดตุ้ม
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -892,8 +911,8 @@ const BalanceRoomPage = () => {
         open={configWeight != null}
         onOpenChange={(open) => { if (!open) setConfigWeight(null); }}
         scale={scale}
-        config={activePanel.config}
-        digits={activePanel.digits}
+        config={activeConfig}
+        digits={activeDigits}
       />
     </div>
   );

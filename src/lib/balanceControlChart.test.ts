@@ -157,7 +157,8 @@ describe("config defaults / validation", () => {
     expect(validateBalanceControlInput({ mean: NaN, sd: 1 })).toBe("ค่า Mean ต้องเป็นตัวเลข");
     expect(validateBalanceControlInput({ mean: 100, sd: NaN })).toBe("ค่า STD ต้องเป็นตัวเลข");
     expect(validateBalanceControlInput({ mean: 100, sd: -1 })).toBe("ค่า STD ต้องไม่ติดลบ");
-    expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0 })).toBe("น้ำหนักตุ้มต้องมากกว่า 0");
+    expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0 })).toBe("น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0");
+    expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0.5 })).toBe("น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, mpe: -1 })).toBe("ค่า MPE ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, updatedDate: "26/10/2569" })).toBe(
       "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD",
