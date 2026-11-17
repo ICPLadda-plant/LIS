@@ -24,7 +24,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useArrivalFlash } from '@/hooks/useArrivalFlash';
 import { normalizeRoles } from '@/lib/roles';
 import { isAssignedTo } from '@/lib/assignment';
-import { labReceivedAt, labReceivedBy } from '@/lib/receiveStatus';
+import { labReceivedAt, labReceivedBy, labWorkReceived } from '@/lib/receiveStatus';
+import { isItemLabelPending } from '@/lib/labelReceipt';
 import { useConfirm } from '@/context/ConfirmDialog';
 import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, resolveLabLabelTolerance, isLabLabelToleranceAbnormal } from '@/lib/parameterValidation';
 import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
@@ -1145,7 +1146,7 @@ export default function LabTestingDetailPage() {
   const remarkOf = (item: PetitionItem, param: ParameterItem) =>
     savedResults.find((r) => r.itemSeq === item.seq && r.parameterId === param._id)?.remark ?? '';
   const switchablePetitions = (worklistData?.items ?? []).filter((p) =>
-    !!labReceivedAt(p) && (p.items ?? []).some(
+    labWorkReceived(p) && (p.items ?? []).some(
       (it) =>
         (isResearchAndDevelopmentPetition(p) || shouldSendItemToLab(it)) &&
         matchLabParametersForItem(p, it, allParameters, idsFor(it)).length > 0,
@@ -1268,6 +1269,8 @@ export default function LabTestingDetailPage() {
           const phaseValues = valuesForPhase(effectivePhase);
           const phaseSaves = savesForPhase(effectivePhase);
           const phaseLocked = effectivePhase === 2 && itemCurrentPhase === 1;
+          // รับทีละป้าย: ตัวอย่างที่ยังไม่สแกนรับป้าย Lab ยังกรอกผลไม่ได้
+          const labelPending = isItemLabelPending(petition, item, 'lab');
           return (
             <Card key={item.seq} className="overflow-hidden">
               <CardHeader className="bg-muted pb-3">
@@ -1291,6 +1294,9 @@ export default function LabTestingDetailPage() {
                 </CardTitle>
                 {item.testItems && (
                   <p className="text-xs text-muted-foreground mt-1">รายการทดสอบ: {item.testItems}</p>
+                )}
+                {labelPending && (
+                  <p className="text-xs text-muted-foreground mt-1">รอสแกนรับป้ายของตัวอย่างนี้ก่อน จึงจะกรอกผลได้</p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   ปริมาณที่ส่ง: {item.labelQuantities?.some((quantity) => quantity.trim())
@@ -1373,7 +1379,7 @@ export default function LabTestingDetailPage() {
                             )}
                           </div>
                           {(() => {
-                            const fieldDisabled = isLocked || viewOnly || phaseLocked || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
+                            const fieldDisabled = isLocked || viewOnly || phaseLocked || labelPending || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
 
                             // Render a single editable render-unit. `srcValues` is the
                             // value-object to read/display from; `onUnitChange` persists a

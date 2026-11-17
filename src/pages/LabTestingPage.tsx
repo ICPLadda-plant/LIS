@@ -31,7 +31,7 @@ import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
 import { DataTable, type DataTableColumn } from '@/components/lis/DataTable';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
-import { isLabWorkAccepted, labReceivedAt, labReceivedBy, labTrackStatusBadge } from '@/lib/receiveStatus';
+import { isLabWorkAccepted, labReceivedAt, labReceivedBy, labTrackStatusBadge, labWorkReceived } from '@/lib/receiveStatus';
 import { normalizeRoles } from '@/lib/roles';
 import { assigneeNamesForUser, isAssignedTo } from '@/lib/assignment';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
@@ -112,7 +112,7 @@ export default function LabTestingPage() {
 
   // หัวหน้า assign แล้ว เจ้าหน้าที่ต้องกดรับงานก่อน จึงเริ่มนับเวลาวิเคราะห์
   const needsAccept = (p: Petition) =>
-    !!labReceivedAt(p) && !!p.assignedTo && !isLabWorkAccepted(p)
+    labWorkReceived(p) && !!p.assignedTo && !isLabWorkAccepted(p)
     && (isFullAccess || isAssignedTo(p.assignedTo, user));
 
   // ผู้กดเริ่มงานเป็นคนเลือกเครื่องที่ใช้ (หัวหน้า assign แค่ผู้รับงาน)
@@ -139,7 +139,7 @@ export default function LabTestingPage() {
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
     // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
-    .filter((p) => !canReceiveAndClaim || p.assignedTo || labReceivedAt(p)));
+    .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p)));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
@@ -247,7 +247,7 @@ export default function LabTestingPage() {
           >
             {acceptingId === p._id ? 'กำลังเริ่มงาน...' : 'เริ่มงาน'}
           </Button>
-        ) : labReceivedAt(p) ? (
+        ) : labWorkReceived(p) ? (
           <Button
             size="sm"
             onClick={(e) => {
@@ -367,7 +367,7 @@ export default function LabTestingPage() {
           isLoading={loading || !parametersLoaded}
           rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
           onRowClick={(p) => {
-            if (labReceivedAt(p) && !needsAccept(p)) navigate(`/lab-testing/${p._id}`);
+            if (labWorkReceived(p) && !needsAccept(p)) navigate(`/lab-testing/${p._id}`);
           }}
           emptyTitle="ไม่มีคำร้อง Lab ที่รอตรวจ"
         />
