@@ -11,7 +11,8 @@ router.post('/', async (req, res) => {
   if (!userId) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ LIS ก่อนใช้ AI' });
   let input;
   try { input = validateInput(req.body); } catch (error) { return res.status(400).json({ error: error.message }); }
-  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'AI ยังไม่ได้ตั้งค่าใน server' });
+  const configured = input.image ? Boolean(process.env.OCR_API_KEY && process.env.OCR_MODEL) : Boolean(process.env.OPENAI_API_KEY);
+  if (!configured) return res.status(503).json({ error: 'AI ยังไม่ได้ตั้งค่าใน server' });
   const now = Date.now();
   for (const [key, value] of windows) if (now - value.start >= 60000) windows.delete(key);
   const window = windows.get(userId) || { start: now, count: 0 };

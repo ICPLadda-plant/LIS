@@ -53,6 +53,7 @@ const QCApprovalReviewPage = lazy(() => import("./pages/QCApprovalReviewPage"));
 const LabApproval = lazy(() => import("./pages/LabApproval"));
 const LabApprovalReviewPage = lazy(() => import("./pages/LabApprovalReviewPage"));
 const AdminData = lazy(() => import("./pages/AdminData"));
+const DocumentsPage = lazy(() => import("./pages/DocumentsPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const NotificationsPage = lazy(() => import("./pages/NotificationsPage"));
 const ParameterSettings = lazy(() => import("./pages/ParameterSettings"));
@@ -177,6 +178,7 @@ const App = () => (
               <Route path="/simple-method" element={<PrivateRoute><SimpleMethodPage /></PrivateRoute>} />
               <Route path="/machines" element={<PrivateRoute><MachinesPage /></PrivateRoute>} />
               <Route path="/admin-data" element={<PrivateRoute><AdminData /></PrivateRoute>} />
+              <Route path="/documents" element={<PrivateRoute><DocumentsPage /></PrivateRoute>} />
               <Route path="/access-control" element={<PrivateRoute><AccessControl /></PrivateRoute>} />
               <Route path="/profile/signature" element={<PrivateRoute><SignatureCapturePage /></PrivateRoute>} />
               <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />

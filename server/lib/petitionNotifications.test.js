@@ -40,15 +40,13 @@ function recipients(petition, entry) {
 }
 const sorted = (list) => [...list].sort();
 
-test('คำขอใหม่: ทุก role ตระกูล QC และ Lab ได้รับ แต่ viewer/role อื่น/admin ไม่ได้', () => {
-  assert.deepStrictEqual(recipients(basePetition, log({ event: 'created' })), sorted([...QC_ALL, ...LAB_ALL]));
-  const qcOnly = { ...basePetition, routeTargets: ['qc'] };
-  assert.deepStrictEqual(recipients(qcOnly, log({ event: 'created' })), sorted(QC_ALL));
+test('คำขอใหม่ยังไม่แจ้งใคร — รอแจ้งตอนสแกนรับตัวอย่าง', () => {
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'created' })), []);
 });
 
 test('แผนกไม่มีผลแล้ว: viewer ที่อยู่แผนก QC ไม่ได้รับงานของฝั่ง QC', () => {
   const viewerInQcDept = { roles: ['viewer'], employeeId: 'V1', department: 'QC ควบคุมคุณภาพ' };
-  assert.strictEqual(notificationForViewer(basePetition, log({ event: 'created' }), viewerInQcDept), null);
+  assert.strictEqual(notificationForViewer(basePetition, log({ event: 'received', metadata: { side: 'qc' } }), viewerInQcDept), null);
 });
 
 test('ส่งตัวอย่างแล้ว: QC มีเสียง ส่วน Lab ได้รับเฉพาะงานที่ส่ง Lab หรืองาน Lab อย่างเดียว', () => {
@@ -64,7 +62,7 @@ test('ส่งตัวอย่างแล้ว: QC มีเสียง �
 test('QC รับตัวอย่าง: QC ทุกคน + ผู้ยื่น; รับบางป้ายยังไม่แจ้ง', () => {
   assert.deepStrictEqual(recipients(basePetition, log({ event: 'received', metadata: { side: 'qc' } })), sorted([...QC_ALL, 'submitter']));
   assert.deepStrictEqual(recipients(basePetition, log({ event: 'received', metadata: { side: 'qc', partial: true } })), []);
-  assert.deepStrictEqual(recipients(basePetition, log({ event: 'received', metadata: { side: 'lab' } })), ['submitter']);
+  assert.deepStrictEqual(recipients(basePetition, log({ event: 'received', metadata: { side: 'lab' } })), sorted([...LAB_ALL, 'submitter']));
 });
 
 test('เริ่มบันทึกผลฝั่ง QC: QC ทุกคน, id คงที่ต่อคำขอ; ผลฝั่ง Lab ไม่แจ้ง', () => {

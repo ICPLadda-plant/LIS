@@ -1,3 +1,5 @@
+const { getOcrConfig } = require('./openaiClient');
+
 const OUTPUT_SCHEMA = {
   type: 'object', additionalProperties: false,
   properties: {
@@ -24,13 +26,16 @@ function validateOutput(value) {
 }
 
 async function runValidationAi(input) {
-  const key = process.env.OPENAI_API_KEY;
+  // Requests with an image (PDF page OCR) go through the OCR gateway; text-only review stays on OpenAI.
+  const ocr = input.image ? getOcrConfig() : null;
+  const key = ocr ? ocr.apiKey : process.env.OPENAI_API_KEY;
   if (!key) throw new Error('AI ยังไม่ได้ตั้งค่าใน server');
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  if (ocr && !ocr.model) throw new Error('AI ยังไม่ได้ตั้งค่าใน server');
+  const response = await fetch(ocr ? `${ocr.baseUrl}/chat/completions` : 'https://api.openai.com/v1/chat/completions', {
     method: 'POST', signal: AbortSignal.timeout(60000),
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      model: process.env.OPENAI_VALIDATION_MODEL || process.env.OPENAI_VISION_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      model: ocr ? ocr.model : (process.env.OPENAI_VALIDATION_MODEL || process.env.OPENAI_MODEL || 'gpt-4o-mini'),
       store: false, max_completion_tokens: 6000,
       response_format: { type: 'json_schema', json_schema: { name: 'validation_assistance', strict: true, schema: OUTPUT_SCHEMA } },
       messages: [
