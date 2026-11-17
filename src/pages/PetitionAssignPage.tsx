@@ -27,7 +27,7 @@ import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { api } from '@/lib/api';
 import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
-import { isLabRecheckPending, labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
+import { isLabRecheckPending, isLabWorkAccepted, labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
 
 const createdTime = (p: Petition) => Date.parse(p.createdAt) || 0;
 
@@ -238,6 +238,8 @@ export default function PetitionAssignPage() {
     return [...byId.values()].filter(
       (petition) =>
         isVisibleInAssignQueue(petition)
+        // เจ้าหน้าที่กดเริ่มงาน/บันทึกผลแล้ว ไม่ต้องอยู่บนบอร์ด assign (ยกเว้น re-check ที่ต้องเปลี่ยนผู้รับงานได้)
+        && (isLabRecheckPending(petition) || !isLabWorkAccepted(petition))
         // งานรอมอบหมาย: แสดงเฉพาะใบที่วันที่ส่ง <= วันนี้ (ใบที่มอบหมายแล้วยังอยู่ในคอลัมน์ผู้รับงาน)
         && (Boolean(petition.assignedTo) || isSendDateReached(petition, today))
         && hasAssignableLabParameter(petition, labParameters, groupMembership),
