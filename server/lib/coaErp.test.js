@@ -274,7 +274,7 @@ test('legacy Lab averages P1 and P2 but excludes after-drying results', () => {
   const result = resultRowsFromLegacyLabs(match.matchingRows, commonName);
 
   assert.equal(match.matchingRows.length, 2);
-  assert.equal(result.ai.result, '25.39 % W/W / 51.07 % W/W');
+  assert.equal(result.ai.result, '25.39 % W/W + 51.07 % W/W');
 });
 
 test('legacy Lab fallback fills placeholder values without replacing live results', () => {

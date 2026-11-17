@@ -933,7 +933,7 @@ function resultRowsFromLegacyLabs(rows, commonName) {
   const result = groups
     .map((entries) => averagedLegacyResult(entries.map((entry) => entry.value)))
     .filter(Boolean)
-    .join(' / ');
+    .join(' + ');
   const criteria = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.criteria))?.test?.criteria));
   const method = joinGroups((entries) => text(entries.find((entry) => text(entry.test?.method))?.test?.method));
   const valueCount = groups.reduce((sum, entries) => sum + entries.length, 0);
