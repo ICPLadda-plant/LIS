@@ -270,9 +270,9 @@ export function chartDomain(
   return [min - pad, max + pad];
 }
 
-/** ค่า Control แสดงอย่างน้อย 4 ตำแหน่งเพื่อให้เห็นความต่างของ ±2SD/±3SD */
+/** แสดงตามความละเอียดของเครื่อง (LD-005 = 2 ตำแหน่ง) */
 export function controlDigits(scaleDecimals: number): number {
-  return Math.max(scaleDecimals, 4);
+  return scaleDecimals;
 }
 
 export function displayDigits(scaleDecimals: number, _sd: number | null | undefined): number {

@@ -45,6 +45,7 @@ import {
   controlUpdateDueDate,
   displayDigits,
   formatControlNumber,
+  formatSd,
   limitDecimalPlaces,
   formatThaiMonth,
   getBalanceControlConfig,
@@ -729,7 +730,7 @@ const BalanceRoomPage = () => {
                 <dl className="grid grid-cols-3 gap-x-4 gap-y-2 border-y py-2 sm:grid-cols-6">
                   {[
                     ["Mean", formatControlNumber(panel.limits?.mean, panel.digits)],
-                    ["STD", formatControlNumber(panel.limits?.sd ?? panel.config.sd, panel.digits)],
+                    ["STD", formatSd(panel.limits?.sd ?? panel.config.sd)],
                     ["UWL", formatControlNumber(panel.limits?.uwl, panel.digits)],
                     ["LWL", formatControlNumber(panel.limits?.lwl, panel.digits)],
                     ["UCL", formatControlNumber(panel.limits?.ucl, panel.digits)],

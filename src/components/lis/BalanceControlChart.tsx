@@ -123,19 +123,26 @@ export default function BalanceControlChart({
   className,
 }: BalanceControlChartProps) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
-  const round = (value: number) => Number(value.toFixed(digits));
   const data: ChartDatum[] = series.map((point) => ({
     day: point.day,
     date: point.date,
-    value: point.value == null ? null : round(point.value),
+    value: point.value,
     rawValue: point.value,
   }));
   const tickFont = fixed ? 18 : 11;
-  const yTicks = Array.from(new Set([
-    round(domain[0]),
-    ...(limits ? [limits.lcl, limits.lwl, limits.mean, limits.uwl, limits.ucl].map(round) : []),
-    round(domain[1]),
-  ])).sort((a, b) => a - b);
+  // จุดและเส้นวางตามค่าจริง ปัดเฉพาะตอนแสดงผล — กันทศนิยมน้อย ๆ ทำให้ ±2SD/±3SD ทับกัน
+  const tickValues = [
+    domain[0],
+    ...(limits ? [limits.lcl, limits.lwl, limits.mean, limits.uwl, limits.ucl] : []),
+    domain[1],
+  ].sort((a, b) => a - b);
+  const seenTickLabels = new Set<string>();
+  const yTicks = tickValues.filter((value) => {
+    const label = value.toFixed(digits);
+    if (seenTickLabels.has(label)) return false;
+    seenTickLabels.add(label);
+    return true;
+  });
 
   const renderDot = (props: DotRenderProps): ReactElement => {
     const key = props.key ?? `dot-${props.index ?? 0}`;
@@ -191,11 +198,11 @@ export default function BalanceControlChart({
 
   if (limits) {
     elements.push(
-      referenceLine("ucl", round(limits.ucl), palette.controlLine, "UCL", "2 4"),
-      referenceLine("uwl", round(limits.uwl), palette.warningLine, "UWL", "6 4"),
-      referenceLine("mean", round(limits.mean), palette.mean, "Mean"),
-      referenceLine("lwl", round(limits.lwl), palette.warningLine, "LWL", "6 4"),
-      referenceLine("lcl", round(limits.lcl), palette.controlLine, "LCL", "2 4"),
+      referenceLine("ucl", limits.ucl, palette.controlLine, "UCL", "2 4"),
+      referenceLine("uwl", limits.uwl, palette.warningLine, "UWL", "6 4"),
+      referenceLine("mean", limits.mean, palette.mean, "Mean"),
+      referenceLine("lwl", limits.lwl, palette.warningLine, "LWL", "6 4"),
+      referenceLine("lcl", limits.lcl, palette.controlLine, "LCL", "2 4"),
     );
   }
 
