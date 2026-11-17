@@ -38,8 +38,8 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
-.bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 365px; padding: 6px 4px 4px; }
-.bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 15pt; }
+.bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 445px; padding: 6px 4px 4px; }
+.bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 17pt; }
 .bcr .bcr-empty { border: 1px dashed #000; display: flex; min-height: 330px; align-items: center; justify-content: center; text-align: center; font-size: 12pt; }
 .bcr .bcr-sign { display: flex; justify-content: space-around; gap: 24px; margin-top: 10px; font-size: 10pt; }
 .bcr .bcr-sign span { display: inline-block; border-bottom: 1px solid #000; min-width: 220px; }
@@ -184,7 +184,7 @@ export default function BalanceControlReport({
             <BalanceControlChart
               fixed
               width={724}
-              height={350}
+              height={430}
               series={series}
               limits={limits}
               domain={domain}

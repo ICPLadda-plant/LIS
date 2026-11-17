@@ -130,7 +130,7 @@ export default function BalanceControlChart({
     value: point.value == null ? null : round(point.value),
     rawValue: point.value,
   }));
-  const tickFont = fixed ? 15 : 11;
+  const tickFont = fixed ? 18 : 11;
   const yTicks = Array.from(new Set([
     round(domain[0]),
     ...(limits ? [limits.lcl, limits.lwl, limits.mean, limits.uwl, limits.ucl].map(round) : []),
