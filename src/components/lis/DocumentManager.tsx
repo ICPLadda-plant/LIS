@@ -355,6 +355,13 @@ function MetaPanel({ doc, onChange, roles }: { doc: Doc; onChange: (patch: Parti
 
 type SystemDocRow = (typeof SYSTEM_DOCS)[number];
 const sysRoleText = (r: string[]) => (r.length ? r.join(", ") : "-");
+// รหัสผูกแม่แบบ: ฟอร์มที่ไม่มีรหัส ("-") ใช้ชื่อเอกสารแทน กันชนกัน
+const sysKey = (d: SystemDocRow) => (d.code && d.code !== "-" ? d.code : d.name);
+const escHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+// โครงเริ่มต้นสำหรับฟอร์มที่ยังดึงหน้าตาจากระบบไม่ได้ — แก้ต่อใน editor ได้ทั้งหมด
+const skeletonHtml = (d: SystemDocRow) =>
+  '<table style="width:100%;border-collapse:collapse" border="1"><tr><td style="padding:6px"><b>' + escHtml(d.name) + "</b></td>" +
+  '<td style="padding:6px;width:35%">รหัส: ' + escHtml(d.code) + "<br>Rev: " + escHtml(d.rev) + "</td></tr></table><p><br></p><p>เนื้อหาฟอร์ม</p>";
 
 // busy = รายการแม่แบบยังโหลดไม่เสร็จ/กำลังสร้าง — กันกดแล้วสร้างแม่แบบซ้ำทั้งที่มีอยู่แล้ว
 function SystemDocsTable({ onEditTemplate, busy }: { onEditTemplate: (d: SystemDocRow) => void; busy: boolean }) {
@@ -394,9 +401,7 @@ function SystemDocsTable({ onEditTemplate, busy }: { onEditTemplate: (d: SystemD
                     <Link to={d.page} className="inline-flex items-center gap-1 text-primary hover:underline">{d.pageLabel}<ExternalLink className="w-3 h-3" /></Link>
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {SYSTEM_FORM_CAPTURE[d.code] && (
-                      <Button size="sm" variant="outline" className="whitespace-nowrap" disabled={busy} onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
-                    )}
+                    <Button size="sm" variant="outline" className="whitespace-nowrap" disabled={busy} onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
                   </td>
                 </tr>
               ))}
@@ -474,14 +479,17 @@ export default function DocumentManager() {
 
   // แก้ฟอร์มระบบ: เปิดแม่แบบที่มีอยู่ หรือสร้างใหม่จากแม่แบบเริ่มต้น
   const editTemplate = async (sd: SystemDocRow) => {
-    const existing = docs.find((d) => d.templateFor === sd.code);
+    const key = sysKey(sd);
+    const existing = docs.find((d) => d.templateFor === key);
     if (existing) return open(existing);
     let html: string;
-    try { html = await captureSystemForm(sd.code); }
-    catch (e) { return toast.error("เปิดฟอร์มระบบไม่สำเร็จ: " + errMsg(e)); }
+    if (SYSTEM_FORM_CAPTURE[key]) {
+      try { html = await captureSystemForm(key); }
+      catch (e) { return toast.error("เปิดฟอร์มระบบไม่สำเร็จ: " + errMsg(e)); }
+    } else html = skeletonHtml(sd);
     const d = withMeta({
       id: "", title: "แม่แบบ " + sd.name, source: "สร้างเอง", updatedAt: new Date().toISOString(), canEdit: true,
-      code: sd.code, rev: sd.rev, paper: sd.paper, stage: sd.stage, printWhen: sd.status, templateFor: sd.code,
+      code: sd.code, rev: sd.rev, paper: sd.paper, stage: sd.stage, printWhen: sd.status, templateFor: key,
     });
     if (await persist(d, html)) toast.success('สร้างแม่แบบแล้ว ตั้งสถานะเป็น "ใช้งาน" เมื่อพร้อมให้ระบบพิมพ์ด้วยแม่แบบนี้');
   };
@@ -603,7 +611,7 @@ export default function DocumentManager() {
           </div>
         </div>
         {!fillMode && <MetaPanel doc={current} onChange={patch} roles={roles} />}
-        {current.templateFor && !fillMode && (
+        {current.templateFor && SYSTEM_FORM_CAPTURE[current.templateFor] && !fillMode && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 text-sm print:hidden">
             {isSlotTemplate(current.html || "") ? (
               <p className="flex-1 text-muted-foreground">
