@@ -58,6 +58,7 @@ const DEFAULT_COA_REQUESTS_WEBHOOK_URL = 'https://n8n-plant.icpladda.com/webhook
 const COA_REQUESTS_WEBHOOK_URL = process.env.COA_REQUESTS_WEBHOOK_URL || DEFAULT_COA_REQUESTS_WEBHOOK_URL;
 const COA_REQUESTS_WEBHOOK_TIMEOUT_MS = Number(process.env.COA_REQUESTS_WEBHOOK_TIMEOUT_MS || 8000);
 const EXTERNAL_COA_STATUS = 'requested';
+let externalCoaDocumentsCache = null;
 // ponytail: ERP COA webhook has no label production date; remove this correction when ERP exposes that field.
 const EXTERNAL_LABEL_PRODUCTION_DATES = new Map([
   ['SO26110076:10000', '2026-11-16'],
@@ -656,24 +657,33 @@ async function enrichExternalCoaDocumentsWithDensity(documents) {
 }
 
 async function fetchExternalCoaDocuments() {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), COA_REQUESTS_WEBHOOK_TIMEOUT_MS);
-  try {
-    const response = await fetch(new URL(COA_REQUESTS_WEBHOOK_URL), {
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const payload = JSON.parse(text);
-    if (!response.ok) {
-      const error = new Error('COA requests webhook request failed');
-      error.status = response.status;
-      throw error;
+  let lastError;
+  const attempts = externalCoaDocumentsCache !== null ? 1 : 2;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), COA_REQUESTS_WEBHOOK_TIMEOUT_MS);
+    try {
+      const response = await fetch(new URL(COA_REQUESTS_WEBHOOK_URL), {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      });
+      const text = await response.text();
+      const payload = JSON.parse(text);
+      if (!response.ok) {
+        const error = new Error('COA requests webhook request failed');
+        error.status = response.status;
+        throw error;
+      }
+      externalCoaDocumentsCache = externalCoaRowsToDocuments(payload);
+      return externalCoaDocumentsCache;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
     }
-    return externalCoaRowsToDocuments(payload);
-  } finally {
-    clearTimeout(timeout);
   }
+  if (externalCoaDocumentsCache !== null) return externalCoaDocumentsCache;
+  throw lastError;
 }
 
 function shouldFetchExternalCoaRequests(query = {}) {
@@ -1788,3 +1798,5 @@ module.exports.attachDensityToExternalCoaDocuments = attachDensityToExternalCoaD
 module.exports.enrichExternalCoaDocumentsWithHistory = enrichExternalCoaDocumentsWithHistory;
 module.exports.requestedCoaRowsFromPetition = requestedCoaRowsFromPetition;
 module.exports.sortCoaRows = sortCoaRows;
+module.exports.fetchExternalCoaDocuments = fetchExternalCoaDocuments;
+module.exports.clearExternalCoaDocumentsCache = () => { externalCoaDocumentsCache = null; };

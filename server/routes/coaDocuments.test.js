@@ -918,6 +918,24 @@ test('GET / merges external COA requests with stored and Lab-approved requested 
   }
 });
 
+test('ERP request lookup keeps the latest successful rows when the webhook briefly fails', async () => {
+  const originalFetch = global.fetch;
+  const erpRow = { SaleOrderNo: 'SO-CACHED', Line: 10000, CustomerName: 'ERP Customer', remark: 'COA' };
+  try {
+    router.clearExternalCoaDocumentsCache();
+    global.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify([erpRow]) });
+    const fresh = await router.fetchExternalCoaDocuments();
+    global.fetch = async () => { throw new Error('temporary ERP failure'); };
+    const cached = await router.fetchExternalCoaDocuments();
+
+    assert.equal(fresh[0]._id, 'external-coa-request-SO-CACHED-10000');
+    assert.deepEqual(cached, fresh);
+  } finally {
+    router.clearExternalCoaDocumentsCache();
+    global.fetch = originalFetch;
+  }
+});
+
 test('approve route rejects actors who are neither QC Head nor the document creator', async () => {
   const originalFindById = CoaDocument.findById;
   const restore = stubActorLookup({
