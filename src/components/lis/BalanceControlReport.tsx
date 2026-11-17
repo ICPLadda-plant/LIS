@@ -40,7 +40,6 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
 .bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 365px; padding: 6px 4px 4px; }
 .bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 15pt; }
-.bcr .bcr-chart-limits { display: flex; justify-content: space-around; margin-top: 2px; font-size: 12pt; }
 .bcr .bcr-empty { border: 1px dashed #000; display: flex; min-height: 330px; align-items: center; justify-content: center; text-align: center; font-size: 12pt; }
 .bcr .bcr-sign { display: flex; justify-content: space-around; gap: 24px; margin-top: 10px; font-size: 10pt; }
 .bcr .bcr-sign span { display: inline-block; border-bottom: 1px solid #000; min-width: 220px; }
@@ -196,11 +195,6 @@ export default function BalanceControlReport({
           <div className="bcr-empty">ยังไม่ได้ตั้งค่า Control (Mean/STD) จึงยังไม่มีกราฟ</div>
         )}
       </div>
-      <div className="bcr-chart-limits">
-        <span>Control Limited (CL) : Tolerance = ± {config.mpe || "________"}</span>
-        <span>Warning Limited (WL) : 80% of Tolerance = ± {config.mpe ? formatControlNumber(config.mpe * 0.8, digits) : "________"}</span>
-      </div>
-
       <div className="bcr-sign">
         <div>
           ผู้ตรวจสอบ : <span>&nbsp;</span>
