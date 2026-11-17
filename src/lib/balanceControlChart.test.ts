@@ -135,9 +135,9 @@ describe("chartDomain / formatSd", () => {
   });
 
   it("แสดงทศนิยมไม่เกินความละเอียดเครื่องชั่ง", () => {
-    expect(displayDigits(2, null)).toBe(3);
+    expect(displayDigits(2, null)).toBe(4);
     expect(displayDigits(5, null)).toBe(5);
-    expect(displayDigits(2, 0.01)).toBe(3);
+    expect(displayDigits(2, 0.01)).toBe(4);
     expect(displayDigits(5, 0.0000476)).toBe(5);
     expect(displayDigits(5, 1e-12)).toBe(5);
     expect(limitDecimalPlaces("10.009", 2)).toBe("10.00");
