@@ -1228,7 +1228,8 @@ export default function LabTestingDetailPage() {
           const itemCurrentPhase = (round ?? petition).currentPhase ?? 1;
           const effectivePhase = effectivePhaseForItem(item);
           const labOwnedParams = matchedParams.filter((p) => p.scope === 'lab');
-          const sharedQcParams = matchedParams.filter((p) => p.scope === 'qc' && p.shareWithLab);
+          // ค่า ถพ. ใช้คำนวณ %AI จึงต้องให้ Lab เห็นเสมอ แม้ไม่ได้ตั้งค่าแชร์ให้ Lab
+          const sharedQcParams = matchedParams.filter((p) => p.scope === 'qc' && (p.shareWithLab || hasSpecificGravityParam([p])));
           const phaseValues = valuesForPhase(effectivePhase);
           const phaseSaves = savesForPhase(effectivePhase);
           const phaseLocked = effectivePhase === 2 && itemCurrentPhase === 1;
