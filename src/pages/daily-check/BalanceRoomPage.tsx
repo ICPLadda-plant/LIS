@@ -40,6 +40,7 @@ import {
   controlBaselineValues,
   countByStatus,
   currentMonthStr,
+  controlUpdateDueDate,
   displayDigits,
   formatControlNumber,
   limitDecimalPlaces,
@@ -104,6 +105,11 @@ const isPositiveWeight = (value: string) => value.trim() !== "" && Number.isFini
 const signed = (value: number, digits: number) => {
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
   return `${sign}${Math.abs(value).toFixed(digits)}`;
+};
+
+const controlDueMonth = (updatedDate: string) => {
+  const dueDate = controlUpdateDueDate(updatedDate);
+  return dueDate ? formatThaiMonth(dueDate.toISOString().slice(0, 7)) : "—";
 };
 
 const BalanceRoomPage = () => {
@@ -369,6 +375,10 @@ const BalanceRoomPage = () => {
   const compareStatus = classifyPoint(compareValue, limits);
 
   const fmt = (value: number | null | undefined) => formatControlNumber(value, scale.decimals);
+  const formatReading = (value: string | number | null | undefined) => {
+    const numeric = Number(value);
+    return value == null || value === "" || !Number.isFinite(numeric) ? "—" : formatControlNumber(numeric, scale.decimals);
+  };
 
   const infoItems = [
     { label: "รหัสเครื่องมือ", value: scale.code },
@@ -665,6 +675,9 @@ const BalanceRoomPage = () => {
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</h3>
                     <p className="text-xs text-muted-foreground">ค่าเฉลี่ยรายวันและเส้น Control ของเกณฑ์นี้</p>
+                    <p className="text-xs text-muted-foreground">
+                      อัปเดตล่าสุด: {panel.config.updatedDate ? fmtDate(panel.config.updatedDate) : "—"} · ครบกำหนด: {controlDueMonth(panel.config.updatedDate)}
+                    </p>
                   </div>
                   {panel.limits ? (
                     <div className="flex flex-wrap justify-end gap-1">
@@ -755,7 +768,10 @@ const BalanceRoomPage = () => {
             <thead className="bg-muted text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 text-left font-medium">วันที่</th>
-                <th className="px-3 py-2 text-right font-medium">ค่าที่ได้ (g)</th>
+                <th className="px-3 py-2 text-right font-medium">ครั้งที่ 1</th>
+                <th className="px-3 py-2 text-right font-medium">ครั้งที่ 2</th>
+                <th className="px-3 py-2 text-right font-medium">ครั้งที่ 3</th>
+                <th className="px-3 py-2 text-right font-medium">ค่าเฉลี่ย (g)</th>
                 <th className="px-3 py-2 text-right font-medium">ส่วนต่างจาก Mean</th>
                 <th className="px-3 py-2 text-left font-medium">สถานะ Control</th>
                 <th className="px-3 py-2 text-left font-medium">ผล Calibrate</th>
@@ -766,7 +782,7 @@ const BalanceRoomPage = () => {
             <tbody className="divide-y">
               {recordedPoints.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                  <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
                     {monthLoading ? "กำลังโหลดข้อมูล..." : "ยังไม่มีการบันทึกของเครื่องนี้ในเดือนที่เลือก"}
                   </td>
                 </tr>
@@ -776,9 +792,13 @@ const BalanceRoomPage = () => {
                   const calibrateStatus = historyPanel.weight === 10
                     ? point.record.status10 ?? point.record.status
                     : point.record.status100 ?? point.record.status;
+                  const readings = historyPanel.weight === 10 ? point.record.weights10 : point.record.weights100;
                   return (
                     <tr key={point.date} className="hover:bg-accent">
                       <td className="px-3 py-2">{fmtDate(point.date)}</td>
+                      {[0, 1, 2].map(index => (
+                        <td key={index} className="px-3 py-2 text-right tabular-nums">{formatReading(readings[index])}</td>
+                      ))}
                       <td className="px-3 py-2 text-right tabular-nums">{formatControlNumber(point.value, scale.decimals)}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
                         {historyPanel.limits ? signed(point.value - historyPanel.limits.mean, historyPanel.digits) : "—"}

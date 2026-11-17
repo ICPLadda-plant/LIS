@@ -220,7 +220,7 @@ describe("BalanceRoomPage", () => {
     expect(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 10 g" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" }));
     expect(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("cell", { name: "500.00" })).toBeInTheDocument();
+    expect(screen.getAllByRole("cell", { name: "500.00" })).toHaveLength(4);
   });
 
   it("loads the selected scale records for the current month", async () => {
@@ -251,6 +251,7 @@ describe("BalanceRoomPage", () => {
     ]);
     renderPage();
     expect(await screen.findByText(/ครบ 3 เดือนแล้ว/)).toBeInTheDocument();
+    expect(screen.getAllByText("อัปเดตล่าสุด: 17/08/2026 · ครบกำหนด: พฤศจิกายน 2569")).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: /แก้ไขค่า Control/ })).toHaveLength(2);
   });
 });
