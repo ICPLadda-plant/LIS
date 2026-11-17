@@ -16,6 +16,7 @@ import {
   FILL_FIELDS, fillFieldHtml, hasFillFields,
 } from "@/lib/formTemplate";
 import { SYSTEM_FORM_CAPTURE, captureSystemForm, systemFormCatalog } from "@/lib/systemFormCapture";
+import { captureOtherForm, hasOtherFormCapture } from "@/lib/otherFormCapture";
 import { isSlotTemplate, lockSlots, refitBoxes, slotHtml, type SlotInfo } from "@/lib/systemFormSlots";
 import FillFormView from "@/components/lis/FillFormView";
 import { Link } from "react-router-dom";
@@ -486,7 +487,10 @@ export default function DocumentManager() {
     if (SYSTEM_FORM_CAPTURE[key]) {
       try { html = await captureSystemForm(key); }
       catch (e) { return toast.error("เปิดฟอร์มระบบไม่สำเร็จ: " + errMsg(e)); }
-    } else html = skeletonHtml(sd);
+    } else {
+      try { html = await captureOtherForm(key); }
+      catch { html = skeletonHtml(sd); }
+    }
     const d = withMeta({
       id: "", title: "แม่แบบ " + sd.name, source: "สร้างเอง", updatedAt: new Date().toISOString(), canEdit: true,
       code: sd.code, rev: sd.rev, paper: sd.paper, stage: sd.stage, printWhen: sd.status, templateFor: key,
@@ -499,7 +503,7 @@ export default function DocumentManager() {
     if (!current?.templateFor) return;
     if (!confirm("แทนเนื้อหาด้วยฟอร์มปัจจุบันของระบบ? สิ่งที่แก้ไว้ในแม่แบบนี้จะหายไป")) return;
     try {
-      const html = await captureSystemForm(current.templateFor);
+      const html = SYSTEM_FORM_CAPTURE[current.templateFor] ? await captureSystemForm(current.templateFor) : await captureOtherForm(current.templateFor);
       if (await persist(current, html)) toast.success("ดึงฟอร์มจากระบบแล้ว");
     } catch (e) { toast.error("ดึงฟอร์มจากระบบไม่สำเร็จ: " + errMsg(e)); }
   };
@@ -509,6 +513,14 @@ export default function DocumentManager() {
       const res = await api.get<Envelope<Doc>>("/documents/" + d.id);
       const doc = withMeta(body(res));
       setFillMode(false);
+      // แม่แบบโครงเปล่ารุ่นก่อน → เปลี่ยนเป็นหน้าตาฟอร์มจริงของระบบให้อัตโนมัติ
+      if (doc.templateFor && hasOtherFormCapture(doc.templateFor) && doc.canEdit && (doc.html || "").includes("<p>เนื้อหาฟอร์ม</p>")) {
+        try {
+          const html = await captureOtherForm(doc.templateFor);
+          if (await persist(doc, html)) toast.success("อัปเดตแม่แบบเป็นหน้าตาฟอร์มจริงของระบบแล้ว");
+          return;
+        } catch (e) { toast.error("ดึงฟอร์มจากระบบไม่สำเร็จ: " + errMsg(e)); }
+      }
       // แม่แบบรุ่นแรก (โครงเปล่า ไม่ผูกช่อง) ระบบไม่ใช้ตอนพิมพ์ — เปลี่ยนเป็นหน้าตาฟอร์มจริงให้อัตโนมัติ
       if (doc.templateFor && SYSTEM_FORM_CAPTURE[doc.templateFor] && doc.canEdit && !isSlotTemplate(doc.html || "")) {
         try {
@@ -622,6 +634,12 @@ export default function DocumentManager() {
             ) : (
               <p className="flex-1 text-destructive">แม่แบบนี้สร้างจากแบบเก่า ยังไม่ผูกข้อมูลกับฟอร์มระบบ ระบบจะไม่ใช้ตอนพิมพ์ กดปุ่มด้านขวาเพื่อดึงฟอร์มจริงมาแก้</p>
             )}
+            {current.canEdit && <Button size="sm" variant="outline" onClick={resetFromSystem}>ดึงฟอร์มจากระบบใหม่</Button>}
+          </div>
+        )}
+        {current.templateFor && !SYSTEM_FORM_CAPTURE[current.templateFor] && hasOtherFormCapture(current.templateFor) && !fillMode && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-3 text-sm print:hidden">
+            <p className="flex-1 text-muted-foreground">แม่แบบนี้เริ่มจากหน้าตาฟอร์ม {current.templateFor} ของระบบ แก้และบันทึกได้ทั้งหมด</p>
             {current.canEdit && <Button size="sm" variant="outline" onClick={resetFromSystem}>ดึงฟอร์มจากระบบใหม่</Button>}
           </div>
         )}
