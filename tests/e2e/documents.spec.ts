@@ -154,7 +154,9 @@ test('แก้ฟอร์มใบคำขอรับบริการจ�
   await page.setViewportSize({ width: 1500, height: 1000 });
   await page.goto(BASE + '/documents');
   await expect(page.getByText(/เอกสารในระบบ/)).toBeVisible({ timeout: 20000 });
-  await page.getByRole('row').filter({ hasText: 'FM-QP-07-04-001' }).getByRole('button', { name: 'แก้ฟอร์มนี้' }).click();
+  const editBtn = page.getByRole('row').filter({ hasText: 'FM-QP-07-04-001' }).getByRole('button', { name: 'แก้ฟอร์มนี้' });
+  await expect(editBtn).toBeEnabled(); // รอรายการแม่แบบโหลดเสร็จ
+  await editBtn.click();
   await expect(page.getByText(/สร้างแม่แบบแล้ว/).first()).toBeVisible({ timeout: 15000 });
 
   // ได้หน้าตาฟอร์มจริง (ไม่ใช่โครงเปล่า): หัวตารางเดิม + ช่องข้อมูลผูกไว้
@@ -239,4 +241,106 @@ test('ผู้ใช้ที่ไม่มีสิทธิ์: ไม่เ
   await expect(page.getByRole('toolbar')).toHaveCount(0);
   await expect(page.getByLabel('เนื้อหาเอกสาร')).toHaveAttribute('contenteditable', 'false');
   expect(errors).toEqual([]);
+});
+
+test('แม่แบบรุ่นเก่า (โครงเปล่า) เปิดแล้วเปลี่ยนเป็นหน้าตาฟอร์มจริงให้อัตโนมัติ', async ({ page, request }) => {
+  const errors = trackErrors(page);
+  const title = STAMP + ' แม่แบบรุ่นเก่า';
+  const legacy = await request.post(API + '/documents', { headers: DEV, data: {
+    title, templateFor: 'FM-QP-07-01-001', status: 'ร่าง',
+    html: '<h1>ใบคำร้องขอรับบริการ แผ่นที่ 1</h1><p>เลขที่: <span class="fv" data-fv="petitionNo">{{เลขที่คำร้อง}}</span></p>',
+  } });
+  expect(legacy.status()).toBe(201);
+  // ซ่อนแม่แบบ FM-QP-07-01-001 ของผู้ใช้จริงจากรายการ (เฉพาะในเบราว์เซอร์ทดสอบ) ให้ปุ่มเปิดตัวของเทสต์
+  await page.route(/\/api\/documents$/, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const res = await route.fetch();
+    const json = (await res.json()) as { data: Array<{ templateFor?: string; title: string }> };
+    json.data = json.data.filter((d) => d.templateFor !== 'FM-QP-07-01-001' || d.title === title);
+    return route.fulfill({ response: res, json });
+  });
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await page.goto(BASE + '/documents');
+  await expect(page.getByText(/เอกสารในระบบ/)).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('row').filter({ hasText: title })).toBeVisible(); // รายการโหลดเสร็จ
+  await page.getByRole('row').filter({ hasText: 'FM-QP-07-01-001' }).getByRole('button', { name: 'แก้ฟอร์มนี้' }).click();
+  await expect(page.getByText('อัปเดตแม่แบบเป็นหน้าตาฟอร์มจริงของระบบแล้ว').first()).toBeVisible({ timeout: 15000 });
+  const editor = page.getByLabel('เนื้อหาเอกสาร');
+  await expect(editor.locator('.pr-page1')).toHaveCount(1);
+  await expect(editor).toContainText('การทบทวนข้อตกลงการบริการทดสอบ');
+  await expect(editor).not.toContainText('{{เลขที่คำร้อง}}');
+  expect(await editor.locator('[data-slot^="c"]').count()).toBeGreaterThan(10);
+  await expect(page.getByLabel('ชื่อเอกสาร')).toHaveValue(title); // ข้อมูลเอกสารเดิมยังอยู่
+  // บันทึกลง server แล้ว: เปิดผ่าน API ต้องเป็นแบบผูกช่อง
+  const id = ((await legacy.json()) as { data: { id: string } }).data.id;
+  const saved = (await (await request.get(API + '/documents/' + id, { headers: DEV })).json()) as { data: { html: string } };
+  expect(saved.data.html).toContain('data-slot=');
+  expect(errors).toEqual([]);
+});
+
+test('แก้แม่แบบฟอร์มระบบ: หน้าไม่ถูกตัด เห็นฟอนต์/ขนาดของข้อความที่คลุม และลบช่องได้', async ({ page, request }) => {
+  const errors = trackErrors(page);
+  // ซ่อนแม่แบบ FM-QP-07-01-001 ของผู้ใช้ (เฉพาะในเบราว์เซอร์ทดสอบ) ให้ "แก้ฟอร์มนี้" สร้างแม่แบบของเทสต์
+  await page.route(/\/api\/documents$/, async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const res = await route.fetch();
+    const json = (await res.json()) as { data: Array<{ templateFor?: string }> };
+    json.data = json.data.filter((d) => d.templateFor !== 'FM-QP-07-01-001');
+    return route.fulfill({ response: res, json });
+  });
+  let createdId = '';
+  try {
+    await page.setViewportSize({ width: 1280, height: 900 }); // จอแคบกว่าหน้ากระดาษ+เมนู
+    await page.goto(BASE + '/documents');
+    const editBtn = page.getByRole('row').filter({ hasText: 'FM-QP-07-01-001' }).getByRole('button', { name: 'แก้ฟอร์มนี้' });
+    await expect(editBtn).toBeEnabled({ timeout: 20000 });
+    const created = page.waitForResponse((r) => r.url().endsWith('/api/documents') && r.request().method() === 'POST');
+    await editBtn.click();
+    createdId = ((await (await created).json()) as { data: { id: string } }).data.id;
+    const editor = page.getByLabel('เนื้อหาเอกสาร');
+    await expect(editor.locator('.pr-page1')).toHaveCount(1);
+
+    // 1) ฟอร์มย่อพอดีหน้า (ท่อนล่างไม่ถูกตัด) และหน้าไม่ล้นซ้าย
+    // ขอบล่างของบล็อกสุดท้ายในฟอร์ม (ลายเซ็น/footer) ต้องอยู่ในกรอบหน้ากระดาษที่ overflow:hidden
+    await expect.poll(() => editor.locator('[data-fit-box]').first().evaluate((box) => {
+      const content = box.firstElementChild as HTMLElement;
+      const last = content.lastElementChild as HTMLElement;
+      return last.getBoundingClientRect().bottom <= box.getBoundingClientRect().bottom + 1;
+    })).toBe(true);
+    const pageBox = await editor.boundingBox();
+    const areaBox = await editor.locator('xpath=../..').boundingBox();
+    expect(pageBox!.x).toBeGreaterThanOrEqual(areaBox!.x);
+
+    // 2) คลุมหัวเรื่อง → Ribbon แสดงฟอนต์/ขนาดของข้อความนั้น
+    const title = editor.locator('.pr-p1-title b');
+    await title.click({ clickCount: 3 });
+    const font = page.getByLabel('ฟอนต์', { exact: true });
+    const size = page.getByLabel('ขนาด', { exact: true });
+    await expect(font).toHaveValue('Angsana New');
+    const expectedPt = await title.evaluate((el) => String(Math.round(parseFloat(getComputedStyle(el).fontSize) * 0.75 * 2) / 2));
+    await expect(size).toHaveValue(expectedPt);
+    await size.selectOption('20');
+    await expect.poll(() => editor.locator('span[style*="20pt"]').filter({ hasText: 'การทบทวนข้อตกลง' }).count()).toBeGreaterThan(0);
+
+    // 3) ลบช่องผูกข้อมูล: ปุ่ม "ลบช่องนี้" และปุ่ม Delete
+    const slots = editor.locator('[data-slot^="e"]');
+    const before = await slots.count();
+    await slots.first().click();
+    await page.getByRole('button', { name: 'ลบช่องนี้' }).click();
+    await expect(slots).toHaveCount(before - 1);
+    await slots.first().click();
+    await expect(page.getByRole('button', { name: 'ลบช่องนี้' })).toBeVisible();
+    await page.keyboard.press('Delete');
+    await expect(slots).toHaveCount(before - 2);
+
+    await page.getByLabel('ชื่อเอกสาร').fill(STAMP + ' ลบช่อง');
+    await page.getByRole('button', { name: 'บันทึก', exact: true }).click();
+    await expect(page.getByText('บันทึกแล้ว').first()).toBeVisible();
+    const saved = (await (await request.get(API + '/documents/' + createdId, { headers: DEV })).json()) as { data: { html: string } };
+    expect((saved.data.html.match(/data-slot="e\d+"/g) ?? []).length).toBe(before - 2);
+    expect(saved.data.html).toContain('20pt');
+    expect(errors).toEqual([]);
+  } finally {
+    if (createdId) await request.delete(API + '/documents/' + createdId, { headers: DEV });
+  }
 });

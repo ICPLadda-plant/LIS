@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
-import { fillSystemPage } from '@/lib/systemFormSlots';
+import { fillSystemPage, refitBoxes } from '@/lib/systemFormSlots';
 import FitToBox from '@/components/petition/FitToBox';
 import { ICP_LADDA_LOGO_URL } from '@/lib/branding';
 import { customerCodeForPetition } from '@/lib/customerCode';
@@ -659,6 +659,7 @@ function SlotFilledPages({ html, source }: { html: string; source: string }) {
     if (!host || !root) return;
     const sources = Array.from(root.querySelectorAll<HTMLElement>(`[data-tpl-src="${source}"] > section`));
     host.innerHTML = sources.map((src) => fillSystemPage(html, src)).join('');
+    refitBoxes(host);
   });
   return <div ref={ref} className="pr-template-pages" data-template-for={source} />;
 }

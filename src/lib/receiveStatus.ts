@@ -64,8 +64,11 @@ function waitingReceiveBadge(p: ReceiveFields, side: 'qc' | 'lab'): StatusBadge 
  * ฝั่ง Lab จะเห็น "QC กำลังตรวจ" ผิด — ต้องรับตัวอย่างก่อน assign
  */
 /** เจ้าหน้าที่รับงานที่หัวหน้า assign แล้ว (งานเก่าที่เริ่มบันทึกผลไปแล้วถือว่ารับแล้ว) */
-export function isLabWorkAccepted(p: Pick<Petition, 'assignedTo' | 'firstResultAt' | 'labCompletedAt'>): boolean {
-  return !!(p.assignedTo?.acceptedAt || p.firstResultAt || p.labCompletedAt);
+export function isLabWorkAccepted(
+  p: Pick<Petition, 'assignedTo' | 'firstResultAt' | 'labCompletedAt'> & Partial<Pick<Petition, 'reviewHistory'>>,
+): boolean {
+  return !!(p.assignedTo?.acceptedAt || p.firstResultAt || p.labCompletedAt)
+    || (p.reviewHistory ?? []).some((r) => r.action === 'startTesting');
 }
 
 // mirror ของ buildLabTrack ใน server/lib/petitionStatusLog.js

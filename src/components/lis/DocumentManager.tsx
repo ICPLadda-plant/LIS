@@ -16,7 +16,7 @@ import {
   FILL_FIELDS, fillFieldHtml, hasFillFields,
 } from "@/lib/formTemplate";
 import { SYSTEM_FORM_CAPTURE, captureSystemForm } from "@/lib/systemFormCapture";
-import { isSlotTemplate } from "@/lib/systemFormSlots";
+import { isSlotTemplate, lockSlots, refitBoxes } from "@/lib/systemFormSlots";
 import FillFormView from "@/components/lis/FillFormView";
 import { Link } from "react-router-dom";
 import { Label } from "@/components/ui/label";
@@ -60,7 +60,41 @@ const body = <T,>(res: { data: { data: Envelope<T> } }): T => res.data.data?.dat
 const asArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 
 const FONTS = ["TH Sarabun New", "Angsana New", "Cordia New", "Tahoma", "Arial", "Times New Roman"];
-const SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
+const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32];
+
+// ตำแหน่งที่ผู้ใช้คลุมไว้ล่าสุดใน editor — กดเลือกฟอนต์/ขนาดจาก <select> แล้ว selection มักหลุด จึงคืนค่าก่อนสั่งจัดรูปแบบ
+let savedRange: Range | null = null;
+const editableRoot = (n: Node | null | undefined) =>
+  (n instanceof Element ? n : n?.parentElement)?.closest<HTMLElement>('.doc-page[contenteditable="true"]') ?? null;
+const restoreSelection = () => {
+  if (!savedRange) return;
+  editableRoot(savedRange.startContainer)?.focus({ preventScroll: true });
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(savedRange);
+};
+const ptOf = (px: string) => String(Math.round(parseFloat(px) * 0.75 * 2) / 2); // px → pt (ปัด .5)
+const firstFont = (family: string) => family.split(",")[0].replace(/["']/g, "").trim();
+
+/** ฟอนต์/ขนาดของข้อความที่คลุมอยู่ — แสดงใน Ribbon เหมือน Word */
+function useSelectionFont() {
+  const [cur, setCur] = useState({ font: "", size: "" });
+  useEffect(() => {
+    const onChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || !editableRoot(sel.anchorNode)) return;
+      savedRange = sel.getRangeAt(0).cloneRange();
+      const n = sel.anchorNode;
+      const el = n instanceof Element ? n : n?.parentElement;
+      if (!el) return;
+      const cs = getComputedStyle(el);
+      setCur({ font: firstFont(cs.fontFamily), size: ptOf(cs.fontSize) });
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => document.removeEventListener("selectionchange", onChange);
+  }, []);
+  return [cur, setCur] as const;
+}
 // ponytail: execCommand เป็น API เก่าแต่ทุกเบราว์เซอร์ยังรองรับ; เปลี่ยนเป็น editor library เมื่อต้องการ track changes
 const exec = (cmd: string, val?: string) => { document.execCommand("styleWithCSS", false, "true"); document.execCommand(cmd, false, val); };
 
@@ -137,6 +171,9 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 const selectCls = "h-8 rounded-md border bg-background px-2 text-sm";
 
 function Ribbon() {
+  const [cur, setCur] = useSelectionFont();
+  const fonts = cur.font && !FONTS.includes(cur.font) ? [cur.font, ...FONTS] : FONTS;
+  const sizes = cur.size && !SIZES.map(String).includes(cur.size) ? [...SIZES.map(String), cur.size].sort((a, b) => +a - +b) : SIZES.map(String);
   return (
     <Tabs defaultValue="home" className="rounded-lg border bg-card">
       <TabsList className="m-1">
@@ -150,13 +187,17 @@ function Ribbon() {
           <Tool label="ทำซ้ำ" icon={Redo2} onClick={() => exec("redo")} />
         </Group>
         <Group label="แบบอักษร">
-          <select aria-label="ฟอนต์" className={selectCls} defaultValue="" onChange={(e) => { exec("fontName", e.target.value); e.target.value = ""; }}>
+          <select aria-label="ฟอนต์" className={selectCls + " w-40"} value={cur.font} onChange={(e) => {
+            const v = e.target.value; restoreSelection(); exec("fontName", v); setCur((c) => ({ ...c, font: v }));
+          }}>
             <option value="" disabled>ฟอนต์</option>
-            {FONTS.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
+            {fonts.map((f) => <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>)}
           </select>
-          <select aria-label="ขนาด" className={selectCls} defaultValue="" onChange={(e) => { setSize(+e.target.value); e.target.value = ""; }}>
+          <select aria-label="ขนาด" className={selectCls + " w-20"} value={cur.size} onChange={(e) => {
+            const v = e.target.value; restoreSelection(); setSize(+v); setCur((c) => ({ ...c, size: v }));
+          }}>
             <option value="" disabled>ขนาด</option>
-            {SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {sizes.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
           <Tool label="ตัวหนา" icon={Bold} onClick={() => exec("bold")} />
           <Tool label="ตัวเอียง" icon={Italic} onClick={() => exec("italic")} />
@@ -282,7 +323,8 @@ function MetaPanel({ doc, onChange, roles }: { doc: Doc; onChange: (patch: Parti
 type SystemDocRow = (typeof SYSTEM_DOCS)[number];
 const sysRoleText = (r: string[]) => (r.length ? r.join(", ") : "-");
 
-function SystemDocsTable({ onEditTemplate }: { onEditTemplate: (d: SystemDocRow) => void }) {
+// busy = รายการแม่แบบยังโหลดไม่เสร็จ/กำลังสร้าง — กันกดแล้วสร้างแม่แบบซ้ำทั้งที่มีอยู่แล้ว
+function SystemDocsTable({ onEditTemplate, busy }: { onEditTemplate: (d: SystemDocRow) => void; busy: boolean }) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -320,7 +362,7 @@ function SystemDocsTable({ onEditTemplate }: { onEditTemplate: (d: SystemDocRow)
                   </td>
                   <td className="px-3 py-2 text-right">
                     {SYSTEM_FORM_CAPTURE[d.code] && (
-                      <Button size="sm" variant="outline" className="whitespace-nowrap" onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
+                      <Button size="sm" variant="outline" className="whitespace-nowrap" disabled={busy} onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
                     )}
                   </td>
                 </tr>
@@ -341,6 +383,7 @@ export default function DocumentManager() {
   const [current, setCurrent] = useState<Doc | null>(null);
   const [saving, setSaving] = useState(false);
   const [fillMode, setFillMode] = useState(false);
+  const [selSlot, setSelSlot] = useState<HTMLElement | null>(null);
   const editor = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -414,7 +457,17 @@ export default function DocumentManager() {
   const open = async (d: Doc) => {
     try {
       const res = await api.get<Envelope<Doc>>("/documents/" + d.id);
-      setCurrent(withMeta(body(res))); setFillMode(false);
+      const doc = withMeta(body(res));
+      setFillMode(false);
+      // แม่แบบรุ่นแรก (โครงเปล่า ไม่ผูกช่อง) ระบบไม่ใช้ตอนพิมพ์ — เปลี่ยนเป็นหน้าตาฟอร์มจริงให้อัตโนมัติ
+      if (doc.templateFor && SYSTEM_FORM_CAPTURE[doc.templateFor] && doc.canEdit && !isSlotTemplate(doc.html || "")) {
+        try {
+          const html = await captureSystemForm(doc.templateFor);
+          if (await persist(doc, html)) toast.success("อัปเดตแม่แบบเป็นหน้าตาฟอร์มจริงของระบบแล้ว");
+          return;
+        } catch (e) { toast.error("ดึงฟอร์มจากระบบไม่สำเร็จ: " + errMsg(e)); }
+      }
+      setCurrent(doc);
     } catch (e) { toast.error("เปิดเอกสารไม่สำเร็จ: " + errMsg(e)); }
   };
 
@@ -436,6 +489,29 @@ export default function DocumentManager() {
 
   const html = () => editor.current?.innerHTML ?? current?.html ?? "";
 
+  // หลังเนื้อหาเข้า DOM: ช่องผูกข้อมูลเป็นก้อนเดียว + ย่อฟอร์มระบบให้พอดีหน้า (ไม่งั้นท่อนล่างถูกตัด)
+  const currentKey = current ? (current.id || "new") + ":" + fillMode + ":" + (current.html?.length ?? 0) : "";
+  useEffect(() => {
+    const el = editor.current;
+    if (!el) return;
+    lockSlots(el);
+    refitBoxes(el);
+    setSelSlot(null);
+  }, [currentKey]);
+
+  const selectSlot = (target: EventTarget | null) => {
+    const slot = (target instanceof Element ? target : null)?.closest<HTMLElement>("[data-slot], [data-ff]") ?? null;
+    editor.current?.querySelectorAll(".slot-selected").forEach((x) => x.classList.remove("slot-selected"));
+    if (slot && editor.current?.contains(slot)) slot.classList.add("slot-selected");
+    setSelSlot(slot && editor.current?.contains(slot) ? slot : null);
+  };
+  const deleteSlot = () => {
+    if (!selSlot) return;
+    selSlot.remove();
+    setSelSlot(null);
+    if (editor.current) refitBoxes(editor.current);
+  };
+
   const exportDocx = async () => {
     if (!current) return;
     const mm = PAPER_MM[current.paper];
@@ -456,7 +532,8 @@ export default function DocumentManager() {
   if (current) {
     const mm = PAPER_MM[current.paper];
     // ฟอร์มระบบมีขอบกระดาษของตัวเองใน section แล้ว
-    const pad = isSlotTemplate(current.html || "") ? 0 : mm.pad;
+    const sysForm = isSlotTemplate(current.html || "");
+    const pad = sysForm ? 0 : mm.pad;
     const pageStyle = { "--page-w": mm.w + "mm", "--page-h": mm.h + "mm", "--page-pad": pad + "mm" } as React.CSSProperties;
     return (
       <div className="space-y-3 doc-editor-shell">
@@ -489,7 +566,7 @@ export default function DocumentManager() {
             {isSlotTemplate(current.html || "") ? (
               <p className="flex-1 text-muted-foreground">
                 แม่แบบนี้ใช้แทนฟอร์ม {current.templateFor} เมื่อสถานะเป็น "ใช้งาน" ช่องที่ไฮไลต์คือข้อมูลที่ระบบเติมจากคำร้องจริงตอนพิมพ์
-                แก้ข้อความ ตาราง หรือย้ายช่องได้ แต่อย่าลบช่องที่ไฮไลต์ ถ้าไม่อยากให้ข้อมูลนั้นหาย
+                แก้ข้อความ ตาราง ฟอนต์ได้ ถ้าไม่ต้องการช่องไหน คลิกช่องนั้นแล้วกด Delete หรือปุ่ม "ลบช่องนี้"
               </p>
             ) : (
               <p className="flex-1 text-destructive">แม่แบบนี้สร้างจากแบบเก่า ยังไม่ผูกข้อมูลกับฟอร์มระบบ ระบบจะไม่ใช้ตอนพิมพ์ กดปุ่มด้านขวาเพื่อดึงฟอร์มจริงมาแก้</p>
@@ -497,12 +574,31 @@ export default function DocumentManager() {
             {current.canEdit && <Button size="sm" variant="outline" onClick={resetFromSystem}>ดึงฟอร์มจากระบบใหม่</Button>}
           </div>
         )}
-        {current.canEdit && !fillMode && <div className="sticky top-0 z-10 print:hidden"><Ribbon /></div>}
+        {current.canEdit && !fillMode && (
+          <div className="sticky top-0 z-10 space-y-2 print:hidden">
+            <Ribbon />
+            {selSlot && (
+              <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm shadow-sm">
+                <span className="text-muted-foreground">
+                  เลือก{selSlot.dataset.ff ? "ช่องกรอก " + (selSlot.dataset.ffLabel ?? "") : selSlot.dataset.slot?.startsWith("c") ? "กล่องติ๊กที่ผูกข้อมูล" : "ช่องข้อมูลจากระบบ"} อยู่
+                </span>
+                <Button size="sm" variant="destructive" className="gap-1" onClick={deleteSlot}><Trash2 className="w-4 h-4" />ลบช่องนี้</Button>
+              </div>
+            )}
+          </div>
+        )}
         {/* พื้นที่หน้ากระดาษ: ใช้ขนาดกระดาษจริง (mm) เป็นข้อยกเว้นจาก design.md เพราะต้องเหมือนเอกสารพิมพ์ */}
-        <div className="overflow-x-auto rounded-lg bg-muted py-6 print:bg-transparent print:p-0">
-          {fillMode ? <FillFormView html={current.html} style={pageStyle} /> : <div ref={editor} key={current.id || "new"} style={pageStyle} contentEditable={!!current.canEdit} suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
-            className="doc-page mx-auto bg-white text-black shadow-md focus:outline-none print:shadow-none"
-            dangerouslySetInnerHTML={{ __html: current.html || "<p><br></p>" }} />}
+        {/* w-max + mx-auto: หน้าอยู่กลางเมื่อจอกว้าง และเลื่อนดูได้ครบเมื่อจอแคบ (ไม่ถูกตัดซ้าย/ขวา) */}
+        <div className="overflow-x-auto rounded-lg bg-muted p-6 print:bg-transparent print:p-0">
+          <div className="mx-auto w-max">
+            {fillMode ? <FillFormView html={current.html} style={pageStyle} /> : <div ref={editor} key={current.id || "new"} style={pageStyle} contentEditable={!!current.canEdit} suppressContentEditableWarning aria-label="เนื้อหาเอกสาร"
+              className={"doc-page bg-white text-black shadow-md focus:outline-none print:shadow-none" + (sysForm ? " doc-page-sys" : "")}
+              onClick={(e) => current.canEdit && selectSlot(e.target)}
+              onKeyDown={(e) => {
+                if (selSlot && (e.key === "Delete" || e.key === "Backspace")) { e.preventDefault(); deleteSlot(); }
+              }}
+              dangerouslySetInnerHTML={{ __html: current.html || "<p><br></p>" }} />}
+          </div>
         </div>
       </div>
     );
@@ -510,7 +606,7 @@ export default function DocumentManager() {
 
   return (
     <div className="space-y-4">
-      <SystemDocsTable onEditTemplate={editTemplate} />
+      <SystemDocsTable onEditTemplate={editTemplate} busy={loading || !!loadError || saving} />
       <Card>
         <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>

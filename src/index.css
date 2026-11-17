@@ -315,6 +315,10 @@
 .doc-page hr:not(.pr-root *) { border-top: 1px solid #000; margin: 0.5em 0; }
 /* ช่องข้อมูลที่ผูกกับฟอร์มระบบ (ระบบเติมตอนพิมพ์) */
 .doc-page .fv-slot { background: hsl(var(--primary) / 0.12); outline: 1px dashed hsl(var(--primary) / 0.6); }
+.doc-page [data-slot], .doc-page [data-ff] { cursor: pointer; }
+.doc-page .slot-selected { outline: 2px solid hsl(var(--primary)) !important; outline-offset: 1px; }
+/* แม่แบบจากฟอร์มระบบ: section ของฟอร์มกำหนดขนาดกระดาษเอง — กรอบ editor ห่อพอดี ไม่บังคับกว้าง/สูง/เส้นแบ่งหน้า */
+.doc-page.doc-page-sys { width: max-content; min-height: 0; padding: 0; background-image: none; }
 @media print { .doc-page .fv-slot { background: none; outline: none; } }
 .doc-page .page-break { border-top: 1px dashed hsl(var(--border)); margin: 1em 0; }
 /* ช่องกรอก / ตัวแปรระบบ ตอนแก้แม่แบบ */

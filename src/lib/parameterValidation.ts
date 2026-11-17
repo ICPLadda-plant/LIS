@@ -804,3 +804,28 @@ export function isLabelToleranceAbnormal(
   const s = resolveLabelTolerance(std, rawSpec, value).status;
   return s === "review" || s === "fail";
 }
+
+// หน้า Lab ตัดสินด้วยเกณฑ์กรม (headRange) เท่านั้น — ไม่ใช้ช่วงผ่านเองชั้นใน (เช่น 25%)
+export function resolveLabLabelTolerance(
+  std: LabelToleranceRule | undefined,
+  rawSpec: string,
+  value: unknown,
+): LabelToleranceResolved {
+  const r = resolveLabelTolerance(std, rawSpec, value);
+  if (!r.headRange) return r;
+  const num = typeof value === "number" ? value : Number(value);
+  if (value === null || value === undefined || value === "" || Number.isNaN(num)) {
+    return { ...r, status: "none" };
+  }
+  const inDept = num >= r.headRange[0] && num <= r.headRange[1];
+  return { ...r, status: inDept ? "pass" : "fail" };
+}
+
+export function isLabLabelToleranceAbnormal(
+  std: LabelToleranceRule | undefined,
+  rawSpec: string,
+  value: unknown,
+): boolean {
+  const s = resolveLabLabelTolerance(std, rawSpec, value).status;
+  return s === "review" || s === "fail";
+}
