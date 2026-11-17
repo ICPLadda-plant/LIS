@@ -12,9 +12,8 @@ test('water formulation detection mirrors the frontend', () => {
   assert.equal(isWaterFormulationItem({ commonName: 'X', formulation: 'w/v' }), true);
 });
 
-test('Lab waits for the ถพ. confirmation of water samples', () => {
-  assert.equal(isLabAwaitingSgConfirmation(petition()), true);
-  assert.equal(isLabAwaitingSgConfirmation(petition({ items: [{ ...waterItem, sgConfirmedAt: new Date() }] })), false);
+test('Lab does not wait for the ถพ. confirmation of water samples', () => {
+  assert.equal(isLabAwaitingSgConfirmation(petition()), false);
   assert.equal(isLabAwaitingSgConfirmation(petition({ items: [{ ...waterItem, sendToLab: false }] })), false);
   assert.equal(isLabAwaitingSgConfirmation(petition({ labReceivedAt: new Date() })), false);
   assert.equal(isLabAwaitingSgConfirmation(petition({ submittedBy: { department: 'R&D' } })), false);

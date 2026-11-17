@@ -41,7 +41,7 @@ test('ยืนยันค่า ถพ. ไม่ได้ถ้ายัง�
   assert.equal(doc.saved, 0);
 });
 
-test('QC ยืนยันค่า ถพ. แล้วบันทึกต่อ item และปล่อยงานไป Lab พร้อม audit', async (context) => {
+test('QC ยืนยันค่า ถพ. แล้วบันทึกต่อ item พร้อม audit (งานไป Lab อยู่แล้ว)', async (context) => {
   const { doc, audits } = mockSgConfirm(context, { entry: { 'ค่าถพ.': 1.052, 'อุณหภูมิ': 30 } });
   const res = await call('/sg-confirm', 'post', { petitionId, itemSeq: 1 });
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
@@ -52,7 +52,7 @@ test('QC ยืนยันค่า ถพ. แล้วบันทึกต�
   assert.equal(doc.items[0].sgConfirmedTemperature, '30');
   assert.equal(audits.length, 1);
   assert.equal(audits[0].metadata.kind, 'sgConfirmed');
-  assert.equal(audits[0].metadata.releasedToLab, true);
+  assert.equal(audits[0].metadata.releasedToLab, false);
 });
 
 test('ผู้ใช้ที่ไม่ใช่ QC ยืนยันค่า ถพ. ไม่ได้', async (context) => {

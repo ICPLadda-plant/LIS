@@ -66,7 +66,11 @@ function labTrackStarted(petition) {
   return Boolean(petition.labReceivedAt || legacyReceived || petition.labCompletedAt || petition.labApprovedAt || petition.assignedTo?.employeeId || petition.assignedTo?.name);
 }
 
+// ปิดการรอยืนยันค่า ถพ. — คำร้องที่ส่ง Lab ไป Lab ทันที (mirror ของ src/lib/sgConfirmation.ts)
+const LAB_WAITS_FOR_SG_CONFIRMATION = false;
+
 function isLabAwaitingSgConfirmation(petition) {
+  if (!LAB_WAITS_FOR_SG_CONFIRMATION) return false;
   if (!petition || !Array.isArray(petition.items)) return false;
   if (isResearchAndDevelopmentDepartment(petition.submittedBy?.department) || !requiresQcTrack(petition)) return false;
   if (labTrackStarted(petition)) return false;
