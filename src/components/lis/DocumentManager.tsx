@@ -282,7 +282,8 @@ function MetaPanel({ doc, onChange, roles }: { doc: Doc; onChange: (patch: Parti
 type SystemDocRow = (typeof SYSTEM_DOCS)[number];
 const sysRoleText = (r: string[]) => (r.length ? r.join(", ") : "-");
 
-function SystemDocsTable({ onEditTemplate }: { onEditTemplate: (d: SystemDocRow) => void }) {
+// busy = รายการแม่แบบยังโหลดไม่เสร็จ/กำลังสร้าง — กันกดแล้วสร้างแม่แบบซ้ำทั้งที่มีอยู่แล้ว
+function SystemDocsTable({ onEditTemplate, busy }: { onEditTemplate: (d: SystemDocRow) => void; busy: boolean }) {
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -320,7 +321,7 @@ function SystemDocsTable({ onEditTemplate }: { onEditTemplate: (d: SystemDocRow)
                   </td>
                   <td className="px-3 py-2 text-right">
                     {SYSTEM_FORM_CAPTURE[d.code] && (
-                      <Button size="sm" variant="outline" className="whitespace-nowrap" onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
+                      <Button size="sm" variant="outline" className="whitespace-nowrap" disabled={busy} onClick={() => onEditTemplate(d)}>แก้ฟอร์มนี้</Button>
                     )}
                   </td>
                 </tr>
@@ -414,7 +415,17 @@ export default function DocumentManager() {
   const open = async (d: Doc) => {
     try {
       const res = await api.get<Envelope<Doc>>("/documents/" + d.id);
-      setCurrent(withMeta(body(res))); setFillMode(false);
+      const doc = withMeta(body(res));
+      setFillMode(false);
+      // แม่แบบรุ่นแรก (โครงเปล่า ไม่ผูกช่อง) ระบบไม่ใช้ตอนพิมพ์ — เปลี่ยนเป็นหน้าตาฟอร์มจริงให้อัตโนมัติ
+      if (doc.templateFor && SYSTEM_FORM_CAPTURE[doc.templateFor] && doc.canEdit && !isSlotTemplate(doc.html || "")) {
+        try {
+          const html = await captureSystemForm(doc.templateFor);
+          if (await persist(doc, html)) toast.success("อัปเดตแม่แบบเป็นหน้าตาฟอร์มจริงของระบบแล้ว");
+          return;
+        } catch (e) { toast.error("ดึงฟอร์มจากระบบไม่สำเร็จ: " + errMsg(e)); }
+      }
+      setCurrent(doc);
     } catch (e) { toast.error("เปิดเอกสารไม่สำเร็จ: " + errMsg(e)); }
   };
 
@@ -510,7 +521,7 @@ export default function DocumentManager() {
 
   return (
     <div className="space-y-4">
-      <SystemDocsTable onEditTemplate={editTemplate} />
+      <SystemDocsTable onEditTemplate={editTemplate} busy={loading || !!loadError || saving} />
       <Card>
         <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
