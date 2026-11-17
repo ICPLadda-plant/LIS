@@ -42,7 +42,7 @@ import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFiel
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
-import { isResearchAndDevelopmentPetition, mergeQcLabDuplicateItems, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isResearchAndDevelopmentPetition, mergeQcLabDuplicateItems, shouldSendItemToLab, shouldSendItemToQc } from '@/lib/petitionRouting';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import {
   type Petition,
@@ -129,7 +129,7 @@ function matchLabParametersForItem(
   params: ParameterItem[],
   itemGroupIds: string[] = [],
 ): ParameterItem[] {
-  return matchParametersForItem(
+  const matched = matchParametersForItem(
     item,
     labParametersForPetition(petition, params),
     itemGroupIds,
@@ -138,6 +138,41 @@ function matchLabParametersForItem(
       petitionCategory: getPetitionCategory(petition),
     },
   );
+  // รายการที่ส่ง Lab อย่างเดียว → ยืมพารามิเตอร์ ถพ. จากรายการส่ง QC ที่เป็นตัวอย่าง/batch เดียวกัน
+  const sibling = densitySourceItem(petition, item);
+  if (!sibling || isResearchAndDevelopmentPetition(petition)) return matched;
+  const extra = matchParametersForItem(sibling, params, itemGroupIds, { petitionCategory: getPetitionCategory(petition) })
+    .filter((p) => hasSpecificGravityParam([p]) && !matched.some((m) => m._id === p._id));
+  return [...matched, ...extra];
+}
+
+function sameSampleKey(item: PetitionItem) {
+  const batch = (item.batchNo ?? '').trim().toLowerCase();
+  return batch ? batch + '|' + (item.commonName ?? item.sampleName ?? '').trim().toLowerCase() : '';
+}
+
+// QC กรอกค่า ถพ. ไว้ที่รายการส่ง QC ส่วนรายการที่ส่ง Lab อย่างเดียวไม่มีผล QC ของตัวเอง
+function densitySourceItem(petition: Petition, item: PetitionItem): PetitionItem | undefined {
+  if (shouldSendItemToQc(item)) return undefined;
+  const key = sameSampleKey(item);
+  if (!key) return undefined;
+  return (petition.items ?? []).find((other) => other.seq !== item.seq && shouldSendItemToQc(other) && sameSampleKey(other) === key);
+}
+
+function withSiblingDensityResults(petition: Petition | null | undefined, results: QCTestResult[], params: ParameterItem[]): QCTestResult[] {
+  if (!petition) return results;
+  const sgIds = new Set(params.filter((p) => hasSpecificGravityParam([p])).map((p) => String(p._id)));
+  const extra: QCTestResult[] = [];
+  (petition.items ?? []).forEach((item) => {
+    const sibling = densitySourceItem(petition, item);
+    if (!sibling) return;
+    results.forEach((row) => {
+      if (row.itemSeq !== sibling.seq || !sgIds.has(String(row.parameterId))) return;
+      if (results.some((r) => r.itemSeq === item.seq && String(r.parameterId) === String(row.parameterId))) return;
+      extra.push({ ...row, itemSeq: item.seq });
+    });
+  });
+  return [...results, ...extra];
 }
 
 const noteLabelFor = (mainLabel: string) => `${mainLabel}__note`;
@@ -536,7 +571,7 @@ export default function LabTestingDetailPage() {
     const load = ++resultLoad.current;
     return api.getQCResults(petitionId).then((allResults) => {
       if (load !== resultLoad.current) return;
-      const results = currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters);
+      const results = withSiblingDensityResults(petition, currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters), allParameters);
       setSavedResults(results);
       const v: Record<string, Record<string, unknown>> = {};
       const v2: Record<string, Record<string, unknown>> = {};
@@ -567,7 +602,7 @@ export default function LabTestingDetailPage() {
       setSaveStatesPhase2(s2);
       setLoadedResultsKey(resultsKey);
     }).catch(() => {});
-  }, [roundRequests, allParameters, resultsKey]);
+  }, [roundRequests, allParameters, resultsKey, petition]);
 
   useEffect(() => {
     if (!id || !allParameters.length) return;
