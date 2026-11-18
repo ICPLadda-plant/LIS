@@ -85,6 +85,7 @@ export interface StockTransactionItem {
   unit?: string;
   volumeUnit?: string;
   sampleId?: string;
+  petitionNo?: string | null;
   note?: string;
   deductionResolution?: DeductionResolution;
   photoUrls?: string[];

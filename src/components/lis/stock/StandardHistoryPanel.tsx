@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ function HistoryTable({ txs }: { txs: StockTransactionItem[] }) {
           <tr>
             <th className="px-3 py-2 text-left font-medium">วันที่</th>
             <th className="px-3 py-2 text-left font-medium">รายการ</th>
+            <th className="px-3 py-2 text-left font-medium">ใบนำส่ง</th>
             <th className="px-3 py-2 text-right font-medium">จำนวน</th>
             <th className="px-3 py-2 text-left font-medium">ผู้ทำ / หมายเหตุ</th>
           </tr>
@@ -51,6 +53,11 @@ function HistoryTable({ txs }: { txs: StockTransactionItem[] }) {
             <tr key={tx._id} className="border-t border-border align-top">
               <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(tx.createdAt)}</td>
               <td className="px-3 py-2"><Badge variant="outline">{ACTION_LABEL[tx.action] || tx.action}</Badge></td>
+              <td className="px-3 py-2 whitespace-nowrap">
+                {tx.petitionNo ? (
+                  <Link to={`/petition/${encodeURIComponent(tx.petitionNo)}`} className="text-primary underline-offset-2 hover:underline">{tx.petitionNo}</Link>
+                ) : "-"}
+              </td>
               <td className="px-3 py-2 text-right whitespace-nowrap">{qtyText(tx)}</td>
               <td className="px-3 py-2">
                 <div>{tx.userName || tx.userEmail || "-"}</div>
@@ -106,7 +113,9 @@ function BottleCard({ unit, txs, open, onOpenChange }: {
                 <div className="text-sm font-medium">ใบนำส่งที่ใช้ขวดนี้</div>
                 <div className="flex flex-wrap gap-1">
                   {petitions.map((p) => (
-                    <Badge key={p.petitionNo} variant={p.source === "withdraw" ? "default" : "secondary"}>{p.petitionNo}</Badge>
+                    <Link key={p.petitionNo} to={`/petition/${encodeURIComponent(p.petitionId || p.petitionNo)}`} title="เปิดดูคำขอ">
+                      <Badge variant={p.source === "withdraw" ? "default" : "secondary"} className="cursor-pointer hover:opacity-80">{p.petitionNo}</Badge>
+                    </Link>
                   ))}
                 </div>
               </div>
