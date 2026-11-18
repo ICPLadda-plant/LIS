@@ -1,9 +1,15 @@
 const mockFind = jest.fn();
 const mockFindOneAndUpdate = jest.fn();
+const mockCodeFind = jest.fn();
+const mockCodeUpsert = jest.fn();
 
 jest.mock('../models/BalanceControlConfig', () => ({
   find: (...args) => ({ lean: () => mockFind(...args) }),
   findOneAndUpdate: (...args) => ({ lean: () => mockFindOneAndUpdate(...args) }),
+}));
+jest.mock('../models/BalanceWeightCode', () => ({
+  find: (...args) => ({ lean: () => mockCodeFind(...args) }),
+  findOneAndUpdate: (...args) => ({ lean: () => mockCodeUpsert(...args) }),
 }));
 
 const router = require('./balanceControlConfig');
@@ -14,6 +20,7 @@ const handler = (method, path) => router.stack.find(
 
 const getHandler = handler('get', '/');
 const putHandler = handler('put', '/:scaleId');
+const putCodeHandler = handler('put', '/weight-code/:nominal');
 const baselineValues = Array.from({ length: 20 }, (_, index) => 100 + index / 1000);
 const baselineMean = baselineValues.reduce((sum, value) => sum + value, 0) / baselineValues.length;
 const baselineSd = Math.sqrt(baselineValues.reduce((sum, value) => sum + (value - baselineMean) ** 2, 0) / (baselineValues.length - 1));
@@ -26,7 +33,11 @@ function mockResponse() {
 }
 
 describe('GET /balance-control-config', () => {
-  beforeEach(() => mockFind.mockReset());
+  beforeEach(() => {
+    mockFind.mockReset();
+    mockCodeFind.mockReset();
+    mockCodeFind.mockResolvedValue([]);
+  });
 
   it('returns two control weights for all five scales when nothing is stored', async () => {
     mockFind.mockResolvedValue([]);
@@ -39,12 +50,49 @@ describe('GET /balance-control-config', () => {
   });
 
   it('merges stored control values over the defaults', async () => {
-    mockFind.mockResolvedValue([{ scaleId: 'scale-2', brand: 'Mettler Toledo', model: 'MS204', weightCode: 'GL55-11006', nominal: 100, mean: 99.99972, sd: 0.0000476, mpe: 0.5, updatedDate: '2026-10-26' }]);
+    mockFind.mockResolvedValue([{ scaleId: 'scale-2', brand: 'Mettler Toledo', model: 'MS204', nominal: 100, mean: 99.99972, sd: 0.0000476, mpe: 0.5, updatedDate: '2026-10-26' }]);
+    mockCodeFind.mockResolvedValue([{ nominal: 100, weightCode: 'GL55-11006' }]);
     const res = mockResponse();
     await getHandler({}, res);
     const { data } = res.json.mock.calls[0][0];
     expect(data.find((item) => item.scaleId === 'scale-2' && item.nominal === 100)).toMatchObject({ weightCode: 'GL55-11006', mean: 99.99972, sd: 0.0000476 });
     expect(data[0].mean).toBeNull();
+  });
+
+  it('applies a shared weight code to every scale and adds its weight size', async () => {
+    mockFind.mockResolvedValue([]);
+    mockCodeFind.mockResolvedValue([{ nominal: 250, weightCode: 'W-250' }]);
+    const res = mockResponse();
+    await getHandler({}, res);
+    const { data } = res.json.mock.calls[0][0];
+    const at250 = data.filter((item) => item.nominal === 250);
+    expect(at250).toHaveLength(5);
+    expect(at250.every((item) => item.weightCode === 'W-250')).toBe(true);
+  });
+});
+
+describe('PUT /balance-control-config/weight-code/:nominal', () => {
+  beforeEach(() => {
+    mockCodeUpsert.mockReset();
+    mockCodeUpsert.mockResolvedValue({});
+  });
+
+  it('rejects a non-integer weight size', async () => {
+    const res = mockResponse();
+    await putCodeHandler({ params: { nominal: '0.5' }, body: { weightCode: 'W-1' } }, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(mockCodeUpsert).not.toHaveBeenCalled();
+  });
+
+  it('upserts a trimmed weight code for one weight size', async () => {
+    const res = mockResponse();
+    await putCodeHandler({ params: { nominal: '10' }, body: { weightCode: ' GL55-11006 ' } }, res);
+    expect(mockCodeUpsert).toHaveBeenCalledWith(
+      { nominal: 10 },
+      { $set: { nominal: 10, weightCode: 'GL55-11006' } },
+      { new: true, upsert: true },
+    );
+    expect(res.json).toHaveBeenCalledWith({ data: { nominal: 10, weightCode: 'GL55-11006' } });
   });
 });
 
@@ -64,6 +112,7 @@ describe('PUT /balance-control-config/:scaleId', () => {
   it.each([
     [{ baselineValues: baselineValues.slice(0, 19) }, 'กรอกค่าบันทึกให้ครบ 20 ค่า'],
     [{ baselineValues: [...baselineValues.slice(0, 19), 'abc'] }, 'กรอกค่าบันทึกให้ครบ 20 ค่า'],
+    [{ baselineValues, nominal: 0.5 }, 'น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0'],
     [{ baselineValues, updatedDate: '26/10/2569' }, 'วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD'],
   ])('rejects invalid body %j', async (body, message) => {
     const res = mockResponse();
@@ -72,18 +121,18 @@ describe('PUT /balance-control-config/:scaleId', () => {
     expect(res.json).toHaveBeenCalledWith({ error: message });
   });
 
-  it('rejects a control weight that does not belong to the scale', async () => {
+  it('accepts an additional positive integer weight size', async () => {
     const res = mockResponse();
-    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 100, baselineValues } }, res);
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'น้ำหนักตุ้มไม่ตรงกับเครื่องชั่ง' });
+    await putHandler({ params: { scaleId: 'scale-1' }, body: { nominal: 250, baselineValues } }, res);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(mockFindOneAndUpdate.mock.calls[0][1].$set['controls.250']).toMatchObject({ nominal: 250 });
   });
 
   it('upserts valid control values', async () => {
     const res = mockResponse();
     await putHandler({
       params: { scaleId: 'scale-2' },
-      body: { weightCode: ' GL55-11006 ', nominal: 100, baselineValues, mpe: 0.5, updatedDate: '2026-10-26' },
+      body: { nominal: 100, baselineValues, mpe: 0.5, updatedDate: '2026-10-26' },
     }, res);
     expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
       { scaleId: 'scale-2' },
@@ -91,7 +140,7 @@ describe('PUT /balance-control-config/:scaleId', () => {
         scaleId: 'scale-2',
         brand: 'Mettler Toledo',
         model: 'MS204',
-        'controls.100': expect.objectContaining({ weightCode: 'GL55-11006', nominal: 100, mean: baselineMean, sd: baselineSd, baselineValues }),
+        'controls.100': expect.objectContaining({ nominal: 100, mean: baselineMean, sd: baselineSd, baselineValues }),
       }) },
       { new: true, upsert: true },
     );

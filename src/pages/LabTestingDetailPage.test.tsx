@@ -312,6 +312,51 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("% Sample 3")).toBeInTheDocument();
     expect(screen.getByText("Area Average")).toBeInTheDocument();
     expect(screen.getByText("% Sample %RSD")).toBeInTheDocument();
+    expect(screen.getByText("เลขที่ Standard")).toBeInTheDocument();
+    expect(screen.getByText("ค่า Correlation coefficient ( r ) ที่ได้")).toBeInTheDocument();
+    expect(screen.getByText("Mid-level Standard Conc. (mg/mL)")).toBeInTheDocument();
+    expect(screen.getByText("CCS Conc. (mg/mL)")).toBeInTheDocument();
+    expect(screen.getByText("% Difference")).toBeInTheDocument();
+    expect(screen.getByText("CCS Result")).toBeInTheDocument();
+  });
+
+  it("calculates CCS difference and shows Pass or No pass with status color", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      results: [{
+        ...fixtures.results[0],
+        values: {
+          ...fixtures.results[0].values,
+          "Mid-level Standard Conc. (mg/mL)": "0.500",
+          "CCS Conc. (mg/mL)": "0.525",
+        },
+      }],
+    };
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByDisplayValue("5.00")).toBeDisabled();
+    const result = screen.getByDisplayValue("Pass");
+    expect(result).toBeDisabled();
+    expect(result).toHaveClass("text-emerald-700");
+    expect(screen.getByText("เกณฑ์ ≤ 10%")).toBeInTheDocument();
+  });
+
+  it("shows a failed CCS result in red", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      results: [{
+        ...fixtures.results[0],
+        values: {
+          ...fixtures.results[0].values,
+          "Mid-level Standard Conc. (mg/mL)": "0.500",
+          "CCS Conc. (mg/mL)": "0.560",
+        },
+      }],
+    };
+    render(<LabTestingDetailPage />);
+
+    const result = await screen.findByDisplayValue("No pass");
+    expect(result).toHaveClass("text-destructive");
   });
 
   it("lets Lab enter Control Sample and its acceptance range on %AI, saved with the result", async () => {
@@ -376,6 +421,38 @@ describe("LabTestingDetailPage", () => {
     await waitFor(() => {
       expect(mockSaveQCResult).toHaveBeenCalledWith(expect.objectContaining({ fieldLabel: "%AI::abamectin" }));
     }, { timeout: 2000 });
+  });
+
+  // ตามที่เกิดกับคำร้อง P-2611-0068: รายการ 1 ส่ง QC (มีค่า ถพ.) รายการ 2 ส่ง Lab อย่างเดียว batch เดียวกัน
+  it("multiplies %AI by the density QC saved on the QC-only item of the same batch", async () => {
+    const base = { ...fixtures.petition.items[0], testItems: "Active Ingredient, ค่า ถพ." };
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          { ...base, seq: 1, sendToQc: true, sendToLab: false },
+          { ...base, seq: 2, sendToQc: false, sendToLab: true },
+        ],
+      },
+      parameters: [
+        ...fixtures.parameters,
+        { _id: "density-param", name: "ค่า ถพ.", scope: "qc", shareWithLab: true, applyAll: true, multiEntry: true, valueFields: [{ label: "ค่าถพ.", type: "number" }, { label: "อุณหภูมิ", type: "number" }] },
+      ],
+      results: [{ petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: {}, entries: [{ "ค่าถพ.::abamectin": "1.060", "อุณหภูมิ": "30.0" }] }],
+    };
+
+    render(<LabTestingDetailPage />);
+
+    await screen.findByText("Area Inj.1");
+    const inputs = screen.getAllByRole("spinbutton");
+    await waitFor(() => expect(inputs[0]).toBeEnabled());
+    ["801.5579", "800.9444", "802.3262", "14.766", "14.763", "14.738"].forEach((value, index) => {
+      fireEvent.change(inputs[index], { target: { value } });
+    });
+
+    // 14.7557 × 1.060
+    expect(await screen.findByDisplayValue("15.64")).toBeInTheDocument();
   });
 
   it("locks Lab inputs until QC selects and saves a density value", async () => {
@@ -479,6 +556,7 @@ describe("LabTestingDetailPage", () => {
     mockAuthRoles.roles = ["lab-head"];
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: {
         ...fixtures.petition,
         status: "approved",

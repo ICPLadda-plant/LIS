@@ -36,7 +36,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, aiSubstanceFromKey, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
+import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { matchSubstanceKey } from '@/lib/substances';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
@@ -45,6 +45,7 @@ import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSampl
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { isResearchAndDevelopmentPetition, mergeQcLabDuplicateItems, shouldSendItemToLab, shouldSendItemToQc } from '@/lib/petitionRouting';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
+import { isWaterFormulationItem } from '@/lib/sgConfirmation';
 import {
   type Petition,
   type AdditionalSampleRequest,
@@ -97,9 +98,11 @@ function hasSpecificGravityParam(params: ParameterItem[]) {
 }
 
 const AI_FIELD_ORDER = [
+  STANDARD_NO_LABEL, CORRELATION_LABEL,
   'Area Inj.1', 'Area Inj.2', 'Area Inj.3',
   '% Sample 1', '% Sample 2', '% Sample 3',
   'Area Average', 'Area %RSD', '% Sample Average', '% Sample %RSD',
+  MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL,
   // Control Sample + ช่วงยอมรับ — กรอกเองแล้วไปแสดงในใบคำนวณ (LabCalculationForm)
   CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL,
   '%AI',
@@ -111,7 +114,7 @@ function aiFieldsForParameter(fields: ParameterValueField[]) {
   const aiField = fields.find((field) => calculatedAiFieldKind(field.label) === 'ai');
   const generated = AI_FIELD_ORDER.map((label): ParameterValueField => (label === '%AI' ? aiField! : byLabel.get(label.toLowerCase())) ?? ({
     label,
-    type: 'float',
+    type: [STANDARD_NO_LABEL, CORRELATION_LABEL, CCS_RESULT_LABEL].includes(label) ? 'text' : 'float',
     unit: CONTROL_LABELS.has(label) ? undefined : label.includes('Sample') || label === '%AI' ? '%' : undefined,
   }));
   const known = new Set(AI_FIELD_ORDER.map((label) => label.toLowerCase()));
@@ -129,6 +132,7 @@ function matchLabParametersForItem(
   item: PetitionItem,
   params: ParameterItem[],
   itemGroupIds: string[] = [],
+  densitySources: DensitySource[] = [],
 ): ParameterItem[] {
   const matched = matchParametersForItem(
     item,
@@ -140,7 +144,7 @@ function matchLabParametersForItem(
     },
   );
   // รายการที่ส่ง Lab อย่างเดียว → ยืมพารามิเตอร์ ถพ. จากรายการส่ง QC ที่เป็นตัวอย่าง/batch เดียวกัน
-  const sibling = densitySourceItem(petition, item);
+  const sibling = densitySourceItem(petition, item, densitySources)?.item;
   if (!sibling || isResearchAndDevelopmentPetition(petition)) return matched;
   const extra = matchParametersForItem(sibling, params, itemGroupIds, { petitionCategory: getPetitionCategory(petition) })
     .filter((p) => hasSpecificGravityParam([p]) && !matched.some((m) => m._id === p._id));
@@ -152,25 +156,33 @@ function sameSampleKey(item: PetitionItem) {
   return batch ? batch + '|' + (item.commonName ?? item.sampleName ?? '').trim().toLowerCase() : '';
 }
 
+// รายการส่ง QC ที่ batch เดียวกันแต่ถูกแยกไปอยู่อีกคำร้อง พร้อมผล ถพ. ของคำร้องนั้น
+type DensitySource = { item: PetitionItem; results: QCTestResult[]; external?: boolean };
+
 // QC กรอกค่า ถพ. ไว้ที่รายการส่ง QC ส่วนรายการที่ส่ง Lab อย่างเดียวไม่มีผล QC ของตัวเอง
-function densitySourceItem(petition: Petition, item: PetitionItem): PetitionItem | undefined {
+// หาในคำร้องเดียวกันก่อน ถ้าไม่มีจึงใช้คำร้องอื่นที่ batch เดียวกัน (เลือกอันที่มีผล ถพ. แล้ว)
+function densitySourceItem(petition: Petition, item: PetitionItem, external: DensitySource[] = []): DensitySource | undefined {
   if (shouldSendItemToQc(item)) return undefined;
   const key = sameSampleKey(item);
   if (!key) return undefined;
-  return (petition.items ?? []).find((other) => other.seq !== item.seq && shouldSendItemToQc(other) && sameSampleKey(other) === key);
+  const local = (petition.items ?? []).find((other) => other.seq !== item.seq && shouldSendItemToQc(other) && sameSampleKey(other) === key);
+  if (local) return { item: local, results: [] };
+  const candidates = external.filter((source) => sameSampleKey(source.item) === key);
+  return candidates.find((source) => source.results.length > 0) ?? candidates[0];
 }
 
-function withSiblingDensityResults(petition: Petition | null | undefined, results: QCTestResult[], params: ParameterItem[]): QCTestResult[] {
+function withSiblingDensityResults(petition: Petition | null | undefined, results: QCTestResult[], params: ParameterItem[], densitySources: DensitySource[] = []): QCTestResult[] {
   if (!petition) return results;
   const sgIds = new Set(params.filter((p) => hasSpecificGravityParam([p])).map((p) => String(p._id)));
   const extra: QCTestResult[] = [];
   (petition.items ?? []).forEach((item) => {
-    const sibling = densitySourceItem(petition, item);
-    if (!sibling) return;
-    results.forEach((row) => {
-      if (row.itemSeq !== sibling.seq || !sgIds.has(String(row.parameterId))) return;
+    const source = densitySourceItem(petition, item, densitySources);
+    if (!source) return;
+    (source.external ? source.results : results).forEach((row) => {
+      if (row.itemSeq !== source.item.seq || !sgIds.has(String(row.parameterId))) return;
       if (results.some((r) => r.itemSeq === item.seq && String(r.parameterId) === String(row.parameterId))) return;
-      extra.push({ ...row, itemSeq: item.seq });
+      if (extra.some((r) => r.itemSeq === item.seq && String(r.parameterId) === String(row.parameterId))) return;
+      extra.push({ ...row, petitionId: petition._id, itemSeq: item.seq });
     });
   });
   return [...results, ...extra];
@@ -235,6 +247,7 @@ interface TestFieldProps {
   outputResult?: ResolvedOutput | null;
   headerMeta?: ReactNode;
   timerStartBlockedReason?: string;
+  valueClassName?: string;
 }
 
 function TestField({
@@ -257,6 +270,7 @@ function TestField({
   outputResult,
   headerMeta,
   timerStartBlockedReason,
+  valueClassName,
 }: TestFieldProps) {
   const strVal = value == null ? '' : String(value);
   const strNote = noteValue == null ? '' : String(noteValue);
@@ -318,6 +332,7 @@ function TestField({
               'h-8 text-sm',
               isAbnormal && 'border-red-400 ring-1 ring-red-200',
               readOnly && 'bg-muted cursor-default',
+              valueClassName,
             )}
           >
             <SelectValue placeholder="เลือกค่า..." />
@@ -362,6 +377,7 @@ function TestField({
               'h-8 text-sm',
               isAbnormal && 'border-red-400 ring-1 ring-red-200',
               readOnly && 'bg-muted cursor-default',
+              valueClassName,
             )}
             placeholder={
               field.standardOperator
@@ -482,6 +498,7 @@ export default function LabTestingDetailPage() {
   });
 
   const [allParameters, setAllParameters] = useState<ParameterItem[]>([]);
+  const [densitySources, setDensitySources] = useState<DensitySource[]>([]);
   // parameter trigger รอบตรวจซ้ำทุกฝั่ง — ตัวอบอาจเป็น QC ที่ไม่ได้แชร์ให้ Lab แต่ Lab ต้องตรวจ %AI ซ้ำ
   const [phaseTriggerParameters, setPhaseTriggerParameters] = useState<ParameterItem[]>([]);
   // Instrument sources (config) → lookup by key for the "ดึงค่า" pull button.
@@ -572,7 +589,7 @@ export default function LabTestingDetailPage() {
     const load = ++resultLoad.current;
     return api.getQCResults(petitionId).then((allResults) => {
       if (load !== resultLoad.current) return;
-      const results = withSiblingDensityResults(petition, currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters), allParameters);
+      const results = withSiblingDensityResults(petition, currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters), allParameters, densitySources);
       setSavedResults(results);
       const v: Record<string, Record<string, unknown>> = {};
       const v2: Record<string, Record<string, unknown>> = {};
@@ -603,7 +620,42 @@ export default function LabTestingDetailPage() {
       setSaveStatesPhase2(s2);
       setLoadedResultsKey(resultsKey);
     }).catch(() => {});
-  }, [roundRequests, allParameters, resultsKey, petition]);
+  }, [roundRequests, allParameters, resultsKey, petition, densitySources]);
+
+  // รายการส่ง Lab อย่างเดียวที่ไม่มีรายการส่ง QC ในคำร้องนี้ → หาคำร้องอื่นที่ batch เดียวกัน
+  // เพื่อใช้ค่า ถพ. ที่ QC กรอกไว้ (ไม่งั้น %AI จะคำนวณด้วย ถพ. = 1.00)
+  const densityLookupKey = useMemo(() => {
+    if (!petition || isResearchAndDevelopmentPetition(petition)) return '';
+    const batches = (petition.items ?? [])
+      .filter((item) => !shouldSendItemToQc(item) && sameSampleKey(item) && !densitySourceItem(petition, item))
+      .map((item) => (item.batchNo ?? '').trim());
+    return [...new Set(batches)].sort().join('\n');
+  }, [petition]);
+  const petitionId = petition?._id;
+  useEffect(() => {
+    if (!petitionId || !densityLookupKey || !allParameters.length) {
+      setDensitySources((prev) => (prev.length ? [] : prev));
+      return;
+    }
+    let alive = true;
+    const sgIds = allParameters.filter((p) => hasSpecificGravityParam([p])).map((p) => String(p._id));
+    void (async () => {
+      const petitions = (await Promise.all(densityLookupKey.split('\n').map((batch) => api.getPetitionsByBatch(batch, petitionId))))
+        .flat()
+        .filter((other, index, list) => other._id !== petitionId && list.findIndex((p) => p._id === other._id) === index);
+      const ids = petitions.map((other) => other._id);
+      const results = ids.length && sgIds.length ? await api.getQCResultsByPetitions(ids, sgIds).catch(() => []) : [];
+      const sources: DensitySource[] = petitions.flatMap((other) => (other.items ?? [])
+        .filter((item) => shouldSendItemToQc(item))
+        .map((item) => ({
+          item,
+          external: true,
+          results: results.filter((row) => row.petitionId === other._id && row.itemSeq === item.seq),
+        })));
+      if (alive) setDensitySources(sources);
+    })().catch(() => { if (alive) setDensitySources([]); });
+    return () => { alive = false; };
+  }, [petitionId, densityLookupKey, allParameters]);
 
   useEffect(() => {
     if (!id || !allParameters.length) return;
@@ -613,9 +665,10 @@ export default function LabTestingDetailPage() {
 
   const pendingDensity = !!petition && !isResearchAndDevelopmentPetition(petition) &&
     (petition.items ?? []).filter(shouldSendItemToLab).some((item) => {
-      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
       // ตัวอย่างที่ไม่มีพารามิเตอร์ ถพ. → Lab กรอกได้ทันที โดยใช้ ถพ. = 1.00
-      if (!hasSpecificGravityParam(matched)) return false;
+      // ยกเว้นยาน้ำ: ต้องใช้ค่า ถพ. จริงเสมอ ห้ามใช้ค่า default
+      if (!hasSpecificGravityParam(matched) && !isWaterFormulationItem(item)) return false;
       // %AI คำนวณจากค่า ถพ. → ถ้ายังไม่มีค่า ถพ. ที่บันทึกไว้ของรายการนี้ ห้ามกรอกผล
       const needsAiDensity = matched.some((param) => param.scope === 'lab' &&
         param.valueFields?.some((field) => calculatedAiFieldKind(field.label) === 'ai'));
@@ -820,10 +873,10 @@ export default function LabTestingDetailPage() {
     : (petition.items ?? []).filter((it) => shouldSendItemToLab(it));
   const labItems = mergeQcLabDuplicateItems(petition, allLabBatchItems);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
-    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((param) => param.scope === 'lab'),
+    matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
   );
   const hasAllLabOwnedParams = hasLabOwnedParams && labItems.every((item) =>
-    matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((param) => param.scope === 'lab'),
+    matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
   );
 
   // 2-phase support: does any matched parameter use hasPhases?
@@ -852,7 +905,7 @@ export default function LabTestingDetailPage() {
   // ต้องกรอกค่าก่อนอบ (Phase 1) ของรายการให้ครบก่อนเริ่มจับเวลาตัว trigger เช่น อบ 14 วัน
   const phaseTriggerReasonFor = (item: PetitionItem): string | undefined =>
     phaseTriggerBlockedReason(missingValuesBeforePhaseTrigger(
-      matchLabParametersForItem(petition, item, allParameters, idsFor(item)).filter((param) => param.scope === 'lab'),
+      matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).filter((param) => param.scope === 'lab'),
       (param) => {
         const k = resultKey(item.seq, param._id!);
         return param.multiEntry ? getEntryValues({ entries: entriesByKey[k] }, param) : [values[k] ?? {}];
@@ -947,7 +1000,7 @@ export default function LabTestingDetailPage() {
   const countAbnormal = (): number => {
     let count = 0;
     labItems.forEach((item) => {
-      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
       matched.forEach((param) => {
         if (param.scope !== 'lab') return; // skip read-only shared QC params
         count += countAbnormalForParam(item, param);
@@ -963,7 +1016,7 @@ export default function LabTestingDetailPage() {
     labItems.forEach((item) => {
       const phaseToCheck = effectivePhaseForItem(item);
       const phaseValues = valuesForPhase(phaseToCheck);
-      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+      const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
       matched.forEach((param) => {
         if (param.scope !== 'lab') return; // only validate Lab-owned params
         const k = resultKey(item.seq, param._id!);
@@ -1259,7 +1312,7 @@ export default function LabTestingDetailPage() {
 
         {/* Each Lab item */}
         {labItems.map((item) => {
-          const matchedParams = matchLabParametersForItem(petition, item, allParameters, idsFor(item));
+          const matchedParams = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
           const round = sampleRoundFor(petition, 'lab', item.seq);
           const itemCurrentPhase = (round ?? petition).currentPhase ?? 1;
           const effectivePhase = effectivePhaseForItem(item);
@@ -1337,7 +1390,8 @@ export default function LabTestingDetailPage() {
                       // sameParam = this parameter's live values; otherParams = each OTHER
                       // matched parameter's live values for the same item, keyed by parameterId.
                       const densityEntries = matchedParams.flatMap((p) => (p._id && p._id !== param._id ? entriesByKey[resultKey(item.seq, p._id)] ?? [] : []));
-                      const hasSgParam = hasSpecificGravityParam(matchedParams);
+                      // ยาน้ำต้องมีค่า ถพ. จริงก่อนคำนวณ %AI (ไม่ใช้ค่า default 1.00)
+                      const hasSgParam = hasSpecificGravityParam(matchedParams) || isWaterFormulationItem(item);
                       const condCtx: ConditionContext = {
                         sameParam: phaseValues[k] ?? {},
                         otherParams: (() => {
@@ -1408,6 +1462,8 @@ export default function LabTestingDetailPage() {
                               const isAiParameter = (param.valueFields ?? []).some((candidate) => calculatedAiFieldKind(candidate.label) === 'ai');
                               const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
                               const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries, hasSgParam), aiSubstanceFromKey(unit.key)) : null;
+                              const ccsFieldKind = isAiParameter ? calculatedCcsFieldKind(unit.field.label) : null;
+                              const calculatedCcs = ccsFieldKind ? calculateCcsFromValues(srcValues) : null;
 
                               // Field-level `multiple` — repeatable list of bare value rows.
                               // Each row shares the field's standard/abnormal rule; per-row
@@ -1495,12 +1551,13 @@ export default function LabTestingDetailPage() {
                                     field={effectiveField}
                                     item={item}
                                     itemGroupIds={idsFor(item)}
-                                    value={aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null ? '' : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
+                                    value={ccsFieldKind ? (ccsFieldKind === 'difference' && calculatedCcs?.difference != null ? calculatedCcs.difference.toFixed(2) : calculatedCcs?.result ?? '') : aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null ? '' : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
                                     noteValue={srcValues[noteLabel] ?? ''}
                                     saveInfo={saveInfoSrc?.[unit.key]}
                                     noteSaveInfo={saveInfoSrc?.[noteLabel]}
                                     disabled={fieldDisabled}
-                                    readOnly={!!aiFieldKind}
+                                    readOnly={!!aiFieldKind || !!ccsFieldKind}
+                                    valueClassName={ccsFieldKind === 'result' ? (calculatedCcs?.result === 'Pass' ? 'font-semibold text-emerald-700 disabled:opacity-100 dark:text-emerald-300' : calculatedCcs?.result === 'No pass' ? 'font-semibold text-destructive disabled:opacity-100' : undefined) : undefined}
                                     timerStartBlockedReason={unit.field.triggersPhase2 && effectivePhase === 1 ? phaseTriggerReasonFor(item) : undefined}
                                     instrumentSource={srcField}
                                     provenance={provenance}
@@ -1533,6 +1590,11 @@ export default function LabTestingDetailPage() {
                                     onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries, hasSgParam), substance)[kind]));
                                   });
                                         });
+                                        if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(unit.key)) {
+                                          const nextCcs = calculateCcsFromValues(nextValues);
+                                          onUnitChange(CCS_DIFFERENCE_LABEL, nextCcs.difference == null ? '' : nextCcs.difference.toFixed(2));
+                                          onUnitChange(CCS_RESULT_LABEL, nextCcs.result);
+                                        }
                                       }
                                       // Manual edit after a pull → mark provenance as edited (once).
                                       if (scalarExtras && provenance && provenance.source === 'instrument' && String(val) !== String(provenance.rawValue ?? '')) {
@@ -1543,13 +1605,12 @@ export default function LabTestingDetailPage() {
                                     conditionalPending={isOutputMode ? false : (!!unit.field.conditionalMode && !resolved)}
                                     resolvedStandardText={isOutputMode ? undefined : resolvedStandardText}
                                     outputResult={outputResult}
-                                    headerMeta={
+                                    headerMeta={ccsFieldKind === 'result' ? <span className="text-xs text-muted-foreground">เกณฑ์ ≤ 10%</span> :
                                       labelToleranceInfo?.criteriaText ? (
                                         <span className="text-xs text-muted-foreground whitespace-pre-line">
                                           {labelToleranceInfo.criteriaText}
                                         </span>
-                                      ) : undefined
-                                    }
+                                      ) : undefined}
                                   />
                                   {labelToleranceInfo?.badge && (
                                     <div className="mt-1">
@@ -1981,7 +2042,7 @@ export default function LabTestingDetailPage() {
           key={petition._id}
           petition={petition}
           side="lab"
-          items={labItems.filter((item) => matchLabParametersForItem(petition, item, allParameters, idsFor(item)).some((parameter) => parameter.scope === 'lab'))}
+          items={labItems.filter((item) => matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((parameter) => parameter.scope === 'lab'))}
           open={additionalSampleOpen}
           onOpenChange={setAdditionalSampleOpen}
           beforeSubmit={autosaves.flush}

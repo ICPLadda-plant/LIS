@@ -46,7 +46,6 @@ export interface BalanceControlConfig {
 export interface BalanceControlConfigInput {
   brand?: string;
   model?: string;
-  weightCode?: string;
   nominal?: number | null;
   mean: number;
   sd: number;
@@ -271,13 +270,22 @@ export function chartDomain(
   return [min - pad, max + pad];
 }
 
-/** ค่า Control แสดงอย่างน้อย 4 ตำแหน่งเพื่อให้เห็นความต่างของ ±2SD/±3SD */
+/** แสดงตามความละเอียดของเครื่อง (LD-005 = 2 ตำแหน่ง) */
 export function controlDigits(scaleDecimals: number): number {
-  return Math.max(scaleDecimals, 4);
+  return scaleDecimals;
 }
 
 export function displayDigits(scaleDecimals: number, _sd: number | null | undefined): number {
   return controlDigits(scaleDecimals);
+}
+
+/** ทศนิยมน้อยที่สุด (ไม่ต่ำกว่า minDigits, ไม่เกิน 8) ที่ทำให้ค่าทุกตัวอ่านไม่ซ้ำกัน */
+export function axisTickDigits(values: number[], minDigits: number): number {
+  const nums = values.filter(isFiniteNumber);
+  for (let digits = minDigits; digits < 8; digits += 1) {
+    if (new Set(nums.map((value) => value.toFixed(digits))).size === nums.length) return digits;
+  }
+  return 8;
 }
 
 export function limitDecimalPlaces(value: string, digits: number): string {
@@ -305,7 +313,9 @@ export function validateBalanceControlInput(input: BalanceControlConfigInput): s
   if (!isFiniteNumber(mean)) return "ค่า Mean ต้องเป็นตัวเลข";
   if (!isFiniteNumber(sd)) return "ค่า STD ต้องเป็นตัวเลข";
   if (sd < 0) return "ค่า STD ต้องไม่ติดลบ";
-  if (nominal != null && (!isFiniteNumber(nominal) || nominal <= 0)) return "น้ำหนักตุ้มต้องมากกว่า 0";
+  if (nominal != null && (!isFiniteNumber(nominal) || nominal <= 0 || !Number.isInteger(nominal))) {
+    return "น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0";
+  }
   if (mpe != null && (!isFiniteNumber(mpe) || mpe < 0)) return "ค่า MPE ต้องไม่ติดลบ";
   if (updatedDate && !DATE_RE.test(updatedDate)) return "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD";
   if (!Array.isArray(baselineValues) || baselineValues.length !== 20 || !baselineValues.every(isFiniteNumber)) {

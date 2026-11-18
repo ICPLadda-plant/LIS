@@ -16,6 +16,22 @@ export const fmtDate = (s: string) => {
   return `${d}/${m}/${y}`;
 };
 
+const THAI_MONTH_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+/** "2026-11-17" → "17 พ.ย. 2569" — วันขึ้นก่อนเดือน กันสับสนกับรูปแบบ mm/dd */
+export const fmtThaiDate = (s: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s ?? "");
+  if (!match) return "—";
+  const month = THAI_MONTH_ABBR[Number(match[2]) - 1];
+  return month ? `${Number(match[3])} ${month} ${Number(match[1]) + 543}` : fmtDate(s);
+};
+
+/** วันอาทิตย์ไม่ได้ทำงาน — ใช้ระบายสีแถวในรายงาน */
+export const isSunday = (s: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s ?? "");
+  return !!match && new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getDay() === 0;
+};
+
 export const roomLabel = (slug: string) =>
   slug === "environment" ? "อุณหภูมิ/ความชื้น" : getRoomBySlug(slug)?.label ?? slug;
 
