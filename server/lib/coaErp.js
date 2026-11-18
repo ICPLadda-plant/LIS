@@ -1046,7 +1046,8 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     : '';
   const erpProductionDate = erpRequestLot
     ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
-    : petitionStockProductionDate
+    : normalizeIsoDate(petitionItem?.productionDate)
+      || petitionStockProductionDate
       || authoritativeErpLot?.productionDate
       || erpRequestProductionDate
       || matchingStockLot?.productionDate
