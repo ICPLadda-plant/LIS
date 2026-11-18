@@ -19,7 +19,8 @@ export const BALANCE_CONTROL_REPORT_CSS = `
 @page { size: A4 portrait; margin: 5mm; }
 body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr, .bcr * { font-family: ${A4_PRINT_FONT_FAMILY}; box-sizing: border-box; }
-.bcr { color: #000; background: #fff; border: 2px solid #000; display: flex; flex-direction: column; min-height: 1084px; font-size: 11pt; line-height: 1.1; padding: 8px 8px 6px; }
+/* A4 สูง 297mm − ขอบ 2×5mm ≈ 1084px ต้องเหลือที่ว่างไว้ ไม่งั้นท้ายฟอร์มล้นไปหน้า 2 */
+.bcr { color: #000; background: #fff; border: 2px solid #000; display: flex; flex-direction: column; min-height: 1066px; font-size: 11pt; line-height: 1.1; padding: 8px 8px 6px; break-inside: avoid; }
 .bcr + .bcr { break-before: page; }
 .bcr h1, .bcr h2, .bcr .bcr-strong { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; }
 .bcr .bcr-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; }
@@ -40,7 +41,7 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
-.bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 445px; padding: 6px 4px 4px; }
+.bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 420px; padding: 6px 4px 4px; }
 .bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 17pt; }
 .bcr .bcr-empty { border: 1px dashed #000; display: flex; min-height: 330px; align-items: center; justify-content: center; text-align: center; font-size: 12pt; }
 .bcr .bcr-sign { display: flex; justify-content: space-around; gap: 24px; margin-top: 10px; font-size: 10pt; }
@@ -201,7 +202,7 @@ export default function BalanceControlReport({
             <BalanceControlChart
               fixed
               width={724}
-              height={430}
+              height={395}
               series={series}
               limits={limits}
               domain={domain}
