@@ -53,6 +53,9 @@ const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
 /** "" → null, ข้อความที่ไม่ใช่ตัวเลข → NaN (ให้ validate แจ้งเตือน) */
 const parseOptional = (text: string) => (text.trim() === "" ? null : Number(text));
 
+/** draft ค่า Control ที่ยังไม่กดบันทึก — กันกดออก/รีเฟรชแล้วค่าที่กรอกไว้หาย */
+const draftStorageKey = (scaleId: string, nominal: number) => `balance-control-draft:${scaleId}:${nominal}`;
+
 interface BalanceControlConfigDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -69,11 +72,26 @@ export default function BalanceControlConfigDialog({
   digits,
 }: BalanceControlConfigDialogProps) {
   const queryClient = useQueryClient();
+  const storageKey = draftStorageKey(scale.id, config.nominal);
   const [form, setForm] = useState<FormState>(() => toForm(config, scale.decimals));
 
   useEffect(() => {
-    if (open) setForm(toForm(config, scale.decimals));
-  }, [open, config, scale.decimals]);
+    if (!open) return;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        setForm(JSON.parse(saved) as FormState);
+        return;
+      } catch {
+        localStorage.removeItem(storageKey);
+      }
+    }
+    setForm(toForm(config, scale.decimals));
+  }, [open, config, scale.decimals, storageKey]);
+
+  useEffect(() => {
+    if (open) localStorage.setItem(storageKey, JSON.stringify(form));
+  }, [form, open, storageKey]);
 
   const baselineValues = form.baselineValues.map(Number);
   const baselineComplete = form.baselineValues.every((value) => value.trim() !== "" && Number.isFinite(Number(value)));
@@ -94,6 +112,7 @@ export default function BalanceControlConfigDialog({
     mutationFn: (body: BalanceControlConfigInput) => api.updateBalanceControlConfig(scale.id, body),
     onSuccess: () => {
       toast.success(`บันทึกค่า Control ของ ${scale.code} แล้ว`);
+      localStorage.removeItem(storageKey);
       queryClient.invalidateQueries({ queryKey: ["balance-control-config"] });
       onOpenChange(false);
     },

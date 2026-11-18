@@ -116,15 +116,14 @@ describe("BalanceRoomPage", () => {
     expect(screen.getAllByRole("button", { name: /ถ่ายรูปอ่านค่าน้ำหนัก/ })).toHaveLength(6);
   });
 
-  it("marks invalid weights, blocks saving, and ignores mouse wheel changes", () => {
+  it("accepts digits only and blocks saving on invalid input", () => {
     renderPage();
     const input = screen.getAllByPlaceholderText("ครั้งที่ 1")[0];
-    input.focus();
-    fireEvent.change(input, { target: { value: "-0.09" } });
-    expect(input).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByRole("button", { name: /บันทึกผล Calibrate/ })).toBeDisabled();
-    fireEvent.wheel(input);
-    expect(input).not.toHaveFocus();
+    // ตัวอักษรและเครื่องหมายถูกตัดทิ้ง เหลือเฉพาะตัวเลข
+    fireEvent.change(input, { target: { value: "-9a.0e9" } });
+    expect(input).toHaveValue("9.09");
+    // กรอกไม่ครบ 6 ค่า → กดบันทึกแล้วไม่ยิง API
+    fireEvent.click(screen.getByRole("button", { name: /บันทึกผล Calibrate/ }));
     expect(apiMock.createDailyCheck).not.toHaveBeenCalled();
   });
 
@@ -136,7 +135,7 @@ describe("BalanceRoomPage", () => {
     fireEvent.change(fileInput!, { target: { files: [new File(["image"], "balance.jpg", { type: "image/jpeg" })] } });
 
     await waitFor(() => expect(readBalanceDisplayValueFromImageMock).toHaveBeenCalled());
-    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[1]).toHaveValue(100.01);
+    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[1]).toHaveValue("100.01");
   });
 
   it("shows the control values and limits from the saved config", async () => {
@@ -289,6 +288,37 @@ describe("BalanceRoomPage", () => {
     expect((await screen.findByText(/ครบ 3 เดือนแล้ว/)).closest('[role="alert"]')).toHaveClass("bg-destructive");
     expect(screen.getAllByText("อัปเดตล่าสุด: 17 ส.ค. 2569 · ครบกำหนด: พฤศจิกายน 2569")).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: /แก้ไขค่า Control/ })).toHaveLength(2);
+  });
+
+  it("marks values beyond the control limits red and blocks saving", async () => {
+    apiMock.getBalanceControlConfigs.mockResolvedValue([
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, mpe: 0.5, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.001, mpe: 0.5, updatedDate: "2026-11-17" },
+    ]);
+    renderPage();
+    await screen.findAllByText("10.00");
+
+    const [first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
+    fireEvent.change(first10, { target: { value: "10.05" } });
+    expect(first10).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: /บันทึกผล Calibrate/ })).toBeDisabled();
+
+    fireEvent.change(first10, { target: { value: "10.00" } });
+    expect(first10).toHaveAttribute("aria-invalid", "false");
+  });
+
+  it("prints the holiday reason as one wide grey cell", async () => {
+    const month = currentMonthStr();
+    const [year, monthNumber] = month.split("-").map(Number);
+    const day = new Date(year, monthNumber - 1, 1).getDay() === 0 ? 2 : 1;
+    const date = `${month}-${String(day).padStart(2, "0")}`;
+    apiMock.getDailyCheckHolidays.mockResolvedValue([{ date, note: "หยุดชดเชยปีใหม่" }]);
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Print/ }));
+    const preview = await screen.findByTestId("print-preview");
+    const noteCell = await within(preview).findAllByText("หยุดชดเชยปีใหม่");
+    expect(noteCell[0]).toHaveAttribute("colspan", "7");
+    expect(noteCell[0].closest("tr")).toHaveClass("bcr-off");
   });
 
   it("greys out Sundays and marked holidays in the print report", async () => {

@@ -36,6 +36,7 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-table { border: 2px solid #000; }
 .bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 12pt; line-height: 1; height: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bcr .bcr-table tr.bcr-off td { background: #e5e5e5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.bcr .bcr-table tr.bcr-off td.bcr-off-note { text-align: left; padding-left: 6px; font-size: 11pt; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
@@ -61,8 +62,8 @@ export interface BalanceControlReportProps {
   printedAt: string;
   pageNumber?: number;
   totalPages?: number;
-  /** วันหยุดอื่นนอกจากวันอาทิตย์ (YYYY-MM-DD) — ระบายสีเทาเพราะไม่ได้ทำงาน */
-  holidayDates?: ReadonlySet<string>;
+  /** วันหยุดอื่นนอกจากวันอาทิตย์ → เหตุผล (YYYY-MM-DD) — ระบายสีเทาเพราะไม่ได้ทำงาน */
+  holidayNotes?: ReadonlyMap<string, string>;
 }
 
 const resultMark = (record: DailyCheckRecord | null, controlWeight: number) => {
@@ -91,7 +92,7 @@ export default function BalanceControlReport({
   printedAt,
   pageNumber = 1,
   totalPages = 1,
-  holidayDates,
+  holidayNotes,
 }: BalanceControlReportProps) {
   const printedDate = printedAt ? `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}` : "";
   const table = (points: MonthlyPoint<DailyCheckRecord>[]) => (
@@ -121,8 +122,20 @@ export default function BalanceControlReport({
         {points.map((point) => {
           const record = point.record;
           const weights = config.nominal === 10 ? record?.weights10 : record?.weights100;
+          const off = isSunday(point.date) || holidayNotes?.has(point.date);
+          if (off) {
+            // วันไม่ได้ทำงาน: ช่องเทายาวช่องเดียว ไม่แบ่งคอลัมน์
+            return (
+              <tr key={point.date} className="bcr-off">
+                <td>{ddmmBE(point.date)}</td>
+                <td className="bcr-off-note" colSpan={7}>
+                  {holidayNotes?.get(point.date)?.trim() || (isSunday(point.date) ? "วันอาทิตย์ — ไม่ได้ทำงาน" : "วันหยุด — ไม่ได้ทำงาน")}
+                </td>
+              </tr>
+            );
+          }
           return (
-            <tr key={point.date} className={isSunday(point.date) || holidayDates?.has(point.date) ? "bcr-off" : undefined}>
+            <tr key={point.date}>
               <td>{ddmmBE(point.date)}</td>
               <td>{weightText(weights, 0, scale.decimals)}</td>
               <td>{weightText(weights, 1, scale.decimals)}</td>
