@@ -8,13 +8,15 @@ const { requiresQcTrack, shouldSendItemToQc } = require('./petitionSubmissionRul
 const { hasLabTrack, shouldSendItemToLab } = require('./petitionStatusLog');
 
 const SIDE_PREFIX = { qc: 'P', lab: 'L' };
+// คำร้องเฉพาะ Admin ใช้เลขคิวชุดแยก ไม่กินเลขของคำร้องปกติ
+const ADMIN_SIDE_PREFIX = { qc: 'AP', lab: 'AL' };
 
 function buddhistYear(now) {
   return now.getFullYear() + 543;
 }
 
-function formatSampleLabelNo(side, sequence) {
-  return `${SIDE_PREFIX[side]}${String(sequence).padStart(2, '0')}`;
+function formatSampleLabelNo(side, sequence, adminOnly = false) {
+  return `${(adminOnly ? ADMIN_SIDE_PREFIX : SIDE_PREFIX)[side]}${String(sequence).padStart(2, '0')}`;
 }
 
 function sampleLabelSides(petition) {
@@ -108,7 +110,8 @@ async function assignMissingSampleLabelNumbers(petition, { now = new Date(), nex
         legacy[side] = undefined;
         continue;
       }
-      group[side] = formatSampleLabelNo(side, await nextSequence(side, year));
+      const adminOnly = Boolean(petition?.adminOnly);
+      group[side] = formatSampleLabelNo(side, await nextSequence(adminOnly ? `${side}Admin` : side, year), adminOnly);
       changed = true;
     }
     groups.push(group);

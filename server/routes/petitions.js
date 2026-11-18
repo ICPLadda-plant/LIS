@@ -123,6 +123,9 @@ const { nextDocumentNumber } = require('../lib/documentNumber');
 function nextPetitionNo() {
   return nextDocumentNumber('petition', Petition, 'petitionNo');
 }
+function nextAdminPetitionNo() {
+  return nextDocumentNumber('adminPetition', Petition, 'petitionNo');
+}
 
 // Production แก้คำขอที่ส่งเข้า LIS แล้วแบบเพิ่ม/ลดรายการ → ผู้ใช้ตรวจซ้ำในหน้าคำขอแผนกผลิต
 // แล้วบันทึกทับใบเดิม (เลขคำขอเดิม) เพื่อพิมพ์สติกเกอร์ใหม่ ไม่สร้างใบที่สองซ้อน
@@ -725,7 +728,7 @@ router.get('/scan/:code', async (req, res) => {
       query.unshift({ _id: code });
     }
 
-    const fallbackPetitionNo = code.match(/^(P-\d{4}-\d{4})-\d+$/i)?.[1];
+    const fallbackPetitionNo = code.match(/^(PA?-\d{4}-\d{4})-\d+$/i)?.[1];
     if (fallbackPetitionNo) query.push({ petitionNo: fallbackPetitionNo });
 
     let doc = await Petition.findOne({ $or: query }).lean();
@@ -1256,7 +1259,7 @@ router.post('/', async (req, res) => {
       }
       revisionOf = predecessor._id;
     }
-    const petitionNo = await nextPetitionNo();
+    const petitionNo = adminOnly ? await nextAdminPetitionNo() : await nextPetitionNo();
     // เลขที่ใบนำส่ง: ใช้ค่าที่กรอก ถ้าเว้นว่าง default = เลขคำขอ
     const items = normalizePetitionItems(body.items, {
       department: body.submittedBy?.department,
@@ -1266,7 +1269,7 @@ router.post('/', async (req, res) => {
     const deliveredBy = body.deliveredBy?.name ? await resolveEmployeeActor(body.deliveredBy) : body.deliveredBy;
     const sampledBy = normalizeSampledBy(body.sampledBy);
     const routeTargets = routeTargetsForSubmission(body, items);
-    const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ submittedBy, items, routeTargets });
+    const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ submittedBy, items, routeTargets, adminOnly });
     const doc = await Petition.create({
       ...body,
       submittedBy,
