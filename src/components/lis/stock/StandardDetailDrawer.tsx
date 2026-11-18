@@ -1,9 +1,10 @@
-import { Package } from "lucide-react";
+import { Link } from "react-router-dom";
+import { History, Package } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { summarizeStandard, isUsableBottle } from "@/lib/stockStatus";
 import StandardUnitsPanel from "./StandardUnitsPanel";
-import StandardHistoryPanel from "./StandardHistoryPanel";
 import type { StockStandardItem, StockUnitItem } from "@/types/stock";
 
 /** Drawer รายละเอียดสาร Standard — เปิดจากการคลิกแถวในตาราง /stock:
@@ -60,10 +61,9 @@ export default function StandardDetailDrawer({
             <div className="font-semibold mb-2">รายขวด</div>
             <StandardUnitsPanel standard={standard} onEdit={onEdit} />
           </div>
-          <div>
-            <div className="font-semibold mb-2">ประวัติทั้งหมด</div>
-            <StandardHistoryPanel standard={standard} />
-          </div>
+          <Button variant="outline" asChild>
+            <Link to={`/stock/standards/${standard._id}/history`}><History className="w-4 h-4 mr-1" /> ดูประวัติทั้งหมด</Link>
+          </Button>
         </div>
       </SheetContent>
     </Sheet>
