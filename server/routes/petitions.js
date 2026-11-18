@@ -311,7 +311,7 @@ router.get('/', async (req, res) => {
     }
     // ค่าเริ่มต้นซ่อนคำร้องเฉพาะ Admin; admin ขอดูแยกด้วย ?adminOnly=true
     const viewerAdmin = await viewerIsAdmin(req);
-    andConditions.push(req.query.adminOnly === 'true' && viewerAdmin ? { adminOnly: true } : NOT_ADMIN_ONLY);
+    Object.assign(q, req.query.adminOnly === 'true' && viewerAdmin ? { adminOnly: true } : NOT_ADMIN_ONLY);
     if (andConditions.length === 1) Object.assign(q, andConditions[0]);
     else if (andConditions.length > 1) q.$and = andConditions;
     const summaryQ = { ...q };
