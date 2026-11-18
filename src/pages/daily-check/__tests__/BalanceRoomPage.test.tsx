@@ -81,6 +81,33 @@ describe("BalanceRoomPage", () => {
     expect(screen.queryByText("เครื่องชั่ง 1")).not.toBeInTheDocument();
   });
 
+  it("shows today's saved status even when it was recorded in another period", async () => {
+    apiMock.getDailyChecks.mockResolvedValue([{
+      _id: "daily-afternoon",
+      scaleId: "scale-1",
+      scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
+      date: new Date().toISOString().slice(0, 10),
+      weights100: [500, 500, 500],
+      weights10: [10, 10, 10],
+      avg100: 500,
+      avg10: 10,
+      status100: "pass",
+      status10: "pass",
+      status: "pass",
+      tolerance: 0.05,
+      recorder: "Dev Administrator",
+      period: "afternoon",
+      checkedAt: new Date().toISOString(),
+    }]);
+
+    renderPage();
+
+    expect(await screen.findByText("ตรวจแล้ว 1/5")).toBeInTheDocument();
+    expect(screen.getByText("ผ่าน 1/5")).toBeInTheDocument();
+    expect(screen.getAllByText("ผ่าน").length).toBeGreaterThan(0);
+    expect(screen.getByText("ผ่านวันนี้")).toBeInTheDocument();
+  });
+
   it("allows calibration outside the morning and afternoon periods", async () => {
     state.period = null;
     renderPage();

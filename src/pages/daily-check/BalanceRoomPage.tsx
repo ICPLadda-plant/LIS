@@ -32,7 +32,7 @@ import BalanceControlReport, { BALANCE_CONTROL_REPORT_CSS } from "@/components/l
 import { api, type DailyCheckRecord } from "@/lib/api";
 import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTrend } from "@/lib/aiApi";
 import { useAuth } from "@/context/AuthContext";
-import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
+import { getCurrentDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
 import { formatDate } from "@/lib/dateTime";
 import { fmtThaiDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { exportBalanceControlExcel } from "@/lib/balanceControlExport";
@@ -244,14 +244,10 @@ const BalanceRoomPage = () => {
   const latestByScale = useMemo(() => {
     const map: Record<string, DailyCheckRecord> = {};
     for (const r of todayRecords) {
-      if (currentPeriod) {
-        const recordPeriod = r.period ?? getDailyCheckPeriod(r.checkedAt);
-        if (recordPeriod !== currentPeriod) continue;
-      }
       if (!map[r.scaleId]) map[r.scaleId] = r;
     }
     return map;
-  }, [todayRecords, currentPeriod]);
+  }, [todayRecords]);
 
   const config = getBalanceControlConfig(controlConfigs, scale.id, scale.controlWeight);
   const series = useMemo(() => buildMonthlySeries(monthRecords ?? [], month, scale.controlWeight), [monthRecords, month, scale.controlWeight]);
