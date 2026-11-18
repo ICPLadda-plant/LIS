@@ -100,6 +100,7 @@ test('invalid numeric request date falls back to the nearest ERP MF date', () =>
     item_no: 'F-THDMR-1000X12',
     prod_order_no: 'MF26110134',
     create_date: '2026-11-17T00:00:00.000Z',
+    __mfClosed: true,
   }, {
     item_no: 'F-THDMR-1000X12',
     prod_order_no: 'MF26110137',
@@ -107,8 +108,8 @@ test('invalid numeric request date falls back to the nearest ERP MF date', () =>
   }]);
 
   assert.equal(result.sample.batchNo, '20260430');
-  assert.equal(result.sample.productionDate, '2026-11-17');
-  assert.equal(result.mfCandidates[0].productionDate, '2026-11-17');
+  assert.equal(result.sample.productionDate, '2026-11-16');
+  assert.equal(result.mfCandidates[0].productionDate, '2026-11-16');
 });
 
 test('legacy Lab matching handles reversed substances and historical spelling', () => {

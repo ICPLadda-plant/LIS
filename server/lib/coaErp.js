@@ -138,11 +138,16 @@ function itemCodeFromRow(row) {
 }
 
 function productionDateFromRow(row, fallback = '') {
-  const explicit = pick(row, [
-    'create_date', 'createDate', 'production_date', 'productionDate',
+  const actualProductionDate = pick(row, [
+    'production_date', 'productionDate',
     'mfg_date', 'manufacture_date', 'registering_date', 'registeringDate',
   ]);
-  const productionDate = normalizeIsoDate(explicit || positionalDateFromRow(row) || fallback);
+  const createdDate = pick(row, ['create_date', 'createDate']);
+  let productionDate = normalizeIsoDate(actualProductionDate || createdDate || positionalDateFromRow(row) || fallback);
+  if (row?.__mfClosed && !actualProductionDate && createdDate && productionDate) {
+    productionDate = new Date(Date.parse(`${productionDate}T00:00:00.000Z`) - 24 * 60 * 60 * 1000)
+      .toISOString().slice(0, 10);
+  }
   // ponytail: LIS production data is modern; widen this if pre-2000 records are imported intentionally.
   return productionDate && Number(productionDate.slice(0, 4)) >= 2000 ? productionDate : '';
 }
@@ -1173,7 +1178,8 @@ async function fetchErpReferences() {
     fetchJson(STOCK_URL),
   ]);
   return {
-    mfRows: mfResults.flatMap(rowsFromPayload),
+    mfRows: mfResults.flatMap((payload, index) => rowsFromPayload(payload)
+      .map((row) => ({ ...row, __mfClosed: index === 1 }))),
     stockRows: rowsFromPayload(stockPayload),
   };
 }
