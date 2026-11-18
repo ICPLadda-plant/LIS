@@ -21,6 +21,12 @@ function petitionCommonNames(p: Petition): string[] {
   return [...new Set(names)];
 }
 
+// เลข batch ทุกรายการในคำร้อง (ตัดซ้ำ/ว่างออก)
+function petitionBatchNos(p: Petition): string[] {
+  const nos = (p.items ?? []).map((item) => item.batchNo?.trim() ?? "").filter(Boolean);
+  return [...new Set(nos)];
+}
+
 const CONCLUSION_META: Record<ConclusionKey, { label: string; cls: string }> = {
   "pass": { label: "ผ่าน", cls: "border-green-200 bg-green-50 text-green-700 dark:border-green-500/30 dark:bg-green-500/15 dark:text-green-300" },
   "accepted-oos": { label: "ยอมรับผลไม่ปกติ", cls: "border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/15 dark:text-yellow-300" },
@@ -42,14 +48,14 @@ export default function AnalysisResults() {
       .filter((r) => (filter === "all" ? true : r.conclusion === filter))
       .filter((r) =>
         search.trim()
-          ? `${r.p.petitionNo} ${petitionCommonNames(r.p).join(" ")}`.toLowerCase().includes(search.trim().toLowerCase())
+          ? `${r.p.petitionNo} ${petitionBatchNos(r.p).join(" ")} ${petitionCommonNames(r.p).join(" ")}`.toLowerCase().includes(search.trim().toLowerCase())
           : true,
       );
     return rankSearchResults(matches, search, ({ p }) => {
       const itemNos = (p.items ?? []).map((item) => item.itemNo).filter((itemNo) => itemNo?.trim());
       return {
         primary: itemNos.length ? itemNos : [p.petitionNo],
-        secondary: [p.petitionNo, ...petitionCommonNames(p)],
+        secondary: [p.petitionNo, ...petitionBatchNos(p), ...petitionCommonNames(p)],
       };
     });
   }, [data, filter, search]);
@@ -66,7 +72,7 @@ export default function AnalysisResults() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาเลขคำร้อง / ชื่อสามัญ"
+            placeholder="ค้นหาเลขคำร้อง / Batch / ชื่อสามัญ"
             className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
           {(["all", "pass", "accepted-oos", "returned-to-requester"] as const).map((k) => (
@@ -85,6 +91,7 @@ export default function AnalysisResults() {
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">เลขคำร้อง</th>
+                <th className="px-3 py-2">Batch</th>
                 <th className="px-3 py-2">แผนก</th>
                 <th className="px-3 py-2">ชื่อสามัญ</th>
                 <th className="px-3 py-2">วันที่จบ</th>
@@ -93,15 +100,16 @@ export default function AnalysisResults() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">กำลังโหลด…</td></tr>
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">กำลังโหลด…</td></tr>
               )}
               {!loading && rows.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">ยังไม่มีประวัติ</td></tr>
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">ยังไม่มีประวัติ</td></tr>
               )}
               {rows.map(({ p, conclusion }) => {
                 const meta = CONCLUSION_META[conclusion];
                 const doneAt = p.approvedAt || p.rejectedAt || p.completedAt;
                 const commonNames = petitionCommonNames(p);
+                const batchNos = petitionBatchNos(p);
                 return (
                   <tr
                     key={p._id}
@@ -109,6 +117,7 @@ export default function AnalysisResults() {
                     className="cursor-pointer border-t border-border hover:bg-accent/60"
                   >
                     <td className="px-3 py-2 font-medium">{p.petitionNo}</td>
+                    <td className="px-3 py-2 tabular-nums">{batchNos.length ? batchNos.join(", ") : "-"}</td>
                     <td className="px-3 py-2">{petitionDepartmentLabel(p)}</td>
                     <td className="px-3 py-2">{commonNames.length ? commonNames.join(", ") : "-"}</td>
                     <td className="px-3 py-2">{formatDate(doneAt)}</td>
