@@ -37,6 +37,8 @@ import {
   MF_HISTORICAL_API_URL,
 } from '@/lib/mfItemDates';
 import { type Petition, type PetitionRouteTarget } from '@/types/petition.types';
+import { Checkbox } from '@/components/ui/checkbox';
+import { normalizeRoles } from '@/lib/roles';
 
 const ICP_LADDA_ADDRESS = '151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000';
 const ICP_LADDA_COMPANY = 'ICP Ladda Co., LTD.';
@@ -814,6 +816,9 @@ export default function ProductionPetitionNewPage({
   const [items, setItems] = useState<ItemRowValues[]>(() =>
     initialQueryItems.length ? initialQueryItems : [makeBlankItem(1)],
   );
+  // Admin สร้างคำร้องแบบเห็นเฉพาะ Admin ได้ทุกสาร (แยกจากคำร้องปกติ)
+  const canCreateAdminOnly = normalizeRoles(user).includes('admin');
+  const [adminOnlyPetition, setAdminOnlyPetition] = useState(false);
 
   useEffect(() => {
     if (initialQueryItems.length) setItems(initialQueryItems);
@@ -1058,6 +1063,7 @@ export default function ProductionPetitionNewPage({
         cause: '',
         revisionOf: revisionOfId || undefined,
         replacePetitionNo: editPetitionNo || undefined,
+        adminOnly: canCreateAdminOnly && adminOnlyPetition && !editPetitionNo ? true : undefined,
       };
       const created = await createPetition(payload as Parameters<typeof createPetition>[0]) as Petition & { existingLabRequestId?: string | null };
 
@@ -1249,6 +1255,22 @@ export default function ProductionPetitionNewPage({
             )}
           </CardContent>
         </Card>
+
+        {canCreateAdminOnly && !editPetitionNo && (
+          <label className="flex items-start gap-3 rounded-xl bg-muted px-4 py-3 text-sm">
+            <Checkbox
+              checked={adminOnlyPetition}
+              onCheckedChange={(checked) => setAdminOnlyPetition(checked === true)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium text-foreground">คำร้องเฉพาะ Admin</span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                เห็นได้และมอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin ไม่แสดงรวมกับคำร้องปกติ
+              </span>
+            </span>
+          </label>
+        )}
 
         <div className="flex flex-col-reverse sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3">
           <Button variant="ghost" onClick={goBack} disabled={stepIdx === 0 || submitting} className="w-full sm:w-auto">

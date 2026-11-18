@@ -268,6 +268,27 @@ router.get("/last-values", async (req, res) => {
   }
 });
 
+// น้ำหนัก Std PACLOBUTRAZOL ล่าสุด — ใช้ต่อจนกว่าจะเบิก Std PACLOBUTRAZOL ขวดใหม่
+router.get("/paclobutrazol-std-weights", async (req, res) => {
+  try {
+    const STD1 = "PBZ Std 1 wt/mg";
+    const STD2 = "PBZ Std 2 wt/mg";
+    const excludePetitionId = String(req.query.excludePetitionId || "").trim();
+    const filter = { $or: [{ [`values.${STD1}`]: { $nin: [null, ""] } }, { [`values.${STD2}`]: { $nin: [null, ""] } }] };
+    if (mongoose.isValidObjectId(excludePetitionId)) filter.petitionId = { $ne: excludePetitionId };
+    const doc = await QCTestResult.findOne(filter).sort({ updatedAt: -1, enteredAt: -1 }).lean();
+    if (!doc) return res.json({});
+    const StockUnit = require("../models/StockUnit");
+    const lastWithdraw = await StockUnit.findOne({ itemName: /paclobutrazol/i, withdrawnDate: { $ne: null } })
+      .sort({ withdrawnDate: -1 }).select("withdrawnDate").lean();
+    const enteredAt = doc.updatedAt || doc.enteredAt;
+    if (lastWithdraw?.withdrawnDate && enteredAt && new Date(lastWithdraw.withdrawnDate) > new Date(enteredAt)) return res.json({});
+    res.json({ std1: String(doc.values?.[STD1] ?? ""), std2: String(doc.values?.[STD2] ?? ""), petitionNo: doc.petitionNo, enteredAt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/qc-results/by-petitions?petitionIds=a,b&parameterIds=x,y
 // ผลแบบย่อของหลายคำร้อง (เฉพาะ parameter ที่ขอ) — หน้า /petition ใช้อ่านค่า ถพ. ต่อ batch
 router.get("/by-petitions", async (req, res) => {

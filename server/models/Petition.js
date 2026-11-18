@@ -230,6 +230,8 @@ const PetitionSchema = new mongoose.Schema(
     items: { type: [PetitionItemSchema], default: [] },
     cause: String,
     reviewHistory: { type: [ReviewEntrySchema], default: [] },
+    // คำร้อง PACLOBUTRAZOL เฉพาะ Admin: เห็น/รับงานได้เฉพาะ role admin และไม่ปนกับรายการคำร้องปกติ
+    adminOnly: { type: Boolean, default: false, index: true },
     assignedTo: PetitionAssigneeSchema,
     assignedMachines: { type: [PetitionAssignedMachineSchema], default: [] },
     // เวลาที่คาดว่าจะได้รับผล Lab — บันทึกตอนกด "เริ่มงาน" / เปลี่ยนเครื่อง / Re-check

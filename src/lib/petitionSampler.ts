@@ -67,10 +67,11 @@ export function sampleLabelSideNumber(
  * รูปแบบอื่นคืน null ให้ป้ายคงช่องว่างแบบเดิม
  */
 export function sampleLabelDocumentNumber(petitionNo: string | null | undefined): { seq: string; year: string } | null {
-  const match = String(petitionNo ?? "").trim().match(/^P-(\d{2})(\d{2})-(\d+)$/i);
+  // PA- = คำร้องเฉพาะ Admin (ลำดับแยก) → แสดงเลขนำหน้าด้วย A เช่น PA-2611-0002 → A2/69
+  const match = String(petitionNo ?? "").trim().match(/^P(A?)-(\d{2})(\d{2})-(\d+)$/i);
   if (!match) return null;
-  const seq = String(Number(match[3]));
-  const year = String((Number(match[1]) + 43) % 100).padStart(2, "0");
+  const seq = `${match[1] ? "A" : ""}${Number(match[4])}`;
+  const year = String((Number(match[2]) + 43) % 100).padStart(2, "0");
   return { seq, year };
 }
 

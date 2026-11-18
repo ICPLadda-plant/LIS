@@ -64,6 +64,20 @@ router.get('/assignees', async (_req, res) => {
 
 // All active monthly employees (every department) — drives the Access Control
 // "link to employee" picker.
+// ผู้รับงานคำร้องเฉพาะ Admin (PACLOBUTRAZOL) — เฉพาะผู้ใช้ role admin ที่ผูกรหัสพนักงานแล้ว
+router.get('/admin-assignees', async (_req, res) => {
+  try {
+    const admins = await User.find({
+      status: 'active',
+      employeeId: { $gt: '' },
+      $or: [{ roles: 'admin' }, { role: 'admin' }],
+    }).lean();
+    res.json(admins.map(userToAssignee).sort(byDeptThenName));
+  } catch (err) {
+    res.status(500).json({ error: { message: err.message } });
+  }
+});
+
 router.get('/directory', async (_req, res) => {
   try {
     const employees = await fetchMonthlyEmployees();

@@ -88,6 +88,9 @@ export default function PetitionAssignPage() {
   const userRoles = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
   const canManage = userRoles.some((role) => role === 'admin' || role === 'lab-head');
   const canClaimRole = canManage || userRoles.includes('lab-analyze');
+  // Admin สลับไปดูคำร้องเฉพาะ Admin — มอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin
+  const isAdmin = userRoles.includes('admin');
+  const [adminOnlyMode, setAdminOnlyMode] = useState(false);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -134,7 +137,7 @@ export default function PetitionAssignPage() {
     error: pendingError,
     refresh: refreshPending,
   } = usePetitionList(
-    { page: 1, limit: 100, status: 'sampleSent,pendingReview' },
+    { page: 1, limit: 100, status: 'sampleSent,pendingReview', adminOnly: adminOnlyMode },
     { refetchOnFocus: true, pollMs: 30_000 },
   );
   const {
@@ -143,7 +146,7 @@ export default function PetitionAssignPage() {
     error: inProgressError,
     refresh: refreshInProgress,
   } = usePetitionList(
-    { page: 1, limit: 100, status: 'inProgress' },
+    { page: 1, limit: 100, status: 'inProgress', adminOnly: adminOnlyMode },
     { refetchOnFocus: true, pollMs: 30_000 },
   );
   const {
@@ -152,7 +155,7 @@ export default function PetitionAssignPage() {
     error: staleReceivedError,
     refresh: refreshStaleReceived,
   } = usePetitionList(
-    { page: 1, limit: 100, status: 'deliveringQC' },
+    { page: 1, limit: 100, status: 'deliveringQC', adminOnly: adminOnlyMode },
     { refetchOnFocus: true, pollMs: 30_000 },
   );
   // Re-check อาจเป็นคนอื่นมาทำอีกวัน — ดึงงานเหล่านี้กลับมา (แม้สถานะ success แล้ว) ให้เปลี่ยนผู้รับงานได้
@@ -162,7 +165,7 @@ export default function PetitionAssignPage() {
     error: recheckError,
     refresh: refreshRecheck,
   } = usePetitionList(
-    { page: 1, limit: 100, labRecheckPending: true },
+    { page: 1, limit: 100, labRecheckPending: true, adminOnly: adminOnlyMode },
     { refetchOnFocus: true, pollMs: 30_000 },
   );
   const [fetchedEmployees, setFetchedEmployees] = useState<EmployeeAssignee[]>([]);
@@ -177,7 +180,7 @@ export default function PetitionAssignPage() {
     setEmployeesLoading(true);
     setEmployeesError(null);
 
-    api.get<EmployeeAssignee[]>('/employees/assignees')
+    api.get<EmployeeAssignee[]>(adminOnlyMode ? '/employees/admin-assignees' : '/employees/assignees')
       .then((res) => {
         if (!alive) return;
         setFetchedEmployees(res.data.data);
@@ -193,14 +196,14 @@ export default function PetitionAssignPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [adminOnlyMode]);
 
   // In dev mode prepend fake Lab dev users so a petition can be assigned and
   // then viewed on the lab pages by switching to that role (HR API has no dev
   // staff). Always shown, even if the HR fetch failed.
   const employees = useMemo(
-    () => (DEV_MODE ? [...synthesizeDevAssignees(), ...fetchedEmployees] : fetchedEmployees),
-    [fetchedEmployees],
+    () => (DEV_MODE && !adminOnlyMode ? [...synthesizeDevAssignees(), ...fetchedEmployees] : fetchedEmployees),
+    [fetchedEmployees, adminOnlyMode],
   );
 
   const employeeById = useMemo(
@@ -401,7 +404,7 @@ export default function PetitionAssignPage() {
         />
         <div className="space-y-5">
           <PageHeader
-            title="Assign คำร้องให้เจ้าหน้าที่"
+            title={adminOnlyMode ? 'Assign คำร้องเฉพาะ Admin' : 'Assign คำร้องให้เจ้าหน้าที่'}
             description={canManage
               ? 'ลากคำร้องไปวางบนการ์ดเจ้าหน้าที่เพื่อ assign ได้ทันที แม้ยังไม่ส่งหรือยังไม่รับตัวอย่าง เจ้าหน้าที่จะเลือกเครื่องตอนกดเริ่มงาน'
               : canClaim
@@ -409,6 +412,14 @@ export default function PetitionAssignPage() {
                 : 'ดูการมอบหมายงาน Lab ได้อย่างเดียว หัวหน้า Lab เป็นผู้มอบหมายงาน'}
             actions={
               <div className="flex flex-wrap items-center gap-2">
+                {isAdmin && (
+                  <Button
+                    variant={adminOnlyMode ? 'primary' : 'outline'}
+                    onClick={() => setAdminOnlyMode((on) => !on)}
+                  >
+                    {adminOnlyMode ? 'กลับไปคำร้องปกติ' : 'คำร้องเฉพาะ Admin'}
+                  </Button>
+                )}
                 {canManage && (
                   <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
                     <QrCode className="h-4 w-4" />

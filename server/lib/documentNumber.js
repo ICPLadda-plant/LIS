@@ -12,6 +12,10 @@ const DEFAULTS = {
 };
 
 const DOC_TYPES = Object.keys(DEFAULTS);
+// เลขคำร้องเฉพาะ Admin — ลำดับแยกจากคำร้องปกติ ไม่เปิดให้ตั้งค่าในหน้า config
+const HIDDEN_DEFAULTS = {
+  adminPetition: { docType: 'adminPetition', prefix: 'PA', yearFormat: 'yy', includeMonth: true, seqPadding: 4, separator: '-' },
+};
 const YEAR_FORMATS = ['none', 'yy', 'yyyy'];
 
 function escapeRegex(s) {
@@ -65,7 +69,7 @@ function validateDocNumberConfig(input) {
 async function nextDocumentNumber(docType, Model, numField) {
   const DocumentNumberConfig = require('../models/DocumentNumberConfig');
   const saved = await DocumentNumberConfig.findOne({ docType }).lean();
-  const cfg = saved || DEFAULTS[docType];
+  const cfg = saved || DEFAULTS[docType] || HIDDEN_DEFAULTS[docType];
   const now = new Date();
   const scanPrefix = buildScanPrefix(cfg, now);
   const last = await Model.findOne({ [numField]: new RegExp(`^${escapeRegex(scanPrefix)}`) })

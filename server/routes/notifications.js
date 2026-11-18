@@ -15,7 +15,7 @@ const PETITION_FIELDS = [
   'items.seq', 'items.batchNo', 'items.sampleName', 'items.commonName', 'items.itemNo',
   'items.sendToQc', 'items.sendToLab', 'items.sentToLab', 'items.productType', 'items.category',
   'submittedBy', 'productionWorkflow.requesterEmail', 'assignedTo', 'qcHandlers', 'qcReceivedBy',
-  'qcCompletedBy', 'labelReceipts', 'qcCompletedAt', 'labCompletedAt', 'labApprovedAt', 'deletedAt',
+  'qcCompletedBy', 'labelReceipts', 'qcCompletedAt', 'labCompletedAt', 'labApprovedAt', 'deletedAt', 'adminOnly',
 ].join(' ');
 
 const list = (value) => String(value || '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -49,6 +49,7 @@ async function petitionFeed(viewer, since, limit) {
     if (items.length >= limit) break;
     const petition = byId.get(String(log.petitionId));
     if (!petition || petition.deletedAt) continue;
+    if (petition.adminOnly && !viewer?.roles?.includes('admin')) continue;
     if (isCollapsibleDuplicate(log, seen)) continue;
     const notification = notificationForViewer(petition, log, viewer);
     if (notification) items.push({ ...notification, group: 'petition' });

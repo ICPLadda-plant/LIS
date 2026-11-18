@@ -12,6 +12,8 @@ import { api } from '@/lib/api';
 import { buildPetitionMasterItemOptions, normalizeMasterItemPayload } from '@/lib/petitionMasterItem';
 import { createPetition, deletePetition } from '@/hooks/usePetition';
 import { useAuth } from '@/hooks/useAuth';
+import { Checkbox } from '@/components/ui/checkbox';
+import { normalizeRoles } from '@/lib/roles';
 import { buildRmPetitionItems, type RmTestSelection } from '@/lib/rmPetitionMapping';
 import type { GoodsReceiptReceipt, RawMaterialInspection } from '@/types/goodsReceipt.types';
 import GoodsReceiptStep from '@/components/warehouse/GoodsReceiptStep';
@@ -23,6 +25,8 @@ const STEPS = ['ใบรับสินค้า', 'ใบตรวจสอบ
 export default function RmPetitionNewPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const canCreateAdminOnly = normalizeRoles(user).includes('admin');
+  const [adminOnlyPetition, setAdminOnlyPetition] = useState(false);
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
   const [warehouse, setWarehouse] = useState('');
@@ -80,6 +84,7 @@ export default function RmPetitionNewPage() {
         },
         items,
         cause: '',
+        adminOnly: canCreateAdminOnly && adminOnlyPetition ? true : undefined,
       } as Parameters<typeof createPetition>[0]);
       petitionId = created._id;
 
@@ -143,6 +148,22 @@ export default function RmPetitionNewPage() {
           </span></p>
           <p className="text-grey-600">กดส่งเพื่อสร้างคำขอและบันทึกฟอร์ม</p>
         </div>
+      )}
+
+      {canCreateAdminOnly && step === STEPS.length - 1 && (
+        <label className="flex items-start gap-3 rounded-xl bg-muted px-4 py-3 text-sm">
+          <Checkbox
+            checked={adminOnlyPetition}
+            onCheckedChange={(checked) => setAdminOnlyPetition(checked === true)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-medium text-foreground">คำร้องเฉพาะ Admin</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              เห็นได้และมอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin ไม่แสดงรวมกับคำร้องปกติ
+            </span>
+          </span>
+        </label>
       )}
 
       <div className="flex justify-between pt-2">

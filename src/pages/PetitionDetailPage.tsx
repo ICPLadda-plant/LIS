@@ -431,7 +431,7 @@ export default function PetitionDetailPage({ mode = 'petition' }: PetitionDetail
                           ยกเลิกคำขอ
                         </Button>
                       )}
-                      {!isResultMode && canDelete && (
+                      {(!isResultMode || data.adminOnly) && canDelete && (
                         <Button
                           variant="danger-outline"
                           size="sm"

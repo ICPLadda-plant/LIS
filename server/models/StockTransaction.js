@@ -24,6 +24,7 @@ const StockTransactionSchema = new mongoose.Schema({
   delta: { type: Number, default: null },
   unit: String,
   sampleId: String,
+  petitionNo: { type: String, index: true },
   note: String,
   unitId: String,
   qrId: String,

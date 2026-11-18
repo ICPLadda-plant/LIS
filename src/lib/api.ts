@@ -131,7 +131,7 @@ function devDepartmentHeader() {
   return window.localStorage.getItem("dev_department")?.trim() || "";
 }
 
-function identityHeaders(): Record<string, string> {
+export function identityHeaders(): Record<string, string> {
   const headers: Record<string, string> = currentUserEmail ? { "X-LIS-User": currentUserEmail } : {};
   const devDepartment = devDepartmentHeader();
   if (devDepartment) headers["X-LIS-Department"] = encodeURIComponent(devDepartment);
@@ -517,6 +517,13 @@ export const api = {
   },
   getStockUnit: (qrId: string) =>
     request<StockUnitItem>(`/stock/units/${encodeURIComponent(qrId)}`),
+  getStockUnitPetitions: (qrId: string) =>
+    request<{
+      withdrawnDate: string | null;
+      start: string | null;
+      end: string | null;
+      petitions: { petitionNo: string; petitionId?: string; source: "withdraw" | "inferred"; date: string | null }[];
+    }>(`/stock/units/${encodeURIComponent(qrId)}/petitions`),
   getPublicStockItem: (qrId: string) =>
     request<StockPublicScanItem>(`/stock/public/${encodeURIComponent(qrId)}`),
   deductStockUnitMg: (
@@ -943,6 +950,10 @@ export const api = {
   getLastBatchValues: (commonName: string, parameterId: string, excludePetitionId: string) => {
     const qs = new URLSearchParams({ commonName, parameterId, excludePetitionId }).toString();
     return request<{ petitionNo?: string; enteredAt?: string; values?: Record<string, unknown> }>(`/qc-results/last-values?${qs}`);
+  },
+  getPaclobutrazolStdWeights: (excludePetitionId: string) => {
+    const qs = new URLSearchParams({ excludePetitionId }).toString();
+    return request<{ std1?: string; std2?: string; petitionNo?: string; enteredAt?: string }>(`/qc-results/paclobutrazol-std-weights?${qs}`);
   },
   getReturnedFlags: (petitionIds: string[]) => {
     if (petitionIds.length === 0) return Promise.resolve({} as Record<string, boolean>);
