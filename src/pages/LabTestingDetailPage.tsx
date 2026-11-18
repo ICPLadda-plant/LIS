@@ -37,7 +37,9 @@ import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
 import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
-import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
+import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
+import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
+import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
 import { matchSubstanceKey } from '@/lib/substances';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
@@ -1655,6 +1657,20 @@ export default function LabTestingDetailPage() {
                                 return units.map((unit) => renderEditUnit(unit, srcValues, onUnitChange, saveInfoSrc, scalarExtras));
                               };
                               const aiSubstances = isAiParameter ? aiSubstancesForItem(item.commonName) : [];
+                              if (isAiParameter && isPaclobutrazolItem(item.commonName)) {
+                                // PACLOBUTRAZOL: ตาราง Internal standard แทนชุด Area Inj / % Sample
+                                return (
+                                  <div className="grid grid-cols-1 gap-4 pl-2 sm:grid-cols-6">
+                                    <PaclobutrazolGrid
+                                      values={srcValues}
+                                      onChange={onUnitChange}
+                                      disabled={fieldDisabled}
+                                      petitionId={String(petition._id ?? '')}
+                                    />
+                                    {fields.filter((field) => field.type === 'reference' || !isAiSetFieldLabel(field.label)).map(renderField)}
+                                  </div>
+                                );
+                              }
                               if (aiSubstances.length === 0) {
                                 return (
                                   <div className={cn('grid grid-cols-1 gap-4 pl-2', isAiParameter ? 'sm:grid-cols-6' : 'sm:grid-cols-2')}>
