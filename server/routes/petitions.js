@@ -1233,8 +1233,10 @@ router.post('/', async (req, res) => {
     if (submissionError) return badRequest(res, submissionError);
     const adminOnly = body.adminOnly === true;
     delete body.adminOnly;
+    let adminCreator = null;
     if (adminOnly) {
       if (!(await viewerIsAdmin(req))) return res.status(403).json({ error: { message: 'เฉพาะ Admin ที่สร้างคำร้องเฉพาะ Admin ได้' } });
+      adminCreator = await currentUser(req).catch(() => null);
     }
     if (body.replacePetitionNo) return await replaceProductionPetition(body, res);
     let revisionOf = null;
@@ -1275,6 +1277,18 @@ router.post('/', async (req, res) => {
       const now = new Date();
       const actorName = body.actor || submittedBy?.name || 'system';
       const start = { sampleSentAt: now, receivedAt: now, receivedBy: actorName };
+      // ฝั่ง Lab: assign ให้ admin ผู้สร้างทันที
+      const creatorId = String(adminCreator?.employeeId || submittedBy?.employeeId || '').trim();
+      if (creatorId) {
+        start.assignedTo = {
+          employeeId: creatorId,
+          name: String(adminCreator?.name || submittedBy?.name || actorName).trim(),
+          department: adminCreator?.department || submittedBy?.department || undefined,
+          position: adminCreator?.position || submittedBy?.position || undefined,
+          assignedAt: now,
+          assignedBy: actorName,
+        };
+      }
       for (const side of routeTargets || []) {
         if (side === 'qc' || side === 'lab') {
           start[`${side}ReceivedAt`] = now;
