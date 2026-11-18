@@ -52,6 +52,7 @@ const {
   normalizeDeductionResolutionInput,
 } = require('../lib/deductionResolution');
 const { buildInUseItems, canAcknowledgeDeduction } = require('../lib/standardsInUse');
+const { refreshPetitionUsageForGroup } = require('../lib/standardPetitionUsageSync');
 const { normalizeSixMonthStockItems } = require('../lib/sixMonthStockItems');
 const {
   buildStandardExportDateRange,
@@ -725,6 +726,8 @@ async function deductMgFromUnit(qrId, mg, meta = {}) {
   if (!updated) throw new Error('ปริมาณคงเหลือไม่พอ');
   const before = normalizeQuantity(updated.volume.remaining + deductionAmount); // pre-decrement value, atomically consistent
   await settleRemainingAfterInc(updated);
+  // เบิกครั้งแรก = เริ่มใช้ขวด (ขวดก่อนหน้าของสารเดียวกันถือว่าหมด)
+  const firstWithdraw = await StockUnit.updateOne({ _id: updated._id, withdrawnDate: null }, { $set: { withdrawnDate: new Date() } });
   const std = await StockStandard.findOne({ code: updated.itemCode });
   await logTransaction({
     itemType: 'standard',
@@ -744,10 +747,14 @@ async function deductMgFromUnit(qrId, mg, meta = {}) {
     instrumentName: meta.instrumentName,
     instrumentGroup: meta.instrumentGroup,
     sampleId: meta.sampleId,
+    petitionNo: meta.petitionNo || undefined,
     note: meta.note,
     userEmail: meta.userEmail,
     userName: meta.userName,
   });
+  if (firstWithdraw.modifiedCount || meta.petitionNo) {
+    refreshPetitionUsageForGroup(updated.itemCode, updated.type).catch((err) => console.error('[petitionUsage]', err.message));
+  }
   return { unit: updated, before, after: updated.volume.remaining };
 }
 
@@ -1066,6 +1073,7 @@ router.post('/units/:qrId/deduct-mg', async (req, res) => {
       instrumentId, instrumentName, sampleId,
       // กัน audit หาย: ค่านอก enum → undefined (default null)
       instrumentGroup: instrumentGroup === 'gc' || instrumentGroup === 'hplc' ? instrumentGroup : undefined,
+      petitionNo: typeof petitionNo === 'string' ? petitionNo.trim() : undefined,
       note: [petitionNo, note].filter(Boolean).join(' · '),
       ...(await userMeta(req)),
     };
@@ -1304,6 +1312,19 @@ router.get('/units/:qrId', async (req, res) => {
     const unit = await StockUnit.findOne({ qrId: req.params.qrId });
     if (!unit) return res.status(404).json({ error: 'ไม่พบขวด' });
     res.json(unit);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ใบนำส่งที่ใช้ขวดนี้: GET /units/:qrId/petitions (คำนวณใหม่และบันทึกลงขวดทั้งกลุ่ม)
+router.get('/units/:qrId/petitions', async (req, res) => {
+  try {
+    const unit = await StockUnit.findOne({ qrId: req.params.qrId }).select('itemCode type itemType').lean();
+    if (!unit) return res.status(404).json({ error: 'ไม่พบขวด' });
+    if (unit.itemType === 'standard') await refreshPetitionUsageForGroup(unit.itemCode, unit.type);
+    const fresh = await StockUnit.findOne({ qrId: req.params.qrId }).select('petitionUsage withdrawnDate').lean();
+    res.json({ withdrawnDate: fresh?.withdrawnDate || null, ...(fresh?.petitionUsage || { start: null, end: null, petitions: [] }) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -34,6 +34,24 @@ const StockUnitSchema = new mongoose.Schema({
   status: { type: String, enum: ['active', 'empty', 'discarded'], default: 'active', index: true },
   receivedDate: { type: Date, default: null },
   withdrawnDate: { type: Date, default: null },
+  // ใบนำส่งที่ใช้ขวดนี้ (คำนวณจากช่วงเบิกขวดนี้ถึงก่อนเบิกขวดถัดไปของสารเดียวกัน)
+  petitionUsage: {
+    type: new mongoose.Schema({
+      start: { type: Date, default: null },
+      end: { type: Date, default: null },
+      petitions: {
+        type: [new mongoose.Schema({
+          petitionNo: String,
+          petitionId: String,
+          source: { type: String, enum: ['withdraw', 'inferred'] },
+          date: { type: Date, default: null },
+        }, { _id: false })],
+        default: [],
+      },
+      computedAt: Date,
+    }, { _id: false }),
+    default: undefined,
+  },
   discardedAt: { type: Date, default: null },
   discardedBy: { type: PersonSchema, default: undefined },
   discardReason: { type: String, default: '' },

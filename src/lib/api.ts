@@ -517,6 +517,13 @@ export const api = {
   },
   getStockUnit: (qrId: string) =>
     request<StockUnitItem>(`/stock/units/${encodeURIComponent(qrId)}`),
+  getStockUnitPetitions: (qrId: string) =>
+    request<{
+      withdrawnDate: string | null;
+      start: string | null;
+      end: string | null;
+      petitions: { petitionNo: string; petitionId?: string; source: "withdraw" | "inferred"; date: string | null }[];
+    }>(`/stock/units/${encodeURIComponent(qrId)}/petitions`),
   getPublicStockItem: (qrId: string) =>
     request<StockPublicScanItem>(`/stock/public/${encodeURIComponent(qrId)}`),
   deductStockUnitMg: (

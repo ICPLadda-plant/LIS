@@ -23,6 +23,11 @@ export default function StockUnitScanPage() {
     queryFn: () => api.getStockUnit(qrId),
     enabled: !!qrId,
   });
+  const { data: usage } = useQuery({
+    queryKey: ["stock", "unit", qrId, "petitions"],
+    queryFn: () => api.getStockUnitPetitions(qrId),
+    enabled: !!qrId && !!unit,
+  });
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["stock", "unit", qrId] });
   const st = unit ? unitDerivedStatus(unit) : null;
@@ -42,6 +47,25 @@ export default function StockUnitScanPage() {
               <span>เหลือ {formatStockQuantityWithUnit(unit.volume?.remaining, unit.volume?.unit)}</span>
               <span>EXP {formatDate(unit.exp)}</span>
             </div>
+            {usage && (
+              <div className="pt-3 space-y-2 border-t">
+                <div className="text-sm font-medium">ใบนำส่งที่ใช้ขวดนี้</div>
+                <div className="text-xs text-muted-foreground">
+                  {usage.start
+                    ? `เบิก ${formatDate(usage.start)} · ${usage.end ? `หมดเมื่อเบิกขวดถัดไป ${formatDate(usage.end)}` : "กำลังใช้งาน"}`
+                    : "ยังไม่เคยเบิกใช้"}
+                </div>
+                {usage.petitions.length ? (
+                  <div className="flex flex-wrap gap-1">
+                    {usage.petitions.map((p) => (
+                      <Badge key={p.petitionNo} variant={p.source === "withdraw" ? "default" : "secondary"}>{p.petitionNo}</Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">ยังไม่มีใบนำส่ง</p>
+                )}
+              </div>
+            )}
             <div className="pt-3 flex flex-col gap-2">
               {st === "discarded" ? (
                 <p className="text-destructive font-medium">ขวดนี้ถูกทิ้งแล้ว ใช้งานต่อไม่ได้</p>
