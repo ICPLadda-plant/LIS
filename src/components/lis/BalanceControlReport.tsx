@@ -130,7 +130,7 @@ export default function BalanceControlReport({
               <tr key={point.date} className="bcr-off">
                 <td>{ddmmBE(point.date)}</td>
                 <td className="bcr-off-note" colSpan={7}>
-                  {holidayNotes?.get(point.date)?.trim() || (isSunday(point.date) ? "วันอาทิตย์ — ไม่ได้ทำงาน" : "วันหยุด — ไม่ได้ทำงาน")}
+                  {holidayNotes?.get(point.date)?.trim() || (isSunday(point.date) ? "วันอาทิตย์" : "วันหยุด — ไม่ได้ทำงาน")}
                 </td>
               </tr>
             );
