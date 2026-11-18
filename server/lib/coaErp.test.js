@@ -79,6 +79,36 @@ test('normalizes ERP UTC timestamps to the Thailand label date', () => {
   assert.equal(normalizeIsoDate('2026-11-18T17:00:00.000Z'), '2026-11-19');
   assert.equal(normalizeIsoDate('2026-11-19T00:00:00.000+07:00'), '2026-11-19');
   assert.equal(normalizeIsoDate('2026-11-18T00:00:00.000Z'), '2026-11-18');
+  assert.equal(normalizeIsoDate('20260430'), '');
+  assert.equal(lotSnapshot('20260430').productionDate, '');
+});
+
+test('invalid numeric request date falls back to the nearest ERP MF date', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{
+      sampleName: 'ธันเดอร์ มอร์',
+      commonName: 'EMAMECTIN BENZOATE 2.0% W/V ME',
+      batchNo: '20260430',
+      productionDate: '20260430',
+    }],
+    externalCoaRequest: {
+      itemNo: 'F-THDMR-1000X12',
+      shipmentDate: '2026-11-19T00:00:00.000Z',
+    },
+  }, [], [{
+    item_no: 'F-THDMR-1000X12',
+    prod_order_no: 'MF26110134',
+    create_date: '2026-11-17T00:00:00.000Z',
+  }, {
+    item_no: 'F-THDMR-1000X12',
+    prod_order_no: 'MF26110137',
+    create_date: '2026-11-12T00:00:00.000Z',
+  }]);
+
+  assert.equal(result.sample.batchNo, '20260430');
+  assert.equal(result.sample.productionDate, '2026-11-17');
+  assert.equal(result.mfCandidates[0].productionDate, '2026-11-17');
 });
 
 test('legacy Lab matching handles reversed substances and historical spelling', () => {

@@ -199,6 +199,11 @@ function rowMatchesItem(row, normalizedItemNo) {
 }
 
 function normalizeIsoDate(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime())
+      ? ''
+      : new Date(value.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  }
   const source = text(value);
   const zonedIso = source.match(/^(\d{4})-(\d{2})-(\d{2})T.*(?:Z|[+-]\d{2}:?\d{2})$/i);
   if (zonedIso) {
@@ -221,8 +226,7 @@ function normalizeIsoDate(value) {
     }
     return '';
   }
-  const parsed = new Date(source);
-  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+  return '';
 }
 
 function lotDate(lotNo) {
@@ -237,7 +241,7 @@ function lotDate(lotNo) {
       return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
   }
-  const labeledDate = value.match(/([0-3]\d)([01]\d)(\d{2})$/);
+  const labeledDate = value.match(/(?:^|\D)([0-3]\d)([01]\d)(\d{2})$/);
   if (labeledDate) {
     const day = Number(labeledDate[1]);
     const month = Number(labeledDate[2]);
