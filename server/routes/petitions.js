@@ -46,13 +46,8 @@ const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petiti
 const { recordQcHandlerFromRequest } = require('../lib/qcHandlers');
 const User = require('../models/User');
 
-// คำร้องเฉพาะ Admin (PACLOBUTRAZOL) — ซ่อนจากทุกคนที่ไม่ใช่ admin และไม่ปนกับรายการปกติ
+// คำร้องเฉพาะ Admin (ทุกสาร) — ซ่อนจากทุกคนที่ไม่ใช่ admin และไม่ปนกับรายการปกติ
 const NOT_ADMIN_ONLY = { adminOnly: { $ne: true } };
-
-function isPaclobutrazolName(name) {
-  const text = String(name || '');
-  return /paclobutrazol/i.test(text) && !text.includes('+');
-}
 
 async function viewerIsAdmin(req) {
   const user = await currentUser(req).catch(() => null);
@@ -1237,9 +1232,6 @@ router.post('/', async (req, res) => {
     delete body.adminOnly;
     if (adminOnly) {
       if (!(await viewerIsAdmin(req))) return res.status(403).json({ error: { message: 'เฉพาะ Admin ที่สร้างคำร้องเฉพาะ Admin ได้' } });
-      if (!(body.items || []).some((item) => isPaclobutrazolName(item?.commonName) || isPaclobutrazolName(item?.sampleName))) {
-        return badRequest(res, 'คำร้องเฉพาะ Admin ต้องมีรายการ PACLOBUTRAZOL');
-      }
     }
     if (body.replacePetitionNo) return await replaceProductionPetition(body, res);
     let revisionOf = null;

@@ -38,7 +38,6 @@ import {
 } from '@/lib/mfItemDates';
 import { type Petition, type PetitionRouteTarget } from '@/types/petition.types';
 import { Checkbox } from '@/components/ui/checkbox';
-import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { normalizeRoles } from '@/lib/roles';
 
 const ICP_LADDA_ADDRESS = '151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000';
@@ -817,9 +816,8 @@ export default function ProductionPetitionNewPage({
   const [items, setItems] = useState<ItemRowValues[]>(() =>
     initialQueryItems.length ? initialQueryItems : [makeBlankItem(1)],
   );
-  // Admin สร้างคำร้อง PACLOBUTRAZOL แบบเห็นเฉพาะ Admin ได้ (แยกจากคำร้องปกติ)
+  // Admin สร้างคำร้องแบบเห็นเฉพาะ Admin ได้ทุกสาร (แยกจากคำร้องปกติ)
   const canCreateAdminOnly = normalizeRoles(user).includes('admin');
-  const hasPaclobutrazol = items.some((it) => isPaclobutrazolItem(it.commonName));
   const [adminOnlyPetition, setAdminOnlyPetition] = useState(false);
 
   useEffect(() => {
@@ -1065,7 +1063,7 @@ export default function ProductionPetitionNewPage({
         cause: '',
         revisionOf: revisionOfId || undefined,
         replacePetitionNo: editPetitionNo || undefined,
-        adminOnly: canCreateAdminOnly && hasPaclobutrazol && adminOnlyPetition && !editPetitionNo ? true : undefined,
+        adminOnly: canCreateAdminOnly && adminOnlyPetition && !editPetitionNo ? true : undefined,
       };
       const created = await createPetition(payload as Parameters<typeof createPetition>[0]) as Petition & { existingLabRequestId?: string | null };
 
@@ -1258,7 +1256,7 @@ export default function ProductionPetitionNewPage({
           </CardContent>
         </Card>
 
-        {canCreateAdminOnly && hasPaclobutrazol && !editPetitionNo && (
+        {canCreateAdminOnly && !editPetitionNo && (
           <label className="flex items-start gap-3 rounded-xl bg-muted px-4 py-3 text-sm">
             <Checkbox
               checked={adminOnlyPetition}
@@ -1266,7 +1264,7 @@ export default function ProductionPetitionNewPage({
               className="mt-0.5"
             />
             <span>
-              <span className="font-medium text-foreground">คำร้อง PACLOBUTRAZOL เฉพาะ Admin</span>
+              <span className="font-medium text-foreground">คำร้องเฉพาะ Admin</span>
               <span className="mt-0.5 block text-xs text-muted-foreground">
                 เห็นได้และมอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin ไม่แสดงรวมกับคำร้องปกติ
               </span>

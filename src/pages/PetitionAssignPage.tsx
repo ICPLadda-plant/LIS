@@ -88,7 +88,7 @@ export default function PetitionAssignPage() {
   const userRoles = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
   const canManage = userRoles.some((role) => role === 'admin' || role === 'lab-head');
   const canClaimRole = canManage || userRoles.includes('lab-analyze');
-  // Admin สลับไปดูคำร้อง PACLOBUTRAZOL เฉพาะ Admin — มอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin
+  // Admin สลับไปดูคำร้องเฉพาะ Admin — มอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin
   const isAdmin = userRoles.includes('admin');
   const [adminOnlyMode, setAdminOnlyMode] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -404,7 +404,7 @@ export default function PetitionAssignPage() {
         />
         <div className="space-y-5">
           <PageHeader
-            title={adminOnlyMode ? 'Assign คำร้อง PACLOBUTRAZOL (เฉพาะ Admin)' : 'Assign คำร้องให้เจ้าหน้าที่'}
+            title={adminOnlyMode ? 'Assign คำร้องเฉพาะ Admin' : 'Assign คำร้องให้เจ้าหน้าที่'}
             description={canManage
               ? 'ลากคำร้องไปวางบนการ์ดเจ้าหน้าที่เพื่อ assign ได้ทันที แม้ยังไม่ส่งหรือยังไม่รับตัวอย่าง เจ้าหน้าที่จะเลือกเครื่องตอนกดเริ่มงาน'
               : canClaim
@@ -417,7 +417,7 @@ export default function PetitionAssignPage() {
                     variant={adminOnlyMode ? 'primary' : 'outline'}
                     onClick={() => setAdminOnlyMode((on) => !on)}
                   >
-                    {adminOnlyMode ? 'กลับไปคำร้องปกติ' : 'คำร้อง PACLO (เฉพาะ Admin)'}
+                    {adminOnlyMode ? 'กลับไปคำร้องปกติ' : 'คำร้องเฉพาะ Admin'}
                   </Button>
                 )}
                 {canManage && (
