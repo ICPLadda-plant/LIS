@@ -159,11 +159,10 @@ describe("config defaults / validation", () => {
     expect(validateBalanceControlInput({ mean: 100, sd: -1 })).toBe("ค่า STD ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0 })).toBe("น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0.5 })).toBe("น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0");
-    expect(validateBalanceControlInput({ mean: 100, sd: 1, mpe: -1 })).toBe("ค่า MPE ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, updatedDate: "26/10/2569" })).toBe(
       "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD",
     );
-    expect(validateBalanceControlInput({ mean: 99.99972, sd: 0.0000476, baselineValues, mpe: 0.5, updatedDate: "2026-10-26" })).toBeNull();
+    expect(validateBalanceControlInput({ mean: 99.99972, sd: 0.0000476, baselineValues, updatedDate: "2026-10-26" })).toBeNull();
     expect(validateBalanceControlInput({ mean: 100, sd: 1, baselineValues: baselineValues.slice(0, 19) })).toBe(
       "กรอกค่าบันทึกให้ครบ 20 ค่า",
     );

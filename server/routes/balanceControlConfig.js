@@ -26,7 +26,6 @@ function pick(doc, def, nominal, weightCodes) {
     mean: typeof saved?.mean === 'number' ? saved.mean : null,
     sd: typeof saved?.sd === 'number' ? saved.sd : null,
     baselineValues: Array.isArray(saved?.baselineValues) ? saved.baselineValues : [],
-    mpe: typeof saved?.mpe === 'number' ? saved.mpe : 0.5,
     updatedDate: saved?.updatedDate || '',
   };
 }
@@ -35,14 +34,13 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
 // Validate control values; mirrors validateBalanceControlInput on the client.
 function validate(body) {
-  const { baselineValues, nominal, mpe, updatedDate } = body;
+  const { baselineValues, nominal, updatedDate } = body;
   if (!Array.isArray(baselineValues) || baselineValues.length !== 20 || !baselineValues.every(isNum)) {
     return 'กรอกค่าบันทึกให้ครบ 20 ค่า';
   }
   if (nominal != null && (!isNum(nominal) || nominal <= 0 || !Number.isInteger(nominal))) {
     return 'น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0';
   }
-  if (mpe != null && (!isNum(mpe) || mpe < 0)) return 'ค่า MPE ต้องไม่ติดลบ';
   if (updatedDate && (typeof updatedDate !== 'string' || !DATE_RE.test(updatedDate))) {
     return 'วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD';
   }
@@ -121,7 +119,6 @@ router.put('/:scaleId', async (req, res) => {
       mean,
       sd,
       baselineValues: body.baselineValues,
-      mpe: body.mpe != null ? body.mpe : null,
       updatedDate: str(body.updatedDate),
     };
     await BalanceControlConfig.findOneAndUpdate(

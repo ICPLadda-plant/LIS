@@ -509,9 +509,6 @@ function buildControlSheet(workbook: Workbook, input: BalanceControlExportInput)
     put(ws, `B${row}`, formula(expression, result), center({ numFmt: limitFmt }));
     put(ws, `D${row}`, note, center());
   }
-  put(ws, "E4", "MPE", center());
-  put(ws, "F4", isNum(config.mpe) ? config.mpe : null, center({ numFmt: "0.00" }));
-
   const allBorders: Partial<Borders> = { top: THIN, bottom: THIN, left: THIN, right: THIN };
   const header = [" ซ้ำที่", "ค่าที่ได้", "Mean", "UWL", "LWL", "UCL", "LCL"];
   header.forEach((label, index) => {

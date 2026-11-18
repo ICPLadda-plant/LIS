@@ -148,7 +148,6 @@ describe("BalanceRoomPage", () => {
         nominal: 10,
         mean: 10,
         sd: 0.004,
-        mpe: 0.5,
         updatedDate: "2026-10-26",
       },
     ]);
@@ -165,8 +164,8 @@ describe("BalanceRoomPage", () => {
 
   it("edits the weight code bound to each weight size", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "W-10", nominal: 10, mean: 10, sd: 0.01, mpe: 0.5, updatedDate: "2026-11-17" },
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "W-500", nominal: 500, mean: 500, sd: 0.01, mpe: 0.5, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "W-10", nominal: 10, mean: 10, sd: 0.01, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "W-500", nominal: 500, mean: 500, sd: 0.01, updatedDate: "2026-11-17" },
     ]);
     apiMock.updateBalanceWeightCode.mockResolvedValue({ nominal: 10, weightCode: "W-11" });
     renderPage();
@@ -187,7 +186,7 @@ describe("BalanceRoomPage", () => {
 
   it("compares the current LD-005 10 g average with the control lines", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, mpe: 0.5, updatedDate: "" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, updatedDate: "" },
     ]);
     renderPage();
     await screen.findAllByText("10.00");
@@ -218,7 +217,7 @@ describe("BalanceRoomPage", () => {
     fireEvent.blur(screen.getByLabelText("ค่าบันทึกที่ 1"));
     expect(screen.getByLabelText("ค่าบันทึกที่ 1")).toHaveValue("10.00");
     expect(screen.getByLabelText("น้ำหนักตุ้ม Daily check (g)")).toHaveValue("10.00");
-    expect(screen.getByLabelText("MPE (g)")).toHaveValue("0.50");
+    expect(screen.queryByLabelText("MPE (g)")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "บันทึกค่า Control" }));
 
     await waitFor(() => expect(apiMock.updateBalanceControlConfig).toHaveBeenCalledTimes(1));
@@ -281,8 +280,8 @@ describe("BalanceRoomPage", () => {
 
   it("shows edit controls and warns when control values are three months old", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.01, mpe: 0.5, updatedDate: "2026-08-17" },
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.01, mpe: 0.5, updatedDate: "2026-08-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.01, updatedDate: "2026-08-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.01, updatedDate: "2026-08-17" },
     ]);
     renderPage();
     expect((await screen.findByText(/ครบ 3 เดือนแล้ว/)).closest('[role="alert"]')).toHaveClass("bg-destructive");
@@ -292,8 +291,8 @@ describe("BalanceRoomPage", () => {
 
   it("marks values beyond the control limits red and blocks saving", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, mpe: 0.5, updatedDate: "2026-11-17" },
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.001, mpe: 0.5, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.001, updatedDate: "2026-11-17" },
     ]);
     renderPage();
     await screen.findAllByText("10.00");
