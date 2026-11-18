@@ -34,7 +34,7 @@ import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTr
 import { useAuth } from "@/context/AuthContext";
 import { getCurrentDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
 import { formatDate } from "@/lib/dateTime";
-import { fmtThaiDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
+import { firstNameOnly, fmtThaiDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { exportBalanceControlExcel } from "@/lib/balanceControlExport";
 import {
   BALANCE_SCALES,
@@ -668,7 +668,7 @@ const BalanceRoomPage = () => {
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {rec ? `${fmtTime(rec.checkedAt)} · ${rec.recorder}` : "ยังไม่ได้บันทึกวันนี้"}
+                  {rec ? `${fmtTime(rec.checkedAt)} · ${firstNameOnly(rec.recorder)}` : "ยังไม่ได้บันทึกวันนี้"}
                 </span>
               </button>
             );
@@ -803,7 +803,7 @@ const BalanceRoomPage = () => {
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">ผู้บันทึก</label>
               <Input
-                value={showResult && todayRec ? todayRec.recorder : (user?.name ?? "")}
+                value={firstNameOnly(showResult && todayRec ? todayRec.recorder : (user?.name ?? ""))}
                 readOnly
                 disabled
                 className="h-9 bg-muted/40 text-sm"
@@ -823,7 +823,7 @@ const BalanceRoomPage = () => {
 
             {todayRec && (
               <p className="text-xs text-muted-foreground">
-                ตรวจล่าสุด: {fmtTime(todayRec.checkedAt)} โดย {todayRec.recorder}
+                ตรวจล่าสุด: {fmtTime(todayRec.checkedAt)} โดย {firstNameOnly(todayRec.recorder)}
               </p>
             )}
           </CardContent>
@@ -986,7 +986,7 @@ const BalanceRoomPage = () => {
                           {calibrateStatus === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
                         </Badge>
                       </td>
-                      <td className="px-3 py-2">{point.record.recorder}</td>
+                      <td className="px-3 py-2">{firstNameOnly(point.record.recorder)}</td>
                       <td className="px-3 py-2 tabular-nums">{fmtTime(point.record.checkedAt)}</td>
                     </tr>
                   );

@@ -1,7 +1,7 @@
 import type { Borders, Cell, Font, Workbook, Worksheet } from "exceljs";
 import type { DailyCheckRecord } from "@/lib/api";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
-import { isSunday } from "@/lib/dailyCheckFormat";
+import { firstNameOnly, isSunday } from "@/lib/dailyCheckFormat";
 import {
   chartDomain,
   classifyPoint,
@@ -416,7 +416,7 @@ function buildFormSheet(workbook: Workbook, input: BalanceControlExportInput, lo
       fill,
     });
     put(ws, `G${rowNumber}`, null, { horizontal: "center", border: border("G"), fill });
-    put(ws, `H${rowNumber}`, record?.recorder ?? null, { horizontal: "center", border: border("H"), fill });
+    put(ws, `H${rowNumber}`, record ? firstNameOnly(record.recorder) : null, { horizontal: "center", border: border("H"), fill });
   });
 
   const lastDataRow = FIRST_DATA_ROW + Math.max(series.length, 1) - 1;
