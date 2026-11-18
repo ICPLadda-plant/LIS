@@ -1270,8 +1270,22 @@ router.post('/', async (req, res) => {
     const sampledBy = normalizeSampledBy(body.sampledBy);
     const routeTargets = routeTargetsForSubmission(body, items);
     const sampleLabelNumbers = await assignMissingSampleLabelNumbers({ submittedBy, items, routeTargets, adminOnly });
+    // คำร้องเฉพาะ Admin ข้ามขั้นส่ง/รับตัวอย่าง เข้าสถานะกำลังทดสอบทันที
+    const adminStart = adminOnly ? (() => {
+      const now = new Date();
+      const actorName = body.actor || submittedBy?.name || 'system';
+      const start = { sampleSentAt: now, receivedAt: now, receivedBy: actorName };
+      for (const side of routeTargets || []) {
+        if (side === 'qc' || side === 'lab') {
+          start[`${side}ReceivedAt`] = now;
+          start[`${side}ReceivedBy`] = actorName;
+        }
+      }
+      return start;
+    })() : {};
     const doc = await Petition.create({
       ...body,
+      ...adminStart,
       submittedBy,
       deliveredBy,
       items,
@@ -1279,7 +1293,7 @@ router.post('/', async (req, res) => {
       routeTargets,
       sampleLabelNumbers: sampleLabelNumbers ?? undefined,
       petitionNo,
-      status: 'deliveringQC',
+      status: adminOnly ? 'inProgress' : 'deliveringQC',
       revisionOf,
       adminOnly,
       productionWorkflow: buildProductionWorkflow(body.productionWorkflow, petitionNo),
