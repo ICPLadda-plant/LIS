@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Badge } from "@/components/ui/badge";
 import { summarizeStandard, isUsableBottle } from "@/lib/stockStatus";
 import StandardUnitsPanel from "./StandardUnitsPanel";
+import StandardHistoryPanel from "./StandardHistoryPanel";
 import type { StockStandardItem, StockUnitItem } from "@/types/stock";
 
 /** Drawer รายละเอียดสาร Standard — เปิดจากการคลิกแถวในตาราง /stock:
@@ -58,6 +59,10 @@ export default function StandardDetailDrawer({
           <div>
             <div className="font-semibold mb-2">รายขวด</div>
             <StandardUnitsPanel standard={standard} onEdit={onEdit} />
+          </div>
+          <div>
+            <div className="font-semibold mb-2">ประวัติทั้งหมด</div>
+            <StandardHistoryPanel standard={standard} />
           </div>
         </div>
       </SheetContent>
