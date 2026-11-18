@@ -23,9 +23,9 @@ async function main() {
   console.log(`withdrawnDate ที่จะตั้ง: ${toSet.length} ขวด`);
   const groups = await StockUnit.aggregate([
     { $match: { itemType: 'standard' } },
-    { $group: { _id: { itemCode: '$itemCode', type: '$type' } } },
+    { $group: { _id: { itemCode: '$itemCode' } } },
   ]);
-  console.log(`กลุ่มสาร+type ที่จะคำนวณใบนำส่ง: ${groups.length}`);
+  console.log(`สารที่จะคำนวณใบนำส่ง: ${groups.length}`);
   if (!COMMIT) {
     console.log('dry-run: ไม่ได้เขียนข้อมูล (ใส่ --commit เพื่อบันทึก)');
   } else {
@@ -34,7 +34,7 @@ async function main() {
         updateOne: { filter: { _id: u._id, withdrawnDate: null }, update: { $set: { withdrawnDate: firstByUnit.get(String(u._id)) } } },
       })));
     }
-    for (const g of groups) await refreshPetitionUsageForGroup(g._id.itemCode, g._id.type);
+    for (const g of groups) await refreshPetitionUsageForGroup(g._id.itemCode);
     console.log('บันทึกเรียบร้อย');
   }
   await mongoose.disconnect();

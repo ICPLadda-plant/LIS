@@ -1,12 +1,14 @@
-// บันทึกผลการคำนวณใบนำส่งลงขวด (StockUnit.petitionUsage) ของสาร + type เดียวกันทั้งกลุ่ม
+// บันทึกผลการคำนวณใบนำส่งลงขวด (StockUnit.petitionUsage) ของสารเดียวกันทั้งกลุ่ม
+// นับรวมทุก type (primary/working) — ขวดที่เบิกล่าสุดของสารเท่านั้นที่ "กำลังใช้งาน"
 const StockUnit = require('../models/StockUnit');
 const StockTransaction = require('../models/StockTransaction');
 const Petition = require('../models/Petition');
 const { StockStandard } = require('../models/Stock');
 const { buildUsagePeriods, matchPetitions } = require('./standardPetitionUsage');
 
-async function refreshPetitionUsageForGroup(itemCode, type) {
-  const units = await StockUnit.find({ itemType: 'standard', itemCode, type: type || '' })
+// eslint-disable-next-line no-unused-vars
+async function refreshPetitionUsageForGroup(itemCode, _type) {
+  const units = await StockUnit.find({ itemType: 'standard', itemCode })
     .select('_id qrId withdrawnDate itemName')
     .lean();
   if (!units.length) return [];
