@@ -110,7 +110,11 @@ function startNotificationScheduler() {
         await runUrgentTick(now);
       }
       await runDailyCheckTick(now);
-      if (ticks % STOCK_SCAN_EVERY_TICKS === 1) await require('./stockAlerts').runStockAlertScan(now);
+      if (ticks % STOCK_SCAN_EVERY_TICKS === 1) {
+        await require('./stockAlerts').runStockAlertScan(now);
+        // แจ้งเตือน "หมดอายุ" ก่อน แล้วค่อยทิ้งขวดหมดอายุออกจากสต็อกอัตโนมัติ
+        await require('./stockUnitDiscard').autoDiscardExpiredUnits(now);
+      }
     } catch (err) {
       console.error('[notificationScheduler] tick failed:', err.message);
     }
