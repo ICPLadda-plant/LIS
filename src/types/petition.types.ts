@@ -286,6 +286,8 @@ interface PetitionBase {
   qcCompletedBy?: string;
   labApprovedAt?: string | null;
   labApprovedBy?: string;
+  /** คำร้อง PACLOBUTRAZOL เฉพาะ Admin — เห็นและรับงานได้เฉพาะ role admin */
+  adminOnly?: boolean;
   // กด Re-check ฝั่ง Lab — งานกลับไปโชว์บนบอร์ด Assign ให้เปลี่ยนผู้รับงานได้จนกว่าหัวหน้า Lab ออกผล
   labRecheckRequestedAt?: string | null;
   labRecheckRequestedBy?: string;

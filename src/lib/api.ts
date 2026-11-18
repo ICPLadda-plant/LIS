@@ -131,7 +131,7 @@ function devDepartmentHeader() {
   return window.localStorage.getItem("dev_department")?.trim() || "";
 }
 
-function identityHeaders(): Record<string, string> {
+export function identityHeaders(): Record<string, string> {
   const headers: Record<string, string> = currentUserEmail ? { "X-LIS-User": currentUserEmail } : {};
   const devDepartment = devDepartmentHeader();
   if (devDepartment) headers["X-LIS-Department"] = encodeURIComponent(devDepartment);

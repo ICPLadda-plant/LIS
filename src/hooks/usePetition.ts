@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { identityHeaders } from '@/lib/api';
 import type {
   Petition,
   PetitionAuditLogEntry,
@@ -22,8 +23,8 @@ interface ApiError extends Error {
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...identityHeaders(), ...options?.headers },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: { message: res.statusText } }));
@@ -144,6 +145,8 @@ interface PetitionListParams {
   submitterGroup?: 'production';
   /** เฉพาะสายผลิตที่เลือก เช่น "ผลิต 3" */
   submitterDepartment?: string;
+  /** เฉพาะคำร้อง PACLOBUTRAZOL ที่เห็นเฉพาะ Admin (server ซ่อนจากคนอื่นเสมอ) */
+  adminOnly?: boolean;
 }
 interface PetitionListResponse {
   items: Petition[];
@@ -183,6 +186,7 @@ export function usePetitionList(params: PetitionListParams, options: PetitionRef
     if (params.urgent) sp.set('urgent', 'true');
     if (params.submitterGroup) sp.set('submitterGroup', params.submitterGroup);
     if (params.submitterDepartment) sp.set('submitterDepartment', params.submitterDepartment);
+    if (params.adminOnly) sp.set('adminOnly', 'true');
     return sp.toString();
   })();
 

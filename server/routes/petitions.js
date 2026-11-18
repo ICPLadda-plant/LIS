@@ -44,6 +44,24 @@ const { assignMissingSampleLabelNumbers, planLabelReceipt } = require('../lib/sa
 const { sendProductionCancel } = require('../lib/productionCallback');
 const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
 const { recordQcHandlerFromRequest } = require('../lib/qcHandlers');
+const User = require('../models/User');
+
+// คำร้องเฉพาะ Admin (PACLOBUTRAZOL) — ซ่อนจากทุกคนที่ไม่ใช่ admin และไม่ปนกับรายการปกติ
+const NOT_ADMIN_ONLY = { adminOnly: { $ne: true } };
+
+function isPaclobutrazolName(name) {
+  const text = String(name || '');
+  return /paclobutrazol/i.test(text) && !text.includes('+');
+}
+
+async function viewerIsAdmin(req) {
+  const user = await currentUser(req).catch(() => null);
+  return Boolean(user && normalizeRoles(user).includes('admin'));
+}
+
+async function hiddenFromViewer(req, doc) {
+  return Boolean(doc?.adminOnly) && !(await viewerIsAdmin(req));
+}
 
 function logAudit(petition, payload) {
   if (!petition) return;
@@ -291,6 +309,9 @@ router.get('/', async (req, res) => {
         ],
       });
     }
+    // ค่าเริ่มต้นซ่อนคำร้องเฉพาะ Admin; admin ขอดูแยกด้วย ?adminOnly=true
+    const viewerAdmin = await viewerIsAdmin(req);
+    andConditions.push(req.query.adminOnly === 'true' && viewerAdmin ? { adminOnly: true } : NOT_ADMIN_ONLY);
     if (andConditions.length === 1) Object.assign(q, andConditions[0]);
     else if (andConditions.length > 1) q.$and = andConditions;
     const summaryQ = { ...q };
@@ -312,7 +333,7 @@ router.get('/', async (req, res) => {
     if (idsRaw) {
       const ids = idsRaw.split(',').map((s) => s.trim()).filter((s) => mongoose.isValidObjectId(s));
       if (ids.length === 0) return res.json({ items: [], total: 0, page: 1, limit: 0 });
-      const docs = await Petition.find({ _id: { $in: ids } }).sort({ createdAt: -1 });
+      const docs = await Petition.find({ _id: { $in: ids }, ...(viewerAdmin ? {} : NOT_ADMIN_ONLY) }).sort({ createdAt: -1 });
       const items = docs.map((doc) => doc.toObject());
       return res.json({ items, total: items.length, page: 1, limit: items.length });
     }
@@ -451,8 +472,8 @@ router.get('/exec-summary', async (req, res) => {
       // งานที่ยังไม่ปิด — query ไม่จำกัดช่วงเวลา เพราะงานค้างเก่าคือสิ่งที่หัวหน้าต้องเห็นที่สุด
       // (ตัวเลขสรุป/แถบด่านถูกย่อให้เหลือเฉพาะใบที่ยื่นในช่วงโดย buildLiveSection · คิว
       // "งานที่ต้องจัดการ" ยังกินทั้งหมด)
-      Petition.find({ approvedAt: null, status: { $nin: ['approved', 'rejected'] } }).lean(),
-      Petition.find({ approvedAt: { $gte: windowStart } }).lean(),
+      Petition.find({ approvedAt: null, status: { $nin: ['approved', 'rejected'] }, ...NOT_ADMIN_ONLY }).lean(),
+      Petition.find({ approvedAt: { $gte: windowStart }, ...NOT_ADMIN_ONLY }).lean(),
       // "created" series for throughput: a dedicated, provably-complete query on
       // sampleSentAt alone — งานเข้ามาตอนตัวอย่างถูกนำส่ง ไม่ใช่ตอนกรอกฟอร์ม. Rejected
       // petitions (status 'rejected', approvedAt null) sit in neither openDocs
@@ -460,7 +481,7 @@ router.get('/exec-summary', async (req, res) => {
       // were later sent back, but they DID arrive, and the inflow line must show that.
       // Project only sampleSentAt, the one field the throughput bucketing reads
       // (see buildStatsSection).
-      Petition.find({ sampleSentAt: { $gte: windowStart } }, { sampleSentAt: 1 }).lean(),
+      Petition.find({ sampleSentAt: { $gte: windowStart }, ...NOT_ADMIN_ONLY }, { sampleSentAt: 1 }).lean(),
       loadQcBaseline(now),
     ]);
 
@@ -667,6 +688,7 @@ router.get('/by-batch', async (req, res) => {
     const exclude = String(req.query.exclude || '').trim();
     const rx = new RegExp('^\\s*' + batchNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i');
     const filter = { 'items.batchNo': rx, status: { $ne: 'deleted' } };
+    if (!(await viewerIsAdmin(req))) Object.assign(filter, NOT_ADMIN_ONLY);
     if (exclude && /^[a-f0-9]{24}$/i.test(exclude)) filter._id = { $ne: exclude };
     const rows = await Petition.find(filter)
       .select('_id petitionNo status createdAt items.seq items.batchNo items.commonName items.sampleName items.sendToQc items.sendToLab')
@@ -712,7 +734,7 @@ router.get('/scan/:code', async (req, res) => {
     if (fallbackPetitionNo) query.push({ petitionNo: fallbackPetitionNo });
 
     let doc = await Petition.findOne({ $or: query }).lean();
-    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้องจาก QR Code นี้' } });
+    if (!doc || await hiddenFromViewer(req, doc)) return res.status(404).json({ error: { message: 'ไม่พบคำร้องจาก QR Code นี้' } });
     doc = await latestDeliverableRevision(doc);
     res.json(doc);
   } catch (err) {
@@ -1164,7 +1186,7 @@ router.get('/:id', async (req, res) => {
     let doc = mongoose.Types.ObjectId.isValid(id)
       ? await Petition.findById(id)
       : await Petition.findOne({ petitionNo: id });
-    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (!doc || await hiddenFromViewer(req, doc)) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
     // Lazy phase advance: if phase2DueAt has elapsed, transition to Phase 2 on read
     doc = await maybeAdvancePhase(doc);
     res.json(doc.toObject());
@@ -1211,6 +1233,14 @@ router.post('/', async (req, res) => {
     if (Object.keys(body).some(key => key.startsWith('additionalSampleRequests') || key.startsWith('$'))) return badRequest(res, 'รอบตัวอย่างเพิ่มต้องสร้างหลังรับและบันทึกผลตรวจเท่านั้น');
     const submissionError = validatePetitionSubmission(body);
     if (submissionError) return badRequest(res, submissionError);
+    const adminOnly = body.adminOnly === true;
+    delete body.adminOnly;
+    if (adminOnly) {
+      if (!(await viewerIsAdmin(req))) return res.status(403).json({ error: { message: 'เฉพาะ Admin ที่สร้างคำร้องเฉพาะ Admin ได้' } });
+      if (!(body.items || []).some((item) => isPaclobutrazolName(item?.commonName) || isPaclobutrazolName(item?.sampleName))) {
+        return badRequest(res, 'คำร้องเฉพาะ Admin ต้องมีรายการ PACLOBUTRAZOL');
+      }
+    }
     if (body.replacePetitionNo) return await replaceProductionPetition(body, res);
     let revisionOf = null;
     if (body.revisionOf) {
@@ -1256,6 +1286,7 @@ router.post('/', async (req, res) => {
       petitionNo,
       status: 'deliveringQC',
       revisionOf,
+      adminOnly,
       productionWorkflow: buildProductionWorkflow(body.productionWorkflow, petitionNo),
     });
     logAudit(doc, {
@@ -1525,6 +1556,13 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(petitionQuery(req.params.id));
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (doc.adminOnly) {
+      if (!normalizeRoles(user).includes('admin')) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+      const assigneeUser = await User.findOne({ employeeId: String(employeeId).trim(), status: { $ne: 'inactive' } }).lean();
+      if (!assigneeUser || !normalizeRoles(assigneeUser).includes('admin')) {
+        return res.status(403).json({ error: { message: 'คำร้องเฉพาะ Admin มอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin' } });
+      }
+    }
 
     await applyLabAssignment(doc, { employeeId, name, department, position }, machines, {
       actor: user.name || user.email,
@@ -1627,6 +1665,7 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
 
     const doc = await Petition.findOne(petitionQuery(req.params.id));
     if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    if (doc.adminOnly && !normalizeRoles(user).includes('admin')) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
     if (doc.assignedTo?.employeeId) {
       return res.status(409).json({ error: { message: `มีผู้รับงานนี้แล้ว (${doc.assignedTo.name})` } });
     }
@@ -1648,7 +1687,7 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
 router.patch('/:id', serializePetitionWrite(async (req, res) => {
   try {
     const updates = { ...req.body };
-    const managedFields = ['itemApprovals', 'additionalSampleRequests', 'assignedTo', 'assignedMachines', 'labExpected', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
+    const managedFields = ['adminOnly', 'itemApprovals', 'additionalSampleRequests', 'assignedTo', 'assignedMachines', 'labExpected', 'qcCompletedAt', 'qcCompletedBy', 'labCompletedAt', 'labCompletedBy', 'labApprovedAt', 'labApprovedBy', 'labEditSession', 'labRecheckRequestedAt', 'labRecheckRequestedBy', 'labRecheckReason', 'labRecheckCount', 'completedAt', 'qcReceivedAt', 'qcReceivedBy', 'labReceivedAt', 'labReceivedBy', 'receivedAt', 'receivedBy', 'sampleSentAt', '__v'];
     if (Object.keys(updates).some(key => key.startsWith('$') || key.includes('.') || managedFields.includes(key))) return badRequest(res, 'ข้อมูลสถานะและรอบตัวอย่างต้องเปลี่ยนผ่านขั้นตอนที่กำหนด');
     let actor = updates.actor;
     delete updates.actor;
