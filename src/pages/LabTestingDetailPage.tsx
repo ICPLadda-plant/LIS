@@ -36,7 +36,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, aiSubstanceFromKey, calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
+import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { matchSubstanceKey } from '@/lib/substances';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
@@ -98,9 +98,11 @@ function hasSpecificGravityParam(params: ParameterItem[]) {
 }
 
 const AI_FIELD_ORDER = [
+  STANDARD_NO_LABEL, CORRELATION_LABEL,
   'Area Inj.1', 'Area Inj.2', 'Area Inj.3',
   '% Sample 1', '% Sample 2', '% Sample 3',
   'Area Average', 'Area %RSD', '% Sample Average', '% Sample %RSD',
+  MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL,
   // Control Sample + ช่วงยอมรับ — กรอกเองแล้วไปแสดงในใบคำนวณ (LabCalculationForm)
   CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL,
   '%AI',
@@ -112,7 +114,7 @@ function aiFieldsForParameter(fields: ParameterValueField[]) {
   const aiField = fields.find((field) => calculatedAiFieldKind(field.label) === 'ai');
   const generated = AI_FIELD_ORDER.map((label): ParameterValueField => (label === '%AI' ? aiField! : byLabel.get(label.toLowerCase())) ?? ({
     label,
-    type: 'float',
+    type: [STANDARD_NO_LABEL, CORRELATION_LABEL, CCS_RESULT_LABEL].includes(label) ? 'text' : 'float',
     unit: CONTROL_LABELS.has(label) ? undefined : label.includes('Sample') || label === '%AI' ? '%' : undefined,
   }));
   const known = new Set(AI_FIELD_ORDER.map((label) => label.toLowerCase()));
@@ -245,6 +247,7 @@ interface TestFieldProps {
   outputResult?: ResolvedOutput | null;
   headerMeta?: ReactNode;
   timerStartBlockedReason?: string;
+  valueClassName?: string;
 }
 
 function TestField({
@@ -267,6 +270,7 @@ function TestField({
   outputResult,
   headerMeta,
   timerStartBlockedReason,
+  valueClassName,
 }: TestFieldProps) {
   const strVal = value == null ? '' : String(value);
   const strNote = noteValue == null ? '' : String(noteValue);
@@ -328,6 +332,7 @@ function TestField({
               'h-8 text-sm',
               isAbnormal && 'border-red-400 ring-1 ring-red-200',
               readOnly && 'bg-muted cursor-default',
+              valueClassName,
             )}
           >
             <SelectValue placeholder="เลือกค่า..." />
@@ -372,6 +377,7 @@ function TestField({
               'h-8 text-sm',
               isAbnormal && 'border-red-400 ring-1 ring-red-200',
               readOnly && 'bg-muted cursor-default',
+              valueClassName,
             )}
             placeholder={
               field.standardOperator
@@ -1456,6 +1462,8 @@ export default function LabTestingDetailPage() {
                               const isAiParameter = (param.valueFields ?? []).some((candidate) => calculatedAiFieldKind(candidate.label) === 'ai');
                               const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
                               const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries, hasSgParam), aiSubstanceFromKey(unit.key)) : null;
+                              const ccsFieldKind = isAiParameter ? calculatedCcsFieldKind(unit.field.label) : null;
+                              const calculatedCcs = ccsFieldKind ? calculateCcsFromValues(srcValues) : null;
 
                               // Field-level `multiple` — repeatable list of bare value rows.
                               // Each row shares the field's standard/abnormal rule; per-row
@@ -1543,12 +1551,13 @@ export default function LabTestingDetailPage() {
                                     field={effectiveField}
                                     item={item}
                                     itemGroupIds={idsFor(item)}
-                                    value={aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null ? '' : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
+                                    value={ccsFieldKind ? (ccsFieldKind === 'difference' && calculatedCcs?.difference != null ? calculatedCcs.difference.toFixed(2) : calculatedCcs?.result ?? '') : aiFieldKind ? (calculatedAi?.[aiFieldKind] != null ? formatCalculatedAi(calculatedAi[aiFieldKind]) : aiFieldKind === 'ai' && calculatedAi?.sampleAverage != null ? '' : srcValues[unit.key] ?? '') : srcValues[unit.key] ?? ''}
                                     noteValue={srcValues[noteLabel] ?? ''}
                                     saveInfo={saveInfoSrc?.[unit.key]}
                                     noteSaveInfo={saveInfoSrc?.[noteLabel]}
                                     disabled={fieldDisabled}
-                                    readOnly={!!aiFieldKind}
+                                    readOnly={!!aiFieldKind || !!ccsFieldKind}
+                                    valueClassName={ccsFieldKind === 'result' ? (calculatedCcs?.result === 'Pass' ? 'font-semibold text-emerald-700 disabled:opacity-100 dark:text-emerald-300' : calculatedCcs?.result === 'No pass' ? 'font-semibold text-destructive disabled:opacity-100' : undefined) : undefined}
                                     timerStartBlockedReason={unit.field.triggersPhase2 && effectivePhase === 1 ? phaseTriggerReasonFor(item) : undefined}
                                     instrumentSource={srcField}
                                     provenance={provenance}
@@ -1581,6 +1590,11 @@ export default function LabTestingDetailPage() {
                                     onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries, hasSgParam), substance)[kind]));
                                   });
                                         });
+                                        if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(unit.key)) {
+                                          const nextCcs = calculateCcsFromValues(nextValues);
+                                          onUnitChange(CCS_DIFFERENCE_LABEL, nextCcs.difference == null ? '' : nextCcs.difference.toFixed(2));
+                                          onUnitChange(CCS_RESULT_LABEL, nextCcs.result);
+                                        }
                                       }
                                       // Manual edit after a pull → mark provenance as edited (once).
                                       if (scalarExtras && provenance && provenance.source === 'instrument' && String(val) !== String(provenance.rawValue ?? '')) {
@@ -1591,13 +1605,12 @@ export default function LabTestingDetailPage() {
                                     conditionalPending={isOutputMode ? false : (!!unit.field.conditionalMode && !resolved)}
                                     resolvedStandardText={isOutputMode ? undefined : resolvedStandardText}
                                     outputResult={outputResult}
-                                    headerMeta={
+                                    headerMeta={ccsFieldKind === 'result' ? <span className="text-xs text-muted-foreground">เกณฑ์ ≤ 10%</span> :
                                       labelToleranceInfo?.criteriaText ? (
                                         <span className="text-xs text-muted-foreground whitespace-pre-line">
                                           {labelToleranceInfo.criteriaText}
                                         </span>
-                                      ) : undefined
-                                    }
+                                      ) : undefined}
                                   />
                                   {labelToleranceInfo?.badge && (
                                     <div className="mt-1">

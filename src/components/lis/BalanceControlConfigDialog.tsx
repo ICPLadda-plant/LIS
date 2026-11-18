@@ -31,7 +31,6 @@ interface FormState {
   baselineValues: string[];
   nominal: string;
   mpe: string;
-  weightCode: string;
   updatedDate: string;
   brand: string;
   model: string;
@@ -46,7 +45,6 @@ const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
   baselineValues: Array.from({ length: 20 }, (_, index) => numText(config.baselineValues?.[index], digits)),
   nominal: numText(config.nominal, digits),
   mpe: numText(config.mpe, digits),
-  weightCode: config.weightCode,
   updatedDate: config.updatedDate,
   brand: config.brand,
   model: config.model,
@@ -54,6 +52,9 @@ const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
 
 /** "" → null, ข้อความที่ไม่ใช่ตัวเลข → NaN (ให้ validate แจ้งเตือน) */
 const parseOptional = (text: string) => (text.trim() === "" ? null : Number(text));
+
+/** draft ค่า Control ที่ยังไม่กดบันทึก — กันกดออก/รีเฟรชแล้วค่าที่กรอกไว้หาย */
+const draftStorageKey = (scaleId: string, nominal: number) => `balance-control-draft:${scaleId}:${nominal}`;
 
 interface BalanceControlConfigDialogProps {
   open: boolean;
@@ -71,11 +72,26 @@ export default function BalanceControlConfigDialog({
   digits,
 }: BalanceControlConfigDialogProps) {
   const queryClient = useQueryClient();
+  const storageKey = draftStorageKey(scale.id, config.nominal);
   const [form, setForm] = useState<FormState>(() => toForm(config, scale.decimals));
 
   useEffect(() => {
-    if (open) setForm(toForm(config, scale.decimals));
-  }, [open, config, scale.decimals]);
+    if (!open) return;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        setForm(JSON.parse(saved) as FormState);
+        return;
+      } catch {
+        localStorage.removeItem(storageKey);
+      }
+    }
+    setForm(toForm(config, scale.decimals));
+  }, [open, config, scale.decimals, storageKey]);
+
+  useEffect(() => {
+    if (open) localStorage.setItem(storageKey, JSON.stringify(form));
+  }, [form, open, storageKey]);
 
   const baselineValues = form.baselineValues.map(Number);
   const baselineComplete = form.baselineValues.every((value) => value.trim() !== "" && Number.isFinite(Number(value)));
@@ -86,7 +102,6 @@ export default function BalanceControlConfigDialog({
     baselineValues: baselineComplete ? baselineValues : [],
     nominal: parseOptional(form.nominal),
     mpe: parseOptional(form.mpe),
-    weightCode: form.weightCode.trim(),
     updatedDate: form.updatedDate,
     brand: form.brand.trim(),
     model: form.model.trim(),
@@ -97,6 +112,7 @@ export default function BalanceControlConfigDialog({
     mutationFn: (body: BalanceControlConfigInput) => api.updateBalanceControlConfig(scale.id, body),
     onSuccess: () => {
       toast.success(`บันทึกค่า Control ของ ${scale.code} แล้ว`);
+      localStorage.removeItem(storageKey);
       queryClient.invalidateQueries({ queryKey: ["balance-control-config"] });
       onOpenChange(false);
     },
@@ -182,10 +198,6 @@ export default function BalanceControlConfigDialog({
             <div className="space-y-1.5">
               <Label htmlFor="bcc-mpe">MPE (g)</Label>
               <Input id="bcc-mpe" inputMode="decimal" value={form.mpe} onChange={setField("mpe")} onBlur={normalizeField("mpe")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="bcc-weight">รหัสตุ้มน้ำหนัก</Label>
-              <Input id="bcc-weight" value={form.weightCode} onChange={setField("weightCode")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-updated">วันที่ปรับปรุงค่า Control</Label>

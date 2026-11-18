@@ -98,6 +98,7 @@ mountApi('/qc-results', require('./routes/qcResults'));
 mountApi('/coa-documents', require('./routes/coaDocuments'));
 mountApi('/uploads', require('./routes/uploads'));
 mountApi('/daily-checks', require('./routes/dailyChecks'));
+mountApi('/daily-check-holidays', require('./routes/dailyCheckHolidays')); // วันหยุดอื่นนอกจากวันอาทิตย์
 mountApi('/equipment-checks', require('./routes/equipment-checks'));
 mountApi('/chemical-requisitions', require('./routes/chemical-requisitions')); // เบิกสารเคมี (solvent) → เครื่อง
 mountApi('/temphum', require('./routes/temphum'));

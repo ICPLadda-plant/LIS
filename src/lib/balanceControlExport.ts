@@ -1,6 +1,7 @@
 import type { Borders, Cell, Font, Workbook, Worksheet } from "exceljs";
 import type { DailyCheckRecord } from "@/lib/api";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
+import { isSunday } from "@/lib/dailyCheckFormat";
 import {
   chartDomain,
   classifyPoint,
@@ -22,6 +23,8 @@ export interface BalanceControlExportInput {
   limits: ControlLimits | null;
   series: MonthlyPoint<DailyCheckRecord>[];
   month: string;
+  /** วันหยุดอื่นนอกจากวันอาทิตย์ (YYYY-MM-DD) — ระบายเทาเพราะไม่ได้ทำงาน */
+  holidayDates?: ReadonlySet<string>;
 }
 
 export const BALANCE_FORM_CODE = "FM-WI-06-04-001-R00 (01/06/65)";
@@ -70,15 +73,18 @@ interface CellOptions {
   border?: Partial<Borders>;
   numFmt?: string;
   font?: Partial<Font>;
+  /** สีพื้นแบบ ARGB เช่น "FFE5E5E5" */
+  fill?: string;
 }
 
 /** กำหนด style ใหม่ทั้งก้อนให้แต่ละ cell (cell ใน merge ใช้ object style ร่วมกับ master ถ้าไม่สร้างใหม่) */
-function styleCell(cell: Cell, { bold, horizontal, border, numFmt, font }: CellOptions = {}) {
+function styleCell(cell: Cell, { bold, horizontal, border, numFmt, font, fill }: CellOptions = {}) {
   cell.style = {
     font: { ...BASE_FONT, ...(bold ? { bold: true } : {}), ...font },
     alignment: { vertical: "middle", ...(horizontal ? { horizontal } : {}) },
     ...(border ? { border } : {}),
     ...(numFmt ? { numFmt } : {}),
+    ...(fill ? { fill: { type: "pattern", pattern: "solid", fgColor: { argb: fill } } } : {}),
   };
 }
 
@@ -297,7 +303,7 @@ function renderChartPng(
 // ---------------------------------------------------------------------------
 
 function buildFormSheet(workbook: Workbook, input: BalanceControlExportInput, logo: PngImage | null, chart: PngImage | null) {
-  const { scale, config, series } = input;
+  const { scale, config, series, holidayDates } = input;
   const ws = workbook.addWorksheet(`เครื่องชั่ง ${scale.decimals} ตำแหน่ง`, {
     pageSetup: {
       orientation: "portrait",
@@ -376,13 +382,15 @@ function buildFormSheet(workbook: Workbook, input: BalanceControlExportInput, lo
     const rowNumber = FIRST_DATA_ROW + index;
     ws.getRow(rowNumber).height = 12;
     const record = point.record;
+    // วันอาทิตย์และวันหยุดอื่น = ไม่ได้ทำงาน จึงระบายเทาอ่อนทั้งแถว
+    const fill = isSunday(point.date) || holidayDates?.has(point.date) ? "FFE5E5E5" : undefined;
     const border = (column: string): Partial<Borders> => ({
       top: THIN,
       bottom: THIN,
       left: column === "A" ? MEDIUM : THIN,
       right: column === "H" ? MEDIUM : THIN,
     });
-    put(ws, `A${rowNumber}`, ddmmBE(point.date), { horizontal: "center", border: border("A") });
+    put(ws, `A${rowNumber}`, ddmmBE(point.date), { horizontal: "center", border: border("A"), fill });
     ["B", "C", "D"].forEach((column, weightIndex) => {
       const weights = scale.controlWeight === 10 ? record?.weights10 : record?.weights100;
       const weight = Number(weights?.[weightIndex]);
@@ -391,21 +399,24 @@ function buildFormSheet(workbook: Workbook, input: BalanceControlExportInput, lo
         horizontal: "center",
         border: border(column),
         numFmt: valueFmt,
+        fill,
       });
     });
     put(ws, `E${rowNumber}`, formula(`IFERROR(AVERAGE(B${rowNumber}:D${rowNumber}),"")`, record ? (scale.controlWeight === 10 ? record.avg10 : record.avg100) : ""), {
       horizontal: "center",
       border: border("E"),
       numFmt: valueFmt,
+      fill,
     });
     const result = scale.controlWeight === 10 ? record?.status10 ?? record?.status : record?.status100 ?? record?.status;
     put(ws, `F${rowNumber}`, result === "pass" ? "∕" : result === "fail" ? "X" : null, {
       horizontal: "center",
       border: border("F"),
       font: result === "pass" ? { name: "Calibri" } : undefined,
+      fill,
     });
-    put(ws, `G${rowNumber}`, null, { horizontal: "center", border: border("G") });
-    put(ws, `H${rowNumber}`, record?.recorder ?? null, { horizontal: "center", border: border("H") });
+    put(ws, `G${rowNumber}`, null, { horizontal: "center", border: border("G"), fill });
+    put(ws, `H${rowNumber}`, record?.recorder ?? null, { horizontal: "center", border: border("H"), fill });
   });
 
   const lastDataRow = FIRST_DATA_ROW + Math.max(series.length, 1) - 1;

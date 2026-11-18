@@ -1,6 +1,6 @@
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import LabCalculationForm, { ccsDifference, controlResult, parseSampleName } from "./LabCalculationForm";
+import LabCalculationForm, { LAB_CALCULATION_CSS, ccsDifference, controlResult, parseSampleName } from "./LabCalculationForm";
 import type { LabReportPage } from "@/lib/labReport";
 
 const row = (testItem: string, result: string) => ({ testItem, result, criteria: "-", method: "-" });
@@ -21,6 +21,10 @@ function page(rows: ReturnType<typeof row>[]): LabReportPage {
 const field = (container: HTMLElement, name: string) => container.querySelector(`[data-field="${name}"]`)?.textContent;
 
 describe("LabCalculationForm", () => {
+  it("prints on A4 landscape", () => {
+    expect(LAB_CALCULATION_CSS).toContain("@page { size: A4 landscape; margin: 0; }");
+  });
+
   it("splits the sample name into common name, strength and form", () => {
     expect(parseSampleName("OMETHOATE 50% SL")).toEqual({ commonName: "OMETHOATE", strength: "50", form: "SL" });
   });
@@ -63,6 +67,7 @@ describe("LabCalculationForm", () => {
       row("Solvent Blank", "ไม่พบ Peak"),
     ])} />);
     expect(field(container, "ccs-2")).toBe("2.00");
+    expect(field(container, "ccs-3")).toBe("Pass");
     expect(field(container, "blankNotFound")).toBe("✓");
     expect(field(container, "blankFound")).toBe("");
   });

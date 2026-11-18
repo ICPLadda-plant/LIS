@@ -34,6 +34,10 @@ export function collectDocumentCss(): string {
   return css;
 }
 
+// index.css ซ่อนทุกอย่างยกเว้น .doc-page ตอน @media print (ใช้ตอนสั่งพิมพ์ทั้งหน้าเว็บ)
+// iframe พิมพ์มีแค่เอกสารที่ serialize มาแล้ว จึงต้องปลดการซ่อน ไม่งั้นได้กระดาษเปล่า
+export const PRINT_UNHIDE_CSS = "@media print { body *, .doc-page, .doc-page * { visibility: visible; } }";
+
 function printBaseCss(docType: PrintDocType): string {
   const fontFamily = getPrintFontFamilyForDocType(docType);
   const fontSize = getPrintFontSizeForDocType(docType);
@@ -46,7 +50,7 @@ function printBaseCss(docType: PrintDocType): string {
 }
 
 function documentHtml(docType: PrintDocType, el: HTMLElement | null, css?: string): string {
-  const combinedCss = [collectDocumentCss(), printBaseCss(docType), css].filter(Boolean).join("\n");
+  const combinedCss = [collectDocumentCss(), PRINT_UNHIDE_CSS, printBaseCss(docType), css].filter(Boolean).join("\n");
   return serializeForPrint(el, combinedCss || undefined);
 }
 

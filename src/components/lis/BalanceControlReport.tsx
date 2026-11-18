@@ -7,9 +7,9 @@ import {
   type ControlLimits,
   type MonthlyPoint,
 } from "@/lib/balanceControlChart";
-import { BALANCE_CHART_TITLE, BALANCE_FORM_CODE, BALANCE_FORM_TITLE } from "@/lib/balanceControlExport";
+import { BALANCE_CHART_TITLE, BALANCE_FORM_CODE, BALANCE_FORM_TITLE, ddmmBE } from "@/lib/balanceControlExport";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
-import { fmtDate, fmtTime } from "@/lib/dailyCheckFormat";
+import { fmtDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
 // รายงานพิมพ์ Daily check เครื่องชั่ง ตามแบบฟอร์ม FM-WI-06-04-001-R00 (A4 แนวตั้ง)
@@ -19,7 +19,8 @@ export const BALANCE_CONTROL_REPORT_CSS = `
 @page { size: A4 portrait; margin: 5mm; }
 body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr, .bcr * { font-family: ${A4_PRINT_FONT_FAMILY}; box-sizing: border-box; }
-.bcr { color: #000; background: #fff; border: 2px solid #000; display: flex; flex-direction: column; min-height: 1084px; font-size: 11pt; line-height: 1.1; padding: 8px 8px 6px; }
+/* A4 สูง 297mm − ขอบ 2×5mm ≈ 1084px ต้องเหลือที่ว่างไว้ ไม่งั้นท้ายฟอร์มล้นไปหน้า 2 */
+.bcr { color: #000; background: #fff; border: 2px solid #000; display: flex; flex-direction: column; min-height: 1066px; font-size: 11pt; line-height: 1.1; padding: 8px 8px 6px; break-inside: avoid; }
 .bcr + .bcr { break-before: page; }
 .bcr h1, .bcr h2, .bcr .bcr-strong { font-weight: ${A4_PRINT_HEADING_FONT_WEIGHT}; }
 .bcr .bcr-head { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; }
@@ -35,10 +36,12 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .bcr .bcr-table { border: 2px solid #000; }
 .bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 12pt; line-height: 1; height: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcr .bcr-table tr.bcr-off td { background: #e5e5e5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.bcr .bcr-table tr.bcr-off td.bcr-off-note { text-align: left; padding-left: 6px; font-size: 11pt; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
-.bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 445px; padding: 6px 4px 4px; }
+.bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 420px; padding: 6px 4px 4px; }
 .bcr .bcr-chart h2 { margin: 0 0 2px; text-align: center; font-size: 17pt; }
 .bcr .bcr-empty { border: 1px dashed #000; display: flex; min-height: 330px; align-items: center; justify-content: center; text-align: center; font-size: 12pt; }
 .bcr .bcr-sign { display: flex; justify-content: space-around; gap: 24px; margin-top: 10px; font-size: 10pt; }
@@ -60,6 +63,8 @@ export interface BalanceControlReportProps {
   printedAt: string;
   pageNumber?: number;
   totalPages?: number;
+  /** วันหยุดอื่นนอกจากวันอาทิตย์ → เหตุผล (YYYY-MM-DD) — ระบายสีเทาเพราะไม่ได้ทำงาน */
+  holidayNotes?: ReadonlyMap<string, string>;
 }
 
 const resultMark = (record: DailyCheckRecord | null, controlWeight: number) => {
@@ -88,6 +93,7 @@ export default function BalanceControlReport({
   printedAt,
   pageNumber = 1,
   totalPages = 1,
+  holidayNotes,
 }: BalanceControlReportProps) {
   const printedDate = printedAt ? `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}` : "";
   const table = (points: MonthlyPoint<DailyCheckRecord>[]) => (
@@ -117,9 +123,21 @@ export default function BalanceControlReport({
         {points.map((point) => {
           const record = point.record;
           const weights = config.nominal === 10 ? record?.weights10 : record?.weights100;
+          const off = isSunday(point.date) || holidayNotes?.has(point.date);
+          if (off) {
+            // วันไม่ได้ทำงาน: ช่องเทายาวช่องเดียว ไม่แบ่งคอลัมน์
+            return (
+              <tr key={point.date} className="bcr-off">
+                <td>{ddmmBE(point.date)}</td>
+                <td className="bcr-off-note" colSpan={7}>
+                  {holidayNotes?.get(point.date)?.trim() || (isSunday(point.date) ? "วันอาทิตย์ — ไม่ได้ทำงาน" : "วันหยุด — ไม่ได้ทำงาน")}
+                </td>
+              </tr>
+            );
+          }
           return (
             <tr key={point.date}>
-              <td>{fmtDate(point.date)}</td>
+              <td>{ddmmBE(point.date)}</td>
               <td>{weightText(weights, 0, scale.decimals)}</td>
               <td>{weightText(weights, 1, scale.decimals)}</td>
               <td>{weightText(weights, 2, scale.decimals)}</td>
@@ -184,7 +202,7 @@ export default function BalanceControlReport({
             <BalanceControlChart
               fixed
               width={724}
-              height={430}
+              height={395}
               series={series}
               limits={limits}
               domain={domain}

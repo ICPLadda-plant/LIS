@@ -312,6 +312,51 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("% Sample 3")).toBeInTheDocument();
     expect(screen.getByText("Area Average")).toBeInTheDocument();
     expect(screen.getByText("% Sample %RSD")).toBeInTheDocument();
+    expect(screen.getByText("เลขที่ Standard")).toBeInTheDocument();
+    expect(screen.getByText("ค่า Correlation coefficient ( r ) ที่ได้")).toBeInTheDocument();
+    expect(screen.getByText("Mid-level Standard Conc. (mg/mL)")).toBeInTheDocument();
+    expect(screen.getByText("CCS Conc. (mg/mL)")).toBeInTheDocument();
+    expect(screen.getByText("% Difference")).toBeInTheDocument();
+    expect(screen.getByText("CCS Result")).toBeInTheDocument();
+  });
+
+  it("calculates CCS difference and shows Pass or No pass with status color", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      results: [{
+        ...fixtures.results[0],
+        values: {
+          ...fixtures.results[0].values,
+          "Mid-level Standard Conc. (mg/mL)": "0.500",
+          "CCS Conc. (mg/mL)": "0.525",
+        },
+      }],
+    };
+    render(<LabTestingDetailPage />);
+
+    expect(await screen.findByDisplayValue("5.00")).toBeDisabled();
+    const result = screen.getByDisplayValue("Pass");
+    expect(result).toBeDisabled();
+    expect(result).toHaveClass("text-emerald-700");
+    expect(screen.getByText("เกณฑ์ ≤ 10%")).toBeInTheDocument();
+  });
+
+  it("shows a failed CCS result in red", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      results: [{
+        ...fixtures.results[0],
+        values: {
+          ...fixtures.results[0].values,
+          "Mid-level Standard Conc. (mg/mL)": "0.500",
+          "CCS Conc. (mg/mL)": "0.560",
+        },
+      }],
+    };
+    render(<LabTestingDetailPage />);
+
+    const result = await screen.findByDisplayValue("No pass");
+    expect(result).toHaveClass("text-destructive");
   });
 
   it("lets Lab enter Control Sample and its acceptance range on %AI, saved with the result", async () => {

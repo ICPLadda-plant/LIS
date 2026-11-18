@@ -5,6 +5,7 @@ import { fmtDate } from "@/lib/dailyCheckFormat";
 import { cn } from "@/lib/utils";
 import {
   CONTROL_STATUS_LABEL,
+  axisTickDigits,
   classifyPoint,
   formatControlNumber,
   type ControlLimits,
@@ -123,19 +124,22 @@ export default function BalanceControlChart({
   className,
 }: BalanceControlChartProps) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
-  const round = (value: number) => Number(value.toFixed(digits));
   const data: ChartDatum[] = series.map((point) => ({
     day: point.day,
     date: point.date,
-    value: point.value == null ? null : round(point.value),
+    value: point.value,
     rawValue: point.value,
   }));
   const tickFont = fixed ? 18 : 11;
-  const yTicks = Array.from(new Set([
-    round(domain[0]),
-    ...(limits ? [limits.lcl, limits.lwl, limits.mean, limits.uwl, limits.ucl].map(round) : []),
-    round(domain[1]),
-  ])).sort((a, b) => a - b);
+  const tickValues = [
+    domain[0],
+    ...(limits ? [limits.lcl, limits.lwl, limits.mean, limits.uwl, limits.ucl] : []),
+    domain[1],
+  ].sort((a, b) => a - b);
+  // แกน Y เพิ่มทศนิยมเท่าที่จำเป็นให้เส้น Mean/UWL/UCL/LWL/LCL ไม่อ่านเป็นค่าเดียวกัน
+  // (ค่าจุดและตารางยังใช้ digits ตามความละเอียดของเครื่อง)
+  const axisDigits = axisTickDigits(tickValues, digits);
+  const yTicks = tickValues;
 
   const renderDot = (props: DotRenderProps): ReactElement => {
     const key = props.key ?? `dot-${props.index ?? 0}`;
@@ -182,20 +186,20 @@ export default function BalanceControlChart({
       domain={domain}
       allowDataOverflow
       ticks={yTicks}
-      tickFormatter={(value: number) => value.toFixed(digits)}
+      tickFormatter={(value: number) => value.toFixed(axisDigits)}
       tick={{ fontSize: tickFont, fill: palette.axis }}
       tickLine={false}
-      width={digits >= 5 ? 88 : 76}
+      width={axisDigits >= 5 ? 88 : 76}
     />,
   ];
 
   if (limits) {
     elements.push(
-      referenceLine("ucl", round(limits.ucl), palette.controlLine, "UCL", "2 4"),
-      referenceLine("uwl", round(limits.uwl), palette.warningLine, "UWL", "6 4"),
-      referenceLine("mean", round(limits.mean), palette.mean, "Mean"),
-      referenceLine("lwl", round(limits.lwl), palette.warningLine, "LWL", "6 4"),
-      referenceLine("lcl", round(limits.lcl), palette.controlLine, "LCL", "2 4"),
+      referenceLine("ucl", limits.ucl, palette.controlLine, "UCL", "2 4"),
+      referenceLine("uwl", limits.uwl, palette.warningLine, "UWL", "6 4"),
+      referenceLine("mean", limits.mean, palette.mean, "Mean"),
+      referenceLine("lwl", limits.lwl, palette.warningLine, "LWL", "6 4"),
+      referenceLine("lcl", limits.lcl, palette.controlLine, "LCL", "2 4"),
     );
   }
 

@@ -3,19 +3,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Activity,
   AlertTriangle,
+  CalendarIcon,
   CheckCircle2,
   Camera,
   FileSpreadsheet,
   Printer,
+  Plus,
   RotateCcw,
   Scale,
   Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { th } from "date-fns/locale";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +34,7 @@ import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTr
 import { useAuth } from "@/context/AuthContext";
 import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
 import { formatDate } from "@/lib/dateTime";
-import { fmtDate, fmtTime } from "@/lib/dailyCheckFormat";
+import { fmtThaiDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { exportBalanceControlExcel } from "@/lib/balanceControlExport";
 import {
   BALANCE_SCALES,
@@ -44,6 +50,7 @@ import {
   controlUpdateDueDate,
   displayDigits,
   formatControlNumber,
+  formatSd,
   limitDecimalPlaces,
   formatThaiMonth,
   getBalanceControlConfig,
@@ -110,6 +117,15 @@ const evaluate = (avg: number, target: number): "pass" | "fail" =>
 
 const isPositiveWeight = (value: string) => value.trim() !== "" && Number.isFinite(Number(value)) && Number(value) > 0;
 
+/** รับเฉพาะตัวเลขและจุดทศนิยมจุดเดียว (กัน e, +, - ที่ input type=number ยอมให้พิมพ์) */
+const digitsOnly = (value: string) => {
+  const cleaned = value.replace(/[^\d.]/g, "");
+  const [whole, ...rest] = cleaned.split(".");
+  return rest.length ? `${whole}.${rest.join("")}` : whole;
+};
+
+const DRAFTS_STORAGE_KEY = "balance-room-drafts";
+
 /** เลขพร้อมเครื่องหมาย เช่น +0.000012 / −1.25 */
 const signed = (value: number, digits: number) => {
   const sign = value > 0 ? "+" : value < 0 ? "−" : "";
@@ -128,7 +144,14 @@ const BalanceRoomPage = () => {
   const currentPeriod = getCurrentDailyCheckPeriod();
   const currentPeriodLabel = getDailyCheckPeriodLabel(currentPeriod);
 
-  const [drafts, setDrafts] = useState<Record<string, ScaleDraft>>({});
+  // draft แยกตาม "วันที่|เครื่อง" และเก็บลง localStorage กันกดออก/รีเฟรชแล้วค่าหาย
+  const [drafts, setDrafts] = useState<Record<string, ScaleDraft>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(DRAFTS_STORAGE_KEY) ?? "{}") as Record<string, ScaleDraft>;
+    } catch {
+      return {};
+    }
+  });
   const [consecutiveAlert, setConsecutiveAlert] = useState<DailyCheckTrend | null>(null);
   const [selectedScaleId, setSelectedScaleId] = useState(BALANCE_SCALES[0].id);
   const [month, setMonth] = useState(() => currentMonthStr());
@@ -136,6 +159,10 @@ const BalanceRoomPage = () => {
   const [printedAt, setPrintedAt] = useState("");
   const [configWeight, setConfigWeight] = useState<number | null>(null);
   const [weightInfoOpen, setWeightInfoOpen] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [holidayNoteDrafts, setHolidayNoteDrafts] = useState<Record<string, string>>({});
+  const [newWeight, setNewWeight] = useState("");
+  const [weightCodeDrafts, setWeightCodeDrafts] = useState<Record<number, string>>({});
   const [historyWeight, setHistoryWeight] = useState<number>(BALANCE_SCALES[0].controlWeight);
   const [recordDate, setRecordDate] = useState(todayStr);
   const [exporting, setExporting] = useState(false);
@@ -145,6 +172,11 @@ const BalanceRoomPage = () => {
 
   const scale = BALANCE_SCALES.find(s => s.id === selectedScaleId) ?? BALANCE_SCALES[0];
   const typeLabel = balanceScaleTypeLabel(scale);
+  const draftKey = (id: string) => `${recordDate}|${id}`;
+
+  useEffect(() => {
+    localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(drafts));
+  }, [drafts]);
 
   useEffect(() => setHistoryWeight(scale.controlWeight), [scale.controlWeight]);
 
@@ -183,6 +215,31 @@ const BalanceRoomPage = () => {
       range ? api.getDailyChecks({ from: range.from, to: range.to, scaleId: selectedScaleId }) : Promise.resolve([]),
     enabled: !!range,
   });
+
+  // วันหยุดอื่นของเดือนที่เลือก (วันอาทิตย์คำนวณจากวันที่เอง ไม่ต้องเก็บ)
+  const { data: holidays } = useQuery({
+    queryKey: ["daily-check-holidays", month],
+    queryFn: () => (range ? api.getDailyCheckHolidays(range) : Promise.resolve([])),
+    enabled: !!range,
+  });
+  const holidayNotes = useMemo(
+    () => new Map((holidays ?? []).map((item) => [item.date, item.note ?? ""])),
+    [holidays],
+  );
+  const holidayDates = useMemo(() => new Set(holidayNotes.keys()), [holidayNotes]);
+
+  const holidayMutation = useMutation({
+    mutationFn: ({ date, holiday, note }: { date: string; holiday: boolean; note?: string }) =>
+      api.setDailyCheckHoliday(date, holiday, note ?? ""),
+    onSuccess: (_data, vars) => {
+      toast.success(vars.holiday ? `บันทึกวันหยุด ${fmtThaiDate(vars.date)} แล้ว` : `ยกเลิกวันหยุด ${fmtThaiDate(vars.date)} แล้ว`);
+      queryClient.invalidateQueries({ queryKey: ["daily-check-holidays"] });
+    },
+    onError: (err: Error) => toast.error(err.message || "บันทึกวันหยุดไม่สำเร็จ"),
+  });
+
+  const holidayNote = holidayNoteDrafts[recordDate] ?? holidayNotes.get(recordDate) ?? "";
+  const setHolidayNoteDraft = (value: string) => setHolidayNoteDrafts((prev) => ({ ...prev, [recordDate]: value }));
 
   const latestByScale = useMemo(() => {
     const map: Record<string, DailyCheckRecord> = {};
@@ -226,10 +283,28 @@ const BalanceRoomPage = () => {
     { weight: scale.controlWeight, config, series, limits, domain, digits, stats, baselineStats, counts },
     { weight: otherWeight, config: otherConfig, series: otherSeries, limits: otherLimits, domain: otherDomain, digits: otherDigits, stats: otherStats, baselineStats: otherBaselineStats, counts: otherCounts },
   ].sort((a, b) => a.weight - b.weight);
-  const activePanel = chartPanels.find((panel) => panel.weight === configWeight) ?? chartPanels[0];
+  const activeConfig = getBalanceControlConfig(controlConfigs, scale.id, configWeight ?? chartPanels[0].weight);
+  const activeDigits = displayDigits(scale.decimals, activeConfig.sd);
+  const weightConfigs = (controlConfigs?.filter((item) => item.scaleId === scale.id) ?? chartPanels.map((panel) => panel.config))
+    .sort((a, b) => a.nominal - b.nominal);
   const historyPanel = chartPanels.find((panel) => panel.weight === historyWeight) ?? chartPanels[0];
   const recordedPoints = historyPanel.series.filter((point): point is RecordedPoint => point.record != null && point.value != null);
   const duePanels = chartPanels.filter((panel) => isControlUpdateDue(panel.config.updatedDate));
+
+  const weightCodeMutation = useMutation({
+    mutationFn: ({ nominal, weightCode }: { nominal: number; weightCode: string }) =>
+      api.updateBalanceWeightCode(nominal, weightCode),
+    onSuccess: (_data, vars) => {
+      toast.success(`บันทึกรหัสตุ้ม ${vars.nominal} g แล้ว`);
+      setWeightCodeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[vars.nominal];
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: ["balance-control-config"] });
+    },
+    onError: (err: Error) => toast.error(err.message || "บันทึกรหัสตุ้มไม่สำเร็จ"),
+  });
 
   const createMutation = useMutation({
     mutationFn: api.createDailyCheck,
@@ -245,26 +320,26 @@ const BalanceRoomPage = () => {
       // เคลียร์ draft ของ scale นั้น — watcher จะปลดแจ้งเตือนเองเมื่อครบ
       setDrafts(prev => {
         const c = { ...prev };
-        delete c[vars.scaleId];
+        delete c[`${vars.date}|${vars.scaleId}`];
         return c;
       });
     },
     onError: (err: Error) => toast.error(err.message || "บันทึกไม่สำเร็จ"),
   });
 
-  const getDraft = (id: string): ScaleDraft => drafts[id] || emptyDraft();
+  const getDraft = (id: string): ScaleDraft => drafts[draftKey(id)] || emptyDraft();
 
   const updateWeight = (id: string, type: "100" | "10", index: number, value: string) => {
     const r = getDraft(id);
-    const limitedValue = limitDecimalPlaces(value, scale.decimals);
+    const limitedValue = limitDecimalPlaces(digitsOnly(value), scale.decimals);
     if (type === "100") {
       const w = [...r.weights100] as [string, string, string];
       w[index] = limitedValue;
-      setDrafts(prev => ({ ...prev, [id]: { ...r, weights100: w, status100: "", status10: "", checkedAt: undefined } }));
+      setDrafts(prev => ({ ...prev, [draftKey(id)]: { ...r, weights100: w, status100: "", status10: "", checkedAt: undefined } }));
     } else {
       const w = [...r.weights10] as [string, string, string];
       w[index] = limitedValue;
-      setDrafts(prev => ({ ...prev, [id]: { ...r, weights10: w, status100: "", status10: "", checkedAt: undefined } }));
+      setDrafts(prev => ({ ...prev, [draftKey(id)]: { ...r, weights10: w, status100: "", status10: "", checkedAt: undefined } }));
     }
   };
 
@@ -318,6 +393,10 @@ const BalanceRoomPage = () => {
       toast.error("ค่าน้ำหนักต้องเป็นตัวเลขที่มากกว่า 0");
       return;
     }
+    if (r.weights10.some((value) => isOutOfControl("10", value)) || r.weights100.some((value) => isOutOfControl("100", value))) {
+      toast.error("มีค่าเกินเส้น Control (±2SD/±3SD) กรุณาแก้ค่าก่อนบันทึก");
+      return;
+    }
     if (!user?.name) {
       toast.error("ไม่พบชื่อผู้ใช้งานปัจจุบัน");
       return;
@@ -349,7 +428,7 @@ const BalanceRoomPage = () => {
   };
 
   const handleRecheck = (id: string) => {
-    setDrafts(prev => ({ ...prev, [id]: emptyDraft() }));
+    setDrafts(prev => ({ ...prev, [draftKey(id)]: emptyDraft() }));
   };
 
   const handlePrint = () => {
@@ -360,7 +439,7 @@ const BalanceRoomPage = () => {
   const handleExport = async () => {
     setExporting(true);
     try {
-      await exportBalanceControlExcel({ scale, config, limits, series, month });
+      await exportBalanceControlExcel({ scale, config, limits, series, month, holidayDates });
     } catch (err) {
       toast.error(err instanceof Error && err.message ? err.message : "Export Excel ไม่สำเร็จ");
     } finally {
@@ -371,18 +450,40 @@ const BalanceRoomPage = () => {
   const checkedCount = Object.keys(latestByScale).length;
   const passCount = Object.values(latestByScale).filter(r => r.status === "pass").length;
 
-  const todayRec = latestByScale[scale.id];
+  // ผลที่บันทึกไว้ของ "วันที่เลือก" — ย้อนวันเก่าแล้วต้องเห็นค่าที่เคยกรอก
+  const savedRec = recordDate === todayStr()
+    ? latestByScale[scale.id]
+    : (monthRecords ?? []).find((record) => record.date === recordDate && record.scaleId === scale.id);
+  const todayRec = savedRec;
   const draft = getDraft(scale.id);
   // มีผลวันนี้แล้วและยังไม่ได้เริ่มกรอกใหม่ → แสดงผลที่บันทึกไว้
-  const showResult = !!todayRec && !drafts[scale.id];
+  const showResult = !!todayRec && !drafts[draftKey(scale.id)];
   const savingThisScale = createMutation.isPending && createMutation.variables?.scaleId === scale.id;
   const hasInvalidWeight = [...draft.weights100, ...draft.weights10].some(value => value !== "" && !isPositiveWeight(value));
 
-  // ค่าปัจจุบัน (กำลังกรอก หรือผลที่บันทึกแล้ววันนี้) เทียบกับเส้น Control
-  const compareValue = scale.controlWeight === 10
-    ? (showResult ? todayRec?.avg10 ?? null : calcAvg(draft.weights10))
-    : (showResult ? todayRec?.avg100 ?? null : calcAvg(draft.weights100));
-  const compareStatus = classifyPoint(compareValue, limits);
+  // เส้น Control ของแต่ละช่องกรอก (10 g กับตุ้มหลักของเครื่อง)
+  const limitsForType = (type: "100" | "10") => {
+    const weight = type === "10" ? 10 : scale.primaryCalibrationWeight;
+    return chartPanels.find((panel) => panel.weight === weight)?.limits ?? null;
+  };
+  // ค่าที่เกิน ±2SD/±3SD ห้ามบันทึก (ช่องจะขึ้นสีแดง)
+  const isOutOfControl = (type: "100" | "10", value: string) => {
+    if (value === "" || !isPositiveWeight(value)) return false;
+    const status = classifyPoint(Number(value), limitsForType(type));
+    return status === "warning" || status === "out";
+  };
+  const hasOutOfControl = draft.weights10.some((value) => isOutOfControl("10", value))
+    || draft.weights100.some((value) => isOutOfControl("100", value));
+
+  // ค่าปัจจุบันของทั้ง 2 ตุ้ม (กำลังกรอก หรือผลที่บันทึกไว้ของวันนั้น) เทียบกับเส้น Control
+  const comparePanels = (["10", "100"] as const).map((type) => {
+    const weight = type === "10" ? 10 : scale.primaryCalibrationWeight;
+    const value = showResult
+      ? (type === "10" ? todayRec?.avg10 ?? null : todayRec?.avg100 ?? null)
+      : calcAvg(type === "10" ? draft.weights10 : draft.weights100);
+    const panelLimits = limitsForType(type);
+    return { weight, value, limits: panelLimits, status: classifyPoint(value, panelLimits) };
+  });
 
   const fmt = (value: number | null | undefined) => formatControlNumber(value, scale.decimals);
   const formatReading = (value: string | number | null | undefined) => {
@@ -402,8 +503,12 @@ const BalanceRoomPage = () => {
 
   const weightBlock = (type: "100" | "10") => {
     const nominalWeight = type === "100" ? scale.primaryCalibrationWeight : 10;
-    const weights = type === "100" ? draft.weights100 : draft.weights10;
     const savedWeights = type === "100" ? todayRec?.weights100 : todayRec?.weights10;
+    // ย้อนวันเก่า (ยังไม่เริ่มแก้) → แสดงค่าที่บันทึกไว้ในช่องเลย
+    const draftWeights = type === "100" ? draft.weights100 : draft.weights10;
+    const weights = showResult && savedWeights
+      ? ([0, 1, 2].map((i) => String(savedWeights[i] ?? "")) as [string, string, string])
+      : draftWeights;
     const savedStatus = type === "100" ? todayRec?.status100 : todayRec?.status10;
     const savedAvg = type === "100" ? todayRec?.avg100 : todayRec?.avg10;
     return (
@@ -413,37 +518,42 @@ const BalanceRoomPage = () => {
           {showResult && savedStatus === "pass" && <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />}
           {showResult && savedStatus === "fail" && <span className="text-xs text-destructive">ไม่ผ่าน</span>}
         </label>
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
           {[0, 1, 2].map(i => (
             <div key={i} className="flex min-w-0 gap-1">
               <Input
-                type="number"
-                step={10 ** -scale.decimals}
                 inputMode="decimal"
-                placeholder={showResult && savedWeights ? String(savedWeights[i] ?? "") : `ครั้งที่ ${i + 1}`}
+                placeholder={`ครั้งที่ ${i + 1}`}
                 value={weights[i]}
                 onChange={e => updateWeight(scale.id, type, i, e.target.value)}
-                onWheel={e => e.currentTarget.blur()}
-                min={10 ** -scale.decimals}
-                aria-invalid={weights[i] !== "" && (!isPositiveWeight(weights[i]) || Math.abs(Number(weights[i]) - nominalWeight) > TOLERANCE)}
-                title={weights[i] !== "" && !isPositiveWeight(weights[i]) ? "ค่าน้ำหนักต้องมากกว่า 0" : undefined}
-                disabled={createMutation.isPending}
-                className="h-9 min-w-0 text-sm tabular-nums aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive"
+                aria-invalid={weights[i] !== "" && (!isPositiveWeight(weights[i]) || isOutOfControl(type, weights[i]) || Math.abs(Number(weights[i]) - nominalWeight) > TOLERANCE)}
+                title={
+                  weights[i] !== "" && !isPositiveWeight(weights[i])
+                    ? "ค่าน้ำหนักต้องมากกว่า 0"
+                    : isOutOfControl(type, weights[i])
+                      ? "ค่าเกินเส้น Control (±2SD/±3SD) บันทึกไม่ได้"
+                      : undefined
+                }
+                disabled={createMutation.isPending || showResult}
+                className="h-11 min-w-0 text-base tabular-nums aria-[invalid=true]:border-destructive aria-[invalid=true]:ring-destructive"
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-9 w-9 shrink-0"
+                className="h-11 w-11 shrink-0"
                 aria-label={`ถ่ายรูปอ่านค่าน้ำหนัก ${nominalWeight} กรัม ครั้งที่ ${i + 1}`}
                 onClick={() => openWeightCamera(type, i)}
-                disabled={createMutation.isPending || readingPhoto}
+                disabled={createMutation.isPending || readingPhoto || showResult}
               >
                 <Camera className="h-4 w-4" />
               </Button>
             </div>
           ))}
         </div>
+        {draftWeights.some((value) => isOutOfControl(type, value)) && (
+          <p className="mt-1 text-xs text-destructive">ค่าที่ทำเครื่องหมายแดงเกินเส้น Control (±2SD/±3SD) — แก้ค่าก่อนจึงจะบันทึกได้</p>
+        )}
         {showResult && savedAvg != null && (
           <p className={cn("mt-1 text-xs", savedStatus === "pass" ? "text-green-600" : "text-destructive")}>
             ค่าเฉลี่ย: {savedAvg.toFixed(scale.decimals)} g {savedStatus === "pass" ? "อยู่ในเกณฑ์" : "เกินเกณฑ์"} (±{TOLERANCE}g)
@@ -582,9 +692,10 @@ const BalanceRoomPage = () => {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* iPad (md/lg) ฟอร์มกว้างเต็มแถวให้กรอกง่าย กราฟลงไปอยู่ด้านล่าง; จอกว้างจริงค่อยวางคู่กัน */}
+      <div className="grid gap-4 xl:grid-cols-3">
         {/* ฟอร์มบันทึกของเครื่องที่เลือก */}
-        <Card>
+        <Card className="xl:col-span-1">
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
             <div className="min-w-0 space-y-1">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -604,44 +715,94 @@ const BalanceRoomPage = () => {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="balance-record-date">วันที่บันทึก</Label>
-              <Input
-                id="balance-record-date"
-                type="date"
-                value={recordDate}
-                max={todayStr()}
-                required
-                onChange={event => setRecordDate(event.target.value)}
-              />
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button id="balance-record-date" type="button" variant="outline" className="w-full justify-start gap-2 font-normal">
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    {fmtThaiDate(recordDate)}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={th}
+                    formatters={{ formatCaption: (date) => formatThaiMonth(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`) }}
+                    selected={recordDate ? new Date(`${recordDate}T00:00:00`) : undefined}
+                    defaultMonth={recordDate ? new Date(`${recordDate}T00:00:00`) : new Date()}
+                    disabled={{ after: new Date() }}
+                    onSelect={(date) => {
+                      if (!date) return;
+                      setRecordDate(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
+                      setDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               {recordDate !== todayStr() && <p className="text-xs text-muted-foreground">กำลังบันทึกข้อมูลย้อนหลัง</p>}
+              {isSunday(recordDate) ? (
+                <p className="text-xs text-muted-foreground">วันอาทิตย์ — ปกติไม่ได้ทำงาน</p>
+              ) : (
+                <>
+                  <label className="flex items-center gap-2 text-sm text-foreground">
+                    <Checkbox
+                      checked={holidayDates.has(recordDate)}
+                      disabled={holidayMutation.isPending}
+                      onCheckedChange={(checked) => holidayMutation.mutate({ date: recordDate, holiday: checked === true, note: holidayNote })}
+                    />
+                    วันหยุด (ไม่ได้ทำงาน)
+                  </label>
+                  {holidayDates.has(recordDate) && (
+                    <div className="flex gap-2">
+                      <Input
+                        aria-label="เหตุผลวันหยุด"
+                        placeholder="เหตุผล เช่น หยุดชดเชยปีใหม่"
+                        value={holidayNote}
+                        onChange={(event) => setHolidayNoteDraft(event.target.value)}
+                        className="h-9 text-sm"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="h-9 shrink-0"
+                        disabled={holidayMutation.isPending || holidayNote === (holidayNotes.get(recordDate) ?? "")}
+                        onClick={() => holidayMutation.mutate({ date: recordDate, holiday: true, note: holidayNote })}
+                      >
+                        บันทึกเหตุผล
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             {weightBlock("10")}
             {weightBlock("100")}
 
-            <div className="rounded-md border bg-muted/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground">เทียบกับเส้น Control (ตุ้ม {scale.controlWeight} g)</p>
-              {!limits ? (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  ยังไม่มีค่า Mean / STD ของเครื่องนี้ — กดปุ่มตั้งค่าเพื่อเริ่มเทียบกับกราฟ
-                </p>
-              ) : compareValue == null ? (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  กรอกค่าตุ้ม {scale.controlWeight} g ให้ครบ 3 ครั้ง ระบบจะเทียบกับเส้น Control ให้ทันที
-                </p>
-              ) : (
-                <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold tabular-nums text-foreground">{fmt(compareValue)} g</p>
-                    <p className="text-xs text-muted-foreground">
-                      ต่างจาก Mean {signed(compareValue - limits.mean, digits)} (
-                      {signed((compareValue - limits.mean) / limits.sd, 2)} SD)
-                    </p>
+            {/* ขึ้นเมื่อกรอกครบแล้วเท่านั้น และแสดงทั้ง 2 ตุ้ม */}
+            {comparePanels.some((panel) => panel.value != null) && (
+              <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+                <p className="text-xs font-medium text-muted-foreground">เทียบกับเส้น Control</p>
+                {comparePanels.map((panel) => (
+                  <div key={panel.weight} className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold tabular-nums text-foreground">
+                        ตุ้ม {panel.weight} g · {panel.value == null ? "—" : `${fmt(panel.value)} g`}
+                      </p>
+                      {panel.value != null && panel.limits && (
+                        <p className="text-xs text-muted-foreground">
+                          ต่างจาก Mean {signed(panel.value - panel.limits.mean, displayDigits(scale.decimals, panel.limits.sd))} (
+                          {signed((panel.value - panel.limits.mean) / panel.limits.sd, 2)} SD)
+                        </p>
+                      )}
+                      {panel.value != null && !panel.limits && (
+                        <p className="text-xs text-muted-foreground">ยังไม่มีค่า Mean / STD ของตุ้มนี้</p>
+                      )}
+                    </div>
+                    {panel.status && <Badge variant={STATUS_BADGE[panel.status]}>{CONTROL_STATUS_LABEL[panel.status]}</Badge>}
                   </div>
-                  {compareStatus && (
-                    <Badge variant={STATUS_BADGE[compareStatus]}>{CONTROL_STATUS_LABEL[compareStatus]}</Badge>
-                  )}
-                </div>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">ผู้บันทึก</label>
@@ -658,7 +819,7 @@ const BalanceRoomPage = () => {
                 <RotateCcw className="h-4 w-4" /> บันทึกซ้ำ
               </Button>
             ) : (
-              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight}>
+              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight || hasOutOfControl}>
                 <CheckCircle2 className="h-4 w-4" />
                 {savingThisScale ? "กำลังบันทึก..." : "บันทึกผล Calibrate"}
               </Button>
@@ -673,7 +834,7 @@ const BalanceRoomPage = () => {
         </Card>
 
         {/* กราฟควบคุมคุณภาพ */}
-        <Card className="lg:col-span-2">
+        <Card className="xl:col-span-2">
           <CardHeader className="pb-3">
             <div className="space-y-1">
               <CardTitle className="text-base">กราฟควบคุมคุณภาพ (Control Chart)</CardTitle>
@@ -690,7 +851,7 @@ const BalanceRoomPage = () => {
                     <h3 className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</h3>
                     <p className="text-xs text-muted-foreground">ค่าเฉลี่ยรายวันและเส้น Control ของเกณฑ์นี้</p>
                     <p className="text-xs text-muted-foreground">
-                      อัปเดตล่าสุด: {panel.config.updatedDate ? fmtDate(panel.config.updatedDate) : "—"} · ครบกำหนด: {controlDueMonth(panel.config.updatedDate)}
+                      อัปเดตล่าสุด: {panel.config.updatedDate ? fmtThaiDate(panel.config.updatedDate) : "—"} · ครบกำหนด: {controlDueMonth(panel.config.updatedDate)}
                     </p>
                   </div>
                   {panel.limits ? (
@@ -708,7 +869,7 @@ const BalanceRoomPage = () => {
                 <dl className="grid grid-cols-3 gap-x-4 gap-y-2 border-y py-2 sm:grid-cols-6">
                   {[
                     ["Mean", formatControlNumber(panel.limits?.mean, panel.digits)],
-                    ["STD", formatControlNumber(panel.limits?.sd ?? panel.config.sd, panel.digits)],
+                    ["STD", formatSd(panel.limits?.sd ?? panel.config.sd)],
                     ["UWL", formatControlNumber(panel.limits?.uwl, panel.digits)],
                     ["LWL", formatControlNumber(panel.limits?.lwl, panel.digits)],
                     ["UCL", formatControlNumber(panel.limits?.ucl, panel.digits)],
@@ -808,8 +969,8 @@ const BalanceRoomPage = () => {
                     : point.record.status100 ?? point.record.status;
                   const readings = historyPanel.weight === 10 ? point.record.weights10 : point.record.weights100;
                   return (
-                    <tr key={point.date} className="hover:bg-accent">
-                      <td className="px-3 py-2">{fmtDate(point.date)}</td>
+                    <tr key={point.date} className={cn("hover:bg-accent", (isSunday(point.date) || holidayDates.has(point.date)) && "bg-muted/60")}>
+                      <td className="px-3 py-2">{fmtThaiDate(point.date)}</td>
                       {[0, 1, 2].map(index => (
                         <td key={index} className="px-3 py-2 text-right tabular-nums">{formatReading(readings[index])}</td>
                       ))}
@@ -857,6 +1018,7 @@ const BalanceRoomPage = () => {
               domain={panel.domain}
               digits={panel.digits}
               month={month}
+              holidayNotes={holidayNotes}
               printedBy={user?.name ?? user?.email ?? ""}
               printedAt={printedAt || new Date().toISOString()}
               pageNumber={index + 1}
@@ -869,21 +1031,43 @@ const BalanceRoomPage = () => {
       <Dialog open={weightInfoOpen} onOpenChange={setWeightInfoOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>ข้อมูลตุ้มน้ำหนักที่ใช้ — {scale.code}</DialogTitle>
-            <DialogDescription>รหัสตุ้มน้ำหนักสำหรับ Daily Check และ Control Chart</DialogDescription>
+            <DialogTitle>ข้อมูลตุ้มน้ำหนักที่ใช้</DialogTitle>
+            <DialogDescription>รหัสตุ้มผูกกับขนาดตุ้ม ใช้ร่วมกันทุกเครื่องชั่ง</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            {chartPanels.map((panel) => (
-              <div key={panel.weight} className="flex items-center justify-between gap-3 rounded-lg border bg-card p-3">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">ตุ้ม {panel.weight} g</p>
-                  <p className="text-sm text-muted-foreground">รหัส: {panel.config.weightCode || "—"}</p>
+            {weightConfigs.map((weightConfig) => (
+              <div key={weightConfig.nominal} className="flex items-end justify-between gap-3 rounded-lg border bg-card p-3">
+                <div className="flex-1 space-y-1">
+                  <Label htmlFor={`weight-code-${weightConfig.nominal}`}>รหัสตุ้ม {weightConfig.nominal} g</Label>
+                  <Input
+                    id={`weight-code-${weightConfig.nominal}`}
+                    value={weightCodeDrafts[weightConfig.nominal] ?? weightConfig.weightCode}
+                    onChange={(event) => setWeightCodeDrafts((prev) => ({ ...prev, [weightConfig.nominal]: event.target.value }))}
+                  />
                 </div>
-                <Button variant="outline" size="sm" onClick={() => { setWeightInfoOpen(false); setConfigWeight(panel.weight); }}>
-                  แก้ไขข้อมูล
+                <Button
+                  size="sm"
+                  disabled={weightCodeMutation.isPending || (weightCodeDrafts[weightConfig.nominal] ?? weightConfig.weightCode).trim() === weightConfig.weightCode}
+                  onClick={() => weightCodeMutation.mutate({ nominal: weightConfig.nominal, weightCode: (weightCodeDrafts[weightConfig.nominal] ?? "").trim() })}
+                >
+                  บันทึก
                 </Button>
               </div>
             ))}
+            <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-end">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="new-balance-weight">เพิ่มขนาดตุ้ม (g)</Label>
+                <Input id="new-balance-weight" type="number" min="1" step="1" inputMode="numeric" value={newWeight} onChange={(event) => setNewWeight(event.target.value)} />
+              </div>
+              <Button
+                type="button"
+                className="gap-2"
+                disabled={!Number.isInteger(Number(newWeight)) || Number(newWeight) <= 0 || weightConfigs.some((item) => item.nominal === Number(newWeight))}
+                onClick={() => { weightCodeMutation.mutate({ nominal: Number(newWeight), weightCode: "" }); setNewWeight(""); }}
+              >
+                <Plus className="h-4 w-4" /> เพิ่มขนาดตุ้ม
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -892,8 +1076,8 @@ const BalanceRoomPage = () => {
         open={configWeight != null}
         onOpenChange={(open) => { if (!open) setConfigWeight(null); }}
         scale={scale}
-        config={activePanel.config}
-        digits={activePanel.digits}
+        config={activeConfig}
+        digits={activeDigits}
       />
     </div>
   );

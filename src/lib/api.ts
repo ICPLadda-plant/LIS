@@ -631,6 +631,17 @@ export const api = {
   getDailyCheckTodaySummary: () =>
     request<{ data: DailyCheckTodaySummary }>("/daily-checks/summary/today").then(r => r.data),
 
+  // วันหยุดอื่นนอกจากวันอาทิตย์ (ใช้ระบายสีแถวในรายงาน Daily check)
+  getDailyCheckHolidays: (params: { from: string; to: string }) =>
+    request<{ data: Array<{ date: string; note?: string }> }>(
+      `/daily-check-holidays?${new URLSearchParams(params).toString()}`,
+    ).then(r => r.data),
+  setDailyCheckHoliday: (date: string, holiday: boolean, note = "") =>
+    request<{ data: { date: string; holiday: boolean } }>(`/daily-check-holidays/${date}`, {
+      method: "PUT",
+      body: JSON.stringify({ holiday, note }),
+    }).then(r => r.data),
+
   // ฟีดกระดิ่งรวม (คำขอ + สต็อก + ระบบ) — server เลือกผู้รับจาก role และงานของตัวเอง (server/routes/notifications.js)
   // roles/employeeId/email/name ใช้เฉพาะตอน server หาผู้ใช้จาก session ไม่เจอ (dev mode)
   getPetitionNotifications: (params: {
@@ -719,6 +730,12 @@ export const api = {
     request<{ data: BalanceControlConfig }>(`/balance-control-config/${encodeURIComponent(scaleId)}`, {
       method: "PUT",
       body: JSON.stringify(input),
+    }).then((r) => r.data),
+  // รหัสตุ้มผูกกับขนาดตุ้ม ใช้ร่วมกันทุกเครื่องชั่ง
+  updateBalanceWeightCode: (nominal: number, weightCode: string) =>
+    request<{ data: { nominal: number; weightCode: string } }>(`/balance-control-config/weight-code/${nominal}`, {
+      method: "PUT",
+      body: JSON.stringify({ weightCode }),
     }).then((r) => r.data),
 
   // ── Document number config (petition / sampleReceipt / labRequest formats) ──

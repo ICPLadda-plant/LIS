@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAi, calculatedAiFieldKind, findAiDensity, formatCalculatedAi } from './aiCalculation';
+import { calculateAi, calculateCcs, calculatedAiFieldKind, ccsDifference, findAiDensity, formatCalculatedAi } from './aiCalculation';
 
 describe('calculateAi', () => {
   it('calculates separate averages, sample RSD and AI using density', () => {
@@ -54,5 +54,19 @@ describe('calculateAi', () => {
     expect(calculatedAiFieldKind('Sample Average')).toBe('sampleAverage');
     expect(calculatedAiFieldKind('% RSD Sample')).toBe('sampleRsd');
     expect(calculatedAiFieldKind('%AI — IMIDACLOPRID')).toBe('ai');
+  });
+});
+
+describe('calculateCcs', () => {
+  it('calculates % Difference and evaluates the 10% acceptance limit', () => {
+    expect(calculateCcs('0.500', '0.525').difference).toBeCloseTo(5);
+    expect(calculateCcs('0.500', '0.525').result).toBe('Pass');
+    expect(ccsDifference('0.500', '0.525')).toBe('5.00');
+    expect(calculateCcs('0.500', '0.560').result).toBe('No pass');
+  });
+
+  it('waits for complete non-zero numbers', () => {
+    expect(calculateCcs('', '0.500')).toEqual({ difference: null, result: '' });
+    expect(calculateCcs('0', '0.500')).toEqual({ difference: null, result: '' });
   });
 });

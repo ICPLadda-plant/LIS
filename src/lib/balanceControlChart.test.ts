@@ -135,9 +135,9 @@ describe("chartDomain / formatSd", () => {
   });
 
   it("แสดงทศนิยมไม่เกินความละเอียดเครื่องชั่ง", () => {
-    expect(displayDigits(2, null)).toBe(4);
+    expect(displayDigits(2, null)).toBe(2);
     expect(displayDigits(5, null)).toBe(5);
-    expect(displayDigits(2, 0.01)).toBe(4);
+    expect(displayDigits(2, 0.01)).toBe(2);
     expect(displayDigits(5, 0.0000476)).toBe(5);
     expect(displayDigits(5, 1e-12)).toBe(5);
     expect(limitDecimalPlaces("10.009", 2)).toBe("10.00");
@@ -157,7 +157,8 @@ describe("config defaults / validation", () => {
     expect(validateBalanceControlInput({ mean: NaN, sd: 1 })).toBe("ค่า Mean ต้องเป็นตัวเลข");
     expect(validateBalanceControlInput({ mean: 100, sd: NaN })).toBe("ค่า STD ต้องเป็นตัวเลข");
     expect(validateBalanceControlInput({ mean: 100, sd: -1 })).toBe("ค่า STD ต้องไม่ติดลบ");
-    expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0 })).toBe("น้ำหนักตุ้มต้องมากกว่า 0");
+    expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0 })).toBe("น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0");
+    expect(validateBalanceControlInput({ mean: 100, sd: 1, nominal: 0.5 })).toBe("น้ำหนักตุ้มต้องเป็นจำนวนเต็มมากกว่า 0");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, mpe: -1 })).toBe("ค่า MPE ต้องไม่ติดลบ");
     expect(validateBalanceControlInput({ mean: 100, sd: 1, updatedDate: "26/10/2569" })).toBe(
       "วันที่ปรับปรุงต้องอยู่ในรูปแบบ YYYY-MM-DD",
