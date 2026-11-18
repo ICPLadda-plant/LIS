@@ -378,6 +378,38 @@ describe("LabTestingDetailPage", () => {
     }, { timeout: 2000 });
   });
 
+  // ตามที่เกิดกับคำร้อง P-2611-0068: รายการ 1 ส่ง QC (มีค่า ถพ.) รายการ 2 ส่ง Lab อย่างเดียว batch เดียวกัน
+  it("multiplies %AI by the density QC saved on the QC-only item of the same batch", async () => {
+    const base = { ...fixtures.petition.items[0], testItems: "Active Ingredient, ค่า ถพ." };
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          { ...base, seq: 1, sendToQc: true, sendToLab: false },
+          { ...base, seq: 2, sendToQc: false, sendToLab: true },
+        ],
+      },
+      parameters: [
+        ...fixtures.parameters,
+        { _id: "density-param", name: "ค่า ถพ.", scope: "qc", shareWithLab: true, applyAll: true, multiEntry: true, valueFields: [{ label: "ค่าถพ.", type: "number" }, { label: "อุณหภูมิ", type: "number" }] },
+      ],
+      results: [{ petitionId: "petition-1", itemSeq: 1, parameterId: "density-param", values: {}, entries: [{ "ค่าถพ.::abamectin": "1.060", "อุณหภูมิ": "30.0" }] }],
+    };
+
+    render(<LabTestingDetailPage />);
+
+    await screen.findByText("Area Inj.1");
+    const inputs = screen.getAllByRole("spinbutton");
+    await waitFor(() => expect(inputs[0]).toBeEnabled());
+    ["801.5579", "800.9444", "802.3262", "14.766", "14.763", "14.738"].forEach((value, index) => {
+      fireEvent.change(inputs[index], { target: { value } });
+    });
+
+    // 14.7557 × 1.060
+    expect(await screen.findByDisplayValue("15.64")).toBeInTheDocument();
+  });
+
   it("locks Lab inputs until QC selects and saves a density value", async () => {
     const densityParameter: ParameterItem = {
       _id: "density-param",
