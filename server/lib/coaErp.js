@@ -170,11 +170,14 @@ function bestMfProductionDate(rows, targetDate, requestedBatch = '') {
     };
   }).filter((candidate) => candidate.productionDate && Number.isFinite(candidate.productionTime));
 
-  candidates.sort((left, right) => Number(right.exactBatch) - Number(left.exactBatch)
+  const selectable = candidates.some((candidate) => candidate.row?.__mfClosed)
+    ? candidates.filter((candidate) => candidate.row?.__mfClosed)
+    : candidates;
+  selectable.sort((left, right) => Number(right.exactBatch) - Number(left.exactBatch)
     || left.dateDistance - right.dateDistance
     || right.productionDate.localeCompare(left.productionDate)
     || left.index - right.index);
-  return candidates[0] || null;
+  return selectable[0] || null;
 }
 
 function suffixDatedLotFromRow(row) {
@@ -1063,11 +1066,11 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     : '';
   const erpProductionDate = erpRequestLot
     ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
-    : petitionStockProductionDate
-      || authoritativeErpLot?.productionDate
+    : authoritativeErpLot?.productionDate
+      || normalizeIsoDate(mfDate)
+      || petitionStockProductionDate
       || erpRequestProductionDate
       || matchingStockLot?.productionDate
-      || normalizeIsoDate(mfDate)
       || erpStockProductionDate;
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;

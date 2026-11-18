@@ -1755,7 +1755,7 @@ test('ERP autofill keeps the LIS label production date instead of deriving it fr
   }
 });
 
-test('ERP autofill keeps the LIS production date paired with its resolved Batch', async () => {
+test('ERP autofill replaces the LIS date with the closed MF production date', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1804,7 +1804,7 @@ test('ERP autofill keeps the LIS production date paired with its resolved Batch'
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'LOT-CUSTOMER');
-    assert.equal(res.body.sample.productionDate, '2026-06-16');
+    assert.equal(res.body.sample.productionDate, '2026-09-17');
     assert.equal(res.body.dataSources.mf, true);
   } finally {
     global.fetch = originals.fetch;

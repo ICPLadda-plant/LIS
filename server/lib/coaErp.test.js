@@ -112,6 +112,23 @@ test('invalid numeric request date falls back to the nearest ERP MF date', () =>
   assert.equal(result.mfCandidates[0].productionDate, '2026-11-16');
 });
 
+test('closed ERP MF date wins over current MF and generic Stock dates', () => {
+  const result = sampleFromSources({
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{ sampleName: 'Product', commonName: 'COMMON A' }],
+    externalCoaRequest: { itemNo: 'ITEM-A', shipmentDate: '2026-11-20T00:00:00.000Z' },
+  }, [{
+    item_no: 'ITEM-A', lot_no: 'FG261119-001', registering_date: '2026-11-19T00:00:00.000Z',
+  }], [{
+    item_no: 'ITEM-A', prod_order_no: 'MF-CURRENT', create_date: '2026-11-19T00:00:00.000Z',
+  }, {
+    item_no: 'ITEM-A', prod_order_no: 'MF-CLOSED', create_date: '2026-11-17T00:00:00.000Z', __mfClosed: true,
+  }]);
+
+  assert.equal(result.sample.productionDate, '2026-11-16');
+  assert.equal(result.mfCandidates[0].productionDate, '2026-11-16');
+});
+
 test('legacy Lab matching handles reversed substances and historical spelling', () => {
   const source = {
     sampleSnapshots: [{ commonName: 'PROPANIL 36% + ANILOFOS 18% W/V EC' }],
@@ -474,7 +491,7 @@ test('request Batch keeps its matching request production date instead of an unr
   assert.equal(result.sample.productionDate, '2026-06-16');
 });
 
-test('LIS request production date stays paired with its Batch before a newer MF date', () => {
+test('ERP MF production date overrides the LIS request date', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
     sampleSnapshots: [{
@@ -496,7 +513,7 @@ test('LIS request production date stays paired with its Batch before a newer MF 
   });
 
   assert.equal(result.sample.batchNo, '029');
-  assert.equal(result.sample.productionDate, '2026-11-07');
+  assert.equal(result.sample.productionDate, '2026-11-09');
 });
 
 test('customer COA request batch, lot and production date take precedence over ERP references', () => {
