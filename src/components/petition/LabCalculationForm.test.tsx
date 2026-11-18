@@ -67,6 +67,7 @@ describe("LabCalculationForm", () => {
       row("Solvent Blank", "ไม่พบ Peak"),
     ])} />);
     expect(field(container, "ccs-2")).toBe("2.00");
+    expect(field(container, "ccs-3")).toBe("Pass");
     expect(field(container, "blankNotFound")).toBe("✓");
     expect(field(container, "blankFound")).toBe("");
   });

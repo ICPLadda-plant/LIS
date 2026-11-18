@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import type { LabReportPage } from "@/lib/labReport";
-import { CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
+import { calculateCcs, ccsDifference, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
+export { ccsDifference } from "@/lib/aiCalculation";
 
 export const LAB_CALCULATION_FORM_CODE = "FM-QP-07-08-002-R02 (02/11/69) P1/1";
 
@@ -77,14 +78,6 @@ const toNumber = (value: string) => {
   return value && Number.isFinite(n) ? n : null;
 };
 
-// % Difference ของ CCS เทียบกับ Mid-level Standard = |CCS − Mid| / Mid × 100
-export function ccsDifference(mid: string, ccs: string): string {
-  const m = toNumber(mid);
-  const c = toNumber(ccs);
-  if (m == null || c == null || m === 0) return "";
-  return ((Math.abs(c - m) / m) * 100).toFixed(2);
-}
-
 // ผล Control sample: อยู่ในช่วงเกณฑ์ยอมรับ = ผ่าน
 export function controlResult(value: string, low: string, high: string): string {
   const v = toNumber(value);
@@ -142,7 +135,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
     mid: midConc,
     conc: ccsConc,
     diff: firstValue(page, /difference|%\s*diff/i) || ccsDifference(midConc, ccsConc),
-    result: firstValue(page, /^ccs\s*result/i),
+    result: firstValue(page, /^ccs\s*result/i) || calculateCcs(midConc, ccsConc).result,
   };
   const blank = solventBlankFinding(firstValue(page, /solvent\s*blank/i));
   // Control Sample + ช่วงยอมรับ มาจากผลที่บันทึกในหน้าการทดสอบ Lab

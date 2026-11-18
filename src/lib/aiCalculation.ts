@@ -6,6 +6,19 @@ export type AiCalculationResult = {
   ai: number | null;
 };
 
+export type CcsCalculationResult = {
+  difference: number | null;
+  result: '' | 'Pass' | 'No pass';
+};
+
+export const CCS_DIFFERENCE_LIMIT = 10;
+export const STANDARD_NO_LABEL = 'เลขที่ Standard';
+export const CORRELATION_LABEL = 'ค่า Correlation coefficient ( r ) ที่ได้';
+export const MID_LEVEL_STANDARD_LABEL = 'Mid-level Standard Conc. (mg/mL)';
+export const CCS_CONC_LABEL = 'CCS Conc. (mg/mL)';
+export const CCS_DIFFERENCE_LABEL = '% Difference';
+export const CCS_RESULT_LABEL = 'CCS Result';
+
 const numberValues = (values: Record<string, unknown>, matcher: RegExp) =>
   Object.entries(values)
     .filter(([label]) => matcher.test(label))
@@ -13,6 +26,12 @@ const numberValues = (values: Record<string, unknown>, matcher: RegExp) =>
     .filter((value) => Number.isFinite(value));
 
 const average = (values: number[]) => values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+
+const finiteNumber = (value: unknown) => {
+  if (value == null || value === '') return null;
+  const number = Number(String(value).replace(/,/g, '').trim());
+  return Number.isFinite(number) ? number : null;
+};
 
 const sampleStandardDeviation = (values: number[], mean: number | null) => {
   if (mean == null || values.length < 2) return null;
@@ -81,6 +100,33 @@ export function calculateAi(values: Record<string, unknown>, density: number | n
   };
 }
 
+const valueByLabel = (values: Record<string, unknown>, label: string) =>
+  Object.entries(values).find(([key]) => key.trim().toLowerCase() === label.toLowerCase())?.[1];
+
+export function calculateCcs(mid: unknown, ccs: unknown): CcsCalculationResult {
+  const midValue = finiteNumber(mid);
+  const ccsValue = finiteNumber(ccs);
+  if (midValue == null || ccsValue == null || midValue === 0) return { difference: null, result: '' };
+  const difference = (Math.abs(ccsValue - midValue) / Math.abs(midValue)) * 100;
+  return { difference, result: difference <= CCS_DIFFERENCE_LIMIT ? 'Pass' : 'No pass' };
+}
+
+export function calculateCcsFromValues(values: Record<string, unknown>) {
+  return calculateCcs(valueByLabel(values, MID_LEVEL_STANDARD_LABEL), valueByLabel(values, CCS_CONC_LABEL));
+}
+
+export function ccsDifference(mid: unknown, ccs: unknown) {
+  const difference = calculateCcs(mid, ccs).difference;
+  return difference == null ? '' : difference.toFixed(2);
+}
+
+export function calculatedCcsFieldKind(label: string): keyof CcsCalculationResult | null {
+  const normalized = label.trim().toLowerCase();
+  if (normalized === CCS_DIFFERENCE_LABEL.toLowerCase()) return 'difference';
+  if (normalized === CCS_RESULT_LABEL.toLowerCase()) return 'result';
+  return null;
+}
+
 export function aiSubstanceFromKey(key: string) {
   return keySubstance(key);
 }
@@ -116,6 +162,9 @@ export function aiGridClass(label: string) {
   const kind = calculatedAiFieldKind(label);
   if (kind === 'ai') return 'sm:col-span-6';
   if (isControlSampleLabel(label)) return 'sm:col-span-2';
+  if ([STANDARD_NO_LABEL, CORRELATION_LABEL].includes(label)) return 'sm:col-span-3';
+  if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(label)) return 'sm:col-span-2';
+  if ([CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL].includes(label)) return 'sm:col-span-1';
   if (kind === 'areaAverage' || kind === 'areaRsd' || kind === 'sampleAverage' || kind === 'sampleRsd') return 'sm:col-span-3';
   if (/^(area\s*inj\.?|%\s*sample)/i.test(label.trim())) return 'sm:col-span-2';
   return '';
