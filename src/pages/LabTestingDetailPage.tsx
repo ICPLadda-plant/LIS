@@ -45,6 +45,7 @@ import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSampl
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
 import { isResearchAndDevelopmentPetition, mergeQcLabDuplicateItems, shouldSendItemToLab, shouldSendItemToQc } from '@/lib/petitionRouting';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
+import { isWaterFormulationItem } from '@/lib/sgConfirmation';
 import {
   type Petition,
   type AdditionalSampleRequest,
@@ -660,7 +661,8 @@ export default function LabTestingDetailPage() {
     (petition.items ?? []).filter(shouldSendItemToLab).some((item) => {
       const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
       // ตัวอย่างที่ไม่มีพารามิเตอร์ ถพ. → Lab กรอกได้ทันที โดยใช้ ถพ. = 1.00
-      if (!hasSpecificGravityParam(matched)) return false;
+      // ยกเว้นยาน้ำ: ต้องใช้ค่า ถพ. จริงเสมอ ห้ามใช้ค่า default
+      if (!hasSpecificGravityParam(matched) && !isWaterFormulationItem(item)) return false;
       // %AI คำนวณจากค่า ถพ. → ถ้ายังไม่มีค่า ถพ. ที่บันทึกไว้ของรายการนี้ ห้ามกรอกผล
       const needsAiDensity = matched.some((param) => param.scope === 'lab' &&
         param.valueFields?.some((field) => calculatedAiFieldKind(field.label) === 'ai'));
@@ -1382,7 +1384,8 @@ export default function LabTestingDetailPage() {
                       // sameParam = this parameter's live values; otherParams = each OTHER
                       // matched parameter's live values for the same item, keyed by parameterId.
                       const densityEntries = matchedParams.flatMap((p) => (p._id && p._id !== param._id ? entriesByKey[resultKey(item.seq, p._id)] ?? [] : []));
-                      const hasSgParam = hasSpecificGravityParam(matchedParams);
+                      // ยาน้ำต้องมีค่า ถพ. จริงก่อนคำนวณ %AI (ไม่ใช้ค่า default 1.00)
+                      const hasSgParam = hasSpecificGravityParam(matchedParams) || isWaterFormulationItem(item);
                       const condCtx: ConditionContext = {
                         sameParam: phaseValues[k] ?? {},
                         otherParams: (() => {

@@ -511,6 +511,7 @@ describe("LabTestingDetailPage", () => {
     mockAuthRoles.roles = ["lab-head"];
     mockState.activeFixtures = {
       ...fixtures,
+      results: [...fixtures.results, savedDensity],
       petition: {
         ...fixtures.petition,
         status: "approved",
