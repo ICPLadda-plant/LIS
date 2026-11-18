@@ -200,6 +200,14 @@ function rowMatchesItem(row, normalizedItemNo) {
 
 function normalizeIsoDate(value) {
   const source = text(value);
+  const zonedIso = source.match(/^(\d{4})-(\d{2})-(\d{2})T.*(?:Z|[+-]\d{2}:?\d{2})$/i);
+  if (zonedIso) {
+    const parsed = new Date(source);
+    if (!Number.isNaN(parsed.getTime())) {
+      // ERP timestamps are UTC instants; labels use Thailand's calendar date (UTC+7).
+      return new Date(parsed.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    }
+  }
   const iso = source.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
   if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
   const dmy = source.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
@@ -1046,8 +1054,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     : '';
   const erpProductionDate = erpRequestLot
     ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
-    : normalizeIsoDate(petitionItem?.productionDate)
-      || petitionStockProductionDate
+    : petitionStockProductionDate
       || authoritativeErpLot?.productionDate
       || erpRequestProductionDate
       || matchingStockLot?.productionDate

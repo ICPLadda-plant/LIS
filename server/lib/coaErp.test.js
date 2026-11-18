@@ -75,6 +75,12 @@ test('normalizes Buddhist-era dates from the legacy Lab database', () => {
   assert.equal(normalizeIsoDate('31/02/2569'), '');
 });
 
+test('normalizes ERP UTC timestamps to the Thailand label date', () => {
+  assert.equal(normalizeIsoDate('2026-11-18T17:00:00.000Z'), '2026-11-19');
+  assert.equal(normalizeIsoDate('2026-11-19T00:00:00.000+07:00'), '2026-11-19');
+  assert.equal(normalizeIsoDate('2026-11-18T00:00:00.000Z'), '2026-11-18');
+});
+
 test('legacy Lab matching handles reversed substances and historical spelling', () => {
   const source = {
     sampleSnapshots: [{ commonName: 'PROPANIL 36% + ANILOFOS 18% W/V EC' }],
@@ -518,31 +524,6 @@ test('LIS petition keeps the label production date instead of deriving it from L
   assert.equal(result.sample.productionDate, '2026-10-15');
 });
 
-test('LIS label date overrides stock date when the petition uses a different item code', () => {
-  const source = {
-    selectedItemSeqs: [10000],
-    sampleSnapshots: [{ sampleName: 'Finished Good', commonName: 'COMMON A' }],
-    externalCoaRequest: {
-      itemNo: 'FG-ITEM-A',
-      shipmentDate: '2026-11-18',
-    },
-  };
-  const petitionItem = {
-    itemNo: 'BULK-ITEM-A',
-    batchNo: '081',
-    productionDate: '2026-11-19',
-  };
-  const result = sampleFromSources(source, [{
-    item_no: 'BULK-ITEM-A',
-    lot_no: 'FG261118-001',
-    registering_date: '2026-11-18T00:00:00.000Z',
-    stock_qty: 100,
-  }], [], petitionItem);
-
-  assert.equal(result.sample.batchNo, '081');
-  assert.equal(result.sample.productionDate, '2026-11-19');
-});
-
 test('finished-good COA request can use the matching bulk production batch and date by common name', () => {
   const source = {
     sampleSnapshots: [{ sampleName: 'กะรัต 35', commonName: 'CYPERMETHRIN 35% W/V EC' }],
@@ -573,7 +554,7 @@ test('finished-good COA request can use the matching bulk production batch and d
   assert.equal(result.sample.productionDate, '2026-11-04');
 });
 
-test('production request label date overrides the related bulk RM lot date', () => {
+test('bulk RM lot date overrides a stale production request date for a finished-good COA', () => {
   const source = {
     sampleSnapshots: [{ sampleName: 'โบรมาดิโอการ์ด - อ.ย.', commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)' }],
     externalCoaRequest: { itemNo: 'FPH-BROMD-1X20', shipmentDate: '2026-11-05' },
@@ -596,7 +577,7 @@ test('production request label date overrides the related bulk RM lot date', () 
   }], [], requestMatch.item);
 
   assert.equal(result.sample.batchNo, '26S-BRM0.005-GMP(R)-240');
-  assert.equal(result.sample.productionDate, '2026-11-05');
+  assert.equal(result.sample.productionDate, '2026-11-06');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {
