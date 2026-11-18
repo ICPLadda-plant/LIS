@@ -6,6 +6,7 @@ import { CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/l
 export const LAB_CALCULATION_FORM_CODE = "FM-QP-07-08-002-R02 (02/11/69) P1/1";
 
 export const LAB_CALCULATION_CSS = `
+@page { size: A4 landscape; margin: 0; }
 .brom-form-root, .brom-form-root * { box-sizing: border-box; color: #000; font-family: Tahoma, sans-serif; font-size: 8.5pt; line-height: 1.25; }
 .brom-form-page { width: 297mm; min-height: 210mm; padding: 8mm 9mm 7mm; background: #fff; display: flex; flex-direction: column; }
 .brom-form-top { display: grid; grid-template-columns: 30mm 1fr 30mm; align-items: center; }
