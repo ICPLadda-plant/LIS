@@ -5,6 +5,7 @@ import {
   statusFilterLabel,
   dateFilterLabel,
   formatReadings,
+  firstNameOnly,
 } from "./dailyCheckFormat";
 
 describe("dailyCheckFormat", () => {
@@ -13,6 +14,10 @@ describe("dailyCheckFormat", () => {
   });
   it("fmtDate: empty → em dash", () => {
     expect(fmtDate("")).toBe("—");
+  });
+  it("firstNameOnly ตัดคำนำหน้าและนามสกุล", () => {
+    expect(firstNameOnly("นายนคร อ่อนคง")).toBe("นคร");
+    expect(firstNameOnly("Dev Administrator")).toBe("Dev");
   });
   it("roomFilterLabel: all → ทุกห้อง", () => {
     expect(roomFilterLabel("all")).toBe("ทุกห้อง");
