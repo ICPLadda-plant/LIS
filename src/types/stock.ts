@@ -132,6 +132,12 @@ export interface StockUnitItem {
   status: StockUnitStatus;
   receivedDate?: string | null;
   withdrawnDate?: string | null;
+  petitionUsage?: {
+    start: string | null;
+    end: string | null;
+    petitions: { petitionNo: string; petitionId?: string; source: "withdraw" | "inferred"; date: string | null }[];
+    computedAt?: string;
+  };
   discardedAt?: string | null;
   discardedBy?: { email?: string; name?: string };
   discardReason?: string;
