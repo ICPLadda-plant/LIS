@@ -63,6 +63,8 @@ describe('calculateCcs', () => {
     expect(calculateCcs('0.500', '0.525').result).toBe('Pass');
     expect(ccsDifference('0.500', '0.525')).toBe('5.00');
     expect(calculateCcs('0.500', '0.560').result).toBe('No pass');
+    expect(ccsDifference('100.637543', '99.946168')).toBe('-0.69');
+    expect(calculateCcs('0.500', '0.400').result).toBe('No pass');
   });
 
   it('waits for complete non-zero numbers', () => {

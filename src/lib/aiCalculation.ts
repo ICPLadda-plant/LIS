@@ -107,8 +107,8 @@ export function calculateCcs(mid: unknown, ccs: unknown): CcsCalculationResult {
   const midValue = finiteNumber(mid);
   const ccsValue = finiteNumber(ccs);
   if (midValue == null || ccsValue == null || midValue === 0) return { difference: null, result: '' };
-  const difference = (Math.abs(ccsValue - midValue) / Math.abs(midValue)) * 100;
-  return { difference, result: difference <= CCS_DIFFERENCE_LIMIT ? 'Pass' : 'No pass' };
+  const difference = ((ccsValue - midValue) / midValue) * 100;
+  return { difference, result: Math.abs(difference) <= CCS_DIFFERENCE_LIMIT ? 'Pass' : 'No pass' };
 }
 
 export function calculateCcsFromValues(values: Record<string, unknown>) {
