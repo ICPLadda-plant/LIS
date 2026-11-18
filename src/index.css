@@ -320,6 +320,9 @@
 /* แม่แบบจากฟอร์มระบบ: section ของฟอร์มกำหนดขนาดกระดาษเอง — กรอบ editor ห่อพอดี ไม่บังคับกว้าง/สูง/เส้นแบ่งหน้า */
 .doc-page.doc-page-sys { width: max-content; min-height: 0; padding: 0; background-image: none; }
 @media print { .doc-page .fv-slot { background: none; outline: none; } }
+/* แถว "ข้อความ ... [ช่องเติม]": ข้อความหน้าช่องห้ามถูกบีบเป็นคำละบรรทัดเมื่อช่องมีข้อความยาว (ครอบแม่แบบที่บันทึก CSS เก่าไว้ด้วย) */
+.pr-root .pr-fill-row > :not(.pr-line-fill) { flex: 0 0 auto; }
+.pr-root .pr-fill-row > .pr-line-fill { flex: 1 1 0; min-width: 0; }
 .doc-page .page-break { border-top: 1px dashed hsl(var(--border)); margin: 1em 0; }
 /* ช่องกรอก / ตัวแปรระบบ ตอนแก้แม่แบบ */
 .doc-page .ff { border-radius: 4px; padding: 0 4px; font-size: 0.9em; white-space: nowrap; }

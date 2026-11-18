@@ -1158,6 +1158,7 @@ export type DailyCheckRecord = {
 export type CreateDailyCheckPayload = {
   scaleId: string;
   scaleName: string;
+  date: string;
   model?: string;
   weights100: string[];
   weights10: string[];

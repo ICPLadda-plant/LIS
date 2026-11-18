@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { annotateSystemPage, fillSystemPage, isSlotTemplate } from "./systemFormSlots";
+import { annotateSystemPage, fillSystemPage, isSlotTemplate, slotCatalog, slotHtml } from "./systemFormSlots";
+import { fillFieldHtml } from "./formTemplate";
 
 const page = (name: string, checked: boolean, rows: string[]) => {
   const el = document.createElement("section");
@@ -41,5 +42,25 @@ describe("system form slots", () => {
     const out = document.createElement("div");
     out.innerHTML = fillSystemPage(tpl, page("y", false, []));
     expect(out.querySelector("[data-slot=c0]")!.classList.contains("pr-cb-x")).toBe(false);
+  });
+
+  it("ลบช่องแล้วแทรกกลับจากรายการได้ และช่องกรอกที่เพิ่มพิมพ์เป็นเส้นประให้เขียน", () => {
+    const src = document.createElement("section");
+    src.innerHTML = '<div>โทรศัพท์ : <span class="pr-line pr-edit" style="min-width: 3.5cm">034-1</span> E-mail : <span class="pr-line pr-edit">a@x</span></div>'
+      + '<div><span class="pr-cb pr-toggle pr-cb-x"></span> 1.1 ลูกค้ามาเอง</div>';
+    const tpl = annotateSystemPage(src);
+    const cat = slotCatalog(tpl);
+    expect(cat.map((c) => [c.slot, c.label])).toEqual([["e0", "โทรศัพท์"], ["e1", "E-mail"], ["c0", "1.1 ลูกค้ามาเอง"]]);
+    // ผู้ใช้ลบทุกช่อง แล้วแทรกโทรศัพท์กลับ 2 ที่ + ช่องกรอกของตัวเอง
+    const edited = "<p>โทร " + slotHtml(cat[0]) + " สำรอง " + slotHtml(cat[0]) + " ผู้ตรวจ " + fillFieldHtml("text", "ผู้ตรวจ") + fillFieldHtml("checkbox", "ผ่าน") + "</p>";
+    const real = document.createElement("section");
+    real.innerHTML = src.innerHTML.replace("034-1", "02-999");
+    const out = document.createElement("div");
+    out.innerHTML = fillSystemPage(edited, real);
+    expect(Array.from(out.querySelectorAll("[data-slot=e0]")).map((x) => x.textContent)).toEqual(["02-999", "02-999"]);
+    expect(out.querySelector("[data-slot=e0]")!.getAttribute("style")).toContain("3.5cm");
+    expect(out.textContent).not.toContain("[ผู้ตรวจ]");
+    expect(out.querySelector('[aria-label="ผู้ตรวจ"]')!.className).toBe("pr-line pr-edit");
+    expect(out.querySelector('[aria-label="ผ่าน"]')!.className).toBe("pr-cb pr-toggle");
   });
 });

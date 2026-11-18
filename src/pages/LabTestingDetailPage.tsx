@@ -24,7 +24,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useArrivalFlash } from '@/hooks/useArrivalFlash';
 import { normalizeRoles } from '@/lib/roles';
 import { isAssignedTo } from '@/lib/assignment';
-import { labReceivedAt, labReceivedBy } from '@/lib/receiveStatus';
+import { labReceivedAt, labReceivedBy, labWorkReceived } from '@/lib/receiveStatus';
+import { isItemLabelPending } from '@/lib/labelReceipt';
 import { useConfirm } from '@/context/ConfirmDialog';
 import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, resolveLabLabelTolerance, isLabLabelToleranceAbnormal } from '@/lib/parameterValidation';
 import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
@@ -42,7 +43,7 @@ import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFiel
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
 import { useItemGroupMembership } from '@/hooks/useItemGroupMembership';
-import { isResearchAndDevelopmentPetition, mergeQcLabDuplicateItems, shouldSendItemToLab } from '@/lib/petitionRouting';
+import { isResearchAndDevelopmentPetition, mergeQcLabDuplicateItems, shouldSendItemToLab, shouldSendItemToQc } from '@/lib/petitionRouting';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import {
   type Petition,
@@ -129,7 +130,7 @@ function matchLabParametersForItem(
   params: ParameterItem[],
   itemGroupIds: string[] = [],
 ): ParameterItem[] {
-  return matchParametersForItem(
+  const matched = matchParametersForItem(
     item,
     labParametersForPetition(petition, params),
     itemGroupIds,
@@ -138,6 +139,41 @@ function matchLabParametersForItem(
       petitionCategory: getPetitionCategory(petition),
     },
   );
+  // รายการที่ส่ง Lab อย่างเดียว → ยืมพารามิเตอร์ ถพ. จากรายการส่ง QC ที่เป็นตัวอย่าง/batch เดียวกัน
+  const sibling = densitySourceItem(petition, item);
+  if (!sibling || isResearchAndDevelopmentPetition(petition)) return matched;
+  const extra = matchParametersForItem(sibling, params, itemGroupIds, { petitionCategory: getPetitionCategory(petition) })
+    .filter((p) => hasSpecificGravityParam([p]) && !matched.some((m) => m._id === p._id));
+  return [...matched, ...extra];
+}
+
+function sameSampleKey(item: PetitionItem) {
+  const batch = (item.batchNo ?? '').trim().toLowerCase();
+  return batch ? batch + '|' + (item.commonName ?? item.sampleName ?? '').trim().toLowerCase() : '';
+}
+
+// QC กรอกค่า ถพ. ไว้ที่รายการส่ง QC ส่วนรายการที่ส่ง Lab อย่างเดียวไม่มีผล QC ของตัวเอง
+function densitySourceItem(petition: Petition, item: PetitionItem): PetitionItem | undefined {
+  if (shouldSendItemToQc(item)) return undefined;
+  const key = sameSampleKey(item);
+  if (!key) return undefined;
+  return (petition.items ?? []).find((other) => other.seq !== item.seq && shouldSendItemToQc(other) && sameSampleKey(other) === key);
+}
+
+function withSiblingDensityResults(petition: Petition | null | undefined, results: QCTestResult[], params: ParameterItem[]): QCTestResult[] {
+  if (!petition) return results;
+  const sgIds = new Set(params.filter((p) => hasSpecificGravityParam([p])).map((p) => String(p._id)));
+  const extra: QCTestResult[] = [];
+  (petition.items ?? []).forEach((item) => {
+    const sibling = densitySourceItem(petition, item);
+    if (!sibling) return;
+    results.forEach((row) => {
+      if (row.itemSeq !== sibling.seq || !sgIds.has(String(row.parameterId))) return;
+      if (results.some((r) => r.itemSeq === item.seq && String(r.parameterId) === String(row.parameterId))) return;
+      extra.push({ ...row, itemSeq: item.seq });
+    });
+  });
+  return [...results, ...extra];
 }
 
 const noteLabelFor = (mainLabel: string) => `${mainLabel}__note`;
@@ -536,7 +572,7 @@ export default function LabTestingDetailPage() {
     const load = ++resultLoad.current;
     return api.getQCResults(petitionId).then((allResults) => {
       if (load !== resultLoad.current) return;
-      const results = currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters);
+      const results = withSiblingDensityResults(petition, currentSampleResults({ additionalSampleRequests: roundRequests }, allResults, allParameters), allParameters);
       setSavedResults(results);
       const v: Record<string, Record<string, unknown>> = {};
       const v2: Record<string, Record<string, unknown>> = {};
@@ -567,7 +603,7 @@ export default function LabTestingDetailPage() {
       setSaveStatesPhase2(s2);
       setLoadedResultsKey(resultsKey);
     }).catch(() => {});
-  }, [roundRequests, allParameters, resultsKey]);
+  }, [roundRequests, allParameters, resultsKey, petition]);
 
   useEffect(() => {
     if (!id || !allParameters.length) return;
@@ -1110,7 +1146,7 @@ export default function LabTestingDetailPage() {
   const remarkOf = (item: PetitionItem, param: ParameterItem) =>
     savedResults.find((r) => r.itemSeq === item.seq && r.parameterId === param._id)?.remark ?? '';
   const switchablePetitions = (worklistData?.items ?? []).filter((p) =>
-    !!labReceivedAt(p) && (p.items ?? []).some(
+    labWorkReceived(p) && (p.items ?? []).some(
       (it) =>
         (isResearchAndDevelopmentPetition(p) || shouldSendItemToLab(it)) &&
         matchLabParametersForItem(p, it, allParameters, idsFor(it)).length > 0,
@@ -1228,10 +1264,13 @@ export default function LabTestingDetailPage() {
           const itemCurrentPhase = (round ?? petition).currentPhase ?? 1;
           const effectivePhase = effectivePhaseForItem(item);
           const labOwnedParams = matchedParams.filter((p) => p.scope === 'lab');
-          const sharedQcParams = matchedParams.filter((p) => p.scope === 'qc' && p.shareWithLab);
+          // ค่า ถพ. ใช้คำนวณ %AI จึงต้องให้ Lab เห็นเสมอ แม้ไม่ได้ตั้งค่าแชร์ให้ Lab
+          const sharedQcParams = matchedParams.filter((p) => p.scope === 'qc' && (p.shareWithLab || hasSpecificGravityParam([p])));
           const phaseValues = valuesForPhase(effectivePhase);
           const phaseSaves = savesForPhase(effectivePhase);
           const phaseLocked = effectivePhase === 2 && itemCurrentPhase === 1;
+          // รับทีละป้าย: ตัวอย่างที่ยังไม่สแกนรับป้าย Lab ยังกรอกผลไม่ได้
+          const labelPending = isItemLabelPending(petition, item, 'lab');
           return (
             <Card key={item.seq} className="overflow-hidden">
               <CardHeader className="bg-muted pb-3">
@@ -1255,6 +1294,9 @@ export default function LabTestingDetailPage() {
                 </CardTitle>
                 {item.testItems && (
                   <p className="text-xs text-muted-foreground mt-1">รายการทดสอบ: {item.testItems}</p>
+                )}
+                {labelPending && (
+                  <p className="text-xs text-muted-foreground mt-1">รอสแกนรับป้ายของตัวอย่างนี้ก่อน จึงจะกรอกผลได้</p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   ปริมาณที่ส่ง: {item.labelQuantities?.some((quantity) => quantity.trim())
@@ -1337,7 +1379,7 @@ export default function LabTestingDetailPage() {
                             )}
                           </div>
                           {(() => {
-                            const fieldDisabled = isLocked || viewOnly || phaseLocked || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
+                            const fieldDisabled = isLocked || viewOnly || phaseLocked || labelPending || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
 
                             // Render a single editable render-unit. `srcValues` is the
                             // value-object to read/display from; `onUnitChange` persists a

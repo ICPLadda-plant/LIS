@@ -72,6 +72,8 @@ describe("BalanceRoomPage", () => {
       "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง",
       "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง",
     ].forEach(name => expect(screen.getByText(name)).toBeInTheDocument());
+    expect(screen.getByText("LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง").closest("button")).toHaveClass("bg-sky-50/70");
+    expect(screen.getByText("LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง").closest("button")).toHaveClass("bg-violet-50/70");
     expect(screen.queryByText("เครื่องชั่ง 1")).not.toBeInTheDocument();
   });
 
@@ -81,11 +83,12 @@ describe("BalanceRoomPage", () => {
 
     expect(screen.queryByText("นอกเวลาบันทึก")).not.toBeInTheDocument();
     expect(screen.getByText(/บันทึกได้ทุกเวลา/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("วันที่บันทึก"), { target: { value: "2026-11-12" } });
 
-    const [first100, first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
-    const [second100, second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
-    const [third100, third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
-    [first100, second100, third100].forEach(input => fireEvent.change(input, { target: { value: "100.01" } }));
+    const [first10, first500] = screen.getAllByPlaceholderText("ครั้งที่ 1");
+    const [second10, second500] = screen.getAllByPlaceholderText("ครั้งที่ 2");
+    const [third10, third500] = screen.getAllByPlaceholderText("ครั้งที่ 3");
+    [first500, second500, third500].forEach(input => fireEvent.change(input, { target: { value: "500.01" } }));
     [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.01" } }));
 
     const [saveButton] = screen.getAllByRole("button", { name: /บันทึกผล Calibrate/ });
@@ -96,6 +99,9 @@ describe("BalanceRoomPage", () => {
     expect(apiMock.createDailyCheck.mock.calls[0][0]).toMatchObject({
       scaleId: "scale-1",
       scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
+      date: "2026-11-12",
+      avg100: 500.01,
+      status100: "pass",
     });
   });
 
@@ -104,15 +110,27 @@ describe("BalanceRoomPage", () => {
     expect(screen.getAllByRole("button", { name: /ถ่ายรูปอ่านค่าน้ำหนัก/ })).toHaveLength(6);
   });
 
+  it("marks invalid weights, blocks saving, and ignores mouse wheel changes", () => {
+    renderPage();
+    const input = screen.getAllByPlaceholderText("ครั้งที่ 1")[0];
+    input.focus();
+    fireEvent.change(input, { target: { value: "-0.09" } });
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("button", { name: /บันทึกผล Calibrate/ })).toBeDisabled();
+    fireEvent.wheel(input);
+    expect(input).not.toHaveFocus();
+    expect(apiMock.createDailyCheck).not.toHaveBeenCalled();
+  });
+
   it("fills the selected weight with the value read from a photo", async () => {
     const { container } = renderPage();
-    fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 100 กรัม ครั้งที่ 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 500 กรัม ครั้งที่ 1" }));
     const fileInput = container.querySelector<HTMLInputElement>('input[type="file"]');
     expect(fileInput).not.toBeNull();
     fireEvent.change(fileInput!, { target: { files: [new File(["image"], "balance.jpg", { type: "image/jpeg" })] } });
 
     await waitFor(() => expect(readBalanceDisplayValueFromImageMock).toHaveBeenCalled());
-    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[0]).toHaveValue(100.012);
+    expect(screen.getAllByPlaceholderText("ครั้งที่ 1")[1]).toHaveValue(100.01);
   });
 
   it("shows the control values and limits from the saved config", async () => {
@@ -122,41 +140,106 @@ describe("BalanceRoomPage", () => {
         brand: "Mettler Toledo",
         model: "MS3002S",
         weightCode: "W-100",
-        nominal: 100,
-        mean: 99.99972,
-        sd: 0.0000476,
+        nominal: 10,
+        mean: 10,
+        sd: 0.004,
         mpe: 0.5,
         updatedDate: "2026-10-26",
       },
     ]);
     renderPage();
 
-    expect(await screen.findByText("99.999720")).toBeInTheDocument();
-    expect(screen.getByText("0.0000476")).toBeInTheDocument();
+    expect((await screen.findAllByText("10.0000")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("0.0040").length).toBeGreaterThan(0);
     // UWL = Mean + 2SD, LCL = Mean − 3SD (ไม่ใช่ค่า LCL ที่ผิดในชีต Excel)
-    expect(screen.getByText("99.999815")).toBeInTheDocument();
-    expect(screen.getByText("99.999577")).toBeInTheDocument();
+    expect(screen.getAllByText("10.0080").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("9.9880").length).toBeGreaterThan(0);
     expect(screen.queryByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).not.toBeInTheDocument();
   });
 
-  it("compares the current 100 g average with the control lines", async () => {
+  it("shows the weight codes used by the selected balance", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 100, mean: 100, sd: 0.001, mpe: 0.5, updatedDate: "" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "W-10", nominal: 10, mean: 10, sd: 0.01, mpe: 0.5, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "W-500", nominal: 500, mean: 500, sd: 0.01, mpe: 0.5, updatedDate: "2026-11-17" },
     ]);
     renderPage();
-    await screen.findByText("100.0000");
 
-    const [first100] = screen.getAllByPlaceholderText("ครั้งที่ 1");
-    const [second100] = screen.getAllByPlaceholderText("ครั้งที่ 2");
-    const [third100] = screen.getAllByPlaceholderText("ครั้งที่ 3");
-    [first100, second100, third100].forEach(input => fireEvent.change(input, { target: { value: "100.004" } }));
+    fireEvent.click(screen.getByRole("button", { name: /รหัสตุ้มน้ำหนัก/ }));
+    expect(await screen.findByRole("heading", { name: /ข้อมูลตุ้มน้ำหนักที่ใช้/ })).toBeInTheDocument();
+    expect(screen.getByText("รหัส: W-10")).toBeInTheDocument();
+    expect(screen.getByText("รหัส: W-500")).toBeInTheDocument();
+  });
+
+  it("compares the current LD-005 10 g average with the control lines", async () => {
+    apiMock.getBalanceControlConfigs.mockResolvedValue([
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, mpe: 0.5, updatedDate: "" },
+    ]);
+    renderPage();
+    await screen.findAllByText("10.0000");
+
+    const [first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
+    const [second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
+    const [third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
+    [first10, second10, third10].forEach(input => fireEvent.change(input, { target: { value: "10.01" } }));
 
     expect(screen.getByText("เกิน 3SD (นอกเกณฑ์)")).toBeInTheDocument();
   });
 
   it("asks for control values when the scale has no config", async () => {
     renderPage();
-    expect(await screen.findByText("ยังไม่ได้ตั้งค่าค่า Control ของเครื่องนี้")).toBeInTheDocument();
+    expect(await screen.findByText("ยังไม่มีข้อมูลหรือค่า Control สำหรับตุ้ม 500 g")).toBeInTheDocument();
+    expect(screen.getByText("ยังไม่มีข้อมูลหรือค่า Control สำหรับตุ้ม 10 g")).toBeInTheDocument();
+  });
+
+  it("calculates control values from 20 entered readings", async () => {
+    apiMock.updateBalanceControlConfig.mockResolvedValue({});
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "ตั้งค่า 10 g" }));
+
+    const baselineValues = Array.from({ length: 20 }, (_, index) => 10 + index / 100);
+    baselineValues.forEach((value, index) => {
+      fireEvent.change(screen.getByLabelText(`ค่าบันทึกที่ ${index + 1}`), { target: { value: String(value) } });
+    });
+    fireEvent.blur(screen.getByLabelText("ค่าบันทึกที่ 1"));
+    expect(screen.getByLabelText("ค่าบันทึกที่ 1")).toHaveValue("10.00");
+    expect(screen.getByLabelText("น้ำหนักตุ้ม Daily check (g)")).toHaveValue("10.00");
+    expect(screen.getByLabelText("MPE (g)")).toHaveValue("0.50");
+    fireEvent.click(screen.getByRole("button", { name: "บันทึกค่า Control" }));
+
+    await waitFor(() => expect(apiMock.updateBalanceControlConfig).toHaveBeenCalledTimes(1));
+    const [, input] = apiMock.updateBalanceControlConfig.mock.calls[0];
+    expect(input.baselineValues).toEqual(baselineValues);
+    expect(input.mean).toBeCloseTo(10.095);
+    expect(input.sd).toBeGreaterThan(0);
+  });
+
+  it("shows recorded values before control limits are configured", async () => {
+    apiMock.getDailyChecks.mockImplementation((params?: { from?: string }) =>
+      Promise.resolve(params?.from ? [{
+        _id: "daily-1",
+        scaleId: "scale-1",
+        scaleName: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง",
+        date: `${currentMonthStr()}-12`,
+        weights100: [500, 500, 500],
+        weights10: [10, 10, 10],
+        avg100: 500,
+        avg10: 10,
+        status100: "pass",
+        status10: "pass",
+        status: "pass",
+        tolerance: 0.05,
+        recorder: "Dev Administrator",
+        checkedAt: `${currentMonthStr()}-12T08:00:00.000Z`,
+      }] : []),
+    );
+
+    renderPage();
+
+    expect(await screen.findAllByText(/กราฟมีข้อมูลแล้ว แต่ยังไม่มีเส้น Mean/)).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 10 g" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" }));
+    expect(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("cell", { name: "500.00" })).toHaveLength(4);
   });
 
   it("loads the selected scale records for the current month", async () => {
@@ -173,8 +256,21 @@ describe("BalanceRoomPage", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: /Print/ }));
     const preview = await screen.findByTestId("print-preview");
-    expect(within(preview).getAllByRole("table")).toHaveLength(2);
-    expect(within(preview).getByText(/01\/.*\/2026/)).toBeInTheDocument();
-    expect(within(preview).getByText(/16\/.*\/2026/)).toBeInTheDocument();
+    expect(within(preview).getAllByRole("table")).toHaveLength(4);
+    expect(within(preview).getByText("P1/2")).toBeInTheDocument();
+    expect(within(preview).getByText("P2/2")).toBeInTheDocument();
+    expect(within(preview).getAllByText(/01\/.*\/2026/).length).toBeGreaterThan(0);
+    expect(within(preview).getAllByText(/16\/.*\/2026/).length).toBeGreaterThan(0);
+  });
+
+  it("shows edit controls and warns when control values are three months old", async () => {
+    apiMock.getBalanceControlConfigs.mockResolvedValue([
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.01, mpe: 0.5, updatedDate: "2026-08-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.01, mpe: 0.5, updatedDate: "2026-08-17" },
+    ]);
+    renderPage();
+    expect((await screen.findByText(/ครบ 3 เดือนแล้ว/)).closest('[role="alert"]')).toHaveClass("bg-destructive");
+    expect(screen.getAllByText("อัปเดตล่าสุด: 17/08/2026 · ครบกำหนด: พฤศจิกายน 2569")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /แก้ไขค่า Control/ })).toHaveLength(2);
   });
 });
