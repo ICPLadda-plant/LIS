@@ -218,6 +218,11 @@ describe("BalanceRoomPage", () => {
     renderPage();
     await screen.findAllByText("10.00");
 
+    ["ครั้งที่ 1", "ครั้งที่ 2", "ครั้งที่ 3"].forEach((placeholder) => {
+      const [weight10, weight500] = screen.getAllByPlaceholderText(placeholder);
+      fireEvent.change(weight10, { target: { value: "10.00" } });
+      fireEvent.change(weight500, { target: { value: "500.00" } });
+    });
     const [first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
     const [second10] = screen.getAllByPlaceholderText("ครั้งที่ 2");
     const [third10] = screen.getAllByPlaceholderText("ครั้งที่ 3");
@@ -316,21 +321,33 @@ describe("BalanceRoomPage", () => {
     expect(screen.getAllByRole("button", { name: /แก้ไขค่า Control/ })).toHaveLength(2);
   });
 
-  it("marks values beyond the control limits red and blocks saving", async () => {
+  it("warns on an individual value but only blocks saving when the mean exceeds control limits", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.001, updatedDate: "2026-11-17" },
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.001, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 10, sd: 0.01, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 500, mean: 500, sd: 0.01, updatedDate: "2026-11-17" },
     ]);
     renderPage();
     await screen.findAllByText("10.00");
 
+    for (const placeholder of ["ครั้งที่ 1", "ครั้งที่ 2", "ครั้งที่ 3"]) {
+      const [weight10, weight500] = screen.getAllByPlaceholderText(placeholder);
+      fireEvent.change(weight10, { target: { value: "10.00" } });
+      await waitFor(() => expect(weight10).toHaveValue("10.00"));
+      fireEvent.change(weight500, { target: { value: "500.00" } });
+      await waitFor(() => expect(weight500).toHaveValue("500.00"));
+    }
+
     const [first10] = screen.getAllByPlaceholderText("ครั้งที่ 1");
     fireEvent.change(first10, { target: { value: "10.05" } });
-    expect(first10).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByRole("button", { name: /บันทึกผล Calibrate/ })).toBeDisabled();
+    await waitFor(() => expect(first10).toHaveAttribute("aria-invalid", "true"));
+    expect(screen.getAllByText(/ระบบจะตัดสินจากค่าเฉลี่ย/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /บันทึกผล Calibrate/ })).toBeEnabled();
+
+    fireEvent.change(first10, { target: { value: "10.10" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /บันทึกผล Calibrate/ })).toBeDisabled());
 
     fireEvent.change(first10, { target: { value: "10.00" } });
-    expect(first10).toHaveAttribute("aria-invalid", "false");
+    await waitFor(() => expect(first10).toHaveAttribute("aria-invalid", "false"));
   });
 
   it("prints the holiday reason as one wide grey cell", async () => {
