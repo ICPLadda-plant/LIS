@@ -34,16 +34,16 @@ import { isLabRecheckPending, isLabWorkAccepted, labAssignBoardStatusBadge, labR
 
 const createdTime = (p: Petition) => Date.parse(p.createdAt) || 0;
 
-/** คิวรอมอบหมาย: งาน Re-check ขึ้นก่อนทั้งหมด แล้วเรียงตามวันที่สร้างคำขอ (เก่า → ใหม่) */
+/** คิวรอมอบหมาย: งานด่วน/Re-check ขึ้นก่อน แล้วเรียงตามวันที่สร้างคำขอ (ใหม่ → เก่า) */
 function sortAssignQueue(petitions: Petition[]): Petition[] {
   return [...petitions].sort((a, b) => {
     const urgent = Number(isUrgentPetition(b)) - Number(isUrgentPetition(a));
     if (urgent !== 0) return urgent;
     const recheck = Number(isLabRecheckPending(b)) - Number(isLabRecheckPending(a));
     if (recheck !== 0) return recheck;
-    const time = createdTime(a) - createdTime(b);
+    const time = createdTime(b) - createdTime(a);
     if (time !== 0) return time;
-    return a._id.localeCompare(b._id);
+    return b._id.localeCompare(a._id);
   });
 }
 
