@@ -113,7 +113,7 @@ describe('labAssignBoardStatusBadge', () => {
 
   it('Lab received card still shows received wording', () => {
     const p = { status: 'inProgress' as const, labReceivedAt: T1 };
-    expect(labAssignBoardStatusBadge(p).label).toBe('รับตัวอย่างแล้ว');
+    expect(labAssignBoardStatusBadge(p)).toEqual({ label: 'รับตัวอย่างแล้ว', variant: 'green-soft' });
   });
 
   it('re-check card shows Re-check even when already assigned', () => {
