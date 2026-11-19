@@ -16,6 +16,9 @@ export const fmtDate = (s: string) => {
   return `${d}/${m}/${y}`;
 };
 
+export const firstNameOnly = (name: string) =>
+  name.trim().replace(/^(?:นางสาว|นาย|นาง|ดร\.?|Mr\.?|Mrs\.?|Ms\.?)\s*/i, "").split(/\s+/)[0] ?? "";
+
 const THAI_MONTH_ABBR = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
 /** "2026-11-17" → "17 พ.ย. 2569" — วันขึ้นก่อนเดือน กันสับสนกับรูปแบบ mm/dd */

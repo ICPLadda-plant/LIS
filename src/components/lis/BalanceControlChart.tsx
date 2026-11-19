@@ -178,7 +178,7 @@ export default function BalanceControlChart({
       dataKey="day"
       tick={{ fontSize: tickFont, fill: palette.axis }}
       tickLine={false}
-      interval={fixed ? 0 : "preserveStartEnd"}
+      interval={0}
       minTickGap={4}
     />,
     <YAxis
@@ -211,7 +211,6 @@ export default function BalanceControlChart({
       name="ค่าที่ได้"
       stroke={palette.value}
       strokeWidth={2}
-      connectNulls
       dot={renderDot}
       activeDot={{ r: 6 }}
       isAnimationActive={!fixed}

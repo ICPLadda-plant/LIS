@@ -115,6 +115,11 @@ describe("buildLabReportPages", () => {
     expect(p.labHeadName).toBe("นคร");
   });
 
+  it("เติมปี พ.ศ. แบบย่อให้เลขตัวอย่างที่เลือกตอน Assign", () => {
+    const numbered = { ...petition, sampleLabelNumbers: { year: 2569 }, items: [{ ...petition.items[0], sampleId: "3450" }] } as Petition;
+    expect(buildLabReportPages(numbered, labRequests, groups)[0].sample.sampleNo).toBe("3450/69");
+  });
+
   it("แถวผลกรองเฉพาะ scope=lab และใช้วิธีทดสอบตาม FM-QP-07-01-002", () => {
     const p = pages[0];
     expect(p.rows).toHaveLength(1); // qc row ถูกตัดออก

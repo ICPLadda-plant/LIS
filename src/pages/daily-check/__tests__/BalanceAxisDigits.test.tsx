@@ -24,7 +24,7 @@ describe("LD-005 axis digits", () => {
 
   it("keeps point values at two decimals while the axis stays readable", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([
-      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 9.9995, sd: 0.0051, mpe: 0.5, updatedDate: "2026-11-17" },
+      { scaleId: "scale-1", brand: "", model: "", weightCode: "", nominal: 10, mean: 9.9995, sd: 0.0051, updatedDate: "2026-11-17" },
     ]);
     const month = new Date().toISOString().slice(0, 7);
     apiMock.getDailyChecks.mockResolvedValue([

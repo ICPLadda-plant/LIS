@@ -9,7 +9,7 @@ import {
 } from "@/lib/balanceControlChart";
 import { BALANCE_CHART_TITLE, BALANCE_FORM_CODE, BALANCE_FORM_TITLE, ddmmBE } from "@/lib/balanceControlExport";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
-import { fmtDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
+import { firstNameOnly, fmtDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { A4_PRINT_FONT_FAMILY, A4_PRINT_HEADING_FONT_WEIGHT } from "@/lib/printConfig";
 
 // รายงานพิมพ์ Daily check เครื่องชั่ง ตามแบบฟอร์ม FM-WI-06-04-001-R00 (A4 แนวตั้ง)
@@ -35,7 +35,7 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .bcr .bcr-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .bcr .bcr-table { border: 2px solid #000; }
-.bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 2px; font-size: 12pt; line-height: 1; height: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bcr .bcr-table th, .bcr .bcr-table td { border: 1px solid #000; text-align: center; vertical-align: middle; padding: 0 1px; font-size: 10pt; line-height: 1; height: 25px; white-space: normal; overflow-wrap: anywhere; }
 .bcr .bcr-table tr.bcr-off td { background: #e5e5e5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .bcr .bcr-table tr.bcr-off td.bcr-off-note { text-align: left; padding-left: 6px; font-size: 11pt; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
@@ -100,13 +100,13 @@ export default function BalanceControlReport({
     <table className="bcr-table">
       <colgroup>
         <col style={{ width: "15%" }} />
-        <col style={{ width: "12%" }} />
-        <col style={{ width: "12%" }} />
-        <col style={{ width: "12%" }} />
         <col style={{ width: "13%" }} />
-        <col style={{ width: "9%" }} />
-        <col style={{ width: "12%" }} />
-        <col style={{ width: "15%" }} />
+        <col style={{ width: "13%" }} />
+        <col style={{ width: "13%" }} />
+        <col style={{ width: "14%" }} />
+        <col style={{ width: "8%" }} />
+        <col style={{ width: "10%" }} />
+        <col style={{ width: "14%" }} />
       </colgroup>
       <thead>
         <tr>
@@ -130,7 +130,7 @@ export default function BalanceControlReport({
               <tr key={point.date} className="bcr-off">
                 <td>{ddmmBE(point.date)}</td>
                 <td className="bcr-off-note" colSpan={7}>
-                  {holidayNotes?.get(point.date)?.trim() || (isSunday(point.date) ? "วันอาทิตย์ — ไม่ได้ทำงาน" : "วันหยุด — ไม่ได้ทำงาน")}
+                  {holidayNotes?.get(point.date)?.trim() || (isSunday(point.date) ? "วันอาทิตย์" : "วันหยุด — ไม่ได้ทำงาน")}
                 </td>
               </tr>
             );
@@ -144,7 +144,7 @@ export default function BalanceControlReport({
               <td>{record ? formatControlNumber(config.nominal === 10 ? record.avg10 : record.avg100, scale.decimals) : ""}</td>
               <td>{resultMark(record, config.nominal)}</td>
               <td />
-              <td>{record?.recorder ?? ""}</td>
+              <td>{firstNameOnly(record?.recorder ?? "")}</td>
             </tr>
           );
         })}

@@ -51,6 +51,11 @@ async function withLabUser(user, freeUntil, run) {
 const LAB_HEAD = { _id: 'u-head', email: 'head@lab.test', name: 'Lab Head', roles: ['lab-head'], status: 'active' };
 const ANALYST = { _id: 'u-a', email: 'a@lab.test', name: 'Analyst A', employeeId: 'E77', roles: ['lab-analyze'], status: 'active' };
 
+test('sample number options route is registered before the petition id route', () => {
+  const paths = router.stack.filter((entry) => entry.route).map((entry) => entry.route.path);
+  assert.ok(paths.indexOf('/lab-sample-number-options') < paths.indexOf('/:id'));
+});
+
 test('GET / filters assigned petitions by current assignee before pagination', async () => {
   const originals = {
     petitionFind: Petition.find,
@@ -129,23 +134,40 @@ test('GET / awaitingQcApproval returns petitions after QC confirms or Lab head i
   }
 });
 
-test('PATCH /:id/assign works before Lab receives the sample and leaves machine choice for start', async () => {
+test('PATCH /:id/lab-sample-numbers saves a sample number after the sample was sent', async () => {
   const originalFindOne = Petition.findOne;
   const doc = {
+    _id: 'doc-1',
     status: 'sampleSent',
-    async save() { throw new Error('stop-after-assign'); },
+    sampleSentAt: new Date(),
+    items: [{ seq: 1, sendToLab: true }],
+    markModified() {},
+    async save() { throw new Error('stop-after-sample-number'); },
   };
   try {
-    Petition.findOne = async () => doc;
-    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/assign', 'patch', {
+    Petition.findOne = (query) => query?.['items.sampleId'] ? { lean: async () => null } : doc;
+    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/lab-sample-numbers', 'patch', {
       params: { id: 'P-2609-0001' },
-      body: { employeeId: 'E1', name: 'Analyst' },
+      body: { sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] },
       headers,
     }));
-    assert.match(res.body.error.message, /stop-after-assign/);
-    assert.equal(doc.assignedTo.employeeId, 'E1');
-    assert.equal(doc.assignedTo.acceptedAt, undefined);
-    assert.equal(doc.status, 'sampleSent');
+    assert.match(res.body.error.message, /stop-after-sample-number/);
+    assert.equal(doc.items[0].sampleId, '3450');
+  } finally {
+    Petition.findOne = originalFindOne;
+  }
+});
+
+test('PATCH /:id/lab-sample-numbers rejects selection before the sample was sent', async () => {
+  const originalFindOne = Petition.findOne;
+  try {
+    Petition.findOne = async () => ({ _id: 'doc-1', items: [{ seq: 1, sendToLab: true }] });
+    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/lab-sample-numbers', 'patch', {
+      params: { id: 'P-2609-0001' },
+      body: { sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] },
+      headers,
+    }));
+    assert.match(res.body.error.message, /ต้องส่งตัวอย่างก่อน/);
   } finally {
     Petition.findOne = originalFindOne;
   }
@@ -232,12 +254,16 @@ test('POST /:id/claim refuses work that already has an assignee', async () => {
 test('POST /:id/claim assigns the work to the logged-in analyst, ignoring body identity', async () => {
   const originalFindOne = Petition.findOne;
   const doc = {
+    _id: 'doc-1',
     status: 'pendingReview',
+    sampleSentAt: new Date(),
     labReceivedAt: new Date(),
+    items: [{ seq: 1, sendToLab: true, sampleId: '3450' }],
+    markModified() {},
     async save() { throw new Error('stop-after-assign'); },
   };
   try {
-    Petition.findOne = async () => doc;
+    Petition.findOne = (query) => query?.['items.sampleId'] ? { lean: async () => null } : doc;
     const res = await withLabUser(ANALYST, new Date(Date.now() + 3600 * 1000), (headers) => invoke('/:id/claim', 'post', {
       params: { id: 'P-2609-0001' },
       body: { employeeId: 'HACK', machines: [] },
@@ -245,6 +271,7 @@ test('POST /:id/claim assigns the work to the logged-in analyst, ignoring body i
     }));
     assert.match(res.body.error.message, /stop-after-assign/);
     assert.equal(doc.assignedTo.employeeId, 'E77');
+    assert.equal(doc.items[0].sampleId, '3450');
     assert.equal(doc.assignedTo.name, 'Analyst A');
     assert.equal(doc.assignedTo.assignedBy, 'Analyst A');
     assert.equal(doc.assignedTo.acceptedAt, undefined);

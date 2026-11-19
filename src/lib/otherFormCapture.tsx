@@ -58,7 +58,7 @@ const CAPTURES: Record<string, Capture> = {
   "FM-WI-06-04-001": {
     render: () => {
       const scale = BALANCE_SCALES[0];
-      return <BalanceControlReport scale={scale} config={{ scaleId: scale.id, brand: "", model: scale.model, weightCode: "", nominal: 100, mean: null, sd: null, mpe: null, updatedDate: "" }}
+      return <BalanceControlReport scale={scale} config={{ scaleId: scale.id, brand: "", model: scale.model, weightCode: "", nominal: 100, mean: null, sd: null, updatedDate: "" }}
         limits={null} series={[]} domain={null} digits={scale.decimals} month={NOW.slice(0, 7)} printedBy="" printedAt={NOW} />;
     },
     css: BALANCE_CONTROL_REPORT_CSS,

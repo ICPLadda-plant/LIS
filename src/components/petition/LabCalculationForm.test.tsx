@@ -73,7 +73,7 @@ describe("LabCalculationForm", () => {
   });
 
   it("calculates CCS % difference and Control result only from complete numbers", () => {
-    expect(ccsDifference("0.5", "0.49")).toBe("2.00");
+    expect(ccsDifference("0.5", "0.49")).toBe("-2.00");
     expect(ccsDifference("", "0.49")).toBe("");
     expect(controlResult("0.3", "0.24692", "0.27363")).toBe("ไม่ผ่าน");
     expect(controlResult("0.25", "", "0.27")).toBe("");

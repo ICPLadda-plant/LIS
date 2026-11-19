@@ -111,7 +111,7 @@ export function labAssignBoardStatusBadge(
   if (assigned) return toneBadge('info', 'assign แล้ว');
   // ตัวอย่างยังไม่ถึง Lab (assign ล่วงหน้าได้) → "กำลังส่งตัวอย่าง"
   if (!labReceivedAt(p)) return statusBadge('deliveringQC');
-  return statusBadge('pendingReview');
+  return toneBadge('success', 'รับตัวอย่างแล้ว');
 }
 
 /**
