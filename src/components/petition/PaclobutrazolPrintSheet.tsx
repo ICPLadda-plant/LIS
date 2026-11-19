@@ -79,7 +79,7 @@ export function PaclobutrazolPrintSheet({ page, values }: Props) {
     });
   };
 
-  const name = (n: string) => (n && n !== "-" ? `(......${n}......)` : "(..............................)");
+  const name = (n: string) => `(......${n && n !== "-" ? n : "...................."}......)`;
 
   return (
     <section className="pbz-print-page">
