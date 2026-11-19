@@ -505,6 +505,7 @@ export default function LabTestingDetailPage() {
     ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
   const [calculationPrintOpen, setCalculationPrintOpen] = useState(false);
+  const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
   const pendingSample = pendingAdditionalSample(petition, 'lab');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
   const roundRequests = useMemo(() => JSON.parse(roundsKey) as AdditionalSampleRequest[], [roundsKey]);
@@ -1382,7 +1383,24 @@ export default function LabTestingDetailPage() {
         )}
 
         {/* Each Lab item */}
+        {labItems.length > 1 && (
+          <div className="flex flex-wrap gap-2" role="tablist">
+            {labItems.map((item) => (
+              <Button
+                key={item.seq}
+                type="button"
+                role="tab"
+                size="sm"
+                variant={item.seq === (activeItemSeq ?? labItems[0].seq) ? 'default' : 'outline'}
+                onClick={() => setActiveItemSeq(item.seq)}
+              >
+                รายการที่ {item.seq}
+              </Button>
+            ))}
+          </div>
+        )}
         {labItems.map((item) => {
+          if (labItems.length > 1 && item.seq !== (activeItemSeq ?? labItems[0].seq)) return null;
           const matchedParams = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
           const round = sampleRoundFor(petition, 'lab', item.seq);
           const itemCurrentPhase = (round ?? petition).currentPhase ?? 1;
