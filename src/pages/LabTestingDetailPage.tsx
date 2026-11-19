@@ -1800,9 +1800,21 @@ export default function LabTestingDetailPage() {
                                     </section>
                                   ))}
                                   {sharedFields.length > 0 && (
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-                                      {sharedFields.map(renderField)}
-                                    </div>
+                                    (() => {
+                                      const knownLabels = new Set<string>(AI_FIELD_SECTIONS.flatMap((section) => [...section.labels]));
+                                      const sharedSections = [
+                                        ...AI_FIELD_SECTIONS.map((section) => ({ ...section, fields: sharedFields.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
+                                        { title: 'ข้อมูลเพิ่มเติม', labels: [], className: 'border-border bg-card', fields: sharedFields.filter((field) => !knownLabels.has(field.label)) },
+                                      ].filter((section) => section.fields.length > 0);
+                                      return sharedSections.map((section) => (
+                                        <section key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
+                                          <h4 className="text-base font-semibold text-foreground">{section.title}</h4>
+                                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                                            {section.fields.map(renderField)}
+                                          </div>
+                                        </section>
+                                      ));
+                                    })()
                                   )}
                                 </div>
                               );
