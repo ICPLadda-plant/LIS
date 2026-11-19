@@ -33,6 +33,8 @@ export const LAB_REPORT_CSS = `
 @media screen { .lr-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 .lr-root, .lr-root * { font-size: ${A4_PRINT_FONT_SIZE} !important; }
 .lr-root .lr-small, .lr-root .lr-small *, .lr-root .lr-note, .lr-root .lr-note * { font-size: 12pt !important; }
+.lr-root .lr-header, .lr-root .lr-header * { font-size: 11pt !important; }
+.lr-root .lr-header td.lr-hd-mid { font-size: 12pt !important; }
 .lr-root h1,
 .lr-root h2,
 .lr-root h3,
@@ -56,7 +58,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
         <section className="lr-page" key={i}>
           {/* Header */}
           <table className="lr-tbl">
-            <tbody>
+            <tbody className="lr-header">
               <tr>
                 <td style={{ width: "34%" }}>
                   <img className="lr-logo" src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" />
