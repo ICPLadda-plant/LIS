@@ -159,7 +159,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
 
         <div className="brom-form-bar">Sample</div>
         <div className="brom-form-row">
-          <Field label="ตัวอย่างเลขที่ :" value={name(page.sample.submissionNo)} field="sampleNo" />
+          <Field label="ตัวอย่างเลขที่ :" value={name(page.sample.sampleId) || name(page.sample.submissionNo)} field="sampleNo" />
           <Field grow label="ชื่อสามัญ (sample name)" value={name(page.sample.name)} field="sampleName" />
           <Field label="วันที่วิเคราะห์" value={testedDate} field="testedDate" />
         </div>
