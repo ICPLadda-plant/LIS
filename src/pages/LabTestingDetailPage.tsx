@@ -1394,7 +1394,7 @@ export default function LabTestingDetailPage() {
                 variant={item.seq === (activeItemSeq ?? labItems[0].seq) ? 'default' : 'outline'}
                 onClick={() => setActiveItemSeq(item.seq)}
               >
-                รายการที่ {item.seq}
+                {/^\d+$/.test(item.sampleId || '') ? ${item.sampleId}/ : item.sampleId || รายการที่ }
               </Button>
             ))}
           </div>
