@@ -14,10 +14,10 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-top { display: grid; grid-template-columns: 30mm 1fr 30mm; align-items: center; }
 .brom-form-logo { width: 26mm; height: auto; object-fit: contain; }
 .brom-form-title { text-align: center; font-size: 13pt; font-weight: 700; }
-.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 2mm; background: #eef1f5; border-left: 2.5pt solid #8aa0c2; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 2mm; background: #f2f2f2; }
 .brom-form-row { display: flex; align-items: flex-end; gap: 3mm; margin-top: 2mm; padding: 0 1mm; }
 .brom-form-label { white-space: nowrap; }
-.brom-form-line { display: block; min-height: 5.5mm; padding: 0 1mm 0.6mm; border-bottom: 1pt solid #4a5568; background: #fbfcfe; text-align: center; overflow-wrap: anywhere; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.brom-form-line { display: block; min-height: 5.5mm; padding: 0 1mm 0.6mm; border-bottom: .6pt solid #000; text-align: center; overflow-wrap: anywhere; }
 .brom-form-line--na { background: #e4e6ea; color: #6b7280; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .brom-form-row .brom-form-line { flex: 0 0 38mm; }
 .brom-form-row .brom-form-grow { flex: 1 1 auto; }
@@ -34,13 +34,6 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-sign-role { grid-column: 1; grid-row: 2; text-align: center; margin-top: 2mm; }
 .brom-form-sign-name { grid-column: 2; grid-row: 2; text-align: center; margin-top: 1.5mm; }
 .brom-form-footer { margin-top: auto; padding-top: 6mm; font-size: 8pt; }
-.brom-bar-sample { background: #e7f0fb; border-left-color: #6d93c7; }
-.brom-bar-curve { background: #eaf5ec; border-left-color: #7fb892; }
-.brom-bar-suit { background: #fdf3e3; border-left-color: #d9a84e; }
-.brom-bar-ccs { background: #f1ecf9; border-left-color: #9b7fcf; }
-.brom-bar-blank { background: #fdeeee; border-left-color: #d98585; }
-.brom-bar-control { background: #e9f6f6; border-left-color: #5fa9a9; }
-.brom-bar-results { background: #f6f2e7; border-left-color: #c4a35a; }
 @media screen { .brom-form-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 `;
 
@@ -168,40 +161,40 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
       <section className="brom-form-page">
         <div className="brom-form-top"><img className="brom-form-logo" src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" /><div className="brom-form-title">ใบคำนวณผลวิเคราะห์</div></div>
 
-        <div className="brom-form-bar brom-bar-sample">Sample</div>
+        <div className="brom-form-bar">Sample</div>
         <div className="brom-form-row">
           <Field label="ตัวอย่างเลขที่ :" value={name(page.sample.sampleNo) || name(page.sample.submissionNo)} field="sampleNo" />
           <Field grow label="ชื่อสามัญ (sample name)" value={name(page.sample.name)} field="sampleName" />
           <Field label="วันที่วิเคราะห์" value={testedDate} field="testedDate" />
         </div>
 
-        <div className="brom-form-bar brom-bar-curve">Calibration Curve</div>
+        <div className="brom-form-bar">Calibration Curve</div>
         <div className="brom-form-row">
           <Field grow label="เลขที่ Standard" value={standardNo} field="standardNo" />
           <Field grow label="ค่า Correlation coefficient ( r ) ที่ได้" value={correlation} field="correlation" />
           <span className="brom-form-label" style={{ marginLeft: "8mm" }}>เกณฑ์</span><span className="brom-form-label" style={{ marginLeft: "6mm" }}>r ≥ 0.995</span>
         </div>
 
-        <div className="brom-form-bar brom-bar-suit">System Suitability Test</div>
+        <div className="brom-form-bar">System Suitability Test</div>
         <Columns labels={["Area Inj. 1", "Area Inj. 2", "Area Inj. 3", "Average", "%RSD (ไม่เกิน 2%)"]} items={area} field="area" />
 
-        <div className="brom-form-bar brom-bar-ccs">Continuing Calibration Standard Test ; CCS</div>
+        <div className="brom-form-bar">Continuing Calibration Standard Test ; CCS</div>
         <Columns labels={["Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", "% Difference", "Result"]} items={[ccs.mid, ccs.conc, ccs.diff, ccs.result]} field="ccs" />
 
-        <div className="brom-form-bar brom-bar-blank" style={{ marginTop: "4mm" }}>
+        <div className="brom-form-bar" style={{ marginTop: "4mm" }}>
           <span style={{ width: "30mm" }}>Solvent Blank</span>
           <Check checked={blank === "found"} label="พบ Peak สารที่วิเคราะห์" field="blankFound" />
           <span style={{ marginLeft: "40mm" }}><Check checked={blank !== "found"} label="ไม่พบ Peak สารที่วิเคราะห์" field="blankNotFound" /></span>
         </div>
 
-        <div className="brom-form-bar brom-bar-control">Control sample Test</div>
+        <div className="brom-form-bar">Control sample Test</div>
         <div className="brom-form-row">
           <Field grow label="%Ai (W/W)" value={control.value} field="controlValue" />
           <Field grow label="ช่วงเกณฑ์การยอมรับ" value={controlRange} field="controlRange" />
           <Field label="Result" value={firstValue(page, /^control\s*result/i) || controlResult(control.value, control.low, control.high)} field="controlResult" />
         </div>
 
-        <div className="brom-form-bar brom-bar-results">Analytical Results</div>
+        <div className="brom-form-bar">Analytical Results</div>
         <Columns labels={["%Sample 1", "%Sample 2", "%Sample 3", "Average", "%RSD (ไม่เกิน 5)"]} items={sample} field="sample" />
 
         <div className="brom-form-summary">
