@@ -276,14 +276,16 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
     const excludePetitionId = String(req.query.excludePetitionId || "").trim();
     const filter = { $or: [{ [`values.${STD1}`]: { $nin: [null, ""] } }, { [`values.${STD2}`]: { $nin: [null, ""] } }] };
     if (mongoose.isValidObjectId(excludePetitionId)) filter.petitionId = { $ne: excludePetitionId };
-    const doc = await QCTestResult.findOne(filter).sort({ updatedAt: -1, enteredAt: -1 }).lean();
-    if (!doc) return res.json({});
     const StockUnit = require("../models/StockUnit");
     const lastWithdraw = await StockUnit.findOne({ itemName: /paclobutrazol/i, withdrawnDate: { $ne: null } })
-      .sort({ withdrawnDate: -1 }).select("withdrawnDate").lean();
+      .sort({ withdrawnDate: -1 }).select("withdrawnDate purity").lean();
+    // % Std = purity ของขวด Std PACLOBUTRAZOL ที่เบิกใช้อยู่
+    const purity = String(lastWithdraw?.purity ?? "").replace(/%/g, "").trim();
+    const doc = await QCTestResult.findOne(filter).sort({ updatedAt: -1, enteredAt: -1 }).lean();
+    if (!doc) return res.json(purity ? { stdPct: purity } : {});
     const enteredAt = doc.updatedAt || doc.enteredAt;
-    if (lastWithdraw?.withdrawnDate && enteredAt && new Date(lastWithdraw.withdrawnDate) > new Date(enteredAt)) return res.json({});
-    res.json({ std1: String(doc.values?.[STD1] ?? ""), std2: String(doc.values?.[STD2] ?? ""), stdPct: String(doc.values?.["PBZ %Std"] ?? ""), petitionNo: doc.petitionNo, enteredAt });
+    if (lastWithdraw?.withdrawnDate && enteredAt && new Date(lastWithdraw.withdrawnDate) > new Date(enteredAt)) return res.json(purity ? { stdPct: purity } : {});
+    res.json({ std1: String(doc.values?.[STD1] ?? ""), std2: String(doc.values?.[STD2] ?? ""), stdPct: purity || String(doc.values?.["PBZ %Std"] ?? ""), petitionNo: doc.petitionNo, enteredAt });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

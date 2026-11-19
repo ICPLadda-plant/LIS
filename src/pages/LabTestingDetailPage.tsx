@@ -1730,11 +1730,24 @@ export default function LabTestingDetailPage() {
                               const aiSubstances = isAiParameter ? aiSubstancesForItem(item.commonName) : [];
                               if (isAiParameter && isPaclobutrazolItem(item.commonName)) {
                                 // PACLOBUTRAZOL: ตาราง Internal standard แทนชุด Area Inj / % Sample
+                                // %AI = Report %W/V ของใบคำนวณ — คำนวณใหม่ทุกครั้งที่แก้ค่าในตาราง
+                                const pbzNext: Record<string, unknown> = { ...srcValues };
+                                const onPbzChange = (key: string, val: unknown) => {
+                                  onUnitChange(key, val);
+                                  pbzNext[key] = val;
+                                  fields.forEach((candidate) => {
+                                    if (calculatedAiFieldKind(candidate.label) !== 'ai') return;
+                                    expandAiAwareFieldForItem(candidate, item.commonName, { category: petitionCategory }, true).forEach((derivedUnit) => {
+                                      const substance = aiSubstanceFromKey(derivedUnit.key);
+                                      onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(pbzNext, aiDensity(pbzNext, condCtx, substance, densityEntries, hasSgParam), substance).ai));
+                                    });
+                                  });
+                                };
                                 return (
                                   <div className="grid grid-cols-1 gap-4 pl-2 sm:grid-cols-6">
                                     <PaclobutrazolGrid
                                       values={srcValues}
-                                      onChange={onUnitChange}
+                                      onChange={onPbzChange}
                                       disabled={fieldDisabled}
                                       petitionId={String(petition._id ?? '')}
                                       density={aiDensity(srcValues, condCtx, 'paclobutrazol', densityEntries, hasSgParam)}

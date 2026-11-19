@@ -159,7 +159,8 @@ export function buildLabReportPages(
   groups.forEach((g) => groupBySeq.set(g.seq, g));
 
   const reportedDate = buddhistDate(petition.labApprovedAt);
-  const analystName = petition.labCompletedBy || DASH;
+  // ผู้วิเคราะห์: คนที่กดเสร็จ ถ้ายังไม่เสร็จใช้คนที่ได้รับ assign
+  const analystName = petition.labCompletedBy || petition.assignedTo?.name || DASH;
   const labHeadName = petition.labApprovedBy || DASH;
 
   return (petition.items ?? []).map((item) => {
