@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { FlaskConical, QrCode, AlertTriangle, RotateCcw, CalendarIcon } from 'lucide-react';
 import AppLayout from '@/components/lis/AppLayout';
 import { usePetitionList } from '@/hooks/usePetition';
+import { useAuth } from '@/hooks/useAuth';
+import { normalizeRoles } from '@/lib/roles';
 import { api } from '@/lib/api';
 import {
   PETITION_DEPT_LABELS,
@@ -79,6 +81,16 @@ export default function QCTestingPage() {
     dept: dept || undefined,
     limit: 50,
   });
+  // คำร้องเฉพาะ Admin ถูกซ่อนจากรายการปกติ จึงดึงแยกมารวมให้ Admin ทดสอบ QC ได้
+  const { user } = useAuth();
+  const isAdmin = normalizeRoles(user).includes('admin');
+  const { data: adminOnlyData, refresh: refreshAdminOnly } = usePetitionList({
+    status: 'sampleSent,pendingReview,inProgress,success',
+    search,
+    dept: dept || undefined,
+    limit: 50,
+    adminOnly: true,
+  }, { enabled: isAdmin });
   const {
     data: staleReceivedData,
     loading: staleReceivedLoading,
@@ -91,6 +103,7 @@ export default function QCTestingPage() {
   });
 
   const visiblePetitions: Petition[] = [
+    ...(isAdmin ? adminOnlyData?.items ?? [] : []),
     ...(data?.items ?? []),
     ...(staleReceivedData?.items ?? []),
   ].filter(isVisibleInQcTestingQueue);
@@ -351,6 +364,7 @@ export default function QCTestingPage() {
       onReceived={() => {
         refresh();
         refreshStaleReceived();
+        if (isAdmin) refreshAdminOnly();
       }}
     />
     </AppLayout>
