@@ -36,7 +36,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
+import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, isSharedDailyAiField, isUnsetSharedDailyAiValue, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
@@ -110,6 +110,15 @@ const AI_FIELD_ORDER = [
   '%AI',
 ] as const;
 
+const AI_FIELD_SECTIONS = [
+  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL] },
+  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'] },
+  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'] },
+  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL] },
+  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL] },
+  { title: 'ผลวิเคราะห์', labels: ['%AI'] },
+] as const;
+
 function aiFieldsForParameter(fields: ParameterValueField[]) {
   if (!fields.some((field) => calculatedAiFieldKind(field.label) === 'ai')) return fields;
   const byLabel = new Map(fields.map((field) => [field.label.trim().toLowerCase(), field]));
@@ -156,6 +165,10 @@ function matchLabParametersForItem(
 function sameSampleKey(item: PetitionItem) {
   const batch = (item.batchNo ?? '').trim().toLowerCase();
   return batch ? batch + '|' + (item.commonName ?? item.sampleName ?? '').trim().toLowerCase() : '';
+}
+
+function sameDrugKey(item: PetitionItem) {
+  return (item.commonName || item.sampleName || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 // รายการส่ง QC ที่ batch เดียวกันแต่ถูกแยกไปอยู่อีกคำร้อง พร้อมผล ถพ. ของคำร้องนั้น
@@ -703,33 +716,50 @@ export default function LabTestingDetailPage() {
     ) => {
       if (pendingDensity || pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
       if (phase === 2 && ((sampleRoundFor(petition, 'lab', item.seq) ?? petition).currentPhase ?? 1) === 1) return;
-      const k = resultKey(item.seq, param._id!);
 
       advanceToInProgress();
 
       const setValuesFn = phase === 2 ? setValuesPhase2 : setValues;
       const setStatesFn = phase === 2 ? setSaveStatesPhase2 : setSaveStates;
+      const currentValues = phase === 2 ? valuesPhase2 : values;
+      const drugKey = sameDrugKey(item);
+      const sameDrugItems = (petition.items ?? []).filter((candidate) =>
+        drugKey !== ''
+        && sameDrugKey(candidate) === drugKey
+        && (isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(candidate))
+        && !isItemLabelPending(petition, candidate, 'lab')
+        && matchLabParametersForItem(petition, candidate, allParameters, groupMembership.get(itemGroupKey(candidate)) ?? [], densitySources)
+          .some((candidateParam) => candidateParam._id === param._id),
+      );
+      const isFirstSameDrugItem = sameDrugItems[0]?.seq === item.seq;
+      const targets = isFirstSameDrugItem && isSharedDailyAiField(fieldLabel)
+        ? sameDrugItems.slice(1).filter((candidate) => {
+            const targetKey = resultKey(candidate.seq, param._id!);
+            const current = currentValues[targetKey]?.[fieldLabel];
+            return isUnsetSharedDailyAiValue(fieldLabel, current);
+          })
+        : [];
+      const writes = [item, ...targets].map((target) => ({ item: target, key: resultKey(target.seq, param._id!) }));
 
-      setValuesFn((prev) => ({
-        ...prev,
-        [k]: { ...(prev[k] ?? {}), [fieldLabel]: newVal },
-      }));
+      setValuesFn((prev) => Object.fromEntries([
+        ...Object.entries(prev),
+        ...writes.map((write) => [write.key, { ...(prev[write.key] ?? {}), [fieldLabel]: newVal }]),
+      ]));
 
-      setStatesFn((prev) => ({
-        ...prev,
-        [k]: { ...(prev[k] ?? {}), [fieldLabel]: { state: 'saving' } },
-      }));
+      setStatesFn((prev) => Object.fromEntries([
+        ...Object.entries(prev),
+        ...writes.map((write) => [write.key, { ...(prev[write.key] ?? {}), [fieldLabel]: { state: 'saving' } }]),
+      ]));
 
-      const debounceKey = `${k}__${fieldLabel}__p${phase}`;
-      autosaves.schedule(debounceKey, async () => {
+      writes.forEach((write) => autosaves.schedule(`${write.key}__${fieldLabel}__p${phase}`, async () => {
         try {
           await api.saveQCResult({
             petitionId: petition._id!,
             petitionNo: petition.petitionNo,
-            itemSeq: item.seq,
-            sampleRoundId: sampleRoundIdFor(petition, 'lab', item.seq),
-            sampleId: item.sampleId,
-            sampleName: item.sampleName,
+            itemSeq: write.item.seq,
+            sampleRoundId: sampleRoundIdFor(petition, 'lab', write.item.seq),
+            sampleId: write.item.sampleId,
+            sampleName: write.item.sampleName,
             parameterId: param._id!,
             parameterName: param.name,
             fieldLabel,
@@ -743,8 +773,8 @@ export default function LabTestingDetailPage() {
           const now = new Date();
           setStatesFn((prev) => ({
             ...prev,
-            [k]: {
-              ...(prev[k] ?? {}),
+            [write.key]: {
+              ...(prev[write.key] ?? {}),
               [fieldLabel]: {
                 state: 'saved',
                 savedAt: now,
@@ -755,13 +785,13 @@ export default function LabTestingDetailPage() {
         } catch (error) {
           setStatesFn((prev) => ({
             ...prev,
-            [k]: { ...(prev[k] ?? {}), [fieldLabel]: { state: 'error' } },
+            [write.key]: { ...(prev[write.key] ?? {}), [fieldLabel]: { state: 'error' } },
           }));
           throw error;
         }
-      }, k);
+      }, write.key));
     },
-    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity],
+    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity, values, valuesPhase2, allParameters, densitySources, groupMembership],
   );
 
   // multiEntry write: field write into entry `entryIndex` of a multiEntry param.
@@ -1672,6 +1702,26 @@ export default function LabTestingDetailPage() {
                                 );
                               }
                               if (aiSubstances.length === 0) {
+                                if (isAiParameter) {
+                                  const knownLabels = new Set<string>(AI_FIELD_SECTIONS.flatMap((section) => [...section.labels]));
+                                  const sections = [
+                                    ...AI_FIELD_SECTIONS.map((section) => ({ ...section, fields: fields.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
+                                    { title: 'ข้อมูลเพิ่มเติม', labels: [], fields: fields.filter((field) => !knownLabels.has(field.label)) },
+                                  ].filter((section) => section.fields.length > 0);
+                                  return (
+                                    <div className="space-y-4 pl-2">
+                                      <p className="text-xs text-muted-foreground">ข้อมูล Standard, Area Injection, CCS และ Control Sample จะเติมให้อัตโนมัติในตัวอย่างชื่อยาเดียวกัน โดยยังแก้ไขแต่ละตัวอย่างได้</p>
+                                      {sections.map((section) => (
+                                        <section key={section.title} className="space-y-3 rounded-lg border bg-card p-3">
+                                          <h4 className="text-sm font-semibold text-foreground">{section.title}</h4>
+                                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                                            {section.fields.map(renderField)}
+                                          </div>
+                                        </section>
+                                      ))}
+                                    </div>
+                                  );
+                                }
                                 return (
                                   <div className={cn('grid grid-cols-1 gap-4 pl-2', isAiParameter ? 'sm:grid-cols-6' : 'sm:grid-cols-2')}>
                                     {fields.map(renderField)}

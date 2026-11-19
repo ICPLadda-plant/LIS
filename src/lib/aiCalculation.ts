@@ -136,6 +136,22 @@ export const CONTROL_SAMPLE_LABEL = 'Control Sample';
 export const CONTROL_LOW_LABEL = 'Control ช่วงต่ำสุด';
 export const CONTROL_HIGH_LABEL = 'Control ช่วงสูงสุด';
 export const CONTROL_LABELS = new Set<string>([CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL]);
+const SHARED_DAILY_AI_LABELS = new Set([
+  STANDARD_NO_LABEL, CORRELATION_LABEL,
+  'Area Inj.1', 'Area Inj.2', 'Area Inj.3',
+  MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL,
+  CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL,
+].map((label) => label.toLowerCase()));
+
+export function isSharedDailyAiField(label: string) {
+  return SHARED_DAILY_AI_LABELS.has(label.split('::', 1)[0].trim().toLowerCase());
+}
+
+export function isUnsetSharedDailyAiValue(label: string, value: unknown) {
+  const text = value == null ? '' : String(value).trim();
+  return text === '' || (label.split('::', 1)[0].trim() === STANDARD_NO_LABEL && text === '0');
+}
+
 export function isControlSampleLabel(label: string) {
   return CONTROL_LABELS.has(label.trim());
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAi, calculateCcs, calculatedAiFieldKind, ccsDifference, findAiDensity, formatCalculatedAi } from './aiCalculation';
+import { calculateAi, calculateCcs, calculatedAiFieldKind, ccsDifference, findAiDensity, formatCalculatedAi, isSharedDailyAiField, isUnsetSharedDailyAiValue } from './aiCalculation';
 
 describe('calculateAi', () => {
   it('calculates separate averages, sample RSD and AI using density', () => {
@@ -70,5 +70,22 @@ describe('calculateCcs', () => {
   it('waits for complete non-zero numbers', () => {
     expect(calculateCcs('', '0.500')).toEqual({ difference: null, result: '' });
     expect(calculateCcs('0', '0.500')).toEqual({ difference: null, result: '' });
+  });
+});
+
+describe('isSharedDailyAiField', () => {
+  it('shares Standard, Area, CCS and Control inputs but keeps sample results separate', () => {
+    expect(isSharedDailyAiField('เลขที่ Standard')).toBe(true);
+    expect(isSharedDailyAiField('Area Inj.2::BROMADIOLONE')).toBe(true);
+    expect(isSharedDailyAiField('Control ช่วงสูงสุด')).toBe(true);
+    expect(isSharedDailyAiField('CCS Result')).toBe(false);
+    expect(isSharedDailyAiField('% Sample 1')).toBe(false);
+    expect(isSharedDailyAiField('%AI')).toBe(false);
+  });
+
+  it('treats the default Standard number 0 as empty without overwriting other entered values', () => {
+    expect(isUnsetSharedDailyAiValue('เลขที่ Standard', '0')).toBe(true);
+    expect(isUnsetSharedDailyAiValue('เลขที่ Standard', '03458')).toBe(false);
+    expect(isUnsetSharedDailyAiValue('Area Inj.1', '0')).toBe(false);
   });
 });
