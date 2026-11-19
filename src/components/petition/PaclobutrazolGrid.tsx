@@ -27,12 +27,14 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
     prefilled.current = true;
     if (!String(values[PBZ_DIL_STD] ?? "")) onChange(PBZ_DIL_STD, DEFAULT_DILUTION);
     if (!String(values[PBZ_DIL_SAMPLE] ?? "")) onChange(PBZ_DIL_SAMPLE, DEFAULT_DILUTION);
-    if (String(values[std1Key] ?? "") || String(values[std2Key] ?? "")) return;
+    const hasWeights = Boolean(String(values[std1Key] ?? "") || String(values[std2Key] ?? ""));
+    const hasPct = Boolean(String(values[PBZ_STD_PCT] ?? ""));
+    if (hasWeights && hasPct) return;
     api.getPaclobutrazolStdWeights(petitionId ?? "")
       .then((res) => {
-        if (res.std1) onChange(std1Key, res.std1);
-        if (res.std2) onChange(std2Key, res.std2);
-        if (res.stdPct && !String(values[PBZ_STD_PCT] ?? "")) onChange(PBZ_STD_PCT, res.stdPct);
+        if (!hasWeights && res.std1) onChange(std1Key, res.std1);
+        if (!hasWeights && res.std2) onChange(std2Key, res.std2);
+        if (!hasPct && res.stdPct) onChange(PBZ_STD_PCT, res.stdPct);
       })
       .catch(() => undefined);
   }, [disabled, onChange, petitionId, std1Key, std2Key, values]);
