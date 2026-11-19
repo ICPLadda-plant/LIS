@@ -30,7 +30,7 @@ const petitionOf = (items: unknown[]) =>
   ({ _id: "sample", petitionNo: "", dept: "production", status: "draft", items, submittedBy: { name: "" }, createdAt: NOW, additionalSampleRequests: [] }) as unknown as Petition;
 const labPage: LabReportPage = {
   reportNo: "", reportDate: "", customer: { name: "", company: "", department: "", email: "", phone: "" },
-  sample: { name: "", batchNo: "", productionDate: "", submissionNo: "", manufacturer: "", sampleNo: "", receivedDate: "", testedDate: "", reportedDate: "", condition: "" },
+    sample: { name: "", batchNo: "", productionDate: "", submissionNo: "", manufacturer: "", sampleNo: "", sampleId: "", receivedDate: "", testedDate: "", reportedDate: "", condition: "" },
   rows: [{ testItem: "", result: "", criteria: "", method: "" }], analystName: "", labHeadName: "", remark: "",
 };
 const chemSheet: ChemReportSheet = {

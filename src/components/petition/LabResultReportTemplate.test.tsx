@@ -20,6 +20,7 @@ const page: LabReportPage = {
     submissionNo: "SUB-001",
     manufacturer: "Maker",
     sampleNo: "S-001",
+    sampleId: "",
     receivedDate: "02/07/2569",
     testedDate: "03/07/2569",
     reportedDate: "04/07/2569",

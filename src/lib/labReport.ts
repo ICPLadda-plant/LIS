@@ -23,6 +23,7 @@ export interface LabReportPage {
     submissionNo: string;
     manufacturer: string;
     sampleNo: string;
+    sampleId: string;
     receivedDate: string;
     testedDate: string;
     reportedDate: string;
@@ -185,8 +186,9 @@ export function buildLabReportPages(
         sampleNo: /^\d+$/.test(item.sampleId || "")
           ? `${item.sampleId}/${String((petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100).padStart(2, "0")}`
           : item.sampleId || lr?.labRequestNo || "",
+        sampleId: item.sampleId || "",
         receivedDate: buddhistDate(petition.labReceivedAt || petition.receivedAt || petition.sampleSentAt) || "",
-        testedDate: buddhistDate(petition.firstResultAt || petition.labCompletedAt) || "",
+        testedDate: buddhistDate(petition.firstResultAt || petition.labCompletedAt || petition.updatedAt) || "",
         reportedDate: reportedDate || "",
         condition: physicalDescription(group) || conditionText(item.condition),
       },

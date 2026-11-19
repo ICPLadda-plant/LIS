@@ -19,7 +19,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import LabFreeAssignControl from '@/components/petition/LabFreeAssignControl';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
@@ -462,10 +461,15 @@ export default function PetitionAssignPage() {
               {(sampleNumberPetition?.items ?? []).filter(shouldSendItemToLab).map((item) => (
                 <label key={item.seq} className="grid gap-1.5 text-sm">
                   <span className="font-medium">{item.sampleName} · {item.batchNo || `รายการ ${item.seq}`}</span>
-                  <NativeSelect value={sampleNumbers[item.seq] ?? ''} onChange={(event) => setSampleNumbers((current) => ({ ...current, [item.seq]: event.target.value }))}>
-                    <option value="">เลือกเลขตัวอย่าง</option>
-                    {[item.sampleId, ...sampleNumberOptions].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index).map((value) => <option key={value} value={value}>{value}/{sampleNumberYear}</option>)}
-                  </NativeSelect>
+                  <Input
+                    list={`sample-number-options-${item.seq}`}
+                    placeholder="พิมพ์หรือเลือกเลขตัวอย่าง"
+                    value={sampleNumbers[item.seq] ?? ''}
+                    onChange={(event) => setSampleNumbers((current) => ({ ...current, [item.seq]: event.target.value }))}
+                  />
+                  <datalist id={`sample-number-options-${item.seq}`}>
+                    {[item.sampleId, ...sampleNumberOptions].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index).map((value) => <option key={value} value={value} />)}
+                  </datalist>
                 </label>
               ))}
             </div>

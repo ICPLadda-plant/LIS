@@ -10,7 +10,7 @@ function page(rows: ReturnType<typeof row>[]): LabReportPage {
     reportNo: "L-2610-0001",
     reportDate: "28/10/2569",
     customer: { name: "", company: "", department: "", email: "", phone: "" },
-    sample: { name: "OMETHOATE 50% SL", batchNo: "", productionDate: "", submissionNo: "S-2610-0007", manufacturer: "", sampleNo: "L-2610-0001", receivedDate: "", testedDate: "27/10/2569", reportedDate: "", condition: "" },
+    sample: { name: "OMETHOATE 50% SL", batchNo: "", productionDate: "", submissionNo: "S-2610-0007", manufacturer: "", sampleNo: "L-2610-0001", sampleId: "", receivedDate: "", testedDate: "27/10/2569", reportedDate: "", condition: "" },
     rows,
     analystName: "นักเคมี ก",
     labHeadName: "-",
@@ -31,12 +31,18 @@ describe("LabCalculationForm", () => {
 
   it("fills the sample header and uses form FM-QP-07-08-002-R02", () => {
     const { container } = render(<LabCalculationForm page={page([])} />);
-    expect(field(container, "sampleNo")).toBe("S-2610-0007");
+    expect(field(container, "sampleNo")).toBe("L-2610-0001");
     expect(field(container, "sampleName")).toBe("OMETHOATE 50% SL");
     expect(field(container, "testedDate")).toBe("27/10/2569");
     expect(field(container, "analyst")).toBe("นักเคมี ก");
     expect(field(container, "approved")).toBe("");
     expect(container.textContent).toContain("FM-QP-07-08-002-R02 (02/11/69) P1/1");
+  });
+
+  it("prefers the manually assigned sample number (with year suffix) over the auto submission number", () => {
+    const base = page([]);
+    const { container } = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, sampleId: "3455", sampleNo: "3455/69" } }} />);
+    expect(field(container, "sampleNo")).toBe("3455/69");
   });
 
   it("prints Control Sample, its acceptance range and the pass result", () => {
@@ -57,7 +63,7 @@ describe("LabCalculationForm", () => {
     expect(field(container, "controlValue")).toBe("");
     expect(field(container, "controlResult")).toBe("");
     expect(field(container, "blankFound")).toBe("");
-    expect(field(container, "blankNotFound")).toBe("");
+    expect(field(container, "blankNotFound")).toBe("✓");
   });
 
   it("fills CCS and Solvent Blank when they are recorded", () => {
@@ -77,5 +83,16 @@ describe("LabCalculationForm", () => {
     expect(ccsDifference("", "0.49")).toBe("");
     expect(controlResult("0.3", "0.24692", "0.27363")).toBe("ไม่ผ่าน");
     expect(controlResult("0.25", "", "0.27")).toBe("");
+  });
+
+  it("reports %W/W and blanks Density for GR/WP/SP samples, %W/V with a density value otherwise", () => {
+    const base = page([]);
+    const liquid = render(<LabCalculationForm page={base} />);
+    expect(field(liquid.container, "density")).toBe("1.000");
+    expect(liquid.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/V");
+
+    const granule = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, name: "FIPRONIL 0.3% GR" } }} />);
+    expect(field(granule.container, "density")).toBe("-");
+    expect(granule.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/W");
   });
 });

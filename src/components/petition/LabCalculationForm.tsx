@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import type { LabReportPage } from "@/lib/labReport";
 import { calculateCcs, ccsDifference, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
+import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 export { ccsDifference } from "@/lib/aiCalculation";
 
 export const LAB_CALCULATION_FORM_CODE = "FM-QP-07-08-002-R02 (02/11/69) P1/1";
@@ -13,10 +14,11 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-top { display: grid; grid-template-columns: 30mm 1fr 30mm; align-items: center; }
 .brom-form-logo { width: 26mm; height: auto; object-fit: contain; }
 .brom-form-title { text-align: center; font-size: 13pt; font-weight: 700; }
-.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 1mm; background: #f2f2f2; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 2mm; background: #f2f2f2; }
 .brom-form-row { display: flex; align-items: flex-end; gap: 3mm; margin-top: 2mm; padding: 0 1mm; }
 .brom-form-label { white-space: nowrap; }
 .brom-form-line { display: block; min-height: 5.5mm; padding: 0 1mm 0.6mm; border-bottom: .6pt solid #000; text-align: center; overflow-wrap: anywhere; }
+.brom-form-line--na { background: #e4e6ea; color: #6b7280; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .brom-form-row .brom-form-line { flex: 0 0 38mm; }
 .brom-form-row .brom-form-grow { flex: 1 1 auto; }
 .brom-form-grid { display: grid; column-gap: 12mm; margin-top: 2mm; }
@@ -101,7 +103,7 @@ function solventBlankFinding(value: string): "found" | "not-found" | "" {
 const name = (value?: string) => (value && !BLANK.test(value.trim()) ? value.trim() : "");
 
 function Field({ label, value, grow = false, field }: { label: ReactNode; value?: string; grow?: boolean; field?: string }) {
-  return <><span className="brom-form-label">{label}</span><span className={grow ? "brom-form-line brom-form-grow" : "brom-form-line"} data-field={field}>{value}</span></>;
+  return <><span className="brom-form-label">{label}</span><span className={`brom-form-line${grow ? " brom-form-grow" : ""}`} data-field={field}>{value}</span></>;
 }
 
 function Columns({ labels, items, field }: { labels: string[]; items: string[]; field: string }) {
@@ -150,6 +152,8 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
   };
   const controlRange = control.low && control.high ? `${control.low} - ${control.high}` : control.low || control.high;
   const testedDate = name(page.sample.testedDate);
+  const isWW = isGrWpSpCommonName(page.sample.name);
+  const densityValue = isWW ? "-" : firstValue(page, /density|ถ\.?\s*พ\.?/i, "1.000");
 
   return (
     <div className="brom-form-root">
@@ -159,7 +163,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
 
         <div className="brom-form-bar">Sample</div>
         <div className="brom-form-row">
-          <Field label="ตัวอย่างเลขที่ :" value={name(page.sample.submissionNo)} field="sampleNo" />
+          <Field label="ตัวอย่างเลขที่ :" value={name(page.sample.sampleNo) || name(page.sample.submissionNo)} field="sampleNo" />
           <Field grow label="ชื่อสามัญ (sample name)" value={name(page.sample.name)} field="sampleName" />
           <Field label="วันที่วิเคราะห์" value={testedDate} field="testedDate" />
         </div>
@@ -180,7 +184,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
         <div className="brom-form-bar" style={{ marginTop: "4mm" }}>
           <span style={{ width: "30mm" }}>Solvent Blank</span>
           <Check checked={blank === "found"} label="พบ Peak สารที่วิเคราะห์" field="blankFound" />
-          <span style={{ marginLeft: "40mm" }}><Check checked={blank === "not-found"} label="ไม่พบ Peak สารที่วิเคราะห์" field="blankNotFound" /></span>
+          <span style={{ marginLeft: "40mm" }}><Check checked={blank !== "found"} label="ไม่พบ Peak สารที่วิเคราะห์" field="blankNotFound" /></span>
         </div>
 
         <div className="brom-form-bar">Control sample Test</div>
@@ -195,8 +199,8 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>
-          <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className="brom-form-line" data-field="density">{firstValue(page, /density|ถ\.?\s*พ\.?/i, "1.000")}</span><span>g/cm3</span>
-          <span>Report</span><span className="brom-form-line" data-field="report">{aiResult}</span><span>%W/V</span>
+          <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className={`brom-form-line${isWW ? " brom-form-line--na" : ""}`} data-field="density">{densityValue}</span><span>g/cm3</span>
+          <span>Report</span><span className="brom-form-line" data-field="report">{aiResult}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
         </div>
 
         <div className="brom-form-signatures">

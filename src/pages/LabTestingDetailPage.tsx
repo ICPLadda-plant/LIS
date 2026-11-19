@@ -117,12 +117,12 @@ const AI_FIELD_ORDER = [
 ] as const;
 
 const AI_FIELD_SECTIONS = [
-  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-primary/30 bg-primary/5' },
-  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-border bg-muted/40' },
-  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-primary/30 bg-accent/50' },
-  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-border bg-secondary/40' },
-  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-border bg-muted/40' },
-  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-primary/20 bg-primary/5' },
+  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-primary/40 bg-primary/10' },
+  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-border bg-muted/70' },
+  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-primary/40 bg-accent/70' },
+  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-border bg-secondary/70' },
+  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-border bg-muted/70' },
+  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-primary/30 bg-primary/10' },
 ] as const;
 
 function aiFieldsForParameter(fields: ParameterValueField[]) {
@@ -350,7 +350,7 @@ function TestField({
         >
           <SelectTrigger
             className={cn(
-              'h-8 text-sm',
+              'h-8 text-sm bg-background border-input/80 shadow-sm',
               isAbnormal && 'border-red-400 ring-1 ring-red-200',
               readOnly && 'bg-muted cursor-default',
               valueClassName,
@@ -1810,9 +1810,21 @@ export default function LabTestingDetailPage() {
                                     </section>
                                   ))}
                                   {sharedFields.length > 0 && (
-                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-                                      {sharedFields.map(renderField)}
-                                    </div>
+                                    (() => {
+                                      const knownLabels = new Set<string>(AI_FIELD_SECTIONS.flatMap((section) => [...section.labels]));
+                                      const sharedSections = [
+                                        ...AI_FIELD_SECTIONS.map((section) => ({ ...section, fields: sharedFields.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
+                                        { title: 'ข้อมูลเพิ่มเติม', labels: [], className: 'border-border bg-card', fields: sharedFields.filter((field) => !knownLabels.has(field.label)) },
+                                      ].filter((section) => section.fields.length > 0);
+                                      return sharedSections.map((section) => (
+                                        <section key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
+                                          <h4 className="text-base font-semibold text-foreground">{section.title}</h4>
+                                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                                            {section.fields.map(renderField)}
+                                          </div>
+                                        </section>
+                                      ));
+                                    })()
                                   )}
                                 </div>
                               );
