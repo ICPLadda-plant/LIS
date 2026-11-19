@@ -1258,6 +1258,8 @@ export default function LabTestingDetailPage() {
   const remarkOf = (item: PetitionItem, param: ParameterItem) =>
     savedResults.find((r) => r.itemSeq === item.seq && r.parameterId === param._id)?.remark ?? '';
   const switchablePetitions = (worklistData?.items ?? []).filter((p) =>
+    // แถบสลับงานแสดงเฉพาะงานที่มอบหมายให้ผู้ใช้คนนี้ (ยกเว้นสิทธิ์เต็ม)
+    (isFullAccess || isAssignedTo(p.assignedTo, user)) &&
     labWorkReceived(p) && (p.items ?? []).some(
       (it) =>
         (isResearchAndDevelopmentPetition(p) || shouldSendItemToLab(it)) &&
