@@ -1205,10 +1205,16 @@ router.get('/lab-sample-number-options', async (req, res) => {
   try {
     const user = await currentUser(req);
     if (!canClaimLabWork(user)) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์เลือกเลขตัวอย่าง Lab' } });
-    const rows = await Petition.find({ deletedAt: null, 'items.sampleId': { $regex: '^[0-9]+$' } }, { 'items.sampleId': 1 }).lean();
-    const used = new Set(rows.flatMap((row) => row.items || []).map((item) => Number(item.sampleId)).filter((value) => value >= LAB_SAMPLE_NUMBER_START));
+    // คำร้องเฉพาะ Admin ใช้เลขชุด A1, A2, ... แยกจากเลขปกติ
+    const adminOnly = ['1', 'true'].includes(String(req.query.adminOnly || ''));
+    const prefix = adminOnly ? ADMIN_SAMPLE_NUMBER_PREFIX : '';
+    const start = adminOnly ? 1 : LAB_SAMPLE_NUMBER_START;
+    const rows = await Petition.find({ deletedAt: null, 'items.sampleId': { $regex: `^${prefix}[0-9]+$` } }, { 'items.sampleId': 1 }).lean();
+    const used = new Set(rows.flatMap((row) => row.items || [])
+      .filter((item) => new RegExp(`^${prefix}\\d+$`).test(String(item.sampleId || '')))
+      .map((item) => Number(String(item.sampleId).slice(prefix.length))));
     const options = [];
-    for (let value = LAB_SAMPLE_NUMBER_START; options.length < 100; value += 1) if (!used.has(value)) options.push(String(value));
+    for (let value = start; options.length < 100; value += 1) if (!used.has(value)) options.push(`${prefix}${value}`);
     res.json(options);
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
@@ -1507,6 +1513,12 @@ function labNotReceived(doc) {
 }
 
 const LAB_SAMPLE_NUMBER_START = 3450;
+const ADMIN_SAMPLE_NUMBER_PREFIX = 'A';
+
+function isValidLabSampleNumber(sampleId, adminOnly) {
+  if (adminOnly) return /^A[1-9]\d*$/.test(sampleId);
+  return /^\d+$/.test(sampleId) && Number(sampleId) >= LAB_SAMPLE_NUMBER_START;
+}
 
 function labItems(doc) {
   return (doc.items || []).filter((item) => shouldSendItemToLab(item));
@@ -1518,8 +1530,10 @@ async function setLabSampleNumbers(doc, mappings) {
   const items = labItems(doc);
   if (!items.length) throw new Error('คำร้องนี้ไม่มีตัวอย่าง Lab');
   const picked = items.map((item) => ({ item, sampleId: bySeq.get(Number(item.seq)) || String(item.sampleId || '').trim() }));
-  if (picked.some(({ sampleId }) => !/^\d+$/.test(sampleId) || Number(sampleId) < LAB_SAMPLE_NUMBER_START)) {
-    throw new Error(`กรุณาเลือกเลขตัวอย่างตั้งแต่ ${LAB_SAMPLE_NUMBER_START} ให้ครบทุกตัวอย่าง`);
+  if (picked.some(({ sampleId }) => !isValidLabSampleNumber(sampleId, doc.adminOnly))) {
+    throw new Error(doc.adminOnly
+      ? 'กรุณาเลือกเลขตัวอย่าง Admin (A1, A2, ...) ให้ครบทุกตัวอย่าง'
+      : `กรุณาเลือกเลขตัวอย่างตั้งแต่ ${LAB_SAMPLE_NUMBER_START} ให้ครบทุกตัวอย่าง`);
   }
   if (new Set(picked.map(({ sampleId }) => sampleId)).size !== picked.length) throw new Error('เลขตัวอย่างต้องไม่ซ้ำกัน');
   const duplicate = await Petition.findOne({ _id: { $ne: doc._id }, deletedAt: null, 'items.sampleId': { $in: picked.map(({ sampleId }) => sampleId) } }).lean();

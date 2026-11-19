@@ -34,6 +34,17 @@ import { isLabRecheckPending, isLabWorkAccepted, labAssignBoardStatusBadge, labR
 
 const createdTime = (p: Petition) => Date.parse(p.createdAt) || 0;
 
+// คำร้องเฉพาะ Admin ใช้เลขตัวอย่างชุด A1, A2, ... แยกจากเลขปกติ (ตั้งแต่ 3450)
+function isValidLabSampleNumber(sampleId: string | undefined, adminOnly?: boolean) {
+  const value = sampleId ?? '';
+  if (adminOnly) return /^A[1-9]\d*$/.test(value);
+  return /^\d+$/.test(value) && Number(value) >= 3450;
+}
+
+function hasValidLabSampleNumbers(petition: Petition) {
+  return (petition.items ?? []).filter(shouldSendItemToLab).every((item) => isValidLabSampleNumber(item.sampleId, petition.adminOnly));
+}
+
 /** คิวรอมอบหมาย: งานด่วน/Re-check ขึ้นก่อน แล้วเรียงตามวันที่สร้างคำขอ (ใหม่ → เก่า) */
 function sortAssignQueue(petitions: Petition[]): Petition[] {
   return [...petitions].sort((a, b) => {
@@ -353,7 +364,7 @@ export default function PetitionAssignPage() {
     setSampleNumbers(Object.fromEntries(items.map((item) => [item.seq, item.sampleId ?? ''])));
     setSampleNumberPetition(petition);
     try {
-      setSampleNumberOptions((await api.get<string[]>('/petitions/lab-sample-number-options')).data.data);
+      setSampleNumberOptions((await api.get<string[]>(`/petitions/lab-sample-number-options${petition.adminOnly ? '?adminOnly=1' : ''}`)).data.data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'โหลดเลขตัวอย่างไม่สำเร็จ');
     }
@@ -398,7 +409,7 @@ export default function PetitionAssignPage() {
     if (savingId) return;
     const petition = allPetitions.find((p) => p._id === petitionId);
     if (!petition) return;
-    if ((petition.items ?? []).filter(shouldSendItemToLab).some((item) => !/^\d+$/.test(item.sampleId ?? '') || Number(item.sampleId) < 3450)) {
+    if (!hasValidLabSampleNumbers(petition)) {
       toast.error('กรุณาใส่เลขตัวอย่างก่อน Assign');
       return;
     }
@@ -409,7 +420,7 @@ export default function PetitionAssignPage() {
     if (savingId) return;
     const petition = allPetitions.find((p) => p._id === petitionId);
     if (!petition) return;
-    if ((petition.items ?? []).filter(shouldSendItemToLab).some((item) => !/^\d+$/.test(item.sampleId ?? '') || Number(item.sampleId) < 3450)) {
+    if (!hasValidLabSampleNumbers(petition)) {
       toast.error('กรุณาใส่เลขตัวอย่างก่อนรับงาน');
       return;
     }
