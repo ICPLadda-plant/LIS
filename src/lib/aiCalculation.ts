@@ -147,11 +147,6 @@ export function isSharedDailyAiField(label: string) {
   return SHARED_DAILY_AI_LABELS.has(label.split('::', 1)[0].trim().toLowerCase());
 }
 
-export function isUnsetSharedDailyAiValue(label: string, value: unknown) {
-  const text = value == null ? '' : String(value).trim();
-  return text === '' || (label.split('::', 1)[0].trim() === STANDARD_NO_LABEL && text === '0');
-}
-
 export function isControlSampleLabel(label: string) {
   return CONTROL_LABELS.has(label.trim());
 }

@@ -320,6 +320,35 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("CCS Result")).toBeInTheDocument();
   });
 
+  it("updates shared Standard input on every keystroke for the same drug", async () => {
+    mockState.activeFixtures = {
+      ...fixtures,
+      petition: {
+        ...fixtures.petition,
+        items: [
+          { ...fixtures.petition.items[0], sampleName: "BROMADIOLONE 0.005% W/W", commonName: "BROMADIOLONE 0.005% W/W", batchNo: "A1" },
+          { ...fixtures.petition.items[0], seq: 2, sampleName: "BROMADIOLONE 0.005% W/W", commonName: "BROMADIOLONE 0.005% W/W", batchNo: "A2" },
+        ],
+      },
+      results: [
+        { ...fixtures.results[0], values: { ...fixtures.results[0].values, "เลขที่ Standard": "" } },
+        { ...fixtures.results[0], itemSeq: 2, values: { ...fixtures.results[0].values, "เลขที่ Standard": "03" } },
+      ],
+    };
+
+    render(<LabTestingDetailPage />);
+
+    const labels = await screen.findAllByText("เลขที่ Standard");
+    const inputs = labels.map((label) => {
+      let box: HTMLElement | null = label.parentElement;
+      while (box && !box.querySelector("input")) box = box.parentElement;
+      return box!.querySelector("input")!;
+    });
+    fireEvent.change(inputs[0], { target: { value: "03458" } });
+
+    await waitFor(() => expect(inputs[1]).toHaveValue("03458"));
+  });
+
   it("calculates CCS difference and shows Pass or No pass with status color", async () => {
     mockState.activeFixtures = {
       ...fixtures,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateAi, calculateCcs, calculatedAiFieldKind, ccsDifference, findAiDensity, formatCalculatedAi, isSharedDailyAiField, isUnsetSharedDailyAiValue } from './aiCalculation';
+import { calculateAi, calculateCcs, calculatedAiFieldKind, ccsDifference, findAiDensity, formatCalculatedAi, isSharedDailyAiField } from './aiCalculation';
 
 describe('calculateAi', () => {
   it('calculates separate averages, sample RSD and AI using density', () => {
@@ -83,9 +83,4 @@ describe('isSharedDailyAiField', () => {
     expect(isSharedDailyAiField('%AI')).toBe(false);
   });
 
-  it('treats the default Standard number 0 as empty without overwriting other entered values', () => {
-    expect(isUnsetSharedDailyAiValue('เลขที่ Standard', '0')).toBe(true);
-    expect(isUnsetSharedDailyAiValue('เลขที่ Standard', '03458')).toBe(false);
-    expect(isUnsetSharedDailyAiValue('Area Inj.1', '0')).toBe(false);
-  });
 });

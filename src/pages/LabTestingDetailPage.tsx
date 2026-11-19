@@ -36,7 +36,7 @@ import { TimerField } from '@/components/lis/TimerField';
 import { PhaseBanner } from '@/components/lis/PhaseBanner';
 import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
-import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, isSharedDailyAiField, isUnsetSharedDailyAiValue, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
+import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, isSharedDailyAiField, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
@@ -721,7 +721,6 @@ export default function LabTestingDetailPage() {
 
       const setValuesFn = phase === 2 ? setValuesPhase2 : setValues;
       const setStatesFn = phase === 2 ? setSaveStatesPhase2 : setSaveStates;
-      const currentValues = phase === 2 ? valuesPhase2 : values;
       const drugKey = sameDrugKey(item);
       const sameDrugItems = (petition.items ?? []).filter((candidate) =>
         drugKey !== ''
@@ -732,13 +731,7 @@ export default function LabTestingDetailPage() {
           .some((candidateParam) => candidateParam._id === param._id),
       );
       const isFirstSameDrugItem = sameDrugItems[0]?.seq === item.seq;
-      const targets = isFirstSameDrugItem && isSharedDailyAiField(fieldLabel)
-        ? sameDrugItems.slice(1).filter((candidate) => {
-            const targetKey = resultKey(candidate.seq, param._id!);
-            const current = currentValues[targetKey]?.[fieldLabel];
-            return isUnsetSharedDailyAiValue(fieldLabel, current);
-          })
-        : [];
+      const targets = isFirstSameDrugItem && isSharedDailyAiField(fieldLabel) ? sameDrugItems.slice(1) : [];
       const writes = [item, ...targets].map((target) => ({ item: target, key: resultKey(target.seq, param._id!) }));
 
       setValuesFn((prev) => Object.fromEntries([
@@ -791,7 +784,7 @@ export default function LabTestingDetailPage() {
         }
       }, write.key));
     },
-    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity, values, valuesPhase2, allParameters, densitySources, groupMembership],
+    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity, allParameters, densitySources, groupMembership],
   );
 
   // multiEntry write: field write into entry `entryIndex` of a multiEntry param.
