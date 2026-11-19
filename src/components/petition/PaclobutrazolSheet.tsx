@@ -47,6 +47,10 @@ export function PaclobutrazolSheet({ values, density = null, header, analyst }: 
     );
   };
   const out = (n: number | null | undefined, digits: number) => <span className="tabular-nums">{pbzFixed(n, digits)}</span>;
+  const pctRaw = String(values[PBZ_STD_PCT] ?? "").trim();
+  const missingPct = pctRaw === "" || !Number.isFinite(Number(pctRaw));
+  const contentCell = (n: number | null | undefined) =>
+    n == null && missingPct ? <span className="text-xs text-muted-foreground">กรอก % Std</span> : out(n, 4);
 
   const td = "border border-border px-1.5 py-1 text-center align-middle";
   const th = "border border-border px-2 py-1.5 text-center font-medium";
@@ -64,7 +68,7 @@ export function PaclobutrazolSheet({ values, density = null, header, analyst }: 
         <td className={td}>{input(row, is)}</td>
         <td className={td}>{kind === "std" ? out(calc.std[index].inj[inj].fi, 4) : null}</td>
         <td className={td}>{kind === "std" && index === 0 && inj === 1 ? out(calc.meanFactor, 4) : null}</td>
-        <td className={td}>{kind === "sample" ? out(calc.sample[index].inj[inj].content, 4) : null}</td>
+        <td className={td}>{kind === "sample" ? contentCell(calc.sample[index].inj[inj].content) : null}</td>
         <td className={td}>{kind === "sample" && inj === 1 ? out(calc.sample[index].meanContent, 4) : null}</td>
       </tr>
     ));
