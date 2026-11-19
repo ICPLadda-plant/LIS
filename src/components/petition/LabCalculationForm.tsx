@@ -84,13 +84,13 @@ const toNumber = (value: string) => {
   return value && Number.isFinite(n) ? n : null;
 };
 
-// ผล Control sample: อยู่ในช่วงเกณฑ์ยอมรับ = ผ่าน
+// ผล Control sample: อยู่ในช่วงเกณฑ์ยอมรับ = Pass
 export function controlResult(value: string, low: string, high: string): string {
   const v = toNumber(value);
   const lo = toNumber(low);
   const hi = toNumber(high);
   if (v == null || lo == null || hi == null) return "";
-  return v >= Math.min(lo, hi) && v <= Math.max(lo, hi) ? "ผ่าน" : "ไม่ผ่าน";
+  return v >= Math.min(lo, hi) && v <= Math.max(lo, hi) ? "Pass" : "No pass";
 }
 
 // "ไม่พบ" ต้องเช็กก่อน "พบ" เพราะมีคำว่าพบอยู่ข้างใน
