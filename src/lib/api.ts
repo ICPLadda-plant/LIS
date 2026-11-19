@@ -953,7 +953,7 @@ export const api = {
   },
   getPaclobutrazolStdWeights: (excludePetitionId: string) => {
     const qs = new URLSearchParams({ excludePetitionId }).toString();
-    return request<{ std1?: string; std2?: string; petitionNo?: string; enteredAt?: string }>(`/qc-results/paclobutrazol-std-weights?${qs}`);
+    return request<{ std1?: string; std2?: string; stdPct?: string; petitionNo?: string; enteredAt?: string }>(`/qc-results/paclobutrazol-std-weights?${qs}`);
   },
   getReturnedFlags: (petitionIds: string[]) => {
     if (petitionIds.length === 0) return Promise.resolve({} as Record<string, boolean>);

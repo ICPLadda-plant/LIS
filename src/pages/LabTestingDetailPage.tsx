@@ -1737,6 +1737,14 @@ export default function LabTestingDetailPage() {
                                       onChange={onUnitChange}
                                       disabled={fieldDisabled}
                                       petitionId={String(petition._id ?? '')}
+                                      density={aiDensity(srcValues, condCtx, 'paclobutrazol', densityEntries, hasSgParam)}
+                                      analyst={user?.name}
+                                      header={{
+                                        sampleNo: item.submissionNo || petition.petitionNo,
+                                        tradeName: item.sampleName,
+                                        commonName: item.commonName,
+                                        formula: /\d+(?:\.\d+)?\s*%\s*[A-Z]{2,3}\b/i.exec(String(item.sampleName ?? ''))?.[0],
+                                      }}
                                     />
                                     {fields.filter((field) => field.type === 'reference' || !isAiSetFieldLabel(field.label)).map(renderField)}
                                   </div>

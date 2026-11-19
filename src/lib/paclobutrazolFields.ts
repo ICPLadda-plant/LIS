@@ -20,3 +20,66 @@ export function pbzMirrorKey(key: string): string | null {
 export function isPbzReadOnly(row: string, col: string) {
   return row.startsWith("Sample") && (col === "Peak area 2" || col === "Internal std 2");
 }
+
+export const PBZ_STD_PCT = "PBZ %Std";
+export const PBZ_DIL_STD = "PBZ Dilution Std";
+export const PBZ_DIL_SAMPLE = "PBZ Dilution Sample";
+
+const num = (v: unknown) => {
+  if (v === "" || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const mean = (xs: Array<number | null>) => {
+  const ok = xs.filter((x): x is number => x != null && Number.isFinite(x));
+  return ok.length === xs.length && ok.length > 0 ? ok.reduce((a, b) => a + b, 0) / ok.length : null;
+};
+
+export type PbzInjection = { fi: number | null; content: number | null };
+export type PbzCalc = {
+  std: Array<{ conc: number | null; inj: PbzInjection[] }>;
+  sample: Array<{ conc: number | null; inj: PbzInjection[]; meanContent: number | null }>;
+  meanFactor: number | null;
+  average: number | null;
+  report: number | null;
+};
+
+// ใบคำนวณ FM-QP-07-08-002: conc = wt/dilution, fi = conc·IS/area std, f = mean(fi),
+// content = f·(area sample/IS)/conc·%Std, average = mean(mean content), report %W/V = average·density
+export function calculatePaclobutrazol(values: Record<string, unknown>, density: number | null): PbzCalc {
+  const v = (row: (typeof PBZ_ROWS)[number], col: (typeof PBZ_COLS)[number]) => num(values[pbzKey(row, col)]);
+  const pct = num(values[PBZ_STD_PCT]);
+  const dilStd = num(values[PBZ_DIL_STD]);
+  const dilSample = num(values[PBZ_DIL_SAMPLE]);
+  const conc = (wt: number | null, dil: number | null) => (wt != null && dil ? wt / dil : null);
+  const pairs = [["Peak area 1", "Internal std 1"], ["Peak area 2", "Internal std 2"]] as const;
+
+  const std = (["Std 1", "Std 2"] as const).map((row) => {
+    const c = conc(v(row, "wt/mg"), dilStd);
+    return {
+      conc: c,
+      inj: pairs.map(([a, is]) => {
+        const area = v(row, a);
+        const isv = v(row, is);
+        return { fi: c != null && area && isv != null ? (c * isv) / area : null, content: null };
+      }),
+    };
+  });
+  const meanFactor = mean(std.flatMap((s) => s.inj.map((i) => i.fi)));
+  const sample = (["Sample 1", "Sample 2"] as const).map((row) => {
+    const c = conc(v(row, "wt/mg"), dilSample);
+    const inj = pairs.map(([a, is]) => {
+      const area = v(row, a);
+      const isv = v(row, is);
+      const content = meanFactor != null && c && area != null && isv && pct != null ? (meanFactor * (area / isv) / c) * pct : null;
+      return { fi: null, content };
+    });
+    return { conc: c, inj, meanContent: mean(inj.map((i) => i.content)) };
+  });
+  const average = mean(sample.map((s) => s.meanContent));
+  const report = average != null && density != null && density > 0 ? average * density : null;
+  return { std, sample, meanFactor, average, report };
+}
+
+export const pbzFixed = (n: number | null | undefined, digits: number) => (n == null || !Number.isFinite(n) ? "" : n.toFixed(digits));
+

@@ -283,7 +283,7 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
       .sort({ withdrawnDate: -1 }).select("withdrawnDate").lean();
     const enteredAt = doc.updatedAt || doc.enteredAt;
     if (lastWithdraw?.withdrawnDate && enteredAt && new Date(lastWithdraw.withdrawnDate) > new Date(enteredAt)) return res.json({});
-    res.json({ std1: String(doc.values?.[STD1] ?? ""), std2: String(doc.values?.[STD2] ?? ""), petitionNo: doc.petitionNo, enteredAt });
+    res.json({ std1: String(doc.values?.[STD1] ?? ""), std2: String(doc.values?.[STD2] ?? ""), stdPct: String(doc.values?.["PBZ %Std"] ?? ""), petitionNo: doc.petitionNo, enteredAt });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
