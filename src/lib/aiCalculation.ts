@@ -1,3 +1,4 @@
+import { calculatePaclobutrazol } from './paclobutrazolFields';
 export type AiCalculationResult = {
   areaAverage: number | null;
   sampleAverage: number | null;
@@ -86,6 +87,11 @@ const valuesForSubstance = (values: Record<string, unknown>, substance: string) 
 
 export function calculateAi(values: Record<string, unknown>, density: number | null = null, substance = ''): AiCalculationResult {
   const own = valuesForSubstance(values, substance);
+  // PACLOBUTRAZOL (Internal standard): %AI = Report %W/V จากใบคำนวณ
+  if (Object.keys(own).some((key) => key.startsWith('PBZ '))) {
+    const pbz = calculatePaclobutrazol(own, density != null && Number(density) > 0 ? Number(density) : null);
+    return { areaAverage: null, sampleAverage: pbz.average, areaRsd: null, sampleRsd: null, ai: pbz.report == null ? null : Number(pbz.report.toFixed(2)) };
+  }
   const areas = numberValues(own, /area\s*inj\.?\s*[1-3]/i);
   const samples = numberValues(own, /%?\s*sample\s*[1-3]/i);
   const areaAverage = average(areas);
