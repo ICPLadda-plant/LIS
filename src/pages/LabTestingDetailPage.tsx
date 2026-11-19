@@ -11,6 +11,7 @@ import {
   Save,
   Send,
   ShieldAlert,
+  Printer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
@@ -56,6 +57,11 @@ import {
   type QCTestResult,
 } from '@/types/petition.types';
 import { Button } from '@/components/ui/button';
+import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
+import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationFields } from '@/components/petition/LabCalculationForm';
+import { buildApprovalGroups } from '@/lib/qcApprovalRows';
+import { buildLabReportPages } from '@/lib/labReport';
+import { buildLabCalculationPages } from '@/lib/labCalculation';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -498,6 +504,7 @@ export default function LabTestingDetailPage() {
     && Date.parse(requestedPetition.updatedAt) >= Date.parse(currentPetition.updatedAt)
     ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
+  const [calculationPrintOpen, setCalculationPrintOpen] = useState(false);
   const pendingSample = pendingAdditionalSample(petition, 'lab');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
   const roundRequests = useMemo(() => JSON.parse(roundsKey) as AdditionalSampleRequest[], [roundsKey]);
@@ -897,6 +904,33 @@ export default function LabTestingDetailPage() {
     ? (petition.items ?? [])
     : (petition.items ?? []).filter((it) => shouldSendItemToLab(it));
   const labItems = mergeQcLabDuplicateItems(petition, allLabBatchItems);
+  const liveResultKeys = new Set([
+    ...savedResults.map((result) => resultKey(result.itemSeq, result.parameterId)),
+    ...Object.keys(values),
+    ...Object.keys(valuesPhase2),
+    ...Object.keys(entriesByKey),
+  ]);
+  const liveResults = [...liveResultKeys].map((key): QCTestResult => {
+    const separator = key.indexOf('__');
+    const itemSeq = Number(key.slice(0, separator));
+    const parameterId = key.slice(separator + 2);
+    const saved = savedResults.find((result) => result.itemSeq === itemSeq && result.parameterId === parameterId);
+    return {
+      ...saved,
+      petitionId: petition._id,
+      itemSeq,
+      parameterId,
+      values: values[key] ?? saved?.values ?? {},
+      valuesPhase2: valuesPhase2[key] ?? saved?.valuesPhase2,
+      entries: entriesByKey[key] ?? saved?.entries,
+    };
+  });
+  const calculationGroups = buildApprovalGroups(petition, allParameters, liveResults, groupMembership, { includeResultOnlyFields: true });
+  const calculationPages = buildLabCalculationPages(
+    petition,
+    buildLabReportPages(petition, [], calculationGroups),
+    calculationGroups,
+  ).filter(hasCalculationFields);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
   );
@@ -1244,10 +1278,22 @@ export default function LabTestingDetailPage() {
             </span>
           }
           actions={
-            <span className="text-sm text-muted-foreground">
-              ผู้นำส่ง: {petition.submittedBy?.name ?? '-'}
-              {labReceivedBy(petition) && ` · ผู้รับงาน: ${labReceivedBy(petition)}`}
-            </span>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span className="text-sm text-muted-foreground">
+                ผู้นำส่ง: {petition.submittedBy?.name ?? '-'}
+                {labReceivedBy(petition) && ` · ผู้รับงาน: ${labReceivedBy(petition)}`}
+              </span>
+              <Button
+                type="button"
+                variant="primary-outline"
+                className="gap-2"
+                disabled={calculationPages.length === 0}
+                onClick={() => setCalculationPrintOpen(true)}
+              >
+                <Printer className="h-4 w-4" />
+                พิมพ์เอกสาร
+              </Button>
+            </div>
           }
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -2154,6 +2200,20 @@ export default function LabTestingDetailPage() {
               </Button>
             )}
           </div>
+        )}
+
+        {calculationPages.length > 0 && (
+          <PrintPreviewDialog
+            open={calculationPrintOpen}
+            onOpenChange={setCalculationPrintOpen}
+            docType="coa"
+            title="ใบคำนวณผลวิเคราะห์"
+            css={LAB_CALCULATION_CSS}
+          >
+            {calculationPages.map((page, index) => (
+              <LabCalculationForm key={`${page.reportNo}-${index}`} page={page} />
+            ))}
+          </PrintPreviewDialog>
         )}
 
         <LabReasonDialog

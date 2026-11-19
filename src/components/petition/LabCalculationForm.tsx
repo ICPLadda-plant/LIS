@@ -64,6 +64,10 @@ export function hasCalculationData(page: LabReportPage): boolean {
   return values(page, AREA_INJ).length > 0 || values(page, SAMPLE_N).length > 0;
 }
 
+export function hasCalculationFields(page: LabReportPage): boolean {
+  return (page.rows ?? []).some((row) => AREA_INJ.test(row.testItem) || SAMPLE_N.test(row.testItem) || /^%\s*AI/i.test(row.testItem));
+}
+
 function triple(list: string[]): string[] {
   return [0, 1, 2].map((i) => list[i] || "");
 }

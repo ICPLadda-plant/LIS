@@ -147,6 +147,11 @@ vi.mock("@/components/lis/PageHeader", () => ({
   ),
 }));
 
+vi.mock("@/components/lis/PrintPreviewDialog", () => ({
+  default: ({ open, title, children }: { open: boolean; title: string; children: React.ReactNode }) =>
+    open ? <section aria-label={title}>{children}</section> : null,
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: {
@@ -205,6 +210,22 @@ describe("LabTestingDetailPage", () => {
     mockState.parametersError = false;
     mockSaveQCResult.mockReset();
     mockSaveQCResult.mockResolvedValue({});
+  });
+
+  it("prints the analysis calculation sheet with the current form value", async () => {
+    mockState.activeFixtures = { ...fixtures, results: [...fixtures.results, savedDensity] };
+    render(<LabTestingDetailPage />);
+
+    const label = await screen.findByText("เลขที่ Standard");
+    let box: HTMLElement | null = label.parentElement;
+    while (box && !box.querySelector("input")) box = box.parentElement;
+    const standardInput = box!.querySelector("input")!;
+    fireEvent.change(standardInput, { target: { value: "03458" } });
+    await waitFor(() => expect(standardInput).toHaveValue("03458"));
+    fireEvent.click(screen.getByRole("button", { name: "พิมพ์เอกสาร" }));
+
+    const preview = screen.getByRole("region", { name: "ใบคำนวณผลวิเคราะห์" });
+    expect(within(preview).getByText("03458")).toBeInTheDocument();
   });
 
   it("shows label-tolerance criteria and saved-by metadata beside the parameter field name", async () => {
