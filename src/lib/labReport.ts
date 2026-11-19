@@ -188,7 +188,7 @@ export function buildLabReportPages(
           : item.sampleId || lr?.labRequestNo || "",
         sampleId: item.sampleId || "",
         receivedDate: buddhistDate(petition.labReceivedAt || petition.receivedAt || petition.sampleSentAt) || "",
-        testedDate: buddhistDate(petition.firstResultAt || petition.labCompletedAt) || "",
+        testedDate: buddhistDate(petition.firstResultAt || petition.labCompletedAt || petition.updatedAt) || "",
         reportedDate: reportedDate || "",
         condition: physicalDescription(group) || conditionText(item.condition),
       },

@@ -31,7 +31,7 @@ describe("LabCalculationForm", () => {
 
   it("fills the sample header and uses form FM-QP-07-08-002-R02", () => {
     const { container } = render(<LabCalculationForm page={page([])} />);
-    expect(field(container, "sampleNo")).toBe("S-2610-0007");
+    expect(field(container, "sampleNo")).toBe("L-2610-0001");
     expect(field(container, "sampleName")).toBe("OMETHOATE 50% SL");
     expect(field(container, "testedDate")).toBe("27/10/2569");
     expect(field(container, "analyst")).toBe("นักเคมี ก");
@@ -39,10 +39,10 @@ describe("LabCalculationForm", () => {
     expect(container.textContent).toContain("FM-QP-07-08-002-R02 (02/11/69) P1/1");
   });
 
-  it("prefers the manually assigned sample ID over the auto submission number", () => {
+  it("prefers the manually assigned sample number (with year suffix) over the auto submission number", () => {
     const base = page([]);
-    const { container } = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, sampleId: "3455" } }} />);
-    expect(field(container, "sampleNo")).toBe("3455");
+    const { container } = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, sampleId: "3455", sampleNo: "3455/69" } }} />);
+    expect(field(container, "sampleNo")).toBe("3455/69");
   });
 
   it("prints Control Sample, its acceptance range and the pass result", () => {
@@ -63,7 +63,7 @@ describe("LabCalculationForm", () => {
     expect(field(container, "controlValue")).toBe("");
     expect(field(container, "controlResult")).toBe("");
     expect(field(container, "blankFound")).toBe("");
-    expect(field(container, "blankNotFound")).toBe("");
+    expect(field(container, "blankNotFound")).toBe("✓");
   });
 
   it("fills CCS and Solvent Blank when they are recorded", () => {
