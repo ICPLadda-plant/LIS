@@ -13,7 +13,7 @@ import { isResearchAndDevelopmentPetition, shouldSendItemToLab } from '@/lib/pet
 import { isLabAwaitingSgConfirmation, SG_PENDING_LABEL } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { additionalSamplePayload, extractScannedCode, extractScannedItemSeq, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
-import { labelReceiptStatus, pickScannedLabels, type SideLabel } from '@/lib/labelReceipt';
+import { labelReceiptStatus, pickScannedLabels, sideLabelText, type SideLabel } from '@/lib/labelReceipt';
 import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
 import LabelReceiptPicker from '@/components/petition/LabelReceiptPicker';
 import LabAgreementReviewDialog from '@/components/review/LabAgreementReviewDialog';
@@ -136,7 +136,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
         return;
       }
 
-      const labelPick = request ? null : pickScannedLabels(found, 'lab', extractScannedItemSeq(rawCode));
+      const labelPick = request ? null : pickScannedLabels(found, 'lab', extractScannedItemSeq(rawCode), code);
       if (labelPick && 'error' in labelPick) {
         setErrorMsg(`${found.petitionNo}: ${labelPick.error}`);
         setPhase('error');
@@ -305,6 +305,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
 
   const labItemCount = petition ? labReceivableItems(petition).length : 0;
   const labelStatus = labelChoices ? labelReceiptStatus(labelChoices, labelKeys) : null;
+  const labHeadline = petition
+    ? (labelChoices ? labelChoices.filter((label) => labelKeys.includes(label.key)).map((label) => label.label).join(', ') : sideLabelText(petition, 'lab'))
+    : '';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -357,7 +360,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
               className="space-y-2"
             >
               {pendingPetitions && (
-                <PendingPetitionSelect petitions={pendingPetitions} onPick={(code) => { void fetchAndCheck(code); }} />
+                <PendingPetitionSelect side="lab" petitions={pendingPetitions} onPick={(code) => { void fetchAndCheck(code); }} />
               )}
               {!manualOnly && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -371,7 +374,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
                   type="text"
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
-                  placeholder="พิมพ์เลขที่คำร้อง เช่น P-2506-0001"
+                  placeholder="พิมพ์เลขนำส่ง เช่น L01/69 หรือเลขคำร้อง"
                   autoFocus={manualOnly}
                   className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
                 />
@@ -385,7 +388,10 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
           {phase === 'confirming' && petition && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-lg font-bold text-primary">{petition.petitionNo}</span>
+                <div className="min-w-0">
+                  <span className="text-lg font-bold text-primary">{labHeadline || petition.petitionNo}</span>
+                  {labHeadline && <p className="text-xs text-muted-foreground">อ้างอิง {petition.petitionNo}</p>}
+                </div>
                 {labelStatus && !labelStatus.complete ? (
                   <Badge variant="yellow-soft">{labelStatus.text}</Badge>
                 ) : (

@@ -49,7 +49,7 @@ describe('QrReceiveModal manual entry', () => {
   it('แสดงช่องกรอกเลขที่คำร้องเมื่อไม่มีกล้อง', async () => {
     renderModal();
     expect(
-      await screen.findByPlaceholderText(/พิมพ์เลขที่คำร้อง/),
+      await screen.findByPlaceholderText(/พิมพ์เลขนำส่ง/),
     ).toBeInTheDocument();
   });
 
@@ -59,7 +59,7 @@ describe('QrReceiveModal manual entry', () => {
     });
     renderModal();
 
-    const input = await screen.findByPlaceholderText(/พิมพ์เลขที่คำร้อง/);
+    const input = await screen.findByPlaceholderText(/พิมพ์เลขนำส่ง/);
     fireEvent.change(input, { target: { value: 'P-2506-0002' } });
     fireEvent.click(screen.getByRole('button', { name: 'รับตัวอย่าง' }));
 
@@ -80,7 +80,7 @@ describe('QrReceiveModal camera failure fallback', () => {
 
     // ต้อง fallback ไปกรอกเอง ไม่ใช่ค้างที่หน้า error
     expect(
-      await screen.findByPlaceholderText(/พิมพ์เลขที่คำร้อง/),
+      await screen.findByPlaceholderText(/พิมพ์เลขนำส่ง/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/ไม่สามารถเปิดกล้องได้/)).not.toBeInTheDocument();
   });
@@ -98,14 +98,14 @@ describe('QrReceiveModal manualOnly mode', () => {
   it('โชว์หัวข้อ "กรอกเลขรับตัวอย่าง" + ช่องกรอกทันที ไม่ต้องรอกล้อง', async () => {
     renderManual();
     expect(screen.getByText('กรอกเลขรับตัวอย่าง')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/พิมพ์เลขนำส่ง/)).toBeInTheDocument();
     expect(screen.queryByText(/ไม่พบกล้อง/)).not.toBeInTheDocument();
   });
 
   it('submit เลขคำร้อง → เข้า confirm เหมือนโหมดสแกน', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: qcPetition } });
     renderManual();
-    const input = screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/);
+    const input = screen.getByPlaceholderText(/พิมพ์เลขนำส่ง/);
     fireEvent.change(input, { target: { value: 'P-2506-0002' } });
     fireEvent.click(screen.getByRole('button', { name: 'รับตัวอย่าง' }));
     expect(await screen.findByText('P-2506-0002')).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('QrReceiveModal manualOnly mode', () => {
     });
     renderManual();
 
-    const input = screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/);
+    const input = screen.getByPlaceholderText(/พิมพ์เลขนำส่ง/);
     fireEvent.change(input, { target: { value: 'P-2609-0003' } });
     fireEvent.click(screen.getByRole('button', { name: 'รับตัวอย่าง' }));
     fireEvent.click(await screen.findByRole('button', { name: 'ยืนยันรับตัวอย่าง' }));
@@ -148,7 +148,7 @@ describe('QrReceiveModal รับทีละป้าย', () => {
   }
 
   function scan(value: string) {
-    fireEvent.change(screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/), { target: { value } });
+    fireEvent.change(screen.getByPlaceholderText(/พิมพ์เลขนำส่ง/), { target: { value } });
     fireEvent.click(screen.getByRole('button', { name: 'รับตัวอย่าง' }));
   }
 

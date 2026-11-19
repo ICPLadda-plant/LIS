@@ -65,17 +65,60 @@ export function labelReceiptStatus(labels: SideLabel[], keys: string[]): { compl
 }
 
 /**
+ * แยกเลขนำส่งที่พิมพ์เอง เช่น "P04/69", "l3/69", "P4" → ฝั่ง + ลำดับ (ไม่สนเลข 0 นำหน้า)
+ * เลขคำร้อง P-YYMM-NNNN ไม่ตรงรูปแบบนี้
+ */
+export function parseLabelCode(code: string): { side: SampleLabelSide; num: number } | null {
+  const match = String(code ?? '').trim().match(/^([PL])\s*0*(\d{1,4})(?:\s*\/\s*(\d{2}))?$/i);
+  if (!match) return null;
+  return { side: match[1].toUpperCase() === 'P' ? 'qc' : 'lab', num: Number(match[2]) };
+}
+
+function labelNum(label: string): number {
+  return Number(label.replace(/^[PL]/i, '').split('/')[0]);
+}
+
+/** เลขนำส่งของฝั่งนี้สำหรับหัวข้อ เช่น "P04/69, P05/69" — คำขอเก่าที่ไม่มีเลขคืน "" */
+export function sideLabelText(petition: Petition, side: SampleLabelSide): string {
+  const labels = sideLabels(petition, side);
+  if (labels.length) return labels.map((label) => label.label).join(', ');
+  const numbers = petition.sampleLabelNumbers;
+  const seq = numbers?.[side];
+  if (!seq) return '';
+  return numbers?.year ? seq + '/' + String(numbers.year % 100).padStart(2, '0') : seq;
+}
+
+/** ป้ายของฝั่งนี้ที่ยังไม่รับ — ใช้ทำรายการเลือกตามเลขนำส่ง */
+export function pendingSideLabels(petition: Petition, side: SampleLabelSide): SideLabel[] {
+  if (petition[side === 'qc' ? 'qcReceivedAt' : 'labReceivedAt']) return [];
+  const labels = sideLabels(petition, side).filter((label) => !label.received);
+  if (labels.length) return labels;
+  const text = sideLabelText(petition, side);
+  return text ? [{ key: '', label: text, received: false }] : [];
+}
+
+/**
  * เลือกป้ายที่จะรับจากการสแกน: QR บนป้ายมี itemSeq → รับเฉพาะป้ายนั้น
+ * พิมพ์/เลือกเลขนำส่ง (เช่น P04/69) → รับเฉพาะป้ายเลขนั้น
  * กรอกเลขคำขอเอง/เลือกจากรายการ → เลือกทุกป้ายที่ยังไม่รับไว้ก่อน (ติ๊กออกได้)
  */
 export function pickScannedLabels(
   petition: Petition,
   side: SampleLabelSide,
   itemSeq: number | null,
+  code?: string,
 ): { labels: SideLabel[]; keys: string[] } | { error: string } | null {
+  const sideName = side.toUpperCase();
+  const typed = code ? parseLabelCode(code) : null;
+  if (typed && typed.side !== side) return { error: 'เลข ' + code + ' เป็นป้ายฝั่ง ' + typed.side.toUpperCase() + ' ไม่ใช่ฝั่ง ' + sideName };
   const labels = labelReceiptChoices(petition, side);
   if (!labels) return null;
-  const sideName = side.toUpperCase();
+  if (typed && itemSeq == null) {
+    const label = labels.find((entry) => labelNum(entry.label) === typed.num);
+    if (!label) return { error: 'ไม่พบป้าย ' + code + ' ฝั่ง ' + sideName };
+    if (label.received) return { error: 'ป้าย ' + label.label + ' รับฝั่ง ' + sideName + ' แล้ว' };
+    return { labels, keys: [label.key] };
+  }
   if (itemSeq == null) return { labels, keys: labels.filter((label) => !label.received).map((label) => label.key) };
   const item = (petition.items ?? []).find((entry) => Number(entry.seq) === itemSeq);
   const label = item ? labels.find((entry) => entry.key === sampleLabelGroupKey(item)) : undefined;

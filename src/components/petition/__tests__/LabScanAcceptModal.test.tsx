@@ -60,7 +60,7 @@ describe('LabScanAcceptModal manual entry', () => {
   it('แสดงช่องกรอกเลขที่คำร้องเมื่อไม่มีกล้อง', async () => {
     renderModal();
     expect(
-      await screen.findByPlaceholderText(/พิมพ์เลขที่คำร้อง/),
+      await screen.findByPlaceholderText(/พิมพ์เลขนำส่ง/),
     ).toBeInTheDocument();
   });
 
@@ -70,7 +70,7 @@ describe('LabScanAcceptModal manual entry', () => {
     });
     renderModal();
 
-    const input = await screen.findByPlaceholderText(/พิมพ์เลขที่คำร้อง/);
+    const input = await screen.findByPlaceholderText(/พิมพ์เลขนำส่ง/);
     fireEvent.change(input, { target: { value: 'P-2506-0001' } });
     fireEvent.click(screen.getByRole('button', { name: 'รับงาน' }));
 
@@ -91,7 +91,7 @@ describe('LabScanAcceptModal camera failure fallback', () => {
 
     // ต้อง fallback ไปกรอกเอง ไม่ใช่ค้างที่หน้า error
     expect(
-      await screen.findByPlaceholderText(/พิมพ์เลขที่คำร้อง/),
+      await screen.findByPlaceholderText(/พิมพ์เลขนำส่ง/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/ไม่สามารถเปิดกล้องได้/)).not.toBeInTheDocument();
   });
@@ -109,7 +109,7 @@ describe('LabScanAcceptModal manualOnly mode', () => {
   it('โชว์หัวข้อ "กรอกเลขรับงาน" + ช่องกรอกทันที ไม่ต้องรอกล้อง', async () => {
     renderManual();
     expect(screen.getByText('กรอกเลขรับงาน Lab')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/พิมพ์เลขนำส่ง/)).toBeInTheDocument();
     // โหมดนี้ไม่เปิดกล้อง → ไม่มีข้อความ "ไม่พบกล้อง"
     expect(screen.queryByText(/ไม่พบกล้อง/)).not.toBeInTheDocument();
   });
@@ -117,7 +117,7 @@ describe('LabScanAcceptModal manualOnly mode', () => {
   it('submit เลขคำร้อง → เข้า confirm เหมือนโหมดสแกน', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: labPetition } });
     renderManual();
-    const input = screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/);
+    const input = screen.getByPlaceholderText(/พิมพ์เลขนำส่ง/);
     fireEvent.change(input, { target: { value: 'P-2506-0001' } });
     fireEvent.click(screen.getByRole('button', { name: 'รับงาน' }));
     expect(await screen.findByText('P-2506-0001')).toBeInTheDocument();
@@ -126,7 +126,7 @@ describe('LabScanAcceptModal manualOnly mode', () => {
   it('รับคำร้อง R&D ที่ไม่มีเลขแบช Lab ได้หลัง assign แล้ว', async () => {
     (api.get as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { data: rdLabPetition } });
     renderManual();
-    const input = screen.getByPlaceholderText(/พิมพ์เลขที่คำร้อง/);
+    const input = screen.getByPlaceholderText(/พิมพ์เลขนำส่ง/);
     fireEvent.change(input, { target: { value: 'P-2609-0003' } });
     fireEvent.click(screen.getByRole('button', { name: 'รับงาน' }));
     expect(await screen.findByText('P-2609-0003')).toBeInTheDocument();
@@ -149,7 +149,7 @@ describe('LabScanAcceptModal pending dropdown', () => {
         />
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole('combobox', { name: 'เลือกคำร้องที่รอรับ' }));
+    fireEvent.click(screen.getByRole('combobox', { name: /ที่รอรับ/ }));
     fireEvent.click(await screen.findByRole('option', { name: /P-2506-0001/ }));
     await waitFor(() =>
       expect(api.get).toHaveBeenCalledWith(expect.stringContaining('/petitions/scan/P-2506-0001')),
@@ -163,7 +163,7 @@ describe('LabScanAcceptModal pending dropdown', () => {
         <LabScanAcceptModal open manualOnly pendingPetitions={[]} onClose={() => {}} onAccepted={() => {}} />
       </MemoryRouter>,
     );
-    expect(screen.getByRole('combobox', { name: 'เลือกคำร้องที่รอรับ' })).toBeDisabled();
-    expect(screen.getByText('ไม่มีคำร้องที่รอรับ')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /ที่รอรับ/ })).toBeDisabled();
+    expect(screen.getByText('ไม่มีงานที่รอรับ')).toBeInTheDocument();
   });
 });

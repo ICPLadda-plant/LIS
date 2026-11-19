@@ -12,7 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { normalizeRoles } from '@/lib/roles';
 import { additionalSamplePayload, extractScannedCode, extractScannedItemSeq, fetchPetitionByScannedCode, getScannedAdditionalSample, type AdditionalSampleRequest } from '@/lib/additionalSampleQr';
-import { labelReceiptStatus, pickScannedLabels, type SideLabel } from '@/lib/labelReceipt';
+import { labelReceiptStatus, pickScannedLabels, sideLabelText, type SideLabel } from '@/lib/labelReceipt';
 import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
 import LabelReceiptPicker from '@/components/petition/LabelReceiptPicker';
 
@@ -180,7 +180,7 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
       setAdditionalRequest(request ?? null);
       setLabelChoices(null);
       setLabelKeys([]);
-      const labelPick = request ? null : pickScannedLabels(found, 'qc', extractScannedItemSeq(rawCode));
+      const labelPick = request ? null : pickScannedLabels(found, 'qc', extractScannedItemSeq(rawCode), code);
       if (labelPick && 'error' in labelPick) {
         setPetition(found);
         setErrorMsg(`${found.petitionNo}: ${labelPick.error}`);
@@ -295,6 +295,9 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
   const receivedKeys = new Set(receivedList.filter((row) => row.complete).map((row) => row._id));
   const selectablePetitions = pendingPetitions?.filter((p) => !receivedKeys.has(p._id));
   const labelStatus = labelChoices ? labelReceiptStatus(labelChoices, labelKeys) : null;
+  const headline = petition
+    ? (labelChoices ? labelChoices.filter((label) => labelKeys.includes(label.key)).map((label) => label.label).join(', ') : sideLabelText(petition, 'qc'))
+    : '';
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
@@ -360,7 +363,7 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
               className="space-y-2"
             >
               {selectablePetitions && (
-                <PendingPetitionSelect petitions={selectablePetitions} onPick={(code) => { void fetchAndConfirm(code); }} />
+                <PendingPetitionSelect side="qc" petitions={selectablePetitions} onPick={(code) => { void fetchAndConfirm(code); }} />
               )}
               {!manualOnly && (
                 <div className="flex items-center gap-2 text-xs text-grey-400">
@@ -374,7 +377,7 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
                   type="text"
                   value={manualCode}
                   onChange={(e) => setManualCode(e.target.value)}
-                  placeholder="พิมพ์เลขที่คำร้อง เช่น P-2506-0001"
+                  placeholder="พิมพ์เลขนำส่ง เช่น P01/69 หรือเลขคำร้อง"
                   autoFocus={manualOnly}
                   className="flex-1 rounded-lg border border-grey-200 px-3 py-2 text-sm outline-none focus:border-primary-400"
                 />
@@ -388,7 +391,10 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
           {phase === 'confirming' && petition && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-lg font-bold">{petition.petitionNo}</span>
+                <div className="min-w-0">
+                  <span className="text-lg font-bold">{headline || petition.petitionNo}</span>
+                  {headline && <p className="text-xs text-grey-500">อ้างอิง {petition.petitionNo}</p>}
+                </div>
                 {labelStatus && !labelStatus.complete
                   ? <Badge variant="yellow-soft">{labelStatus.text}</Badge>
                   : <Badge variant={targetStatusCfg.variant}>→ {targetStatusCfg.label}</Badge>}

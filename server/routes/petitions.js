@@ -720,6 +720,30 @@ router.get('/scan/:code', async (req, res) => {
       return res.json({ ...doc, scannedAdditionalSampleId: String(round._id), scannedAdditionalSampleCode: round.qrCode });
     }
 
+    // เลขนำส่งตัวอย่าง เช่น P04/69, L3/69, P04 (ไม่ใส่ปี = ปี พ.ศ. ปัจจุบัน)
+    const label = code.match(/^([PL])\s*0*(\d{1,4})(?:\s*\/\s*(\d{2}))?$/i);
+    if (label) {
+      const side = label[1].toUpperCase() === 'P' ? 'qc' : 'lab';
+      const num = Number(label[2]);
+      const thisYear = new Date().getFullYear() + 543;
+      const year = label[3] ? Math.floor(thisYear / 100) * 100 + Number(label[3]) : thisYear;
+      const letter = label[1].toUpperCase();
+      const variants = [...new Set([letter + num, letter + String(num).padStart(2, '0'), letter + String(num).padStart(3, '0')])];
+      const found = await Petition.find({
+        'sampleLabelNumbers.year': year,
+        status: { $ne: 'deleted' },
+        $or: [
+          { ['sampleLabelNumbers.' + side]: { $in: variants } },
+          { ['sampleLabelNumbers.groups.' + side]: { $in: variants } },
+        ],
+      }).sort({ createdAt: -1 }).limit(5).lean();
+      for (const candidate of found) {
+        if (await hiddenFromViewer(req, candidate)) continue;
+        return res.json(await latestDeliverableRevision(candidate));
+      }
+      return res.status(404).json({ error: { message: 'ไม่พบคำร้องจากเลขนำส่ง ' + code } });
+    }
+
     const query = [
       { petitionNo: code },
       { 'items.sampleId': code },
