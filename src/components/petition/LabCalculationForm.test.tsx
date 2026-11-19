@@ -53,7 +53,7 @@ describe("LabCalculationForm", () => {
     ])} />);
     expect(field(container, "controlValue")).toBe("0.24949");
     expect(field(container, "controlRange")).toBe("0.24692 - 0.27363");
-    expect(field(container, "controlResult")).toBe("ผ่าน");
+    expect(field(container, "controlResult")).toBe("Pass");
   });
 
   it("leaves lines blank for handwriting when values were not entered", () => {
@@ -81,7 +81,7 @@ describe("LabCalculationForm", () => {
   it("calculates CCS % difference and Control result only from complete numbers", () => {
     expect(ccsDifference("0.5", "0.49")).toBe("-2.00");
     expect(ccsDifference("", "0.49")).toBe("");
-    expect(controlResult("0.3", "0.24692", "0.27363")).toBe("ไม่ผ่าน");
+    expect(controlResult("0.3", "0.24692", "0.27363")).toBe("No pass");
     expect(controlResult("0.25", "", "0.27")).toBe("");
   });
 
