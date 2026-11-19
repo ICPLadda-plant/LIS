@@ -1745,6 +1745,8 @@ export default function LabTestingDetailPage() {
                                 };
                                 return (
                                   <div className="grid grid-cols-1 gap-4 pl-2 sm:grid-cols-6">
+                                    {/* %AI ไว้บนสุดให้เห็นผลก่อน แล้วจึงตามด้วยตารางและช่องอื่น */}
+                                    {fields.filter((field) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai').map(renderField)}
                                     <PaclobutrazolGrid
                                       values={srcValues}
                                       onChange={onPbzChange}
@@ -1759,7 +1761,7 @@ export default function LabTestingDetailPage() {
                                         formula: /\d+(?:\.\d+)?\s*%\s*[A-Z]{2,3}\b/i.exec(String(item.sampleName ?? ''))?.[0],
                                       }}
                                     />
-                                    {fields.filter((field) => field.type === 'reference' || !isAiSetFieldLabel(field.label)).map(renderField)}
+                                    {fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label)) && !(field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai')).map(renderField)}
                                   </div>
                                 );
                               }
