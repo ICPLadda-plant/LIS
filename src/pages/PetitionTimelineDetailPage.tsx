@@ -38,6 +38,7 @@ import { normalizeRoles } from "@/lib/roles";
 import { hasLabTrack, petitionStatusBadge } from "@/lib/statusBadge";
 import { serviceLabRequestFor } from "@/lib/serviceLabRequest";
 import { cn } from "@/lib/utils";
+import { itemSubmissionNoText } from "@/lib/petitionSampler";
 
 function timelinePercent(value: string | null, startAt: string, endAt: string): number | null {
   if (!value) return null;
@@ -447,6 +448,10 @@ export default function PetitionTimelineDetailPage() {
     ...(petition.status === "approved" ? [{ key: "finalReport" as const, label: "Final Report", icon: FileCheck2, availableAt: petition.approvedAt, open: setFinalReportOpen }] : []),
     ...(canPrintChemAnalysisReport(petition) ? [{ key: "chemReport" as const, label: "ใบรายงานผลการวิเคราะห์", icon: FileCheck2, availableAt: petition.labApprovedAt || petition.approvedAt, open: setChemReportOpen }] : []),
   ]);
+  const itemTabLabel = (seq: number, fallback: string) => {
+    const raw = petition.items?.find((entry) => entry.seq === seq);
+    return (raw && itemSubmissionNoText(petition, raw)) || fallback;
+  };
   const activeItem = model.items.find((item) => item.seq === selectedItemSeq) ?? null;
   const responsibleName = petition.assignedTo?.name || "ยังไม่มอบหมาย";
   const timelineDays = model.timeline.days.length
@@ -560,7 +565,7 @@ export default function PetitionTimelineDetailPage() {
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
         {model.items.length > 1 && <div role="tablist" aria-label="ตัวอย่างในคำขอ" className="flex flex-wrap gap-2">
-          {model.items.map((item) => <button key={item.seq} type="button" role="tab" aria-selected={item.seq === selectedItemSeq} title={item.label} className={cn("max-w-[240px] truncate rounded-[8px] border px-3 py-1.5 text-xs font-medium transition-colors", item.seq === selectedItemSeq ? "border-primary-500 bg-primary-50 text-primary-600" : "border-black-50 bg-white text-grey-600 hover:bg-grey-50")} onClick={() => setActiveItemSeq(item.seq)}>{item.label}</button>)}
+          {model.items.map((item) => <button key={item.seq} type="button" role="tab" aria-selected={item.seq === selectedItemSeq} title={item.label} className={cn("max-w-[240px] truncate rounded-[8px] border px-3 py-1.5 text-xs font-medium transition-colors", item.seq === selectedItemSeq ? "border-primary-500 bg-primary-50 text-primary-600" : "border-black-50 bg-white text-grey-600 hover:bg-grey-50")} onClick={() => setActiveItemSeq(item.seq)}>{itemTabLabel(item.seq, item.label)}</button>)}
         </div>}
         <Card aria-label="petition timeline" className="border-black-50 shadow-none">
           <CardHeader className="pb-3">
