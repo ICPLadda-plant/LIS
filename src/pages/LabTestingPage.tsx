@@ -109,6 +109,16 @@ export default function LabTestingPage() {
     labPending: true,
     limit: 50,
   });
+  // คำร้องเฉพาะ Admin ถูกซ่อนจากรายการปกติ จึงดึงแยกมารวมให้ Admin กรอกผลได้
+  const isAdmin = normalizeRoles(user).includes('admin');
+  const { data: adminOnlyData, refresh: refreshAdminOnly } = usePetitionList({
+    status: 'sampleSent,pendingReview,inProgress,success',
+    search,
+    dept: dept || undefined,
+    labPending: true,
+    limit: 50,
+    adminOnly: true,
+  }, { enabled: isAdmin });
 
   // หัวหน้า assign แล้ว เจ้าหน้าที่ต้องกดรับงานก่อน จึงเริ่มนับเวลาวิเคราะห์
   const needsAccept = (p: Petition) =>
@@ -124,6 +134,7 @@ export default function LabTestingPage() {
       toast.success(`เริ่มงาน ${p.petitionNo} แล้ว`);
       setStartTarget(null);
       refresh();
+      if (isAdmin) refreshAdminOnly();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg || 'เริ่มงานไม่สำเร็จ กรุณาลองใหม่');
@@ -132,7 +143,7 @@ export default function LabTestingPage() {
     }
   }
 
-  const petitions: Petition[] = prioritizeUrgentPetitions((data?.items ?? [])
+  const petitions: Petition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
     .filter((p) => !p.labApprovedAt)
     // ตัวอย่างกลุ่มน้ำที่ QC ยังไม่ยืนยันค่า ถพ. ยังไม่ปล่อยมาให้ Lab
     .filter((p) => !isLabAwaitingSgConfirmation(p))
