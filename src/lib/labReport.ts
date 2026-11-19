@@ -182,7 +182,9 @@ export function buildLabReportPages(
         productionDate: buddhistDate(item.productionDate) || "",
         submissionNo: itemSubmissionNoText(petition, item, "lab") || lr?.labRequestNo || petition.petitionNo,
         manufacturer: item.labelManufacturer || item.labelSeller || "",
-        sampleNo: item.sampleId || lr?.labRequestNo || "",
+        sampleNo: /^\d+$/.test(item.sampleId || "")
+          ? `${item.sampleId}/${String((petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100).padStart(2, "0")}`
+          : item.sampleId || lr?.labRequestNo || "",
         receivedDate: buddhistDate(petition.labReceivedAt || petition.receivedAt || petition.sampleSentAt) || "",
         testedDate: buddhistDate(petition.firstResultAt || petition.labCompletedAt) || "",
         reportedDate: reportedDate || "",

@@ -1177,6 +1177,20 @@ router.post('/:id/lab-agreement-review', async (req, res) => {
   }
 });
 
+router.get('/lab-sample-number-options', async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!canClaimLabWork(user)) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์เลือกเลขตัวอย่าง Lab' } });
+    const rows = await Petition.find({ deletedAt: null, 'items.sampleId': { $regex: '^[0-9]+$' } }, { 'items.sampleId': 1 }).lean();
+    const used = new Set(rows.flatMap((row) => row.items || []).map((item) => Number(item.sampleId)).filter((value) => value >= LAB_SAMPLE_NUMBER_START));
+    const options = [];
+    for (let value = LAB_SAMPLE_NUMBER_START; options.length < 100; value += 1) if (!used.has(value)) options.push(String(value));
+    res.json(options);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+});
+
 // GET /api/petitions/:id
 router.get('/:id', async (req, res) => {
   try {
@@ -1468,6 +1482,43 @@ function labNotReceived(doc) {
   return !doc.labReceivedAt && (doc.qcReceivedAt || !doc.receivedAt);
 }
 
+const LAB_SAMPLE_NUMBER_START = 3450;
+
+function labItems(doc) {
+  return (doc.items || []).filter((item) => shouldSendItemToLab(item));
+}
+
+async function setLabSampleNumbers(doc, mappings) {
+  if (!doc.sampleSentAt) throw new Error('ต้องส่งตัวอย่างก่อนเลือกเลขตัวอย่างและ Assign งาน');
+  const bySeq = new Map((Array.isArray(mappings) ? mappings : []).map((row) => [Number(row.itemSeq), String(row.sampleId || '').trim()]));
+  const items = labItems(doc);
+  if (!items.length) throw new Error('คำร้องนี้ไม่มีตัวอย่าง Lab');
+  const picked = items.map((item) => ({ item, sampleId: bySeq.get(Number(item.seq)) || String(item.sampleId || '').trim() }));
+  if (picked.some(({ sampleId }) => !/^\d+$/.test(sampleId) || Number(sampleId) < LAB_SAMPLE_NUMBER_START)) {
+    throw new Error(`กรุณาเลือกเลขตัวอย่างตั้งแต่ ${LAB_SAMPLE_NUMBER_START} ให้ครบทุกตัวอย่าง`);
+  }
+  if (new Set(picked.map(({ sampleId }) => sampleId)).size !== picked.length) throw new Error('เลขตัวอย่างต้องไม่ซ้ำกัน');
+  const duplicate = await Petition.findOne({ _id: { $ne: doc._id }, deletedAt: null, 'items.sampleId': { $in: picked.map(({ sampleId }) => sampleId) } }).lean();
+  if (duplicate) throw new Error('เลขตัวอย่างถูกใช้แล้ว กรุณาเลือกเลขใหม่');
+  picked.forEach(({ item, sampleId }) => { item.sampleId = sampleId; });
+  doc.markModified('items');
+}
+
+router.patch('/:id/lab-sample-numbers', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!isLabAssignHead(user)) return res.status(403).json({ error: { message: 'เฉพาะหัวหน้า Lab ที่เลือกเลขตัวอย่างได้' } });
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    await setLabSampleNumbers(doc, req.body?.sampleNumbers);
+    await doc.save();
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 // ISO 17025 ข้อ 7.1: Lab ต้องทบทวนคำขอ (ใบ L) และสรุปว่า "พร้อมรับงาน" ก่อนรับตัวอย่าง
 // คำร้องที่ไม่มีใบ L (เช่น QC อย่างเดียว / ข้อมูลเก่า) ไม่ต้องทบทวน
 async function labAgreementReviewError(petition) {
@@ -1587,6 +1638,8 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
       }
     }
 
+    await setLabSampleNumbers(doc, req.body?.sampleNumbers);
+
     await applyLabAssignment(doc, { employeeId, name, department, position }, machines, {
       actor: user.name || user.email,
       note: `มอบหมายให้ ${String(name).trim()}`,
@@ -1692,6 +1745,8 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
     if (doc.assignedTo?.employeeId) {
       return res.status(409).json({ error: { message: `มีผู้รับงานนี้แล้ว (${doc.assignedTo.name})` } });
     }
+
+    await setLabSampleNumbers(doc, req.body?.sampleNumbers);
 
     const name = user.name || user.email;
     await applyLabAssignment(doc, {

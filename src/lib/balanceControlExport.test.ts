@@ -23,7 +23,7 @@ const record = {
   status100: "pass",
   status10: "pass",
   status: "pass",
-  recorder: "สมชาย",
+  recorder: "นายสมชาย ใจดี",
   date: "2026-09-04",
   checkedAt: "2026-09-04T01:00:00.000Z",
 } as DailyCheckRecord;

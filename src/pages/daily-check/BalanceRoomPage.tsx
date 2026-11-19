@@ -32,9 +32,9 @@ import BalanceControlReport, { BALANCE_CONTROL_REPORT_CSS } from "@/components/l
 import { api, type DailyCheckRecord } from "@/lib/api";
 import { getDailyCheckTrend, readBalanceDisplayValueFromImage, type DailyCheckTrend } from "@/lib/aiApi";
 import { useAuth } from "@/context/AuthContext";
-import { getCurrentDailyCheckPeriod, getDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
+import { getCurrentDailyCheckPeriod, getDailyCheckPeriodLabel } from "@/lib/dailyCheckPeriod";
 import { formatDate } from "@/lib/dateTime";
-import { fmtThaiDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
+import { firstNameOnly, fmtThaiDate, fmtTime, isSunday } from "@/lib/dailyCheckFormat";
 import { exportBalanceControlExcel } from "@/lib/balanceControlExport";
 import {
   BALANCE_SCALES,
@@ -244,14 +244,10 @@ const BalanceRoomPage = () => {
   const latestByScale = useMemo(() => {
     const map: Record<string, DailyCheckRecord> = {};
     for (const r of todayRecords) {
-      if (currentPeriod) {
-        const recordPeriod = r.period ?? getDailyCheckPeriod(r.checkedAt);
-        if (recordPeriod !== currentPeriod) continue;
-      }
       if (!map[r.scaleId]) map[r.scaleId] = r;
     }
     return map;
-  }, [todayRecords, currentPeriod]);
+  }, [todayRecords]);
 
   const config = getBalanceControlConfig(controlConfigs, scale.id, scale.controlWeight);
   const series = useMemo(() => buildMonthlySeries(monthRecords ?? [], month, scale.controlWeight), [monthRecords, month, scale.controlWeight]);
@@ -393,10 +389,6 @@ const BalanceRoomPage = () => {
       toast.error("ค่าน้ำหนักต้องเป็นตัวเลขที่มากกว่า 0");
       return;
     }
-    if (r.weights10.some((value) => isOutOfControl("10", value)) || r.weights100.some((value) => isOutOfControl("100", value))) {
-      toast.error("มีค่าเกินเส้น Control (±2SD/±3SD) กรุณาแก้ค่าก่อนบันทึก");
-      return;
-    }
     if (!user?.name) {
       toast.error("ไม่พบชื่อผู้ใช้งานปัจจุบัน");
       return;
@@ -405,6 +397,10 @@ const BalanceRoomPage = () => {
     const avg10 = calcAvg(r.weights10);
     if (avg100 === null || avg10 === null) {
       toast.error("ค่าน้ำหนักไม่ถูกต้อง");
+      return;
+    }
+    if (isOutOfControl("10", String(avg10)) || isOutOfControl("100", String(avg100))) {
+      toast.error("ค่าเฉลี่ยเกินเส้น Control (±2SD/±3SD) กรุณาแก้ค่าก่อนบันทึก");
       return;
     }
     const target = BALANCE_SCALES.find(s => s.id === id) ?? scale;
@@ -466,14 +462,14 @@ const BalanceRoomPage = () => {
     const weight = type === "10" ? 10 : scale.primaryCalibrationWeight;
     return chartPanels.find((panel) => panel.weight === weight)?.limits ?? null;
   };
-  // ค่าที่เกิน ±2SD/±3SD ห้ามบันทึก (ช่องจะขึ้นสีแดง)
+  // ค่ารายครั้งที่เกินเส้นขึ้นสีแดง แต่ใช้ค่าเฉลี่ยตัดสินว่าบันทึกได้หรือไม่
   const isOutOfControl = (type: "100" | "10", value: string) => {
     if (value === "" || !isPositiveWeight(value)) return false;
     const status = classifyPoint(Number(value), limitsForType(type));
     return status === "warning" || status === "out";
   };
-  const hasOutOfControl = draft.weights10.some((value) => isOutOfControl("10", value))
-    || draft.weights100.some((value) => isOutOfControl("100", value));
+  const hasMeanOutOfControl = isOutOfControl("10", String(calcAvg(draft.weights10) ?? ""))
+    || isOutOfControl("100", String(calcAvg(draft.weights100) ?? ""));
 
   // ค่าปัจจุบันของทั้ง 2 ตุ้ม (กำลังกรอก หรือผลที่บันทึกไว้ของวันนั้น) เทียบกับเส้น Control
   const comparePanels = (["10", "100"] as const).map((type) => {
@@ -531,7 +527,7 @@ const BalanceRoomPage = () => {
                   weights[i] !== "" && !isPositiveWeight(weights[i])
                     ? "ค่าน้ำหนักต้องมากกว่า 0"
                     : isOutOfControl(type, weights[i])
-                      ? "ค่าเกินเส้น Control (±2SD/±3SD) บันทึกไม่ได้"
+                      ? "ค่าเกินเส้น Control (±2SD/±3SD) ระบบจะใช้ค่าเฉลี่ยตัดสินการบันทึก"
                       : undefined
                 }
                 disabled={createMutation.isPending || showResult}
@@ -552,7 +548,7 @@ const BalanceRoomPage = () => {
           ))}
         </div>
         {draftWeights.some((value) => isOutOfControl(type, value)) && (
-          <p className="mt-1 text-xs text-destructive">ค่าที่ทำเครื่องหมายแดงเกินเส้น Control (±2SD/±3SD) — แก้ค่าก่อนจึงจะบันทึกได้</p>
+          <p className="mt-1 text-xs text-destructive">ค่าที่ทำเครื่องหมายแดงเกินเส้น Control (±2SD/±3SD) — ตรวจสอบความถูกต้องก่อนบันทึก ระบบจะตัดสินจากค่าเฉลี่ย</p>
         )}
         {showResult && savedAvg != null && (
           <p className={cn("mt-1 text-xs", savedStatus === "pass" ? "text-green-600" : "text-destructive")}>
@@ -672,7 +668,7 @@ const BalanceRoomPage = () => {
                   )}
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {rec ? `${fmtTime(rec.checkedAt)} · ${rec.recorder}` : "ยังไม่ได้บันทึกวันนี้"}
+                  {rec ? `${fmtTime(rec.checkedAt)} · ${firstNameOnly(rec.recorder)}` : "ยังไม่ได้บันทึกวันนี้"}
                 </span>
               </button>
             );
@@ -807,7 +803,7 @@ const BalanceRoomPage = () => {
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">ผู้บันทึก</label>
               <Input
-                value={showResult && todayRec ? todayRec.recorder : (user?.name ?? "")}
+                value={firstNameOnly(showResult && todayRec ? todayRec.recorder : (user?.name ?? ""))}
                 readOnly
                 disabled
                 className="h-9 bg-muted/40 text-sm"
@@ -819,7 +815,7 @@ const BalanceRoomPage = () => {
                 <RotateCcw className="h-4 w-4" /> บันทึกซ้ำ
               </Button>
             ) : (
-              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight || hasOutOfControl}>
+              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight || hasMeanOutOfControl}>
                 <CheckCircle2 className="h-4 w-4" />
                 {savingThisScale ? "กำลังบันทึก..." : "บันทึกผล Calibrate"}
               </Button>
@@ -827,7 +823,7 @@ const BalanceRoomPage = () => {
 
             {todayRec && (
               <p className="text-xs text-muted-foreground">
-                ตรวจล่าสุด: {fmtTime(todayRec.checkedAt)} โดย {todayRec.recorder}
+                ตรวจล่าสุด: {fmtTime(todayRec.checkedAt)} โดย {firstNameOnly(todayRec.recorder)}
               </p>
             )}
           </CardContent>
@@ -990,7 +986,7 @@ const BalanceRoomPage = () => {
                           {calibrateStatus === "pass" ? "ผ่าน" : "ไม่ผ่าน"}
                         </Badge>
                       </td>
-                      <td className="px-3 py-2">{point.record.recorder}</td>
+                      <td className="px-3 py-2">{firstNameOnly(point.record.recorder)}</td>
                       <td className="px-3 py-2 tabular-nums">{fmtTime(point.record.checkedAt)}</td>
                     </tr>
                   );

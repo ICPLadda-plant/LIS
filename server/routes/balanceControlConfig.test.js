@@ -50,7 +50,7 @@ describe('GET /balance-control-config', () => {
   });
 
   it('merges stored control values over the defaults', async () => {
-    mockFind.mockResolvedValue([{ scaleId: 'scale-2', brand: 'Mettler Toledo', model: 'MS204', nominal: 100, mean: 99.99972, sd: 0.0000476, mpe: 0.5, updatedDate: '2026-10-26' }]);
+    mockFind.mockResolvedValue([{ scaleId: 'scale-2', brand: 'Mettler Toledo', model: 'MS204', nominal: 100, mean: 99.99972, sd: 0.0000476, updatedDate: '2026-10-26' }]);
     mockCodeFind.mockResolvedValue([{ nominal: 100, weightCode: 'GL55-11006' }]);
     const res = mockResponse();
     await getHandler({}, res);
@@ -132,7 +132,7 @@ describe('PUT /balance-control-config/:scaleId', () => {
     const res = mockResponse();
     await putHandler({
       params: { scaleId: 'scale-2' },
-      body: { nominal: 100, baselineValues, mpe: 0.5, updatedDate: '2026-10-26' },
+      body: { nominal: 100, baselineValues, updatedDate: '2026-10-26' },
     }, res);
     expect(mockFindOneAndUpdate).toHaveBeenCalledWith(
       { scaleId: 'scale-2' },

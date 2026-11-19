@@ -30,7 +30,6 @@ import {
 interface FormState {
   baselineValues: string[];
   nominal: string;
-  mpe: string;
   updatedDate: string;
   brand: string;
   model: string;
@@ -44,7 +43,6 @@ const normalizedNumberText = (value: string, digits: number) => value.trim() !==
 const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
   baselineValues: Array.from({ length: 20 }, (_, index) => numText(config.baselineValues?.[index], digits)),
   nominal: numText(config.nominal, digits),
-  mpe: numText(config.mpe, digits),
   updatedDate: config.updatedDate,
   brand: config.brand,
   model: config.model,
@@ -101,7 +99,6 @@ export default function BalanceControlConfigDialog({
     sd: stats.sd ?? Number.NaN,
     baselineValues: baselineComplete ? baselineValues : [],
     nominal: parseOptional(form.nominal),
-    mpe: parseOptional(form.mpe),
     updatedDate: form.updatedDate,
     brand: form.brand.trim(),
     model: form.model.trim(),
@@ -121,7 +118,7 @@ export default function BalanceControlConfigDialog({
 
   const setField = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
-  const normalizeField = (field: "nominal" | "mpe") => () =>
+  const normalizeField = (field: "nominal") => () =>
     setForm((prev) => ({ ...prev, [field]: normalizedNumberText(prev[field], scale.decimals) }));
 
   const handleSave = () => {
@@ -194,10 +191,6 @@ export default function BalanceControlConfigDialog({
             <div className="space-y-1.5">
               <Label htmlFor="bcc-nominal">น้ำหนักตุ้ม Daily check (g)</Label>
               <Input id="bcc-nominal" inputMode="decimal" value={form.nominal} onChange={setField("nominal")} onBlur={normalizeField("nominal")} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="bcc-mpe">MPE (g)</Label>
-              <Input id="bcc-mpe" inputMode="decimal" value={form.mpe} onChange={setField("mpe")} onBlur={normalizeField("mpe")} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bcc-updated">วันที่ปรับปรุงค่า Control</Label>
