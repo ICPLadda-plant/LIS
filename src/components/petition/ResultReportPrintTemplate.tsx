@@ -232,6 +232,7 @@ th { width: 25%; background: #f3f3f3; text-align: left; }
 .rr-note { margin-top: 8mm; font-size: 9.5pt; }
 @media screen { .rr-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 .rr-root, .rr-root * { font-size: ${A4_PRINT_FONT_SIZE} !important; }
+.rr-root .rr-meta, .rr-root .rr-meta *, .rr-root .rr-note { font-size: 12pt !important; }
 .rr-root h1,
 .rr-root h2,
 .rr-root h3,
