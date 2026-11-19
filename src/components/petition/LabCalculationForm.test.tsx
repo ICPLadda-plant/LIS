@@ -84,4 +84,15 @@ describe("LabCalculationForm", () => {
     expect(controlResult("0.3", "0.24692", "0.27363")).toBe("ไม่ผ่าน");
     expect(controlResult("0.25", "", "0.27")).toBe("");
   });
+
+  it("reports %W/W and blanks Density for GR/WP/SP samples, %W/V with a density value otherwise", () => {
+    const base = page([]);
+    const liquid = render(<LabCalculationForm page={base} />);
+    expect(field(liquid.container, "density")).toBe("1.000");
+    expect(liquid.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/V");
+
+    const granule = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, name: "FIPRONIL 0.3% GR" } }} />);
+    expect(field(granule.container, "density")).toBe("-");
+    expect(granule.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/W");
+  });
 });
