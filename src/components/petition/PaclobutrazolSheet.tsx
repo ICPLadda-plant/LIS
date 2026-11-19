@@ -38,7 +38,6 @@ export function PaclobutrazolSheet({ values, density = null, header, analyst }: 
   );
   // Peak area / Internal std แสดงทศนิยม 2 ตำแหน่ง (คำนวณด้วยค่าเต็มเหมือน Excel); น้ำหนักแสดงตามที่กรอก
   const input = (row: Row, col: Col) => {
-    if (col === "wt/mg") return field(pbzKey(row, col));
     const raw = values[pbzKey(row, col)];
     const n = raw === "" || raw == null ? null : Number(raw);
     return (
@@ -61,7 +60,7 @@ export function PaclobutrazolSheet({ values, density = null, header, analyst }: 
         <td className={cn(td, inj === 0 && "font-medium")}>{inj === 0 ? row.replace(" ", "") : input(row, "wt/mg")}</td>
         <td className={td}>{kind === "std" ? input(row, area) : null}</td>
         <td className={td}>{kind === "sample" ? input(row, area) : null}</td>
-        <td className={td}>{inj === 0 ? out(data.conc, 3) : null}</td>
+        <td className={td}>{inj === 0 ? out(data.conc, 2) : null}</td>
         <td className={td}>{input(row, is)}</td>
         <td className={td}>{kind === "std" ? out(calc.std[index].inj[inj].fi, 4) : null}</td>
         <td className={td}>{kind === "std" && index === 0 && inj === 1 ? out(calc.meanFactor, 4) : null}</td>
