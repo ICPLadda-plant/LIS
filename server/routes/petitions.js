@@ -1136,6 +1136,20 @@ router.post('/:id/lab-agreement-review', async (req, res) => {
   }
 });
 
+router.get('/lab-sample-number-options', async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!canClaimLabWork(user)) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์เลือกเลขตัวอย่าง Lab' } });
+    const rows = await Petition.find({ deletedAt: null, 'items.sampleId': { $regex: '^[0-9]+$' } }, { 'items.sampleId': 1 }).lean();
+    const used = new Set(rows.flatMap((row) => row.items || []).map((item) => Number(item.sampleId)).filter((value) => value >= LAB_SAMPLE_NUMBER_START));
+    const options = [];
+    for (let value = LAB_SAMPLE_NUMBER_START; options.length < 100; value += 1) if (!used.has(value)) options.push(String(value));
+    res.json(options);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+});
+
 // GET /api/petitions/:id
 router.get('/:id', async (req, res) => {
   try {
@@ -1412,20 +1426,6 @@ async function setLabSampleNumbers(doc, mappings) {
   picked.forEach(({ item, sampleId }) => { item.sampleId = sampleId; });
   doc.markModified('items');
 }
-
-router.get('/lab-sample-number-options', async (req, res) => {
-  try {
-    const user = await currentUser(req);
-    if (!canClaimLabWork(user)) return res.status(403).json({ error: { message: 'ไม่มีสิทธิ์เลือกเลขตัวอย่าง Lab' } });
-    const rows = await Petition.find({ deletedAt: null, 'items.sampleId': { $regex: '^[0-9]+$' } }, { 'items.sampleId': 1 }).lean();
-    const used = new Set(rows.flatMap((row) => row.items || []).map((item) => Number(item.sampleId)).filter((value) => value >= LAB_SAMPLE_NUMBER_START));
-    const options = [];
-    for (let value = LAB_SAMPLE_NUMBER_START; options.length < 100; value += 1) if (!used.has(value)) options.push(String(value));
-    res.json(options);
-  } catch (err) {
-    res.status(400).json({ error: { message: err.message } });
-  }
-});
 
 router.patch('/:id/lab-sample-numbers', serializePetitionWrite(async (req, res) => {
   try {

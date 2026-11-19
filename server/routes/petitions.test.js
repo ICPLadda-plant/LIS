@@ -51,6 +51,11 @@ async function withLabUser(user, freeUntil, run) {
 const LAB_HEAD = { _id: 'u-head', email: 'head@lab.test', name: 'Lab Head', roles: ['lab-head'], status: 'active' };
 const ANALYST = { _id: 'u-a', email: 'a@lab.test', name: 'Analyst A', employeeId: 'E77', roles: ['lab-analyze'], status: 'active' };
 
+test('sample number options route is registered before the petition id route', () => {
+  const paths = router.stack.filter((entry) => entry.route).map((entry) => entry.route.path);
+  assert.ok(paths.indexOf('/lab-sample-number-options') < paths.indexOf('/:id'));
+});
+
 test('GET / filters assigned petitions by current assignee before pagination', async () => {
   const originals = {
     petitionFind: Petition.find,
