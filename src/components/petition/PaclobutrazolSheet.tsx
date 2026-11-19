@@ -36,7 +36,16 @@ export function PaclobutrazolSheet({ values, density = null, header, analyst }: 
   const field = (key: string) => (
     <span className="block rounded-md bg-muted px-2 py-1 text-center tabular-nums">{String(values[key] ?? "") || "\u00a0"}</span>
   );
-  const input = (row: Row, col: Col) => field(pbzKey(row, col));
+  // ค่าในตารางแสดงทศนิยม 2 ตำแหน่ง (คำนวณด้วยค่าเต็มเหมือน Excel)
+  const input = (row: Row, col: Col) => {
+    const raw = values[pbzKey(row, col)];
+    const n = raw === "" || raw == null ? null : Number(raw);
+    return (
+      <span className="block rounded-md bg-muted px-2 py-1 text-center tabular-nums">
+        {n != null && Number.isFinite(n) ? n.toFixed(2) : String(raw ?? "") || "\u00a0"}
+      </span>
+    );
+  };
   const out = (n: number | null | undefined, digits: number) => <span className="tabular-nums">{pbzFixed(n, digits)}</span>;
 
   const td = "border border-border px-1.5 py-1 text-center align-middle";
