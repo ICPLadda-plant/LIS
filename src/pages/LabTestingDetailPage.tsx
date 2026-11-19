@@ -117,12 +117,12 @@ const AI_FIELD_ORDER = [
 ] as const;
 
 const AI_FIELD_SECTIONS = [
-  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-sky-400 bg-sky-50 dark:bg-sky-950/40' },
-  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-amber-400 bg-amber-50 dark:bg-amber-950/40' },
-  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-violet-400 bg-violet-50 dark:bg-violet-950/40' },
-  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-950/40' },
-  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-rose-400 bg-rose-50 dark:bg-rose-950/40' },
-  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-teal-500 bg-teal-50 dark:bg-teal-950/40' },
+  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-sky-500 border-l-8 bg-sky-100 shadow-md dark:bg-sky-950/60' },
+  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-amber-500 border-l-8 bg-amber-100 shadow-md dark:bg-amber-950/60' },
+  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-violet-500 border-l-8 bg-violet-100 shadow-md dark:bg-violet-950/60' },
+  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-rose-500 border-l-8 bg-rose-100 shadow-md dark:bg-rose-950/60' },
+  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-emerald-500 border-l-8 bg-emerald-100 shadow-md dark:bg-emerald-950/60' },
+  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-teal-600 border-l-8 bg-teal-100 shadow-md dark:bg-teal-950/60' },
 ] as const;
 
 function aiFieldsForParameter(fields: ParameterValueField[]) {
