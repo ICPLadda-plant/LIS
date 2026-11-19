@@ -26,6 +26,14 @@ function shouldAlert(status, path) {
   return true;
 }
 
+// คำขอจากเครื่องนักพัฒนา (localhost) ไม่ต้องแจ้งเตือน admin
+// production อยู่หลัง Apache ที่เติม X-Forwarded-For และตั้ง trust proxy 'loopback' ไว้
+// req.ip จึงเป็น IP จริงของผู้ใช้ ไม่ใช่ loopback ของตัว proxy
+const LOOPBACK_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+function isLocalRequest(req) {
+  return LOOPBACK_IPS.has(String(req.ip || '').trim());
+}
+
 // Pure: path ที่มี id ต่างกันรวมเป็นแถวเดียว
 function normalizeApiPath(rawPath) {
   return String(rawPath || '')
@@ -58,6 +66,7 @@ function systemAlertMiddleware(req, res, next) {
     const status = res.statusCode;
     const path = normalizeApiPath(req.originalUrl || req.url);
     if (!path.startsWith('/api/') || !shouldAlert(status, path)) return;
+    if (isLocalRequest(req)) return;
     const user = String(req.get?.('X-LIS-User') || '').trim().toLowerCase();
     const { publishAppNotification } = require('./appNotifications');
     publishAppNotification(systemNotificationFor({ status, method: req.method, path, user }))
@@ -66,4 +75,4 @@ function systemAlertMiddleware(req, res, next) {
   next();
 }
 
-module.exports = { systemAlertMiddleware, systemNotificationFor, normalizeApiPath, isWatchedStatus, shouldAlert };
+module.exports = { systemAlertMiddleware, systemNotificationFor, normalizeApiPath, isWatchedStatus, shouldAlert, isLocalRequest };
