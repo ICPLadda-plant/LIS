@@ -3,6 +3,7 @@ import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import type { LabReportPage } from "@/lib/labReport";
 import { calculateCcs, ccsDifference, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
 import { isGrWpSpCommonName } from "@/lib/coaFormulation";
+import { PBZ_PRINT_CSS, PaclobutrazolPrintSheet, paclobutrazolValues } from "./PaclobutrazolPrintSheet";
 export { ccsDifference } from "@/lib/aiCalculation";
 
 export const LAB_CALCULATION_FORM_CODE = "FM-QP-07-08-002-R02 (02/11/69) P1/1";
@@ -35,7 +36,7 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-sign-name { grid-column: 2; grid-row: 2; text-align: center; margin-top: 1.5mm; }
 .brom-form-footer { margin-top: auto; padding-top: 6mm; font-size: 8pt; }
 @media screen { .brom-form-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
-`;
+${PBZ_PRINT_CSS}`;
 
 const BLANK = /^[-–—]?$/;
 
@@ -63,11 +64,11 @@ const SAMPLE_N = /^%\s*Sample\s*\d/i;
 
 /** หน้าไหนมีข้อมูลพอสำหรับใบคำนวณ (มีค่า Area Inj หรือ % Sample) */
 export function hasCalculationData(page: LabReportPage): boolean {
-  return values(page, AREA_INJ).length > 0 || values(page, SAMPLE_N).length > 0;
+  return values(page, AREA_INJ).length > 0 || values(page, SAMPLE_N).length > 0 || values(page, /^PBZ /).length > 0;
 }
 
 export function hasCalculationFields(page: LabReportPage): boolean {
-  return (page.rows ?? []).some((row) => AREA_INJ.test(row.testItem) || SAMPLE_N.test(row.testItem) || /^%\s*AI/i.test(row.testItem));
+  return (page.rows ?? []).some((row) => AREA_INJ.test(row.testItem) || SAMPLE_N.test(row.testItem) || /^%\s*AI/i.test(row.testItem) || /^PBZ /.test(row.testItem));
 }
 
 function triple(list: string[]): string[] {
@@ -120,6 +121,16 @@ function Check({ checked, label, field }: { checked: boolean; label: string; fie
 
 /** ใบคำนวณผลวิเคราะห์ FM-QP-07-08-002-R02 (A4 แนวนอน) */
 export default function LabCalculationForm({ page }: { page: LabReportPage }) {
+  // PACLOBUTRAZOL ใช้ใบคำนวณ Internal standard (FM-QP-07-08-002-R01) ตามแบบ Excel
+  const pbzValues = paclobutrazolValues(page);
+  if (pbzValues) {
+    return (
+      <div className="brom-form-root">
+        <style>{LAB_CALCULATION_CSS}</style>
+        <PaclobutrazolPrintSheet page={page} values={pbzValues} />
+      </div>
+    );
+  }
   const aiResult = firstValue(page, /^%\s*AI/i);
   const area = [
     ...triple(values(page, AREA_INJ)),
