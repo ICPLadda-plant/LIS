@@ -117,12 +117,12 @@ const AI_FIELD_ORDER = [
 ] as const;
 
 const AI_FIELD_SECTIONS = [
-  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-sky-500 border-l-8 bg-sky-100 shadow-md dark:bg-sky-950/60' },
-  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-amber-500 border-l-8 bg-amber-100 shadow-md dark:bg-amber-950/60' },
-  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-violet-500 border-l-8 bg-violet-100 shadow-md dark:bg-violet-950/60' },
-  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-rose-500 border-l-8 bg-rose-100 shadow-md dark:bg-rose-950/60' },
-  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-emerald-500 border-l-8 bg-emerald-100 shadow-md dark:bg-emerald-950/60' },
-  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-teal-600 border-l-8 bg-teal-100 shadow-md dark:bg-teal-950/60' },
+  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-sky-200 border-l-4 border-l-sky-400 bg-sky-50 shadow-sm dark:bg-sky-950/60' },
+  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-amber-200 border-l-4 border-l-amber-400 bg-amber-50 shadow-sm dark:bg-amber-950/60' },
+  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-violet-200 border-l-4 border-l-violet-400 bg-violet-50 shadow-sm dark:bg-violet-950/60' },
+  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-rose-200 border-l-4 border-l-rose-400 bg-rose-50 shadow-sm dark:bg-rose-950/60' },
+  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-emerald-200 border-l-4 border-l-emerald-400 bg-emerald-50 shadow-sm dark:bg-emerald-950/60' },
+  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 shadow-sm dark:bg-teal-950/60' },
 ] as const;
 
 function aiFieldsForParameter(fields: ParameterValueField[]) {
@@ -1495,7 +1495,7 @@ export default function LabTestingDetailPage() {
                               Lab
                             </Badge>
                             {param.hasPhases && (
-                              <Badge className="bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-100">
+                              <Badge className="bg-amber-50 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-50">
                                 Phase {effectivePhase}
                               </Badge>
                             )}
@@ -1935,7 +1935,7 @@ export default function LabTestingDetailPage() {
                               QC กรอกแล้ว
                             </Badge>
                             {param.hasPhases && (
-                              <Badge className="bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-100">
+                              <Badge className="bg-amber-50 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-50">
                                 Phase {effectivePhase}
                               </Badge>
                             )}
