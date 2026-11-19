@@ -71,7 +71,8 @@ export function calculatePaclobutrazol(values: Record<string, unknown>, density:
     const inj = pairs.map(([a, is]) => {
       const area = v(row, a);
       const isv = v(row, is);
-      const content = meanFactor != null && c && area != null && isv && pct != null ? (meanFactor * (area / isv) / c) * pct : null;
+      // ตามสูตร Excel คอลัมน์ M: =$L$6*(E/H)*($E$2/100)/G*100
+      const content = meanFactor != null && c && area != null && isv && pct != null ? ((meanFactor * (area / isv) * (pct / 100)) / c) * 100 : null;
       return { fi: null, content };
     });
     return { conc: c, inj, meanContent: mean(inj.map((i) => i.content)) };
