@@ -90,7 +90,7 @@ export default function PetitionAssignPage() {
   const userRoles = user?.roles?.length ? user.roles : user?.role ? [user.role] : [];
   const canManage = userRoles.some((role) => role === 'admin' || role === 'lab-head');
   const canClaimRole = canManage || userRoles.includes('lab-analyze');
-  const [pendingAssignment, setPendingAssignment] = useState<{ petition: Petition; employeeId: string; claim: boolean } | null>(null);
+  const [sampleNumberPetition, setSampleNumberPetition] = useState<Petition | null>(null);
   const [sampleNumberOptions, setSampleNumberOptions] = useState<string[]>([]);
   const [sampleNumbers, setSampleNumbers] = useState<Record<number, string>>({});
   const [now, setNow] = useState(() => new Date());
@@ -301,7 +301,7 @@ export default function PetitionAssignPage() {
   );
 
   // ต้องส่งตัวอย่างและจับคู่เลขตัวอย่างก่อนมอบหมาย — เครื่องมือให้ผู้รับงานเลือกตอนกด "เริ่มงาน"
-  async function assignPetition(petition: Petition, employeeId: string, claim = false, numbers: Record<number, string> = {}): Promise<boolean> {
+  async function assignPetition(petition: Petition, employeeId: string, claim = false): Promise<boolean> {
     if (!hasAssignableLabParameter(petition, labParameters, groupMembership)) {
       toast.error('คำร้องนี้ไม่มีพารามิเตอร์ Lab ที่ตรงกับตัวอย่าง');
       return false;
@@ -317,14 +317,13 @@ export default function PetitionAssignPage() {
     try {
       if (claim) {
         // server ใช้ตัวตนจาก session; employeeId ใช้เฉพาะ role จำลองตอน dev
-        await api.post<Petition>('/petitions/' + petition._id + '/claim', { employeeId: employee.employeeId, sampleNumbers: Object.entries(numbers).map(([itemSeq, sampleId]) => ({ itemSeq: Number(itemSeq), sampleId })) });
+        await api.post<Petition>('/petitions/' + petition._id + '/claim', { employeeId: employee.employeeId });
       } else {
         await api.patch<Petition>('/petitions/' + petition._id + '/assign', {
           employeeId: employee.employeeId,
           name: employee.name,
           department: employee.department,
           position: employee.position,
-          sampleNumbers: Object.entries(numbers).map(([itemSeq, sampleId]) => ({ itemSeq: Number(itemSeq), sampleId })),
         });
       }
       toast.success(claim
@@ -342,18 +341,35 @@ export default function PetitionAssignPage() {
     }
   }
 
-  async function openAssignment(petition: Petition, employeeId: string, claim = false) {
+  async function openSampleNumbers(petition: Petition) {
     if (!petition.sampleSentAt) {
       toast.error('ต้องส่งตัวอย่างก่อนเลือกเลขตัวอย่างและ Assign งาน');
       return;
     }
     const items = (petition.items ?? []).filter(shouldSendItemToLab);
     setSampleNumbers(Object.fromEntries(items.map((item) => [item.seq, item.sampleId ?? ''])));
-    setPendingAssignment({ petition, employeeId, claim });
+    setSampleNumberPetition(petition);
     try {
       setSampleNumberOptions((await api.get<string[]>('/petitions/lab-sample-number-options')).data.data);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'โหลดเลขตัวอย่างไม่สำเร็จ');
+    }
+  }
+
+  async function saveSampleNumbers() {
+    if (!sampleNumberPetition) return;
+    setSavingId(sampleNumberPetition._id);
+    try {
+      await api.patch(`/petitions/${sampleNumberPetition._id}/lab-sample-numbers`, {
+        sampleNumbers: Object.entries(sampleNumbers).map(([itemSeq, sampleId]) => ({ itemSeq: Number(itemSeq), sampleId })),
+      });
+      toast.success(`บันทึกเลขตัวอย่าง ${sampleNumberPetition.petitionNo} แล้ว`);
+      setSampleNumberPetition(null);
+      refreshPetitions();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'บันทึกเลขตัวอย่างไม่สำเร็จ');
+    } finally {
+      setSavingId(null);
     }
   }
 
@@ -378,13 +394,23 @@ export default function PetitionAssignPage() {
   function handleDropPetition(petitionId: string, employeeId: string) {
     if (savingId) return;
     const petition = allPetitions.find((p) => p._id === petitionId);
-    if (petition) void openAssignment(petition, employeeId);
+    if (!petition) return;
+    if ((petition.items ?? []).filter(shouldSendItemToLab).some((item) => !/^\d+$/.test(item.sampleId ?? '') || Number(item.sampleId) < 3450)) {
+      toast.error('กรุณาใส่เลขตัวอย่างก่อน Assign');
+      return;
+    }
+    void assignPetition(petition, employeeId);
   }
 
   function handleClaimPetition(petitionId: string) {
     if (savingId) return;
     const petition = allPetitions.find((p) => p._id === petitionId);
-    if (petition) void openAssignment(petition, selfEmployee?.employeeId ?? '', true);
+    if (!petition) return;
+    if ((petition.items ?? []).filter(shouldSendItemToLab).some((item) => !/^\d+$/.test(item.sampleId ?? '') || Number(item.sampleId) < 3450)) {
+      toast.error('กรุณาใส่เลขตัวอย่างก่อนรับงาน');
+      return;
+    }
+    void assignPetition(petition, selfEmployee?.employeeId ?? '', true);
   }
 
   async function unassignPetition(petitionId: string) {
@@ -408,18 +434,18 @@ export default function PetitionAssignPage() {
   }
 
   const boardLoading = loading || employeesLoading;
-  const sampleNumberYear = String(((pendingAssignment?.petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100)).padStart(2, '0');
+  const sampleNumberYear = String(((sampleNumberPetition?.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100)).padStart(2, '0');
 
   return (
     <AppLayout>
-        <Dialog open={Boolean(pendingAssignment)} onOpenChange={(open) => { if (!open) setPendingAssignment(null); }}>
+        <Dialog open={Boolean(sampleNumberPetition)} onOpenChange={(open) => { if (!open) setSampleNumberPetition(null); }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>เลือกเลขตัวอย่างก่อน Assign</DialogTitle>
+              <DialogTitle>ใส่เลขตัวอย่าง</DialogTitle>
               <DialogDescription>เลขตัวอย่างจะนำไปแสดงในรายงานรูปแบบ เลข/{sampleNumberYear}</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
-              {(pendingAssignment?.petition.items ?? []).filter(shouldSendItemToLab).map((item) => (
+              {(sampleNumberPetition?.items ?? []).filter(shouldSendItemToLab).map((item) => (
                 <label key={item.seq} className="grid gap-1.5 text-sm">
                   <span className="font-medium">{item.sampleName} · {item.batchNo || `รายการ ${item.seq}`}</span>
                   <NativeSelect value={sampleNumbers[item.seq] ?? ''} onChange={(event) => setSampleNumbers((current) => ({ ...current, [item.seq]: event.target.value }))}>
@@ -430,11 +456,8 @@ export default function PetitionAssignPage() {
               ))}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setPendingAssignment(null)}>ยกเลิก</Button>
-              <Button disabled={!pendingAssignment || (pendingAssignment.petition.items ?? []).filter(shouldSendItemToLab).some((item) => !sampleNumbers[item.seq]) || savingId === pendingAssignment?.petition._id} onClick={async () => {
-                if (!pendingAssignment) return;
-                if (await assignPetition(pendingAssignment.petition, pendingAssignment.employeeId, pendingAssignment.claim, sampleNumbers)) setPendingAssignment(null);
-              }}>ยืนยัน Assign</Button>
+              <Button variant="outline" onClick={() => setSampleNumberPetition(null)}>ยกเลิก</Button>
+              <Button disabled={!sampleNumberPetition || (sampleNumberPetition.items ?? []).filter(shouldSendItemToLab).some((item) => !sampleNumbers[item.seq]) || savingId === sampleNumberPetition?._id} onClick={saveSampleNumbers}>บันทึกเลขตัวอย่าง</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -451,7 +474,7 @@ export default function PetitionAssignPage() {
           <PageHeader
             title="Assign คำร้องให้เจ้าหน้าที่"
             description={canManage
-              ? 'ส่งตัวอย่างแล้วลากคำร้องไปวางบนการ์ดเจ้าหน้าที่ จากนั้นเลือกเลขตัวอย่างก่อน Assign'
+              ? 'ส่งตัวอย่างแล้วใส่เลขตัวอย่างบนการ์ด จากนั้นลากคำร้องไปวางบนเจ้าหน้าที่'
               : canClaim
                 ? 'ช่วงมอบหมายอิสระ: กด "รับงาน" ที่คำร้องเพื่อรับงานนั้นเป็นของคุณ แล้วเลือกเครื่องตอนกดเริ่มงาน'
                 : 'ดูการมอบหมายงาน Lab ได้อย่างเดียว หัวหน้า Lab เป็นผู้มอบหมายงาน'}
@@ -592,6 +615,7 @@ export default function PetitionAssignPage() {
                 onDropPetition={handleDropPetition}
                 onUnassignPetition={unassignPetition}
                 onClaimPetition={handleClaimPetition}
+                onEditSampleNumbers={openSampleNumbers}
                 onPetitionClick={(id) => navigate(`/petition/${id}`)}
                 emptyPoolText="ไม่มีคำร้องที่รอ assign"
               />
@@ -620,6 +644,7 @@ interface AssignBoardProps {
   onDropPetition: (petitionId: string, employeeId: string) => void;
   onUnassignPetition: (petitionId: string) => void;
   onClaimPetition: (petitionId: string) => void;
+  onEditSampleNumbers: (petition: Petition) => void;
   onPetitionClick: (id: string) => void;
   emptyPoolText: string;
 }
@@ -642,6 +667,7 @@ function AssignBoard({
   onDropPetition,
   onUnassignPetition,
   onClaimPetition,
+  onEditSampleNumbers,
   onPetitionClick,
   emptyPoolText,
 }: AssignBoardProps) {
@@ -661,6 +687,7 @@ function AssignBoard({
       methodByCode={methodByCode}
       dragging={draggingId === petition._id}
       canDragRole={canAssign}
+      onEditSampleNumbers={canAssign && petition.sampleSentAt ? () => onEditSampleNumbers(petition) : undefined}
       onClaim={canClaim ? () => onClaimPetition(petition._id) : undefined}
       onDragStart={() => setDraggingId(petition._id)}
       onDragEnd={() => setDraggingId(null)}
@@ -866,6 +893,7 @@ interface PetitionCardProps {
   canDragRole: boolean;
   /** มีค่าเมื่ออยู่ในช่วงมอบหมายอิสระ — แสดงปุ่ม "รับงาน" */
   onClaim?: () => void;
+  onEditSampleNumbers?: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onClick: () => void;
@@ -879,6 +907,7 @@ function PetitionCard({
   dragging,
   canDragRole,
   onClaim,
+  onEditSampleNumbers,
   onDragStart,
   onDragEnd,
   onClick,
@@ -988,6 +1017,21 @@ function PetitionCard({
           >
             <Hand className="h-3.5 w-3.5" />
             รับงาน
+          </Button>
+        )}
+        {onEditSampleNumbers && !assigned && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-2 text-xs"
+            draggable={false}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditSampleNumbers();
+            }}
+          >
+            {(petition.items ?? []).filter(shouldSendItemToLab).every((item) => item.sampleId) ? 'แก้ไขเลขตัวอย่าง' : 'ใส่เลขตัวอย่าง'}
           </Button>
         )}
       </div>

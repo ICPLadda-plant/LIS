@@ -1427,6 +1427,21 @@ router.get('/lab-sample-number-options', async (req, res) => {
   }
 });
 
+router.patch('/:id/lab-sample-numbers', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    if (!isLabAssignHead(user)) return res.status(403).json({ error: { message: 'เฉพาะหัวหน้า Lab ที่เลือกเลขตัวอย่างได้' } });
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    await setLabSampleNumbers(doc, req.body?.sampleNumbers);
+    await doc.save();
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 // ISO 17025 ข้อ 7.1: Lab ต้องทบทวนคำขอ (ใบ L) และสรุปว่า "พร้อมรับงาน" ก่อนรับตัวอย่าง
 // คำร้องที่ไม่มีใบ L (เช่น QC อย่างเดียว / ข้อมูลเก่า) ไม่ต้องทบทวน
 async function labAgreementReviewError(petition) {

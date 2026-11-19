@@ -129,7 +129,7 @@ test('GET / awaitingQcApproval returns petitions after QC confirms or Lab head i
   }
 });
 
-test('PATCH /:id/assign maps a sample number after the sample was sent', async () => {
+test('PATCH /:id/lab-sample-numbers saves a sample number after the sample was sent', async () => {
   const originalFindOne = Petition.findOne;
   const doc = {
     _id: 'doc-1',
@@ -137,32 +137,29 @@ test('PATCH /:id/assign maps a sample number after the sample was sent', async (
     sampleSentAt: new Date(),
     items: [{ seq: 1, sendToLab: true }],
     markModified() {},
-    async save() { throw new Error('stop-after-assign'); },
+    async save() { throw new Error('stop-after-sample-number'); },
   };
   try {
     Petition.findOne = (query) => query?.['items.sampleId'] ? { lean: async () => null } : doc;
-    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/assign', 'patch', {
+    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/lab-sample-numbers', 'patch', {
       params: { id: 'P-2609-0001' },
-      body: { employeeId: 'E1', name: 'Analyst', sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] },
+      body: { sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] },
       headers,
     }));
-    assert.match(res.body.error.message, /stop-after-assign/);
+    assert.match(res.body.error.message, /stop-after-sample-number/);
     assert.equal(doc.items[0].sampleId, '3450');
-    assert.equal(doc.assignedTo.employeeId, 'E1');
-    assert.equal(doc.assignedTo.acceptedAt, undefined);
-    assert.equal(doc.status, 'sampleSent');
   } finally {
     Petition.findOne = originalFindOne;
   }
 });
 
-test('PATCH /:id/assign rejects assignment before the sample was sent', async () => {
+test('PATCH /:id/lab-sample-numbers rejects selection before the sample was sent', async () => {
   const originalFindOne = Petition.findOne;
   try {
     Petition.findOne = async () => ({ _id: 'doc-1', items: [{ seq: 1, sendToLab: true }] });
-    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/assign', 'patch', {
+    const res = await withLabUser(LAB_HEAD, undefined, (headers) => invoke('/:id/lab-sample-numbers', 'patch', {
       params: { id: 'P-2609-0001' },
-      body: { employeeId: 'E1', name: 'Analyst', sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] },
+      body: { sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] },
       headers,
     }));
     assert.match(res.body.error.message, /ต้องส่งตัวอย่างก่อน/);
@@ -256,7 +253,7 @@ test('POST /:id/claim assigns the work to the logged-in analyst, ignoring body i
     status: 'pendingReview',
     sampleSentAt: new Date(),
     labReceivedAt: new Date(),
-    items: [{ seq: 1, sendToLab: true }],
+    items: [{ seq: 1, sendToLab: true, sampleId: '3450' }],
     markModified() {},
     async save() { throw new Error('stop-after-assign'); },
   };
@@ -264,7 +261,7 @@ test('POST /:id/claim assigns the work to the logged-in analyst, ignoring body i
     Petition.findOne = (query) => query?.['items.sampleId'] ? { lean: async () => null } : doc;
     const res = await withLabUser(ANALYST, new Date(Date.now() + 3600 * 1000), (headers) => invoke('/:id/claim', 'post', {
       params: { id: 'P-2609-0001' },
-      body: { employeeId: 'HACK', machines: [], sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] },
+      body: { employeeId: 'HACK', machines: [] },
       headers,
     }));
     assert.match(res.body.error.message, /stop-after-assign/);
