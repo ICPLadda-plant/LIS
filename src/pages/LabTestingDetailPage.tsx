@@ -1394,7 +1394,7 @@ export default function LabTestingDetailPage() {
                 variant={item.seq === (activeItemSeq ?? labItems[0].seq) ? 'default' : 'outline'}
                 onClick={() => setActiveItemSeq(item.seq)}
               >
-                {/^\d+$/.test(item.sampleId || '') ? ${item.sampleId}/ : item.sampleId || รายการที่ }
+                {/^\d+$/.test(item.sampleId || '') ? `${item.sampleId}/${String((petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100).padStart(2, '0')}` : item.sampleId || `รายการที่ ${item.seq}`}
               </Button>
             ))}
           </div>
