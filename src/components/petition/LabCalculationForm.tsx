@@ -199,7 +199,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>
-          <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className="brom-form-line" data-field="density">{densityValue}</span><span>g/cm3</span>
+          <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className="brom-form-line" data-field="density">{densityValue}</span><span>g/cm<sup style={{ fontSize: "6pt" }}>3</sup></span>
           <span>Report</span><span className={`brom-form-line${isWW ? " brom-form-line--na" : ""}`} data-field="report">{aiResult}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
         </div>
 
