@@ -14,7 +14,7 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-top { display: grid; grid-template-columns: 30mm 1fr 30mm; align-items: center; }
 .brom-form-logo { width: 26mm; height: auto; object-fit: contain; }
 .brom-form-title { text-align: center; font-size: 13pt; font-weight: 700; }
-.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 2mm; background: #f2f2f2; }
+.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 2mm; background: #e0e0e0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .brom-form-row { display: flex; align-items: flex-end; gap: 3mm; margin-top: 2mm; padding: 0 1mm; }
 .brom-form-label { white-space: nowrap; }
 .brom-form-line { display: block; min-height: 5.5mm; padding: 0 1mm 0.6mm; border-bottom: .6pt solid #000; text-align: center; overflow-wrap: anywhere; }
