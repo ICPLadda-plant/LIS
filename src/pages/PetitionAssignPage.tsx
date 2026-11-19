@@ -767,7 +767,7 @@ function AssignBoard({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)] items-start">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)] items-start">
       {/* Unassigned pool */}
       <div
         onDragOver={(e) => {
