@@ -36,8 +36,9 @@ export function PaclobutrazolSheet({ values, density = null, header, analyst }: 
   const field = (key: string) => (
     <span className="block rounded-md bg-muted px-2 py-1 text-center tabular-nums">{String(values[key] ?? "") || "\u00a0"}</span>
   );
-  // ค่าในตารางแสดงทศนิยม 2 ตำแหน่ง (คำนวณด้วยค่าเต็มเหมือน Excel)
+  // Peak area / Internal std แสดงทศนิยม 2 ตำแหน่ง (คำนวณด้วยค่าเต็มเหมือน Excel); น้ำหนักแสดงตามที่กรอก
   const input = (row: Row, col: Col) => {
+    if (col === "wt/mg") return field(pbzKey(row, col));
     const raw = values[pbzKey(row, col)];
     const n = raw === "" || raw == null ? null : Number(raw);
     return (
