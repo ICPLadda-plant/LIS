@@ -117,12 +117,12 @@ const AI_FIELD_ORDER = [
 ] as const;
 
 const AI_FIELD_SECTIONS = [
-  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL] },
-  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'] },
-  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'] },
-  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL] },
-  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL] },
-  { title: 'ผลวิเคราะห์', labels: ['%AI'] },
+  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-primary/30 bg-primary/5' },
+  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-border bg-muted/40' },
+  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-primary/30 bg-accent/50' },
+  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-border bg-secondary/40' },
+  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-border bg-muted/40' },
+  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-primary/20 bg-primary/5' },
 ] as const;
 
 function aiFieldsForParameter(fields: ParameterValueField[]) {
@@ -1745,14 +1745,14 @@ export default function LabTestingDetailPage() {
                                   const knownLabels = new Set<string>(AI_FIELD_SECTIONS.flatMap((section) => [...section.labels]));
                                   const sections = [
                                     ...AI_FIELD_SECTIONS.map((section) => ({ ...section, fields: fields.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
-                                    { title: 'ข้อมูลเพิ่มเติม', labels: [], fields: fields.filter((field) => !knownLabels.has(field.label)) },
+                                    { title: 'ข้อมูลเพิ่มเติม', labels: [], className: 'border-border bg-card', fields: fields.filter((field) => !knownLabels.has(field.label)) },
                                   ].filter((section) => section.fields.length > 0);
                                   return (
                                     <div className="space-y-4 pl-2">
                                       <p className="text-xs text-muted-foreground">ข้อมูล Standard, Area Injection, CCS และ Control Sample จะเติมให้อัตโนมัติในตัวอย่างชื่อยาเดียวกัน โดยยังแก้ไขแต่ละตัวอย่างได้</p>
                                       {sections.map((section) => (
-                                        <section key={section.title} className="space-y-3 rounded-lg border bg-card p-3">
-                                          <h4 className="text-sm font-semibold text-foreground">{section.title}</h4>
+                                        <section key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
+                                          <h4 className="text-base font-semibold text-foreground">{section.title}</h4>
                                           <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
                                             {section.fields.map(renderField)}
                                           </div>

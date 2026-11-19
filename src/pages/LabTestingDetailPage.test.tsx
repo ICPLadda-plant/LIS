@@ -339,6 +339,10 @@ describe("LabTestingDetailPage", () => {
     expect(screen.getByText("CCS Conc. (mg/mL)")).toBeInTheDocument();
     expect(screen.getByText("% Difference")).toBeInTheDocument();
     expect(screen.getByText("CCS Result")).toBeInTheDocument();
+    expect(
+      screen.getByText("การตรวจสอบ CCS").compareDocumentPosition(screen.getByText("ผลตัวอย่าง"))
+      & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 
   it("updates shared Standard input on every keystroke for the same drug", async () => {
