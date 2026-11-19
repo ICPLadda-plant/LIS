@@ -384,6 +384,10 @@ export default function QCTestingDetailPage() {
     status: 'pendingReview,inProgress',
     limit: 20,
   });
+  // แถบ "สลับไป" แสดงเฉพาะคำร้องที่ยังรอทำ (เหมือนแท็บ "รอทำ" ใน /qc-testing)
+  const qcSwitchPetitions = (worklistData?.items ?? []).filter(
+    (p) => isVisibleInQcTestingQueue(p) && (!p.qcCompletedAt || p._id === id),
+  );
   const [allParameters, setAllParameters] = useState<ParameterItem[]>([]);
   const parameters = useMemo(() => allParameters.filter((parameter) => (parameter.scope ?? 'qc') === 'qc'), [allParameters]);
   const groupMembership = useItemGroupMembership();
@@ -1204,10 +1208,10 @@ export default function QCTestingDetailPage() {
       )}
 
       {/* Active worklist tab strip — switch between petitions currently in QC */}
-      {worklistData && worklistData.items.filter(isVisibleInQcTestingQueue).length > 1 && (
+      {qcSwitchPetitions.length > 1 && (
         <div className="flex items-center gap-2 overflow-x-auto pb-1 -mt-2">
           <span className="text-xs text-grey-500 shrink-0 mr-1">สลับไป:</span>
-          {worklistData.items.filter(isVisibleInQcTestingQueue).map((p) => {
+          {qcSwitchPetitions.map((p) => {
             const isActive = p._id === petition._id;
             return (
               <button
