@@ -1552,7 +1552,7 @@ export default function LabTestingDetailPage() {
                               const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
                               const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries, hasSgParam), aiSubstanceFromKey(unit.key)) : null;
                               const ccsFieldKind = isAiParameter ? calculatedCcsFieldKind(unit.field.label) : null;
-                              const calculatedCcs = ccsFieldKind ? calculateCcsFromValues(srcValues) : null;
+                              const calculatedCcs = ccsFieldKind ? calculateCcsFromValues(srcValues, aiSubstanceFromKey(unit.key)) : null;
 
                               // Field-level `multiple` — repeatable list of bare value rows.
                               // Each row shares the field's standard/abnormal rule; per-row
@@ -1679,10 +1679,11 @@ export default function LabTestingDetailPage() {
                                     onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries, hasSgParam), substance)[kind]));
                                   });
                                         });
-                                        if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(unit.key)) {
-                                          const nextCcs = calculateCcsFromValues(nextValues);
-                                          onUnitChange(CCS_DIFFERENCE_LABEL, nextCcs.difference == null ? '' : nextCcs.difference.toFixed(2));
-                                          onUnitChange(CCS_RESULT_LABEL, nextCcs.result);
+                                        if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(unit.key.split('::')[0])) {
+                                          const sfx = unit.key.includes('::') ? '::' + unit.key.split('::')[1] : '';
+                                          const nextCcs = calculateCcsFromValues(nextValues, aiSubstanceFromKey(unit.key));
+                                          onUnitChange(CCS_DIFFERENCE_LABEL + sfx, nextCcs.difference == null ? '' : nextCcs.difference.toFixed(2));
+                                          onUnitChange(CCS_RESULT_LABEL + sfx, nextCcs.result);
                                         }
                                       }
                                       // Manual edit after a pull → mark provenance as edited (once).
@@ -1802,19 +1803,25 @@ export default function LabTestingDetailPage() {
                                       <h4 className="text-sm font-semibold text-foreground">
                                         สารที่ {si + 1}: {substance.name}
                                       </h4>
-                                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-                                        {unitsByField.filter(isSubstanceSetField).flatMap(({ units }) => units
+                                      {(() => {
+                                        const subUnits = unitsByField.filter(isSubstanceSetField).flatMap(({ units }) => units
                                           .filter((unit) => matchSubstanceKey(unit.substanceName ?? '') === substance.key)
-                                          .map((unit) => renderEditUnit(
-                                            calculatedAiFieldKind(unit.field.label) === 'ai'
-                                              ? unit
-                                              : { ...unit, field: { ...unit.field, label: stripAiSubstanceSuffix(unit.field.label) } },
-                                            srcValues,
-                                            onUnitChange,
-                                            saveInfoSrc,
-                                            scalarExtras,
-                                          )))}
-                                      </div>
+                                          .map((unit) => (calculatedAiFieldKind(unit.field.label) === 'ai'
+                                            ? unit
+                                            : { ...unit, field: { ...unit.field, label: stripAiSubstanceSuffix(unit.field.label) } })));
+                                        return AI_FIELD_SECTIONS.map((section) => {
+                                          const inSection = subUnits.filter((unit) => (section.labels as readonly string[]).includes(unit.field.label) || (section.title === 'ผลวิเคราะห์' && calculatedAiFieldKind(unit.field.label) === 'ai'));
+                                          if (inSection.length === 0) return null;
+                                          return (
+                                            <div key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
+                                              <h5 className="text-sm font-semibold text-foreground">{section.title}</h5>
+                                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                                                {inSection.map((unit) => renderEditUnit(unit, srcValues, onUnitChange, saveInfoSrc, scalarExtras))}
+                                              </div>
+                                            </div>
+                                          );
+                                        });
+                                      })()}
                                     </section>
                                   ))}
                                   {sharedFields.length > 0 && (
