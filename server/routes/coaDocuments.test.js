@@ -540,6 +540,16 @@ test('externalCoaRowsToDocuments applies the confirmed label production date', (
   assert.equal(doc.sampleSnapshots[0].productionDate, '2026-11-16');
 });
 
+test('externalCoaRowsToDocuments applies the confirmed Lot Description Batch and production date', () => {
+  const [doc] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26110144', Line: 10000, ItemNo: 'FC-NATOK-100X10X12',
+    ProductionDate: '2026-11-17', remark: 'COA',
+  }]);
+
+  assert.equal(doc.sampleSnapshots[0].batchNo, '2026082601');
+  assert.equal(doc.sampleSnapshots[0].productionDate, '2026-11-20');
+});
+
 test('externalCoaRowsToDocuments keeps separate requests when the outstanding quantity changes', () => {
   const base = { SaleOrderNo: 'SO-LATEST', Line: 10000, ItemNo: 'F-1' };
   const removed = router.externalCoaRowsToDocuments([

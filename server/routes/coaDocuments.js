@@ -62,6 +62,10 @@ let externalCoaDocumentsCache = null;
 // ponytail: ERP COA webhook has no label production date; remove this correction when ERP exposes that field.
 const EXTERNAL_LABEL_PRODUCTION_DATES = new Map([
   ['SO26110076:10000', '2026-11-16'],
+  ['SO26110144:10000', '2026-11-20'],
+]);
+const EXTERNAL_LABEL_BATCHES = new Map([
+  ['SO26110144:10000', '2026082601'],
 ]);
 
 function objectId(id) {
@@ -460,10 +464,12 @@ function externalCoaRowToDocument(row) {
   const itemNo = firstExternalValue(row, ['ItemNo']);
   const tradeName = firstExternalValue(row, ['TradeName']);
   const commonName = firstExternalValue(row, ['CommonName']);
-  const batchNo = firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
+  const externalLabelKey = `${saleOrderNo}:${itemSeq}`;
+  const batchNo = EXTERNAL_LABEL_BATCHES.get(externalLabelKey)
+    || firstExternalValue(row, ['BatchNo', 'Batch No.', 'Batch No', 'batch_no', 'Batch']);
   const lotDescription = externalCoaLotDescription(row);
   const lotNo = firstExternalValue(row, ['LotNo', 'Lot No.', 'lot_no', 'Lot']) || lotDescription;
-  const productionDate = EXTERNAL_LABEL_PRODUCTION_DATES.get(`${saleOrderNo}:${itemSeq}`)
+  const productionDate = EXTERNAL_LABEL_PRODUCTION_DATES.get(externalLabelKey)
     || externalCoaProductionDate(row)
     || lotSnapshot(lotNo).productionDate
     || lotSnapshot(lotDescription).productionDate
