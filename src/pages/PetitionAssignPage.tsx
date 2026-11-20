@@ -957,10 +957,10 @@ function PetitionCard({
   const canDrag = canDragRole;
 
   return (
-    // admin กดตัวการ์ดเพื่อเปิดคำร้องได้ (การลากไม่ยิง click) ส่วน role อื่นเปิดจากปุ่มเลขคำร้อง
+    // admin คลิกขวาที่ตัวการ์ดเพื่อเปิดคำร้อง ส่วนคลิกซ้ายใช้ลาก; role อื่นเปิดจากปุ่มเลขคำร้อง
     <Card
       draggable={canDrag}
-      onClick={openOnCardClick ? onClick : undefined}
+      onContextMenu={openOnCardClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
       onDragStart={(e) => {
         if (!canDrag) { e.preventDefault(); return; }
         e.dataTransfer.effectAllowed = 'move';
@@ -970,7 +970,7 @@ function PetitionCard({
       onDragEnd={onDragEnd}
       className={cn(
         'group rounded-lg border-border bg-card p-2.5 text-card-foreground shadow-sm transition hover:border-primary/40 hover:bg-accent/40 hover:shadow',
-        openOnCardClick ? 'cursor-pointer active:cursor-grabbing' : canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
+        canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
         dragging && 'opacity-40',
       )}
     >
