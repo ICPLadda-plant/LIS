@@ -1,3 +1,4 @@
+import { itemSubmissionNoText } from '@/lib/petitionSampler';
 import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -29,7 +30,7 @@ import { labReceivedAt, labReceivedBy, labWorkReceived } from '@/lib/receiveStat
 import { isItemLabelPending } from '@/lib/labelReceipt';
 import { useConfirm } from '@/context/ConfirmDialog';
 import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, resolveLabLabelTolerance, isLabLabelToleranceAbnormal } from '@/lib/parameterValidation';
-import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
+import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue, findSgParameter, resolveSpecificGravity } from '@/lib/formSpecificGravity';
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { cn } from '@/lib/utils';
@@ -931,6 +932,7 @@ export default function LabTestingDetailPage() {
     petition,
     buildLabReportPages(petition, [], calculationGroups),
     calculationGroups,
+    (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(results, seq, findSgParameter(allParameters)),
   ).filter(hasCalculationFields);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
@@ -1775,7 +1777,7 @@ export default function LabTestingDetailPage() {
                                       density={aiDensity(srcValues, condCtx, 'paclobutrazol', densityEntries, hasSgParam)}
                                       analyst={user?.name}
                                       header={{
-                                        sampleNo: item.submissionNo || petition.petitionNo,
+                                        sampleNo: itemSubmissionNoText(petition, item, 'lab') || petition.petitionNo,
                                         tradeName: item.sampleName,
                                         commonName: item.commonName,
                                         formula: /\d+(?:\.\d+)?\s*%\s*[A-Z]{2,3}\b/i.exec(String(item.sampleName ?? ''))?.[0],

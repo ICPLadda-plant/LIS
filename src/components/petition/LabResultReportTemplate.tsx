@@ -22,7 +22,9 @@ export const LAB_REPORT_CSS = `
 .lr-title { text-align: center; font-weight: 700; font-size: 14pt; }
 .lr-results th { text-align: center; background: #f3f3f3; }
 .lr-muted { color: #555; }
-.lr-remark { margin-top: 5mm; font-size: 11pt; }
+.lr-remark { margin-top: 5mm; font-size: 11pt; display: flex; gap: 1mm; }
+  .lr-remark-fill { flex: 1; border-bottom: 1px dotted #000; min-height: 1em; }
+  .lr-res { white-space: pre-line; }
 .lr-sign { margin-top: 10mm; text-align: center; font-size: 11pt; }
 .lr-sigline { display: inline-block; border-bottom: 0.8pt dotted #000; min-width: 62mm; margin: 0 2mm; }
 .lr-sign-name { margin-top: 1mm; }
@@ -31,8 +33,10 @@ export const LAB_REPORT_CSS = `
 .lr-note-ind { margin-left: 12mm; }
 .lr-foot { display: flex; justify-content: space-between; margin-top: 6mm; font-size: 9.5pt; color: #444; }
 @media screen { .lr-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
-.lr-root, .lr-root * { font-size: ${A4_PRINT_FONT_SIZE} !important; }
+.lr-root, .lr-root * { font-size: 12pt !important; }
 .lr-root .lr-small, .lr-root .lr-small *, .lr-root .lr-note, .lr-root .lr-note * { font-size: 10pt !important; }
+.lr-root .lr-header, .lr-root .lr-header * { font-size: 9pt !important; }
+.lr-root .lr-header td.lr-hd-mid { font-size: 10.5pt !important; }
 .lr-root h1,
 .lr-root h2,
 .lr-root h3,
@@ -56,7 +60,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
         <section className="lr-page" key={i}>
           {/* Header */}
           <table className="lr-tbl">
-            <tbody>
+            <tbody className="lr-header">
               <tr>
                 <td style={{ width: "34%" }}>
                   <img className="lr-logo" src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" />
@@ -136,7 +140,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
                 page.rows.map((r, ri) => (
                   <tr key={ri}>
                     <td className="lr-center">{r.testItem}</td>
-                    <td className="lr-center"><PrintMediaValue value={r.result} /></td>
+                    <td className="lr-center lr-res"><PrintMediaValue value={r.result} /></td>
                     <td className="lr-center">{r.criteria}</td>
                     <td className="lr-center lr-method">{r.method}</td>
                   </tr>
@@ -149,7 +153,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
             </tbody>
           </table>
 
-          <div className="lr-remark">หมายเหตุ : {page.remark || "................"}</div>
+          <div className="lr-remark"><span>หมายเหตุ :</span><span className="lr-remark-fill">{page.remark}</span></div>
 
           {/* Signatures */}
           <div className="lr-sign">
@@ -174,3 +178,4 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
     </div>
   );
 }
+

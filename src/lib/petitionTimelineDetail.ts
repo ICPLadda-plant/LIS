@@ -78,6 +78,8 @@ export type TimelineDetailInput = {
   auditLogs: PetitionAuditLogEntry[];
   itemGroupIds?: Map<string, string[]>;
   itemSeq?: number | null;
+  /** แสดงงานของหลายรายการพร้อมกัน (เช่นรายการ batch เดียวกัน) ใช้แทน itemSeq ถ้ามี */
+  itemSeqs?: number[] | null;
 };
 
 const FINISHED_STATUSES = new Set<PetitionStatus>(["success", "approved", "rejected"]);
@@ -550,7 +552,8 @@ export function buildTimelineDetailModel(input: TimelineDetailInput, now = new D
   const timelineEndAt = header.endKind === "actual"
     ? header.endAt
     : latestValidDate(actualEndAt, now.toISOString())!;
-  const tasks = input.itemSeq == null ? allTasks : allTasks.filter((task) => task.itemSeq === input.itemSeq);
+  const seqFilter = input.itemSeqs?.length ? new Set(input.itemSeqs) : input.itemSeq == null ? null : new Set([input.itemSeq]);
+  const tasks = seqFilter ? allTasks.filter((task) => seqFilter.has(task.itemSeq)) : allTasks;
   const allFields = taskFieldTotals(allTasks);
   const finalResultDone = input.petition.status === "approved";
   const preResultDone = allFields.total > 0

@@ -29,6 +29,7 @@ import { api } from '@/lib/api';
 import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
 import { shouldSendItemToLab } from '@/lib/petitionRouting';
+import { itemSubmissionNoText } from '@/lib/petitionSampler';
 import { isLabRecheckPending, isLabWorkAccepted, labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
 
 const createdTime = (p: Petition) => Date.parse(p.createdAt) || 0;
@@ -468,7 +469,7 @@ export default function PetitionAssignPage() {
                     onChange={(event) => setSampleNumbers((current) => ({ ...current, [item.seq]: event.target.value }))}
                   />
                   <datalist id={`sample-number-options-${item.seq}`}>
-                    {[item.sampleId, ...sampleNumberOptions].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index).map((value) => <option key={value} value={value} />)}
+                    {[item.sampleId, ...sampleNumberOptions].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index && !Object.entries(sampleNumbers).some(([seq, picked]) => Number(seq) !== item.seq && picked === value)).map((value) => <option key={value} value={value} />)}
                   </datalist>
                 </label>
               ))}
@@ -643,6 +644,7 @@ export default function PetitionAssignPage() {
                 onClaimPetition={handleClaimPetition}
                 onEditSampleNumbers={openSampleNumbers}
                 onPetitionClick={(id) => navigate(`/petition/${id}`)}
+                openCardOnClick={isAdmin}
                 emptyPoolText="ไม่มีคำร้องที่รอ assign"
               />
             </div>
@@ -672,6 +674,8 @@ interface AssignBoardProps {
   onClaimPetition: (petitionId: string) => void;
   onEditSampleNumbers: (petition: Petition) => void;
   onPetitionClick: (id: string) => void;
+  /** admin กดที่ตัวการ์ดเพื่อเปิดคำร้องได้ */
+  openCardOnClick?: boolean;
   emptyPoolText: string;
 }
 
@@ -695,6 +699,7 @@ function AssignBoard({
   onClaimPetition,
   onEditSampleNumbers,
   onPetitionClick,
+  openCardOnClick = false,
   emptyPoolText,
 }: AssignBoardProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -718,6 +723,7 @@ function AssignBoard({
       onDragStart={() => setDraggingId(petition._id)}
       onDragEnd={() => setDraggingId(null)}
       onClick={() => onPetitionClick(petition._id)}
+      openOnCardClick={openCardOnClick}
     />
   );
 
@@ -896,6 +902,7 @@ function AssignBoard({
                         onDragStart={() => setDraggingId(petition._id)}
                         onDragEnd={() => setDraggingId(null)}
                         onClick={() => onPetitionClick(petition._id)}
+                        openOnCardClick={openCardOnClick}
                         assigned
                       />
                     ))
@@ -923,6 +930,7 @@ interface PetitionCardProps {
   onDragStart: () => void;
   onDragEnd: () => void;
   onClick: () => void;
+  openOnCardClick?: boolean;
   assigned?: boolean;
 }
 
@@ -937,10 +945,16 @@ function PetitionCard({
   onDragStart,
   onDragEnd,
   onClick,
+  openOnCardClick = false,
   assigned,
 }: PetitionCardProps) {
   const statusCfg = labAssignBoardStatusBadge(petition, assigned);
   const showStatusBadge = hasLabTrack(petition);
+  // เลขใบนำส่งเป็นเลขหลักบนการ์ด (ยังไม่มีให้ใช้เลขคำร้องแทน)
+  const submissionNos = [...new Set((petition.items ?? [])
+    .filter(shouldSendItemToLab)
+    .flatMap((item) => itemSubmissionNoText(petition, item, 'lab').split(',').map((s) => s.trim()))
+    .filter((no) => no && no !== petition.petitionNo))];
   const machineCodes = (petition.assignedMachines ?? [])
     .map((m) => m.code)
     .filter(Boolean) as string[];
@@ -949,9 +963,10 @@ function PetitionCard({
   const canDrag = canDragRole;
 
   return (
-    // กดตัวการ์ดไม่เปิดหน้าคำร้อง (กันหลุดมือตอนลาก) — เปิดได้จากปุ่มเลขคำร้องเท่านั้น
+    // admin คลิกขวาที่ตัวการ์ดเพื่อเปิดคำร้อง ส่วนคลิกซ้ายใช้ลาก; role อื่นเปิดจากปุ่มเลขคำร้อง
     <Card
       draggable={canDrag}
+      onContextMenu={openOnCardClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
       onDragStart={(e) => {
         if (!canDrag) { e.preventDefault(); return; }
         e.dataTransfer.effectAllowed = 'move';
@@ -974,11 +989,11 @@ function PetitionCard({
             <button
               type="button"
               className="truncate font-semibold text-primary-500 hover:underline"
-              onClick={onClick}
+              onClick={(e) => { e.stopPropagation(); onClick(); }}
               draggable={false}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              {petition.petitionNo}
+              {submissionNos.length > 0 ? submissionNos.join(', ') : petition.petitionNo}
             </button>
             <UrgentBadge petition={petition} />
             {showStatusBadge && (
@@ -988,8 +1003,17 @@ function PetitionCard({
             )}
           </div>
           <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {submissionNos.length > 0 && <>{petition.petitionNo} · </>}
             {petition.submittedBy?.name ?? '-'} · {petitionDepartmentLabel(petition)}
           </div>
+          {(() => {
+            const batches = [...new Set((petition.items ?? []).filter(shouldSendItemToLab).map((item) => item.batchNo?.trim()).filter(Boolean))];
+            return batches.length > 0 ? (
+              <div className="mt-0.5 truncate text-[11px] text-foreground" title={batches.join(', ')}>
+                <span className="text-muted-foreground">Batch:</span> {batches.join(', ')}
+              </div>
+            ) : null;
+          })()}
         </div>
       </div>
 

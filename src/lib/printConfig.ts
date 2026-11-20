@@ -5,7 +5,7 @@ export type PrintOutputMode = "server" | "local";
 
 export const PAPER_SIZES: PaperSize[] = ["A4", "label-100x50", "label-65x25"];
 
-export const A4_PRINT_FONT_FAMILY = "'Angsana New', 'Cordia New', 'Sarabun', 'TH SarabunPSK', serif";
+export const A4_PRINT_FONT_FAMILY = "'Sarabun', 'TH SarabunPSK', 'TH Sarabun New', 'Angsana New', 'Cordia New', Tahoma, sans-serif";
 export const A4_PRINT_FONT_SIZE = "16pt";
 export const A4_PRINT_HEADING_FONT_WEIGHT = "700";
 
