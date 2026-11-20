@@ -282,8 +282,8 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
     // % Std = purity ของขวด Std PACLOBUTRAZOL ที่เบิกใช้อยู่
     const purity = String(lastWithdraw?.purity ?? "").replace(/%/g, "").trim();
     const doc = await QCTestResult.findOne(filter).sort({ updatedAt: -1, enteredAt: -1 }).lean();
-    // Internal std ของ Std 1/2: ใช้ค่าที่กรอกไว้แล้วในวันเดียวกัน (เวลาไทย) — ครั้งแรกของวันต้องกรอกเอง
-    const IS_KEYS = ["PBZ Std 1 Internal std 1", "PBZ Std 1 Internal std 2", "PBZ Std 2 Internal std 1", "PBZ Std 2 Internal std 2"];
+    // Peak area / Internal std ของ Std 1/2: ใช้ค่าที่กรอกไว้แล้วในวันเดียวกัน (เวลาไทย) — ครั้งแรกของวันต้องกรอกเอง
+    const IS_KEYS = ["Std 1", "Std 2"].flatMap((row) => ["Peak area 1", "Internal std 1", "Peak area 2", "Internal std 2"].map((col) => `PBZ ${row} ${col}`));
     const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
     const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
     const isFilter = { updatedAt: { $gte: dayStart }, $or: IS_KEYS.map((k) => ({ [`values.${k}`]: { $nin: [null, ""] } })) };

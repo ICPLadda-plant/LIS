@@ -29,7 +29,7 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
     if (!String(values[PBZ_DIL_SAMPLE] ?? "")) onChange(PBZ_DIL_SAMPLE, DEFAULT_DILUTION);
     const hasWeights = Boolean(String(values[std1Key] ?? "") || String(values[std2Key] ?? ""));
     const hasPct = Boolean(String(values[PBZ_STD_PCT] ?? ""));
-    const isKeys = (["Std 1", "Std 2"] as const).flatMap((row) => [pbzKey(row, "Internal std 1"), pbzKey(row, "Internal std 2")]);
+    const isKeys = (["Std 1", "Std 2"] as const).flatMap((row) => (["Peak area 1", "Internal std 1", "Peak area 2", "Internal std 2"] as const).map((col) => pbzKey(row, col)));
     const hasIs = isKeys.some((key) => String(values[key] ?? ""));
     if (hasWeights && hasPct && hasIs) return;
     api.getPaclobutrazolStdWeights(petitionId ?? "")
@@ -37,7 +37,7 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
         if (!hasWeights && res.std1) onChange(std1Key, res.std1);
         if (!hasWeights && res.std2) onChange(std2Key, res.std2);
         if (!hasPct && res.stdPct) onChange(PBZ_STD_PCT, res.stdPct);
-        // Internal std ของ Std: ใช้ค่าที่กรอกแล้วในวันนี้ (ครั้งแรกของวันต้องกรอกเอง)
+        // Peak area / Internal std ของ Std: ใช้ค่าที่กรอกแล้วในวันนี้ (ครั้งแรกของวันต้องกรอกเอง)
         if (!hasIs) isKeys.forEach((key) => { const v = res.internalStd?.[key]; if (v) onChange(key, v); });
       })
       .catch(() => undefined);
@@ -99,7 +99,7 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
         </tbody>
       </table>
       <p className="px-3 py-2 text-xs text-muted-foreground">
-        wt/mg ของ Std ใช้ค่าล่าสุดอัตโนมัติจนกว่าจะเบิก Std PACLOBUTRAZOL ขวดใหม่ · Internal std ของ Std ใช้ค่าที่กรอกแล้วในวันนี้ (ครั้งแรกของวันต้องกรอกเอง) · Sample ครั้งที่ 2 ใช้ค่าเดียวกับครั้งที่ 1
+        wt/mg ของ Std ใช้ค่าล่าสุดอัตโนมัติจนกว่าจะเบิก Std PACLOBUTRAZOL ขวดใหม่ · Peak area และ Internal std ของ Std ใช้ค่าที่กรอกแล้วในวันนี้ (ครั้งแรกของวันต้องกรอกเอง) · Sample ครั้งที่ 2 ใช้ค่าเดียวกับครั้งที่ 1
       </p>
     </div>
     <PaclobutrazolSheet values={values} density={density} header={header} analyst={analyst} />
