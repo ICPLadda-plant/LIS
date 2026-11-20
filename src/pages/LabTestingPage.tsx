@@ -114,6 +114,37 @@ export default function LabTestingPage() {
     limit: LAB_PAGE_SIZE,
   });
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / LAB_PAGE_SIZE));
+  const labPager = totalPages > 1 ? (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">
+        หน้า {page}/{totalPages} · {data?.total ?? 0} รายการ
+      </span>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          disabled={page <= 1}
+          onClick={() => setPage((n) => Math.max(1, n - 1))}
+          aria-label="หน้าก่อนหน้า"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          disabled={page >= totalPages}
+          onClick={() => setPage((n) => Math.min(totalPages, n + 1))}
+          aria-label="หน้าถัดไป"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  ) : null;
   // คำร้องเฉพาะ Admin ถูกซ่อนจากรายการปกติ จึงดึงแยกมารวมให้ Admin กรอกผลได้
   const isAdmin = normalizeRoles(user).includes('admin');
   const { data: adminOnlyData, refresh: refreshAdminOnly } = usePetitionList({
@@ -376,6 +407,8 @@ export default function LabTestingPage() {
 
         {parametersError && <p role="alert" className="text-sm text-destructive">โหลดพารามิเตอร์ Lab ไม่สำเร็จ กรุณารีเฟรชหน้า</p>}
 
+        {labPager}
+
         <DataTable
           columns={columns}
           data={petitions}
@@ -387,37 +420,7 @@ export default function LabTestingPage() {
           }}
           emptyTitle="ไม่มีคำร้อง Lab ที่รอตรวจ"
         />
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="text-muted-foreground">
-              หน้า {page}/{totalPages} · {data?.total ?? 0} รายการ
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                disabled={page <= 1}
-                onClick={() => setPage((n) => Math.max(1, n - 1))}
-                aria-label="หน้าก่อนหน้า"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="h-8 w-8"
-                disabled={page >= totalPages}
-                onClick={() => setPage((n) => Math.min(totalPages, n + 1))}
-                aria-label="หน้าถัดไป"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        {labPager}
       </div>
     </AppLayout>
   );
