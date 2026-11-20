@@ -107,7 +107,7 @@ export default function LabTestingPage() {
     assignedToEmployeeId,
     assignedToNames,
     labPending: true,
-    limit: 50,
+    limit: 100,
   });
   // คำร้องเฉพาะ Admin ถูกซ่อนจากรายการปกติ จึงดึงแยกมารวมให้ Admin กรอกผลได้
   const isAdmin = normalizeRoles(user).includes('admin');
@@ -116,7 +116,7 @@ export default function LabTestingPage() {
     search,
     dept: dept || undefined,
     labPending: true,
-    limit: 50,
+    limit: 100,
     adminOnly: true,
   }, { enabled: isAdmin });
 
