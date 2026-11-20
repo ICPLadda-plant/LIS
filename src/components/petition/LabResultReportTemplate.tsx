@@ -22,7 +22,9 @@ export const LAB_REPORT_CSS = `
 .lr-title { text-align: center; font-weight: 700; font-size: 14pt; }
 .lr-results th { text-align: center; background: #f3f3f3; }
 .lr-muted { color: #555; }
-.lr-remark { margin-top: 5mm; font-size: 11pt; }
+.lr-remark { margin-top: 5mm; font-size: 11pt; display: flex; gap: 1mm; }
+  .lr-remark-fill { flex: 1; border-bottom: 1px dotted #000; min-height: 1em; }
+  .lr-res { white-space: pre-line; }
 .lr-sign { margin-top: 10mm; text-align: center; font-size: 11pt; }
 .lr-sigline { display: inline-block; border-bottom: 0.8pt dotted #000; min-width: 62mm; margin: 0 2mm; }
 .lr-sign-name { margin-top: 1mm; }
@@ -138,7 +140,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
                 page.rows.map((r, ri) => (
                   <tr key={ri}>
                     <td className="lr-center">{r.testItem}</td>
-                    <td className="lr-center"><PrintMediaValue value={r.result} /></td>
+                    <td className="lr-center lr-res"><PrintMediaValue value={r.result} /></td>
                     <td className="lr-center">{r.criteria}</td>
                     <td className="lr-center lr-method">{r.method}</td>
                   </tr>
@@ -151,7 +153,7 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
             </tbody>
           </table>
 
-          <div className="lr-remark">หมายเหตุ : {page.remark || "................"}</div>
+          <div className="lr-remark"><span>หมายเหตุ :</span><span className="lr-remark-fill">{page.remark}</span></div>
 
           {/* Signatures */}
           <div className="lr-sign">
@@ -176,3 +178,4 @@ export default function LabResultReportTemplate({ pages }: { pages: LabReportPag
     </div>
   );
 }
+
