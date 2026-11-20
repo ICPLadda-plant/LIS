@@ -1844,11 +1844,22 @@ export default function LabTestingDetailPage() {
                                   });
                                 };
                                 return (
-                                  <div className="grid grid-cols-1 gap-4 pl-2 sm:grid-cols-6">
-                                    {/* %AI และช่อง Standard / CCS ไว้บนสุด แล้วจึงตามด้วยตาราง */}
-                                    {fields.filter((field) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai').map(renderField)}
-                                    {/* ช่อง Area Inj. 1-3 / Average / %RSD อยู่ระหว่างข้อมูล Standard กับ CCS ตามลำดับ AI_FIELD_ORDER */}
-                                    {fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label) || isPbzAreaFieldLabel(field.label)) && !(field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai')).map(renderField)}
+                                  <div className="space-y-4 pl-2">
+                                    {/* แยกกล่องสีเหมือนสารอื่น: Standard / Area Injection / CCS / ผลวิเคราะห์ แล้วจึงตามด้วยตาราง */}
+                                    {(() => {
+                                      const aiOnly = (field: ParameterValueField) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai';
+                                      const shown = fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label) || isPbzAreaFieldLabel(field.label)) && !aiOnly(field));
+                                      const knownLabels = new Set<string>(AI_FIELD_SECTIONS.flatMap((section) => [...section.labels]));
+                                      return [
+                                        ...AI_FIELD_SECTIONS.map((section) => ({ ...section, fields: section.title === 'ผลวิเคราะห์' ? fields.filter(aiOnly) : shown.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
+                                        { title: 'ข้อมูลเพิ่มเติม', labels: [], className: 'border-border bg-card', fields: shown.filter((field) => !knownLabels.has(field.label)) },
+                                      ].filter((section) => section.fields.length > 0).map((section) => (
+                                        <section key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
+                                          <h4 className="text-base font-semibold text-foreground">{section.title}</h4>
+                                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">{section.fields.map(renderField)}</div>
+                                        </section>
+                                      ));
+                                    })()}
                                     <PaclobutrazolGrid
                                       values={srcValues}
                                       onChange={onPbzChange}
