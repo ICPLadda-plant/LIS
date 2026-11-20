@@ -20,7 +20,7 @@ import LabResultGroups from "@/components/petition/LabResultGroups";
 import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/LabResultReportTemplate";
 import ChemAnalysisReportTemplate, { CHEM_ANALYSIS_REPORT_CSS } from "@/components/petition/ChemAnalysisReportTemplate";
 import { buildChemAnalysisSheets, canPrintChemAnalysisReport } from "@/lib/chemAnalysisReport";
-import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationData } from "@/components/petition/LabCalculationForm";
+import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationData, isPaclobutrazolPage, type LabCalculationVariant } from "@/components/petition/LabCalculationForm";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import type { QCTestResult } from "@/types/petition.types";
 import { useAuth } from "@/hooks/useAuth";
@@ -55,7 +55,7 @@ export default function LabResultDetailPage() {
   const [results, setResults] = useState<QCTestResult[]>([]);
   const [paramsLoaded, setParamsLoaded] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
-  const [bromPrintOpen, setBromPrintOpen] = useState(false);
+  const [calcVariant, setCalcVariant] = useState<LabCalculationVariant | null>(null);
   const [chemReportOpen, setChemReportOpen] = useState(false);
 
   // รายงานต้องใช้ Lab parameters + กายภาพ เพื่อเติมสภาพตัวอย่างใน header
@@ -102,6 +102,7 @@ export default function LabResultDetailPage() {
   const calcPages = petition ? buildLabCalculationPages(petition, pages, groups).filter(hasCalculationData) : [];
   // พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ
   const calcPrintable = Boolean(petition && (petition.labCompletedAt || petition.labApprovedAt) && calcPages.length > 0);
+  const hasPbz = calcPages.some(isPaclobutrazolPage);
 
   // รวมเอกสารพิมพ์ทั้งหมดไว้ในปุ่มเดียว ผู้ใช้เลือกจากชื่อและคำอธิบาย แทนการไล่อ่านหลายปุ่ม
   const printOptions: PrintDocumentOption[] = [
@@ -116,12 +117,19 @@ export default function LabResultDetailPage() {
     ...(calcPages.length > 0
       ? [{
           key: "calculation",
-          label: "ใบคำนวณ",
+          label: hasPbz ? "ใบคำนวณ (แบบเดิม)" : "ใบคำนวณ",
           description: calcPrintable ? "ค่าดิบและการคำนวณสารสำคัญ" : "พิมพ์ได้หลัง Lab ออกผล",
           icon: Calculator,
           enabled: calcPrintable,
-          open: () => setBromPrintOpen(true),
-        }]
+          open: () => setCalcVariant("default"),
+        }, ...(hasPbz ? [{
+          key: "calculationStandard",
+          label: "ใบคำนวณ (แบบมาตรฐาน)",
+          description: calcPrintable ? "รูปแบบเดียวกับใบคำนวณสารอื่น" : "พิมพ์ได้หลัง Lab ออกผล",
+          icon: Calculator,
+          enabled: calcPrintable,
+          open: () => setCalcVariant("standard"),
+        }] : [])]
       : []),
     ...(chemReportPrintable
       ? [{
@@ -215,9 +223,9 @@ export default function LabResultDetailPage() {
       {chemReportPrintable && <PrintPreviewDialog open={chemReportOpen} onOpenChange={setChemReportOpen} docType="coa" title="ใบรายงานผลการวิเคราะห์" css={CHEM_ANALYSIS_REPORT_CSS}>
         <ChemAnalysisReportTemplate sheets={chemSheets} />
       </PrintPreviewDialog>}
-      {calcPages.length > 0 && <PrintPreviewDialog open={bromPrintOpen} onOpenChange={setBromPrintOpen} docType="coa" title="ใบคำนวณผลวิเคราะห์" css={LAB_CALCULATION_CSS}>
+      {calcPages.length > 0 && <PrintPreviewDialog open={calcVariant !== null} onOpenChange={(open) => { if (!open) setCalcVariant(null); }} docType="coa" title="ใบคำนวณผลวิเคราะห์" css={LAB_CALCULATION_CSS}>
         {calcPages.map((page, i) => (
-          <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} />
+          <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} variant={calcVariant ?? "default"} />
         ))}
       </PrintPreviewDialog>}
     </AppLayout>

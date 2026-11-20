@@ -13,6 +13,7 @@ import {
   Send,
   ShieldAlert,
   Printer,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
@@ -62,7 +63,8 @@ import {
 } from '@/types/petition.types';
 import { Button } from '@/components/ui/button';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
-import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationFields } from '@/components/petition/LabCalculationForm';
+import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationFields, isPaclobutrazolPage, type LabCalculationVariant } from '@/components/petition/LabCalculationForm';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { buildApprovalGroups } from '@/lib/qcApprovalRows';
 import { buildLabReportPages } from '@/lib/labReport';
 import { buildLabCalculationPages } from '@/lib/labCalculation';
@@ -521,7 +523,7 @@ export default function LabTestingDetailPage() {
     && Date.parse(requestedPetition.updatedAt) >= Date.parse(currentPetition.updatedAt)
     ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
-  const [calculationPrintOpen, setCalculationPrintOpen] = useState(false);
+  const [calculationVariant, setCalculationVariant] = useState<LabCalculationVariant | null>(null);
   const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
   const pendingSample = pendingAdditionalSample(petition, 'lab');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
@@ -1312,16 +1314,33 @@ export default function LabTestingDetailPage() {
                 ผู้นำส่ง: {petition.submittedBy?.name ?? '-'}
                 {labReceivedBy(petition) && ` · ผู้รับงาน: ${labReceivedBy(petition)}`}
               </span>
-              <Button
-                type="button"
-                variant="primary-outline"
-                className="gap-2"
-                disabled={calculationPages.length === 0}
-                onClick={() => setCalculationPrintOpen(true)}
-              >
-                <Printer className="h-4 w-4" />
-                พิมพ์เอกสาร
-              </Button>
+              {calculationPages.some(isPaclobutrazolPage) ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="primary-outline" className="gap-2">
+                      <Printer className="h-4 w-4" />
+                      พิมพ์เอกสาร
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">เลือกเอกสารที่ต้องการพิมพ์</DropdownMenuLabel>
+                    <DropdownMenuItem className="cursor-pointer" onSelect={() => setCalculationVariant('default')}>ใบคำนวณ (แบบเดิม)</DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer" onSelect={() => setCalculationVariant('standard')}>ใบคำนวณ (แบบมาตรฐาน)</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  type="button"
+                  variant="primary-outline"
+                  className="gap-2"
+                  disabled={calculationPages.length === 0}
+                  onClick={() => setCalculationVariant('default')}
+                >
+                  <Printer className="h-4 w-4" />
+                  พิมพ์เอกสาร
+                </Button>
+              )}
             </div>
           }
         />
@@ -2323,14 +2342,14 @@ export default function LabTestingDetailPage() {
 
         {calculationPages.length > 0 && (
           <PrintPreviewDialog
-            open={calculationPrintOpen}
-            onOpenChange={setCalculationPrintOpen}
+            open={calculationVariant !== null}
+            onOpenChange={(open) => { if (!open) setCalculationVariant(null); }}
             docType="coa"
             title="ใบคำนวณผลวิเคราะห์"
             css={LAB_CALCULATION_CSS}
           >
             {calculationPages.map((page, index) => (
-              <LabCalculationForm key={`${page.reportNo}-${index}`} page={page} />
+              <LabCalculationForm key={`${page.reportNo}-${index}`} page={page} variant={calculationVariant ?? 'default'} />
             ))}
           </PrintPreviewDialog>
         )}

@@ -36,8 +36,6 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-sign-name { grid-column: 2; grid-row: 2; text-align: center; margin-top: 1.5mm; }
 .brom-form-footer { margin-top: auto; padding-top: 6mm; font-size: 8pt; }
 @media screen { .brom-form-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
-.brom-form-root > section + section { break-before: page; page-break-before: always; }
-@media screen { .brom-form-root > section + section { margin-top: 8mm; } }
 ${PBZ_PRINT_CSS}`;
 
 const BLANK = /^[-–—]?$/;
@@ -122,10 +120,25 @@ function Check({ checked, label, field }: { checked: boolean; label: string; fie
   return <span className="brom-form-check"><span className="brom-form-box" data-field={field}>{checked ? "✓" : ""}</span>{label}</span>;
 }
 
+/** PACLOBUTRAZOL มีใบคำนวณให้เลือก 2 แบบ: แบบเดิม (Internal standard) และแบบมาตรฐานเหมือนสารอื่น */
+export function isPaclobutrazolPage(page: LabReportPage): boolean {
+  return paclobutrazolValues(page) != null;
+}
+
+export type LabCalculationVariant = "default" | "standard";
+
 /** ใบคำนวณผลวิเคราะห์ FM-QP-07-08-002-R02 (A4 แนวนอน) */
-export default function LabCalculationForm({ page }: { page: LabReportPage }) {
-  // PACLOBUTRAZOL พิมพ์ 2 ใบ: ใบ Internal standard แบบเดิม (FM-QP-07-08-002-R01) ตามด้วยใบคำนวณมาตรฐานเหมือนสารอื่น
+export default function LabCalculationForm({ page, variant = "default" }: { page: LabReportPage; variant?: LabCalculationVariant }) {
+  // PACLOBUTRAZOL: "default" = ใบ Internal standard แบบเดิม (FM-QP-07-08-002-R01), "standard" = ใบคำนวณแบบสารอื่น
   const pbzValues = paclobutrazolValues(page);
+  if (pbzValues && variant === "default") {
+    return (
+      <div className="brom-form-root">
+        <style>{LAB_CALCULATION_CSS}</style>
+        <PaclobutrazolPrintSheet page={page} values={pbzValues} />
+      </div>
+    );
+  }
   const aiResult = firstValue(page, /^%\s*AI/i);
   const area = [
     ...[1, 2, 3].map((n) => firstValue(page, new RegExp("^Area\\s*Inj\\.?\\s*" + n, "i"))),
@@ -164,7 +177,6 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
   return (
     <div className="brom-form-root">
       <style>{LAB_CALCULATION_CSS}</style>
-      {pbzValues && <PaclobutrazolPrintSheet page={page} values={pbzValues} />}
       <section className="brom-form-page">
         <div className="brom-form-top"><img className="brom-form-logo" src={ICP_LADDA_LOGO_URL} alt="ICP Ladda" /><div className="brom-form-title">ใบคำนวณผลวิเคราะห์</div></div>
 
