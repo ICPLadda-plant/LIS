@@ -146,8 +146,11 @@ export default function LabCalculationForm({ page, variant = "default" }: { page
     firstValue(page, /^Area\s*%?\s*RSD/i),
   ];
   const sampleAverage = firstValue(page, /^%\s*Sample\s*Av/i, aiResult);
+  // PACLOBUTRAZOL ใช้แค่ Sample 1/2 — ไม่มีช่อง %Sample 3
+  const isPbz = /paclobutrazol/i.test(page.sample.name ?? "") && !String(page.sample.name ?? "").includes("+");
+  const sampleNos = isPbz ? [1, 2] : [1, 2, 3];
   const sample = [
-    ...[1, 2, 3].map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i"))),
+    ...sampleNos.map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i"))),
     sampleAverage,
     firstValue(page, /^%\s*Sample\s*%?\s*RSD/i),
   ];
@@ -214,7 +217,7 @@ export default function LabCalculationForm({ page, variant = "default" }: { page
         </div>
 
         <div className="brom-form-bar">Analytical Results</div>
-        <Columns labels={["%Sample 1", "%Sample 2", "%Sample 3", "Average", "%RSD (ไม่เกิน 5)"]} items={sample} field="sample" />
+        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample} field="sample" />
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>
