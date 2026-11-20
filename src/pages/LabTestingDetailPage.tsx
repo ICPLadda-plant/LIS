@@ -931,7 +931,7 @@ export default function LabTestingDetailPage() {
     petition,
     buildLabReportPages(petition, [], calculationGroups),
     calculationGroups,
-    (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(results, seq, findSgParameter(allParameters)),
+    (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(savedResults, seq, findSgParameter(allParameters)),
   ).filter(hasCalculationFields);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
