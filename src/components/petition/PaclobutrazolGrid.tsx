@@ -30,15 +30,15 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
     const hasWeights = Boolean(String(values[std1Key] ?? "") || String(values[std2Key] ?? ""));
     const hasPct = Boolean(String(values[PBZ_STD_PCT] ?? ""));
     const isKeys = (["Std 1", "Std 2"] as const).flatMap((row) => (["Peak area 1", "Internal std 1", "Peak area 2", "Internal std 2"] as const).map((col) => pbzKey(row, col)));
-    const hasIs = isKeys.some((key) => String(values[key] ?? ""));
-    if (hasWeights && hasPct && hasIs) return;
+    const missingIs = isKeys.filter((key) => !String(values[key] ?? ""));
+    if (hasWeights && hasPct && !missingIs.length) return;
     api.getPaclobutrazolStdWeights(petitionId ?? "")
       .then((res) => {
         if (!hasWeights && res.std1) onChange(std1Key, res.std1);
         if (!hasWeights && res.std2) onChange(std2Key, res.std2);
         if (!hasPct && res.stdPct) onChange(PBZ_STD_PCT, res.stdPct);
         // Peak area / Internal std ของ Std: ใช้ค่าที่กรอกแล้วในวันนี้ (ครั้งแรกของวันต้องกรอกเอง)
-        if (!hasIs) isKeys.forEach((key) => { const v = res.internalStd?.[key]; if (v) onChange(key, v); });
+        missingIs.forEach((key) => { const v = res.internalStd?.[key]; if (v) onChange(key, v); });
       })
       .catch(() => undefined);
   }, [disabled, onChange, petitionId, std1Key, std2Key, values]);

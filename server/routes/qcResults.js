@@ -288,8 +288,13 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
     const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
     const isFilter = { updatedAt: { $gte: dayStart }, $or: IS_KEYS.map((k) => ({ [`values.${k}`]: { $nin: [null, ""] } })) };
     if (filter.petitionId) isFilter.petitionId = filter.petitionId;
-    const isDoc = await QCTestResult.findOne(isFilter).sort({ updatedAt: -1 }).select("values").lean();
-    const internalStd = isDoc ? Object.fromEntries(IS_KEYS.map((k) => [k, String(isDoc.values?.[k] ?? "")]).filter(([, v]) => v)) : undefined;
+    const isDocs = await QCTestResult.find(isFilter).sort({ updatedAt: -1 }).select("values").limit(50).lean();
+    // เลือกค่าล่าสุดของวันนี้แยกทีละช่อง
+    const internalStd = {};
+    for (const k of IS_KEYS) {
+      const hit = isDocs.find((d) => String(d.values?.[k] ?? ""));
+      if (hit) internalStd[k] = String(hit.values[k]);
+    }
     const extra = internalStd && Object.keys(internalStd).length ? { internalStd } : {};
     if (!doc) return res.json({ ...(purity ? { stdPct: purity } : {}), ...extra });
     const enteredAt = doc.updatedAt || doc.enteredAt;

@@ -193,6 +193,19 @@ function densitySourceItem(petition: Petition, item: PetitionItem, external: Den
   return candidates.find((source) => source.results.length > 0) ?? candidates[0];
 }
 
+const name = (v?: string) => (v && !/^[-–—]?$/.test(v.trim()) ? v.trim() : '');
+// shortcut: scans any ค่าถพ.* field when the shared SG parameter is not configured, replace with config once set.
+function anySg(results: QCTestResult[], seq: number): string {
+  for (const r of results) {
+    if (r.itemSeq !== seq) continue;
+    for (const row of [r.values ?? {}, ...(Array.isArray(r.entries) ? r.entries : [])] as Record<string, unknown>[]) {
+      const k = Object.keys(row).find((key) => key.startsWith(SG_FIELD_LABEL) && row[key] != null && row[key] !== '');
+      if (k) return String(row[k]);
+    }
+  }
+  return '';
+}
+
 function withSiblingDensityResults(petition: Petition | null | undefined, results: QCTestResult[], params: ParameterItem[], densitySources: DensitySource[] = []): QCTestResult[] {
   if (!petition) return results;
   const sgIds = new Set(params.filter((p) => hasSpecificGravityParam([p])).map((p) => String(p._id)));
@@ -932,8 +945,8 @@ export default function LabTestingDetailPage() {
     petition,
     buildLabReportPages(petition, [], calculationGroups),
     calculationGroups,
-    (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(savedResults, seq, findSgParameter(allParameters)),
-  ).filter(hasCalculationFields);
+    (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(savedResults, seq, findSgParameter(allParameters)) || anySg(liveResults, seq) || anySg(savedResults, seq),
+  ).map((page) => ({ ...page, analystName: name(page.analystName) || user?.name || '', labHeadName: name(page.labHeadName) || 'นุชจรินทร์ ดวงเนตร' })).filter(hasCalculationFields);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
   );
