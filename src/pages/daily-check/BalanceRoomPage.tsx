@@ -327,7 +327,7 @@ const BalanceRoomPage = () => {
 
   const updateWeight = (id: string, type: "100" | "10", index: number, value: string) => {
     const r = getDraft(id);
-    const limitedValue = limitDecimalPlaces(digitsOnly(value), scale.decimals);
+    const limitedValue = limitDecimalPlaces(digitsOnly(value), type === "100" ? scale.weights100Decimals ?? scale.decimals : scale.decimals);
     if (type === "100") {
       const w = [...r.weights100] as [string, string, string];
       w[index] = limitedValue;

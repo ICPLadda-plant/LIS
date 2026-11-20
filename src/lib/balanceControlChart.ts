@@ -12,6 +12,8 @@ export interface BalanceScale {
   model: string;
   /** ความละเอียดของเครื่อง (จำนวนตำแหน่งทศนิยม) */
   decimals: number;
+  /** จำนวนทศนิยมของน้ำหนักมาตรฐาน (weights100) ถ้าต่างจาก decimals */
+  weights100Decimals?: number;
   /** ตุ้มน้ำหนักที่นำมาสร้าง Control Chart */
   controlWeight: 10 | 100;
   /** ตุ้มน้ำหนักหลักที่บันทึกในช่องเดิมของระบบ (weights100) */
