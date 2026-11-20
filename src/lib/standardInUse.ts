@@ -121,3 +121,21 @@ export function planInUseNotifications(
   );
   return { push, dismiss };
 }
+
+/** เลขที่ Standard (qrId) ของขวดที่กำลังใช้งานอยู่ ซึ่งตรงกับชื่อสาร — ใช้เติมช่อง "เลขที่ Standard" ในหน้า Lab */
+export function standardNumbersForSubstance(
+  items: Pick<StandardInUseItem, "itemName" | "itemCode" | "qrId">[],
+  substance: string | null | undefined,
+): string[] {
+  const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9ก-๙]+/g, " ").trim();
+  const token = norm(String(substance ?? "")).split(" ").find((t) => t.length >= 3 && !/^\d+$/.test(t));
+  if (!token) return [];
+  const out: string[] = [];
+  for (const item of items) {
+    const name = ` ${norm(item.itemName || item.itemCode || "")} `;
+    const qr = String(item.qrId ?? "").trim();
+    if (qr && name.includes(` ${token}`) && !out.includes(qr)) out.push(qr);
+  }
+  return out;
+}
+

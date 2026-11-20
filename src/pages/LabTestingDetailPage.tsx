@@ -43,6 +43,8 @@ import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, is
 import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
 import { matchSubstanceKey } from '@/lib/substances';
+import { standardNumbersForSubstance } from '@/lib/standardInUse';
+import type { StandardInUseItem } from '@/types/stock';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
@@ -584,6 +586,14 @@ export default function LabTestingDetailPage() {
   }, []);
 
   // Load instrument sources once (for the live-pull button).
+  // ขวด standard ที่กำลังใช้งานอยู่ — ช่อง "เลขที่ Standard" ต้องเลือกจากรายการนี้ของสารนั้น
+  const [standardsInUse, setStandardsInUse] = useState<StandardInUseItem[]>([]);
+  useEffect(() => {
+    api.getStandardsInUse()
+      .then((res) => setStandardsInUse(res?.items ?? []))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     api.getInstrumentSources()
       .then((rows) => setInstrumentSources(rows ?? []))
@@ -1651,6 +1661,32 @@ export default function LabTestingDetailPage() {
                                     };
                                   })()
                                 : null;
+                              if (unit.key.split('::')[0] === STANDARD_NO_LABEL) {
+                                const substance = aiSubstanceFromKey(unit.key) || item.commonName || '';
+                                const options = standardNumbersForSubstance(standardsInUse, substance);
+                                const current = String(srcValues[unit.key] ?? '');
+                                if (!current && options.length === 1 && !fieldDisabled) {
+                                  queueMicrotask(() => onUnitChange(unit.key, options[0]));
+                                }
+                                const choices = current && !options.includes(current) ? [current, ...options] : options;
+                                return (
+                                  <div key={unit.key} className={cn(aiGridClass(unit.field.label), 'space-y-1')}>
+                                    <label className="text-sm font-medium text-foreground" htmlFor={`std-no-${unit.key}`}>{unit.field.label}</label>
+                                    <select
+                                      id={`std-no-${unit.key}`}
+                                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+                                      value={current}
+                                      disabled={fieldDisabled}
+                                      onChange={(e) => onUnitChange(unit.key, e.target.value)}
+                                    >
+                                      <option value="">{options.length ? 'เลือกเลขที่ Standard' : 'ไม่มี Standard ของสารนี้ที่กำลังใช้งาน'}</option>
+                                      {choices.map((qr) => (
+                                        <option key={qr} value={qr}>{qr}{options.includes(qr) ? '' : ' (ไม่อยู่ในรายการที่กำลังใช้งาน)'}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                );
+                              }
                               return (
                                 <div key={unit.key} className={aiGridClass(unit.field.label)}>
                                   <TestField
