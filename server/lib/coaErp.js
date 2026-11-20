@@ -45,6 +45,12 @@ function isExcludedResultSubmitter(value) {
   return normalizeText(value).replace(/\s+/g, '').includes(EXCLUDED_RESULT_SUBMITTER);
 }
 
+function isExcludedQcResult(result) {
+  return [result?.enteredBy, result?.updatedBy, result?.remarkBy]
+    .flatMap((actor) => [actor?.name, actor?.email, typeof actor === 'string' ? actor : ''])
+    .some(isExcludedResultSubmitter);
+}
+
 function isAfterDryingLegacyResult(row) {
   return /หลังอบ|after\s*dry/i.test(text(row?.note));
 }
@@ -1132,9 +1138,10 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
 }
 
 function resultRowsFromQc(qcResults, commonName, options = {}) {
-  const physical = qcResults.map(physicalFromQc).find((entry) => entry.raw);
-  const ai = options.includeAi === false ? null : aiFromQcResults(qcResults, commonName);
-  const density = averagedDensity(qcResults.flatMap(densityReadingsFromQc));
+  const eligibleResults = (qcResults || []).filter((result) => !isExcludedQcResult(result));
+  const physical = eligibleResults.map(physicalFromQc).find((entry) => entry.raw);
+  const ai = options.includeAi === false ? null : aiFromQcResults(eligibleResults, commonName);
+  const density = averagedDensity(eligibleResults.flatMap(densityReadingsFromQc));
   const rows = [];
   if (physical?.raw) rows.push({
     testItem: 'Appearance', criteria: physical.english || physical.raw, result: 'Conform', method: 'Visual', unit: '',
@@ -1145,7 +1152,7 @@ function resultRowsFromQc(qcResults, commonName, options = {}) {
   if (density) rows.push({
     testItem: 'Density at 30°C (g/cm³)', criteria: '-', result: density, unit: 'g/cm³', method: 'DMA 501',
   });
-  const analysisDate = qcResults
+  const analysisDate = eligibleResults
     .map((entry) => normalizeIsoDate(entry.updatedAt || entry.enteredAt))
     .filter(Boolean)
     .sort()

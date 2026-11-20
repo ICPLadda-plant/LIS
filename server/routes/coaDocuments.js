@@ -254,10 +254,8 @@ async function latestAiLabData(petitions, sample) {
   const commonName = manualText(sample?.commonName);
   const selection = findLatestAiLabItems(petitions, sample);
   const hasBatch = Boolean(manualText(sample?.batchNo || sample?.lotNo));
-  const batchCandidates = selection.candidates.filter((candidate) => (
-    candidate.matchKind === 'exact' || candidate.matchKind === 'previous'
-  ));
-  const candidates = (hasBatch && batchCandidates.length ? batchCandidates : selection.candidates).slice(0, 100);
+  const exactBatchCandidates = selection.candidates.filter((candidate) => candidate.matchKind === 'exact');
+  const candidates = (hasBatch ? exactBatchCandidates : selection.candidates).slice(0, 100);
   if (candidates.length) {
     const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
     const itemSeqs = [...new Set(candidates.flatMap((candidate) => candidate.items.map((item) => Number(item.seq))))];

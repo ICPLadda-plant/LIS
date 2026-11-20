@@ -1521,7 +1521,7 @@ test('revision approval aborts without activating the revision when supersession
   }
 });
 
-test('ERP autofill falls back to nearby AI and averages matching density readings', async () => {
+test('ERP autofill rejects nearby-Batch AI while averaging matching density readings', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1568,7 +1568,7 @@ test('ERP autofill falls back to nearby AI and averages matching density reading
     assert.equal(res.body.sample.lotNo, '26S-ACT50-095-171069');
     assert.equal(res.body.sample.productionDate, '2026-10-17');
     assert.equal(res.body.match, null);
-    assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '48.35%');
+    assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '1.158');
     assert.equal(res.body.results.find((row) => row.testItem === 'Appearance'), undefined);
   } finally {
@@ -1640,6 +1640,7 @@ test('ERP autofill averages AI only from records with the exact batch', async ()
       return { sort: () => ({ lean: async () => [
         { petitionId: 'petition-rnd-newer', itemSeq: 1, parameterName: '%AI', values: { '%AI::glyphosate': '24.28' }, updatedAt: '2026-10-12T01:00:00.000Z' },
         { petitionId: 'petition-qc-latest', itemSeq: 3, parameterName: '%AI', values: { '%AI::glyphosate': '24.33' }, updatedAt: '2026-10-12T02:00:00.000Z' },
+        { petitionId: 'petition-qc-latest', itemSeq: 4, parameterName: '%AI', values: { '%AI::glyphosate': '99.99' }, enteredBy: { name: 'วธาธร สอนซี' }, updatedAt: '2026-10-12T03:00:00.000Z' },
       ] }) };
     };
     ResultDensity.find = () => ({ sort: () => ({ limit: () => ({ lean: async () => [] }) }) });
@@ -2055,7 +2056,7 @@ test('real-time Lab AI lookup averages duplicate results from the exact batch', 
   }
 });
 
-test('real-time Lab AI lookup falls back to the nearest previous batch', async () => {
+test('real-time Lab AI lookup returns no AI when only a previous batch has results', async () => {
   const originals = {
     petitionFind: Petition.find,
     legacyFind: LegacyLabResult.find,
@@ -2088,9 +2089,9 @@ test('real-time Lab AI lookup falls back to the nearest previous batch', async (
       query: { batchNo: '081', commonName: 'GLYPHOSATE 48% W/V SL', sampleName: 'ช้างมาร์กี้' },
     });
     assert.equal(fallback.statusCode, 200);
-    assert.equal(fallback.body.ai.result, '48.15%');
-    assert.equal(fallback.body.analysisDate, '2026-10-08');
-    assert.equal(fallback.body.match.batchNo, '080');
+    assert.equal(fallback.body.ai, null);
+    assert.equal(fallback.body.analysisDate, '');
+    assert.equal(fallback.body.match, null);
   } finally {
     Petition.find = originals.petitionFind;
     LegacyLabResult.find = originals.legacyFind;
@@ -2098,7 +2099,7 @@ test('real-time Lab AI lookup falls back to the nearest previous batch', async (
   }
 });
 
-test('real-time Lab AI lookup falls back to the nearest available batch when no previous batch exists', async () => {
+test('real-time Lab AI lookup returns no AI when only another batch has results', async () => {
   const originals = {
     petitionFind: Petition.find,
     legacyFind: LegacyLabResult.find,
@@ -2121,8 +2122,8 @@ test('real-time Lab AI lookup falls back to the nearest available batch when no 
     });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.ai.result, '50.12%');
-    assert.equal(res.body.match.batchNo, '030');
+    assert.equal(res.body.ai, null);
+    assert.equal(res.body.match, null);
   } finally {
     Petition.find = originals.petitionFind;
     LegacyLabResult.find = originals.legacyFind;

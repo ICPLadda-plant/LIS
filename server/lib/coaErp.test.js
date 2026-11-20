@@ -872,3 +872,14 @@ test('AI results average matching values from multiple Lab result documents', ()
   assert.equal(rows.ai.result, '24.305%');
   assert.equal(rows.ai.valueCount, 2);
 });
+
+test('COA result averaging excludes values entered by วธาธร', () => {
+  const result = resultRowsFromQc([
+    { values: { '%AI': '25.20' }, enteredBy: { name: 'นักวิเคราะห์ A' } },
+    { values: { '%AI': '25.40' }, updatedBy: { name: 'นักวิเคราะห์ B' } },
+    { values: { '%AI': '99.99' }, enteredBy: { name: 'วธาธร สอนซี' } },
+  ], 'TRIFLOXYSTROBIN 25% WG');
+
+  assert.equal(result.ai.result, '25.3%');
+  assert.equal(result.ai.valueCount, 2);
+});
