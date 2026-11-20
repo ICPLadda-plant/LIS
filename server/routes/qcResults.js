@@ -282,10 +282,19 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
     // % Std = purity ของขวด Std PACLOBUTRAZOL ที่เบิกใช้อยู่
     const purity = String(lastWithdraw?.purity ?? "").replace(/%/g, "").trim();
     const doc = await QCTestResult.findOne(filter).sort({ updatedAt: -1, enteredAt: -1 }).lean();
-    if (!doc) return res.json(purity ? { stdPct: purity } : {});
+    // Internal std ของ Std 1/2: ใช้ค่าที่กรอกไว้แล้วในวันเดียวกัน (เวลาไทย) — ครั้งแรกของวันต้องกรอกเอง
+    const IS_KEYS = ["PBZ Std 1 Internal std 1", "PBZ Std 1 Internal std 2", "PBZ Std 2 Internal std 1", "PBZ Std 2 Internal std 2"];
+    const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
+    const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
+    const isFilter = { updatedAt: { $gte: dayStart }, $or: IS_KEYS.map((k) => ({ [`values.${k}`]: { $nin: [null, ""] } })) };
+    if (filter.petitionId) isFilter.petitionId = filter.petitionId;
+    const isDoc = await QCTestResult.findOne(isFilter).sort({ updatedAt: -1 }).select("values").lean();
+    const internalStd = isDoc ? Object.fromEntries(IS_KEYS.map((k) => [k, String(isDoc.values?.[k] ?? "")]).filter(([, v]) => v)) : undefined;
+    const extra = internalStd && Object.keys(internalStd).length ? { internalStd } : {};
+    if (!doc) return res.json({ ...(purity ? { stdPct: purity } : {}), ...extra });
     const enteredAt = doc.updatedAt || doc.enteredAt;
-    if (lastWithdraw?.withdrawnDate && enteredAt && new Date(lastWithdraw.withdrawnDate) > new Date(enteredAt)) return res.json(purity ? { stdPct: purity } : {});
-    res.json({ std1: String(doc.values?.[STD1] ?? ""), std2: String(doc.values?.[STD2] ?? ""), stdPct: purity || String(doc.values?.["PBZ %Std"] ?? ""), petitionNo: doc.petitionNo, enteredAt });
+    if (lastWithdraw?.withdrawnDate && enteredAt && new Date(lastWithdraw.withdrawnDate) > new Date(enteredAt)) return res.json({ ...(purity ? { stdPct: purity } : {}), ...extra });
+    res.json({ std1: String(doc.values?.[STD1] ?? ""), std2: String(doc.values?.[STD2] ?? ""), stdPct: purity || String(doc.values?.["PBZ %Std"] ?? ""), petitionNo: doc.petitionNo, enteredAt, ...extra });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
