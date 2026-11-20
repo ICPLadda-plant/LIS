@@ -39,7 +39,7 @@ type PrintDocumentOption = {
 };
 
 function isLabReportSourceParameter(parameter: ParameterItem): boolean {
-  return parameter.scope === "lab" || parameter.name?.trim() === PHYSICAL_PARAMETER_NAME;
+  return parameter.scope === 'lab' || parameter.name?.trim() === PHYSICAL_PARAMETER_NAME || (parameter.scope === 'qc' && parameter.shareWithLab === true && /\u0e16\.?\s*\u0e1e|density/i.test(parameter.name ?? ''));
 }
 
 export default function LabResultDetailPage() {

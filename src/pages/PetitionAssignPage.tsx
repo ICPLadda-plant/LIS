@@ -469,7 +469,7 @@ export default function PetitionAssignPage() {
                     onChange={(event) => setSampleNumbers((current) => ({ ...current, [item.seq]: event.target.value }))}
                   />
                   <datalist id={`sample-number-options-${item.seq}`}>
-                    {[item.sampleId, ...sampleNumberOptions].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index).map((value) => <option key={value} value={value} />)}
+                    {[item.sampleId, ...sampleNumberOptions].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index && !Object.entries(sampleNumbers).some(([seq, picked]) => Number(seq) !== item.seq && picked === value)).map((value) => <option key={value} value={value} />)}
                   </datalist>
                 </label>
               ))}

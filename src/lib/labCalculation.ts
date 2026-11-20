@@ -7,6 +7,7 @@ export function buildLabCalculationPages(
   petition: Petition,
   pages: LabReportPage[],
   groups: ApprovalItemGroup[],
+  densityOf?: (seq: number) => string,
 ): LabReportPage[] {
   return pages.flatMap((page, index) => {
     const seq = petition.items?.[index]?.seq;
@@ -19,6 +20,8 @@ export function buildLabCalculationPages(
       criteria: "-",
       method: "-",
     })));
+    const sg = seq != null ? densityOf?.(seq) : "";
+    if (sg && !rows.some((r) => /ถพ|ถ\.พ|density/i.test(r.testItem) && r.result !== "-")) rows.push({ testItem: "ค่าถพ. (g/cm3)", result: sg, criteria: "-", method: "-" });
     const substances = aiSubstancesForItem(group.commonName);
     if (substances.length === 0) return [{ ...page, rows: [...rows, ...page.rows] }];
 

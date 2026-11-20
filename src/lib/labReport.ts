@@ -116,7 +116,7 @@ function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string):
   if (!group) return [];
   const out: LabReportRow[] = [];
   group.params
-    .filter((p) => p.scope === "lab")
+    .filter((p) => p.scope === "lab" || /ถ\.?\s*พ|density/i.test(p.parameterName))
     .forEach((p) => {
       p.rows.forEach((r) => {
         const unit = r.unit ? ` (${r.unit})` : "";
@@ -128,8 +128,27 @@ function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string):
         });
       });
     });
+  return mergeDensityAndUnit(out, commonName || group.commonName);
+}
+
+// ใส่หน่วย %W/W|%W/V ตามชื่อตัวอย่าง และย้าย Density ไปบรรทัดใต้ค่า %AI
+function mergeDensityAndUnit(rows: LabReportRow[], name?: string): LabReportRow[] {
+  const unit = /W\s*\/\s*V/i.test(name || "") ? "% W/V" : /W\s*\/\s*W/i.test(name || "") ? "% W/W" : "";
+  const isDensity = (r: LabReportRow) => /ถพ|density/i.test(r.testItem);
+  const ai = rows.find((r) => AI_CONTENT_PATTERN.test(r.testItem) && !isDensity(r));
+  const den = rows.find(isDensity);
+  const out = rows.filter((r) => !(ai && den && r === den));
+  if (ai) {
+    if (unit) { ai.testItem = ai.testItem.replace(/\(\s*%\s*\)\s*$/, `(${unit})`); if (ai.result !== DASH) ai.result += ` ${unit}`; }
+    if (den && den.result !== DASH) ai.result += `\nDensity : ${Number.isFinite(Number(den.result)) ? Number(den.result).toFixed(3) : den.result}`;
+  }
   return out;
 }
+
+// shortcut: ข้อมูลติดต่อฮาร์ดโค้ด, ย้ายไปอ่านจากข้อมูลผู้ใช้เมื่อมี API
+const CONTACT_FALLBACK: Record<string, { email: string; phone: string }> = {
+  "นางอัจฉรา บุญไทย": { email: "achara.b@icpladda.com", phone: "034 305281 ต่อ 124" },
+};
 
 const conditionText = (c?: string) =>
   c === "normal" ? "ปกติ" : c === "defective" ? "บกพร่อง" : DASH;
@@ -176,8 +195,8 @@ export function buildLabReportPages(
         name: requesterName,
         company: cleanText(lr?.reportCustomerName) || COMPANY_NAME,
         department: requester?.department || petitionDepartmentLabel(petition) || "",
-        email: requester?.email || "",
-        phone: requester?.phone || "",
+        email: requester?.email || CONTACT_FALLBACK[requesterName]?.email || "",
+        phone: requester?.phone || CONTACT_FALLBACK[requesterName]?.phone || "",
       },
       sample: {
         name: item.commonName || item.sampleName || "",
@@ -210,3 +229,4 @@ export function buildLabReportPages(
 export function labReportPagesWithResults(pages: LabReportPage[]): LabReportPage[] {
   return pages.filter((page) => page.rows.length > 0);
 }
+

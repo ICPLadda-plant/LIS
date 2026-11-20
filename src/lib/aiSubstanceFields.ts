@@ -1,10 +1,13 @@
 import type { ParameterValueField } from "./api";
-import { calculatedAiFieldKind, isControlSampleLabel } from "./aiCalculation";
+import { calculatedAiFieldKind, isControlSampleLabel, STANDARD_NO_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL } from "./aiCalculation";
 import { expandFieldForItem, type RenderFieldUnit } from "./parameterValidation";
 import { extractSubstanceName, matchSubstanceKey, parseSubstances, substanceFieldKey } from "./substances";
 
 type ExpandOptions = Parameters<typeof expandFieldForItem>[2];
 export type AiAwareFieldUnit = RenderFieldUnit & { hiddenStandard?: boolean };
+
+// Standard + CCS แยกรายสารในยาผสม
+const PER_SUBSTANCE_LABELS = new Set<string>([STANDARD_NO_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL]);
 
 export type AiSubstance = { key: string; name: string; raw: string };
 
@@ -49,7 +52,7 @@ export function expandAiAwareFieldForItem(
   const substances = aiSubstancesForItem(commonName);
   if (substances.length === 0) return units;
   const isAiResult = calculatedAiFieldKind(field.label) === "ai";
-  if (!isAiResult && !isAiSetFieldLabel(field.label)) return units;
+  if (!isAiResult && !isAiSetFieldLabel(field.label) && !PER_SUBSTANCE_LABELS.has(field.label)) return units;
   if (isAiResult && units.some((unit) => unit.substanceName !== undefined)) return units;
   return substances.map((substance) => ({
     key: substanceFieldKey(field.label, substance.name),

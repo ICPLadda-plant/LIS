@@ -30,7 +30,7 @@ import { labReceivedAt, labReceivedBy, labWorkReceived } from '@/lib/receiveStat
 import { isItemLabelPending } from '@/lib/labelReceipt';
 import { useConfirm } from '@/context/ConfirmDialog';
 import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, resolveLabLabelTolerance, isLabLabelToleranceAbnormal } from '@/lib/parameterValidation';
-import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue } from '@/lib/formSpecificGravity';
+import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue, findSgParameter, resolveSpecificGravity } from '@/lib/formSpecificGravity';
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { cn } from '@/lib/utils';
@@ -118,12 +118,12 @@ const AI_FIELD_ORDER = [
 ] as const;
 
 const AI_FIELD_SECTIONS = [
-  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-primary/40 bg-primary/10' },
-  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-border bg-muted/70' },
-  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-primary/40 bg-accent/70' },
-  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-border bg-secondary/70' },
-  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-border bg-muted/70' },
-  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-primary/30 bg-primary/10' },
+  { title: 'ข้อมูล Standard', labels: [STANDARD_NO_LABEL, CORRELATION_LABEL], className: 'border-sky-200 border-l-4 border-l-sky-400 bg-sky-50 shadow-sm dark:bg-sky-950/60' },
+  { title: 'Area Injection', labels: ['Area Inj.1', 'Area Inj.2', 'Area Inj.3', 'Area Average', 'Area %RSD'], className: 'border-amber-200 border-l-4 border-l-amber-400 bg-amber-50 shadow-sm dark:bg-amber-950/60' },
+  { title: 'การตรวจสอบ CCS', labels: [MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL], className: 'border-violet-200 border-l-4 border-l-violet-400 bg-violet-50 shadow-sm dark:bg-violet-950/60' },
+  { title: 'Control Sample', labels: [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL], className: 'border-rose-200 border-l-4 border-l-rose-400 bg-rose-50 shadow-sm dark:bg-rose-950/60' },
+  { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-emerald-200 border-l-4 border-l-emerald-400 bg-emerald-50 shadow-sm dark:bg-emerald-950/60' },
+  { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 shadow-sm dark:bg-teal-950/60' },
 ] as const;
 
 function aiFieldsForParameter(fields: ParameterValueField[]) {
@@ -506,6 +506,7 @@ export default function LabTestingDetailPage() {
     ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
   const [calculationPrintOpen, setCalculationPrintOpen] = useState(false);
+  const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
   const pendingSample = pendingAdditionalSample(petition, 'lab');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
   const roundRequests = useMemo(() => JSON.parse(roundsKey) as AdditionalSampleRequest[], [roundsKey]);
@@ -931,6 +932,7 @@ export default function LabTestingDetailPage() {
     petition,
     buildLabReportPages(petition, [], calculationGroups),
     calculationGroups,
+    (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(results, seq, findSgParameter(allParameters)),
   ).filter(hasCalculationFields);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
@@ -1385,7 +1387,24 @@ export default function LabTestingDetailPage() {
         )}
 
         {/* Each Lab item */}
+        {labItems.length > 1 && (
+          <div className="flex flex-wrap gap-2" role="tablist">
+            {labItems.map((item) => (
+              <Button
+                key={item.seq}
+                type="button"
+                role="tab"
+                size="sm"
+                variant={item.seq === (activeItemSeq ?? labItems[0].seq) ? 'default' : 'outline'}
+                onClick={() => setActiveItemSeq(item.seq)}
+              >
+                {/^\d+$/.test(item.sampleId || '') ? `${item.sampleId}/${String((petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100).padStart(2, '0')}` : item.sampleId || `รายการที่ ${item.seq}`}
+              </Button>
+            ))}
+          </div>
+        )}
         {labItems.map((item) => {
+          if (labItems.length > 1 && item.seq !== (activeItemSeq ?? labItems[0].seq)) return null;
           const matchedParams = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
           const round = sampleRoundFor(petition, 'lab', item.seq);
           const itemCurrentPhase = (round ?? petition).currentPhase ?? 1;
@@ -1498,7 +1517,7 @@ export default function LabTestingDetailPage() {
                               Lab
                             </Badge>
                             {param.hasPhases && (
-                              <Badge className="bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-100">
+                              <Badge className="bg-amber-50 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-50">
                                 Phase {effectivePhase}
                               </Badge>
                             )}
@@ -1537,7 +1556,7 @@ export default function LabTestingDetailPage() {
                               const aiFieldKind = isAiParameter ? calculatedAiFieldKind(unit.field.label) : null;
                               const calculatedAi = aiFieldKind ? calculateAi(srcValues, aiDensity(srcValues, condCtx, aiSubstanceFromKey(unit.key), densityEntries, hasSgParam), aiSubstanceFromKey(unit.key)) : null;
                               const ccsFieldKind = isAiParameter ? calculatedCcsFieldKind(unit.field.label) : null;
-                              const calculatedCcs = ccsFieldKind ? calculateCcsFromValues(srcValues) : null;
+                              const calculatedCcs = ccsFieldKind ? calculateCcsFromValues(srcValues, aiSubstanceFromKey(unit.key)) : null;
 
                               // Field-level `multiple` — repeatable list of bare value rows.
                               // Each row shares the field's standard/abnormal rule; per-row
@@ -1664,10 +1683,11 @@ export default function LabTestingDetailPage() {
                                     onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(nextValues, aiDensity(nextValues, condCtx, substance, densityEntries, hasSgParam), substance)[kind]));
                                   });
                                         });
-                                        if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(unit.key)) {
-                                          const nextCcs = calculateCcsFromValues(nextValues);
-                                          onUnitChange(CCS_DIFFERENCE_LABEL, nextCcs.difference == null ? '' : nextCcs.difference.toFixed(2));
-                                          onUnitChange(CCS_RESULT_LABEL, nextCcs.result);
+                                        if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(unit.key.split('::')[0])) {
+                                          const sfx = unit.key.includes('::') ? '::' + unit.key.split('::')[1] : '';
+                                          const nextCcs = calculateCcsFromValues(nextValues, aiSubstanceFromKey(unit.key));
+                                          onUnitChange(CCS_DIFFERENCE_LABEL + sfx, nextCcs.difference == null ? '' : nextCcs.difference.toFixed(2));
+                                          onUnitChange(CCS_RESULT_LABEL + sfx, nextCcs.result);
                                         }
                                       }
                                       // Manual edit after a pull → mark provenance as edited (once).
@@ -1810,19 +1830,25 @@ export default function LabTestingDetailPage() {
                                       <h4 className="text-sm font-semibold text-foreground">
                                         สารที่ {si + 1}: {substance.name}
                                       </h4>
-                                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-                                        {unitsByField.filter(isSubstanceSetField).flatMap(({ units }) => units
+                                      {(() => {
+                                        const subUnits = unitsByField.filter(isSubstanceSetField).flatMap(({ units }) => units
                                           .filter((unit) => matchSubstanceKey(unit.substanceName ?? '') === substance.key)
-                                          .map((unit) => renderEditUnit(
-                                            calculatedAiFieldKind(unit.field.label) === 'ai'
-                                              ? unit
-                                              : { ...unit, field: { ...unit.field, label: stripAiSubstanceSuffix(unit.field.label) } },
-                                            srcValues,
-                                            onUnitChange,
-                                            saveInfoSrc,
-                                            scalarExtras,
-                                          )))}
-                                      </div>
+                                          .map((unit) => (calculatedAiFieldKind(unit.field.label) === 'ai'
+                                            ? unit
+                                            : { ...unit, field: { ...unit.field, label: stripAiSubstanceSuffix(unit.field.label) } })));
+                                        return AI_FIELD_SECTIONS.map((section) => {
+                                          const inSection = subUnits.filter((unit) => (section.labels as readonly string[]).includes(unit.field.label) || (section.title === 'ผลวิเคราะห์' && calculatedAiFieldKind(unit.field.label) === 'ai'));
+                                          if (inSection.length === 0) return null;
+                                          return (
+                                            <div key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
+                                              <h5 className="text-sm font-semibold text-foreground">{section.title}</h5>
+                                              <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+                                                {inSection.map((unit) => renderEditUnit(unit, srcValues, onUnitChange, saveInfoSrc, scalarExtras))}
+                                              </div>
+                                            </div>
+                                          );
+                                        });
+                                      })()}
                                     </section>
                                   ))}
                                   {sharedFields.length > 0 && (
@@ -1961,7 +1987,7 @@ export default function LabTestingDetailPage() {
                               QC กรอกแล้ว
                             </Badge>
                             {param.hasPhases && (
-                              <Badge className="bg-amber-100 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-100">
+                              <Badge className="bg-amber-50 text-amber-800 text-[10px] font-semibold uppercase hover:bg-amber-50">
                                 Phase {effectivePhase}
                               </Badge>
                             )}

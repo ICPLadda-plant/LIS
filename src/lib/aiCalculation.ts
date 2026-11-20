@@ -118,8 +118,9 @@ export function calculateCcs(mid: unknown, ccs: unknown): CcsCalculationResult {
   return { difference, result: Math.abs(difference) <= CCS_DIFFERENCE_LIMIT ? 'Pass' : 'No pass' };
 }
 
-export function calculateCcsFromValues(values: Record<string, unknown>) {
-  return calculateCcs(valueByLabel(values, MID_LEVEL_STANDARD_LABEL), valueByLabel(values, CCS_CONC_LABEL));
+export function calculateCcsFromValues(values: Record<string, unknown>, substance = '') {
+  const k = (label: string) => (substance ? label + '::' + substance : label);
+  return calculateCcs(valueByLabel(values, k(MID_LEVEL_STANDARD_LABEL)), valueByLabel(values, k(CCS_CONC_LABEL)));
 }
 
 export function ccsDifference(mid: unknown, ccs: unknown) {

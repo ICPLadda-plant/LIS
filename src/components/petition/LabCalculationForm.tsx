@@ -15,7 +15,7 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-top { display: grid; grid-template-columns: 30mm 1fr 30mm; align-items: center; }
 .brom-form-logo { width: 26mm; height: auto; object-fit: contain; }
 .brom-form-title { text-align: center; font-size: 13pt; font-weight: 700; }
-.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 2mm; background: #f2f2f2; }
+.brom-form-bar { display: flex; align-items: center; gap: 6mm; margin-top: 2.5mm; padding: 1mm 2mm; font-weight: 700; background: #e0e0e0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .brom-form-row { display: flex; align-items: flex-end; gap: 3mm; margin-top: 2mm; padding: 0 1mm; }
 .brom-form-label { white-space: nowrap; }
 .brom-form-line { display: block; min-height: 5.5mm; padding: 0 1mm 0.6mm; border-bottom: .6pt solid #000; text-align: center; overflow-wrap: anywhere; }
@@ -39,6 +39,7 @@ export const LAB_CALCULATION_CSS = `
 ${PBZ_PRINT_CSS}`;
 
 const BLANK = /^[-–—]?$/;
+const fmtDensity = (v?: string) => (v && Number.isFinite(Number(v)) ? Number(v).toFixed(3) : v || "");
 
 function values(page: LabReportPage, pattern: RegExp): string[] {
   return (page.rows ?? [])
@@ -85,13 +86,13 @@ const toNumber = (value: string) => {
   return value && Number.isFinite(n) ? n : null;
 };
 
-// ผล Control sample: อยู่ในช่วงเกณฑ์ยอมรับ = ผ่าน
+// ผล Control sample: อยู่ในช่วงเกณฑ์ยอมรับ = Pass
 export function controlResult(value: string, low: string, high: string): string {
   const v = toNumber(value);
   const lo = toNumber(low);
   const hi = toNumber(high);
   if (v == null || lo == null || hi == null) return "";
-  return v >= Math.min(lo, hi) && v <= Math.max(lo, hi) ? "ผ่าน" : "ไม่ผ่าน";
+  return v >= Math.min(lo, hi) && v <= Math.max(lo, hi) ? "Pass" : "No pass";
 }
 
 // "ไม่พบ" ต้องเช็กก่อน "พบ" เพราะมีคำว่าพบอยู่ข้างใน
@@ -133,13 +134,13 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
   }
   const aiResult = firstValue(page, /^%\s*AI/i);
   const area = [
-    ...triple(values(page, AREA_INJ)),
+    ...[1, 2, 3].map((n) => firstValue(page, new RegExp("^Area\\s*Inj\\.?\\s*" + n, "i"))),
     firstValue(page, /^Area\s*Av/i),
     firstValue(page, /^Area\s*%?\s*RSD/i),
   ];
   const sampleAverage = firstValue(page, /^%\s*Sample\s*Av/i, aiResult);
   const sample = [
-    ...triple(values(page, SAMPLE_N)),
+    ...[1, 2, 3].map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i"))),
     sampleAverage,
     firstValue(page, /^%\s*Sample\s*%?\s*RSD/i),
   ];
@@ -164,7 +165,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
   const controlRange = control.low && control.high ? `${control.low} - ${control.high}` : control.low || control.high;
   const testedDate = name(page.sample.testedDate);
   const isWW = isGrWpSpCommonName(page.sample.name);
-  const densityValue = isWW ? "-" : firstValue(page, /density|ถ\.?\s*พ\.?/i, "1.000");
+  const densityValue = fmtDensity(firstValue(page, /density|ถ\.?\s*พ\.?/i) || (page.rows ?? []).map((row) => /Density\s*:\s*([\d.]+)/i.exec(row.result ?? "")?.[1]).find(Boolean)) || (isWW ? "-" : "");
 
   return (
     <div className="brom-form-root">
@@ -210,8 +211,8 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>
-          <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className={`brom-form-line${isWW ? " brom-form-line--na" : ""}`} data-field="density">{densityValue}</span><span>g/cm3</span>
-          <span>Report</span><span className="brom-form-line" data-field="report">{aiResult}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
+          <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className="brom-form-line" data-field="density">{densityValue}</span><span>g/cm<sup style={{ fontSize: "6pt" }}>3</sup></span>
+          <span>Report</span><span className={`brom-form-line${isWW ? " brom-form-line--na" : ""}`} data-field="report">{aiResult}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
         </div>
 
         <div className="brom-form-signatures">
