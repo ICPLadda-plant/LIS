@@ -154,7 +154,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
   const controlRange = control.low && control.high ? `${control.low} - ${control.high}` : control.low || control.high;
   const testedDate = name(page.sample.testedDate);
   const isWW = isGrWpSpCommonName(page.sample.name);
-  const densityValue = isWW ? "-" : fmtDensity(firstValue(page, /density|ถ\.?\s*พ\.?/i) || (page.rows ?? []).map((row) => /Density\s*:\s*([\d.]+)/i.exec(row.result ?? "")?.[1]).find(Boolean));
+  const densityValue = fmtDensity(firstValue(page, /density|ถ\.?\s*พ\.?/i) || (page.rows ?? []).map((row) => /Density\s*:\s*([\d.]+)/i.exec(row.result ?? "")?.[1]).find(Boolean)) || (isWW ? "-" : "");
 
   return (
     <div className="brom-form-root">

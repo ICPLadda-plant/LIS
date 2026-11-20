@@ -115,7 +115,7 @@ function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string):
   if (!group) return [];
   const out: LabReportRow[] = [];
   group.params
-    .filter((p) => p.scope === "lab")
+    .filter((p) => p.scope === "lab" || /ถ\.?\s*พ|density/i.test(p.parameterName))
     .forEach((p) => {
       p.rows.forEach((r) => {
         const unit = r.unit ? ` (${r.unit})` : "";
