@@ -112,7 +112,22 @@ export function itemSampleLabelNumbers(
   const year = String(numbers.year % 100).padStart(2, "0");
   const group = numbers.groups?.find((entry) => entry.key === sampleLabelGroupKey(item));
   const source = group ?? numbers;
-  return sides.map((side) => source[side]).filter(Boolean).map((seq) => `${seq}/${year}`);
+  // คำขอเก่าที่ไม่มีกลุ่ม: ใช้เลขระดับคำขอเฉพาะฝั่งที่ป้ายของรายการนี้ส่งจริง (ไม่ออกเลขใหม่)
+  const usedSides = group ? null : legacyItemLabelSides(petition, item);
+  return sides
+    .filter((side) => !usedSides || usedSides.has(side))
+    .map((side) => source[side]).filter(Boolean).map((seq) => `${seq}/${year}`);
+}
+
+function legacyItemLabelSides(petition: Pick<Petition, "sampleLabelNumbers">, item: SampleLabelGroupItem): Set<SampleLabelSide> | null {
+  const full = petition as Petition;
+  const raw = item as Petition["items"][number];
+  if (!Array.isArray(full.items) || !full.items.length) return null;
+  const quantity = Math.floor(Number(raw.sampleQuantity));
+  const copies = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+  const used = new Set<SampleLabelSide>();
+  for (let copyIndex = 0; copyIndex < copies; copyIndex += 1) used.add(sampleLabelCopySide(full, raw, copyIndex));
+  return used;
 }
 
 /**
