@@ -13,6 +13,7 @@ import type { Petition, QCTestResult } from '@/types/petition.types';
 import SampleLabelPrintTemplate from './SampleLabelPrintTemplate';
 import { MediaThumbnails } from '@/components/lis/MediaThumbnails';
 import { mediaUrlsFromValue } from '@/lib/mediaUrls';
+import { formatLabResultValue } from '@/lib/resultNumberFormat';
 
 const statusLabels = { requested: 'รอนำส่ง', sent: 'นำส่งแล้ว รอรับ', received: 'รับแล้ว' };
 
@@ -24,7 +25,7 @@ function displayValue(value: unknown): string {
   if (value == null || value === '') return '-';
   if (Array.isArray(value)) return value.map(displayValue).join(', ');
   if (typeof value === 'object') return Object.entries(value).map(([label, entry]) => `${label}: ${displayValue(entry)}`).join(', ');
-  return String(value);
+  return String(formatLabResultValue(value));
 }
 
 function ResultValue({ value }: { value: unknown }) {
