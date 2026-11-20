@@ -305,6 +305,35 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
   }
 });
 
+// GET /api/qc-results/daily-calibration
+// ค่า r / Mid-level Standard / CCS Conc. ที่กรอกไว้แล้วในวันนี้ (เวลาไทย) — ครั้งแรกของวันต้องกรอกเอง
+// คืน { [label]: { any, bySubstance: { [สาร]: ค่า } } } โดยเลือกค่าล่าสุด
+router.get("/daily-calibration", async (req, res) => {
+  try {
+    const LABELS = ["ค่า Correlation coefficient ( r ) ที่ได้", "Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)"];
+    const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
+    const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
+    const docs = await QCTestResult.find({ updatedAt: { $gte: dayStart } }).sort({ updatedAt: -1 }).select("values").limit(300).lean();
+    const out = {};
+    for (const doc of docs) {
+      for (const [key, raw] of Object.entries(flattenLegacyDottedValues(doc.values) || {})) {
+        const value = String(raw ?? "").trim();
+        if (!value) continue;
+        const [base, substance = ""] = key.split("::");
+        const label = LABELS.find((l) => l.toLowerCase() === base.trim().toLowerCase());
+        if (!label) continue;
+        const slot = (out[label] ??= { bySubstance: {} });
+        slot.any ??= value;
+        const sub = substance.trim().toLowerCase();
+        if (sub) slot.bySubstance[sub] ??= value;
+      }
+    }
+    res.json(out);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/qc-results/by-petitions?petitionIds=a,b&parameterIds=x,y
 // ผลแบบย่อของหลายคำร้อง (เฉพาะ parameter ที่ขอ) — หน้า /petition ใช้อ่านค่า ถพ. ต่อ batch
 router.get("/by-petitions", async (req, res) => {

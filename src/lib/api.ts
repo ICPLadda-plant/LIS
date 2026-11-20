@@ -955,6 +955,8 @@ export const api = {
     const qs = new URLSearchParams({ excludePetitionId }).toString();
     return request<{ std1?: string; std2?: string; stdPct?: string; petitionNo?: string; enteredAt?: string; internalStd?: Record<string, string> }>(`/qc-results/paclobutrazol-std-weights?${qs}`);
   },
+  getDailyCalibration: () =>
+    request<Record<string, { any?: string; bySubstance?: Record<string, string> }>>("/qc-results/daily-calibration"),
   getReturnedFlags: (petitionIds: string[]) => {
     if (petitionIds.length === 0) return Promise.resolve({} as Record<string, boolean>);
     const qs = new URLSearchParams({ petitionIds: petitionIds.join(",") }).toString();

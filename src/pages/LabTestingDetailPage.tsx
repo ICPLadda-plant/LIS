@@ -42,6 +42,7 @@ import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, c
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
+import { DailyCalibrationPrefill, DAILY_CALIBRATION_LABELS } from '@/components/petition/DailyCalibrationPrefill';
 import { matchSubstanceKey } from '@/lib/substances';
 import { standardNumbersForSubstance } from '@/lib/standardInUse';
 import type { StandardInUseItem } from '@/types/stock';
@@ -1980,11 +1981,16 @@ export default function LabTestingDetailPage() {
                               );
                             }
 
-                            return renderEditGrid(
-                              phaseValues[k] ?? {},
-                              (label, val) => handleFieldChange(petition, item, param, label, val, effectivePhase),
-                              phaseSaves[k],
-                              true,
+                            const onScalarChange = (label: string, val: unknown) => handleFieldChange(petition, item, param, label, val, effectivePhase);
+                            const dailyKeys = isAiParameterFields(param.valueFields ?? []) && !fieldDisabled
+                              ? (param.valueFields ?? []).flatMap((field) => expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, true).map((unit) => unit.key))
+                                .filter((key) => DAILY_CALIBRATION_LABELS.includes(key.split('::', 1)[0]))
+                              : [];
+                            return (
+                              <>
+                                {dailyKeys.length > 0 && <DailyCalibrationPrefill keys={dailyKeys} values={phaseValues[k] ?? {}} onChange={onScalarChange} />}
+                                {renderEditGrid(phaseValues[k] ?? {}, onScalarChange, phaseSaves[k], true)}
+                              </>
                             );
                           })()}
                           <ParameterRemarkField
