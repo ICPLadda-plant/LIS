@@ -1693,22 +1693,21 @@ export default function LabTestingDetailPage() {
                                 if (fill !== saved && (fill || isQrValue) && !fieldDisabled) {
                                   queueMicrotask(() => onUnitChange(unit.key, fill));
                                 }
-                                const choices = current && !options.includes(current) ? [current, ...options] : options;
                                 return (
                                   <div key={unit.key} className={cn(aiGridClass(unit.field.label), 'space-y-1')}>
                                     <label className="text-sm font-medium text-foreground" htmlFor={`std-no-${unit.key}`}>{unit.field.label}</label>
-                                    <select
+                                    <input
                                       id={`std-no-${unit.key}`}
+                                      list={`std-no-list-${unit.key}`}
                                       className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
                                       value={current}
                                       disabled={fieldDisabled}
+                                      placeholder={options.length ? 'เลือกหรือพิมพ์เลขที่ Standard' : 'พิมพ์เลขที่ Standard'}
                                       onChange={(e) => onUnitChange(unit.key, e.target.value)}
-                                    >
-                                      <option value="">{options.length ? 'เลือกเลขที่ Standard' : 'ไม่มี Standard ของสารนี้ที่กำลังใช้งาน'}</option>
-                                      {choices.map((qr) => (
-                                        <option key={qr} value={qr}>{qr}{options.includes(qr) ? '' : ' (ไม่อยู่ในรายการที่กำลังใช้งาน)'}</option>
-                                      ))}
-                                    </select>
+                                    />
+                                    <datalist id={`std-no-list-${unit.key}`}>
+                                      {options.map((qr) => <option key={qr} value={qr} />)}
+                                    </datalist>
                                   </div>
                                 );
                               }
