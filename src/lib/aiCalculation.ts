@@ -182,8 +182,9 @@ export function aiGridClass(label: string) {
   if (kind === 'ai') return 'sm:col-span-6';
   if (isControlSampleLabel(label)) return 'sm:col-span-2';
   if ([STANDARD_NO_LABEL, CORRELATION_LABEL].includes(label)) return 'sm:col-span-3';
-  if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(label)) return 'sm:col-span-2';
-  if ([CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL].includes(label)) return 'sm:col-span-1';
+  // แถว CCS: ชิดล่าง ให้กรอบกรอกตรงกันแม้ป้ายของช่องแคบ (CCS Result) ขึ้นสองบรรทัด
+  if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(label)) return 'sm:col-span-2 sm:self-end';
+  if ([CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL].includes(label)) return 'sm:col-span-1 sm:self-end';
   if (kind === 'areaAverage' || kind === 'areaRsd' || kind === 'sampleAverage' || kind === 'sampleRsd') return 'sm:col-span-3';
   if (/^(area\s*inj\.?|%\s*sample)/i.test(label.trim())) return 'sm:col-span-2';
   return '';
