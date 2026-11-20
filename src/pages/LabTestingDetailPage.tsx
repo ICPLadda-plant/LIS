@@ -2354,7 +2354,7 @@ export default function LabTestingDetailPage() {
             css={LAB_CALCULATION_CSS}
           >
             {calculationPages.map((page, index) => (
-              <LabCalculationForm key={`${page.reportNo}-${index}`} page={page} variant={calculationVariant ?? 'default'} />
+              <LabCalculationForm key={`${page.reportNo}-${index}`} page={page} variant={calculationVariant ?? 'default'} standardOptions={standardNumbersForSubstance(standardsInUse, page.sample.name)} />
             ))}
           </PrintPreviewDialog>
         )}

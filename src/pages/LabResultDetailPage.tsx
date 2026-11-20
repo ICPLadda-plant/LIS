@@ -23,6 +23,8 @@ import { buildChemAnalysisSheets, canPrintChemAnalysisReport } from "@/lib/chemA
 import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationData, isPaclobutrazolPage, type LabCalculationVariant } from "@/components/petition/LabCalculationForm";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import type { QCTestResult } from "@/types/petition.types";
+import type { StandardInUseItem } from "@/types/stock";
+import { standardNumbersForSubstance } from "@/lib/standardInUse";
 import { useAuth } from "@/hooks/useAuth";
 import { normalizeRoles } from "@/lib/roles";
 import LabHeadEditAction from "@/components/lis/approval/LabHeadEditAction";
@@ -53,6 +55,11 @@ export default function LabResultDetailPage() {
   const groupMembership = useItemGroupMembership();
   const [parameters, setParameters] = useState<ParameterItem[]>([]);
   const [results, setResults] = useState<QCTestResult[]>([]);
+  // ขวด standard ที่กำลังใช้งาน — เติมเลขที่ Standard ในใบคำนวณเมื่อยังไม่ได้บันทึก
+  const [standardsInUse, setStandardsInUse] = useState<StandardInUseItem[]>([]);
+  useEffect(() => {
+    api.getStandardsInUse().then((res) => setStandardsInUse(res?.items ?? [])).catch(() => {});
+  }, []);
   const [paramsLoaded, setParamsLoaded] = useState(false);
   const [printOpen, setPrintOpen] = useState(false);
   const [calcVariant, setCalcVariant] = useState<LabCalculationVariant | null>(null);
@@ -225,7 +232,7 @@ export default function LabResultDetailPage() {
       </PrintPreviewDialog>}
       {calcPages.length > 0 && <PrintPreviewDialog open={calcVariant !== null} onOpenChange={(open) => { if (!open) setCalcVariant(null); }} docType="coa" title="ใบคำนวณผลวิเคราะห์" css={LAB_CALCULATION_CSS}>
         {calcPages.map((page, i) => (
-          <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} variant={calcVariant ?? "default"} />
+          <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} variant={calcVariant ?? "default"} standardOptions={standardNumbersForSubstance(standardsInUse, page.sample.name)} />
         ))}
       </PrintPreviewDialog>}
     </AppLayout>

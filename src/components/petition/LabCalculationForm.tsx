@@ -128,7 +128,7 @@ export function isPaclobutrazolPage(page: LabReportPage): boolean {
 export type LabCalculationVariant = "default" | "standard";
 
 /** ใบคำนวณผลวิเคราะห์ FM-QP-07-08-002-R02 (A4 แนวนอน) */
-export default function LabCalculationForm({ page, variant = "default" }: { page: LabReportPage; variant?: LabCalculationVariant }) {
+export default function LabCalculationForm({ page, variant = "default", standardOptions = [] }: { page: LabReportPage; variant?: LabCalculationVariant; /** เลขที่ Standard ของขวดที่กำลังใช้งานของสารนี้ ใช้เมื่อยังไม่ได้บันทึกค่า */ standardOptions?: string[] }) {
   // PACLOBUTRAZOL: "default" = ใบ Internal standard แบบเดิม (FM-QP-07-08-002-R01), "standard" = ใบคำนวณแบบสารอื่น
   const pbzValues = paclobutrazolValues(page);
   if (pbzValues && variant === "default") {
@@ -155,7 +155,7 @@ export default function LabCalculationForm({ page, variant = "default" }: { page
     firstValue(page, /^%\s*Sample\s*%?\s*RSD/i),
   ];
   const standardNo = (page.rows ?? []).filter((row) => /standard/i.test(row.testItem) && !/conc|mid/i.test(row.testItem))
-    .map((row) => row.result?.trim() ?? "").find((v) => !BLANK.test(v)) ?? "";
+    .map((row) => row.result?.trim() ?? "").find((v) => !BLANK.test(v) && !/^u_/i.test(v)) ?? (standardOptions.length === 1 ? standardOptions[0] : "");
   const correlation = firstValue(page, /correlation|^r(\s*·|\s*\(|$)/i);
   const midConc = firstValue(page, /mid[-\s]*level/i);
   const ccsConc = firstValue(page, /^ccs\s*conc/i);
