@@ -171,6 +171,8 @@ const BalanceRoomPage = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const scale = BALANCE_SCALES.find(s => s.id === selectedScaleId) ?? BALANCE_SCALES[0];
+  // สีเดียวกับการ์ดเลือกเครื่อง ใช้กับการ์ดด้านล่างของเครื่องนั้น
+  const scaleTone = SCALE_CARD_COLORS[Math.max(0, BALANCE_SCALES.indexOf(scale)) % SCALE_CARD_COLORS.length].replace(/\s*hover:\S+/g, "");
   const typeLabel = balanceScaleTypeLabel(scale);
   const draftKey = (id: string) => `${recordDate}|${id}`;
 
@@ -673,7 +675,7 @@ const BalanceRoomPage = () => {
       </section>
 
       {/* ข้อมูลเครื่องมือ */}
-      <Card>
+      <Card className={scaleTone}>
         <CardContent className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 xl:grid-cols-6">
           {infoItems.map(item => (
             <div key={item.label} className="min-w-0">
@@ -687,7 +689,7 @@ const BalanceRoomPage = () => {
       {/* iPad (md/lg) ฟอร์มกว้างเต็มแถวให้กรอกง่าย กราฟลงไปอยู่ด้านล่าง; จอกว้างจริงค่อยวางคู่กัน */}
       <div className="grid gap-4 xl:grid-cols-3">
         {/* ฟอร์มบันทึกของเครื่องที่เลือก */}
-        <Card className="xl:col-span-1">
+        <Card className={cn("xl:col-span-1", scaleTone)}>
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
             <div className="min-w-0 space-y-1">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -826,7 +828,7 @@ const BalanceRoomPage = () => {
         </Card>
 
         {/* กราฟควบคุมคุณภาพ */}
-        <Card className="xl:col-span-2">
+        <Card className={cn("xl:col-span-2", scaleTone)}>
           <CardHeader className="pb-3">
             <div className="space-y-1">
               <CardTitle className="text-base">กราฟควบคุมคุณภาพ (Control Chart)</CardTitle>
