@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen } from 'lucide-react';
+import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import LabStartWorkDialog from '@/components/petition/LabStartWorkDialog';
@@ -42,6 +42,7 @@ import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
+const LAB_PAGE_SIZE = 50;
 
 const labItemsFor = (petition: Petition) => (petition.items ?? []).filter(
   (item) => isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(item),
@@ -56,6 +57,8 @@ export default function LabTestingPage() {
   const assignedToNames = !isFullAccess ? assigneeNamesForUser(user) : undefined;
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState<PetitionDept | ''>('');
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [search, dept]);
   const [labParameters, setLabParameters] = useState<Awaited<ReturnType<typeof api.getParameters>>>([]);
   const [parametersLoaded, setParametersLoaded] = useState(false);
   const [parametersError, setParametersError] = useState(false);
@@ -107,8 +110,10 @@ export default function LabTestingPage() {
     assignedToEmployeeId,
     assignedToNames,
     labPending: true,
-    limit: 100,
+    page,
+    limit: LAB_PAGE_SIZE,
   });
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / LAB_PAGE_SIZE));
   // คำร้องเฉพาะ Admin ถูกซ่อนจากรายการปกติ จึงดึงแยกมารวมให้ Admin กรอกผลได้
   const isAdmin = normalizeRoles(user).includes('admin');
   const { data: adminOnlyData, refresh: refreshAdminOnly } = usePetitionList({
@@ -382,6 +387,37 @@ export default function LabTestingPage() {
           }}
           emptyTitle="ไม่มีคำร้อง Lab ที่รอตรวจ"
         />
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-muted-foreground">
+              หน้า {page}/{totalPages} · {data?.total ?? 0} รายการ
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={page <= 1}
+                onClick={() => setPage((n) => Math.max(1, n - 1))}
+                aria-label="หน้าก่อนหน้า"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                disabled={page >= totalPages}
+                onClick={() => setPage((n) => Math.min(totalPages, n + 1))}
+                aria-label="หน้าถัดไป"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </AppLayout>
   );
