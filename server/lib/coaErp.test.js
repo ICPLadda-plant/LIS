@@ -491,7 +491,7 @@ test('request Batch keeps its matching request production date instead of an unr
   assert.equal(result.sample.productionDate, '2026-06-16');
 });
 
-test('ERP MF production date overrides the LIS request date', () => {
+test('label withdrawal production date overrides the ERP MF create date', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
     sampleSnapshots: [{
@@ -499,7 +499,7 @@ test('ERP MF production date overrides the LIS request date', () => {
       commonName: 'FENOBUCARB 50% EC',
       batchNo: '029',
       sampleId: 'F-JAZ50-200',
-      productionDate: '2026-11-09',
+      productionDate: '2026-11-20',
     }],
     externalCoaRequest: { itemNo: 'F-JAZ50-200', shipmentDate: '2026-11-10T00:00:00.000Z' },
   }, [], [{
@@ -513,7 +513,7 @@ test('ERP MF production date overrides the LIS request date', () => {
   });
 
   assert.equal(result.sample.batchNo, '029');
-  assert.equal(result.sample.productionDate, '2026-11-09');
+  assert.equal(result.sample.productionDate, '2026-11-20');
 });
 
 test('customer COA request batch, lot and production date take precedence over ERP references', () => {
@@ -602,7 +602,7 @@ test('finished-good COA request can use the matching bulk production batch and d
   assert.equal(result.sample.productionDate, '2026-11-04');
 });
 
-test('bulk RM lot date overrides a stale production request date for a finished-good COA', () => {
+test('label withdrawal date overrides an RM stock lot date for a finished-good COA', () => {
   const source = {
     sampleSnapshots: [{ sampleName: 'โบรมาดิโอการ์ด - อ.ย.', commonName: 'BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)' }],
     externalCoaRequest: { itemNo: 'FPH-BROMD-1X20', shipmentDate: '2026-11-05' },
@@ -625,7 +625,7 @@ test('bulk RM lot date overrides a stale production request date for a finished-
   }], [], requestMatch.item);
 
   assert.equal(result.sample.batchNo, '26S-BRM0.005-GMP(R)-240');
-  assert.equal(result.sample.productionDate, '2026-11-06');
+  assert.equal(result.sample.productionDate, '2026-11-05');
 });
 
 test('batch matching ranks the exact number first and nearby numbers above unrelated batches', () => {

@@ -550,6 +550,25 @@ test('externalCoaRowsToDocuments applies the confirmed Lot Description Batch and
   assert.equal(doc.sampleSnapshots[0].productionDate, '2026-11-20');
 });
 
+test('ERP enrichment keeps the label withdrawal date instead of replacing it with the MF date', () => {
+  const [source] = router.externalCoaRowsToDocuments([{
+    SaleOrderNo: 'SO26110144', Line: 10000, ItemNo: 'FC-NATOK-100X10X12',
+    ProductionDate: '2026-11-17', remark: 'COA',
+  }]);
+
+  const [enriched] = router.enrichExternalCoaDocumentsWithErpLots([source], {
+    stockRows: [],
+    mfRows: [{
+      item_no: 'FC-NATOK-100X10X12',
+      prod_order_no: 'MF26110185',
+      create_date: '2026-11-17',
+    }],
+  });
+
+  assert.equal(enriched.sampleSnapshots[0].batchNo, '2026082601');
+  assert.equal(enriched.sampleSnapshots[0].productionDate, '2026-11-20');
+});
+
 test('externalCoaRowsToDocuments keeps separate requests when the outstanding quantity changes', () => {
   const base = { SaleOrderNo: 'SO-LATEST', Line: 10000, ItemNo: 'F-1' };
   const removed = router.externalCoaRowsToDocuments([
@@ -1765,7 +1784,7 @@ test('ERP autofill keeps the LIS label production date instead of deriving it fr
   }
 });
 
-test('ERP autofill replaces the LIS date with the closed MF production date', async () => {
+test('ERP autofill keeps the label withdrawal date over the closed MF date', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1814,7 +1833,7 @@ test('ERP autofill replaces the LIS date with the closed MF production date', as
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'LOT-CUSTOMER');
-    assert.equal(res.body.sample.productionDate, '2026-09-17');
+    assert.equal(res.body.sample.productionDate, '2026-06-16');
     assert.equal(res.body.dataSources.mf, true);
   } finally {
     global.fetch = originals.fetch;
