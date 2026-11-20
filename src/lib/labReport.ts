@@ -4,6 +4,7 @@ import type { ApprovalItemGroup } from "@/lib/qcApprovalRows";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { pesticideTestMethod } from "@/lib/pesticideTestMethods";
 import { itemSubmissionNoText } from "@/lib/petitionSampler";
+import { formatLabResultText } from "@/lib/resultNumberFormat";
 
 export interface LabReportRow {
   testItem: string;
@@ -121,7 +122,7 @@ function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string):
         const unit = r.unit ? ` (${r.unit})` : "";
         out.push({
           testItem: `${r.label}${unit}`,
-          result: r.value || DASH,
+          result: r.value ? formatLabResultText(r.value) : DASH,
           criteria: r.standardText ? labReportCriteriaText(r.standardText) : DASH,
           method: methodForRow(r.label, p.parameterName, commonName || group.commonName),
         });

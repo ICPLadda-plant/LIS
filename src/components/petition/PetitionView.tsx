@@ -21,6 +21,7 @@ import { describeResolvedStandard, describeStandard, formatLabelToleranceRange, 
 import { itemSubmissionNoText } from '@/lib/petitionSampler';
 import { MediaThumbnails } from '@/components/lis/MediaThumbnails';
 import { mediaUrlsFromValue } from '@/lib/mediaUrls';
+import { formatLabResultValue } from '@/lib/resultNumberFormat';
 
 interface Props { petition: Petition; hideMissingStandardBadge?: boolean; }
 
@@ -28,7 +29,7 @@ function formatResultValue(value: unknown): string {
   if (value == null || value === '') return '-';
   if (typeof value === 'boolean') return value ? '✓' : '✗';
   if (typeof value === 'object') return JSON.stringify(value);
-  return String(value);
+  return String(formatLabResultValue(value));
 }
 
 function ResultValue({ value }: { value: unknown }) {

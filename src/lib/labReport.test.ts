@@ -125,7 +125,7 @@ describe("buildLabReportPages", () => {
     expect(p.rows).toHaveLength(1); // qc row ถูกตัดออก
     expect(p.rows[0]).toEqual({
       testItem: "Glyphosate (%w/v)",
-      result: "48.2",
+      result: "48.20",
       criteria: "45.5-50.5",
       method: "HPLC\nJ. Henriet and H.H. Povlsen. 1988. Analysis of Technical and Formulated Pesticides. CIPAC Handbook. Vol. D. P. 100-105.",
     });
