@@ -131,6 +131,12 @@ const AI_FIELD_SECTIONS = [
   { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 shadow-sm dark:bg-teal-950/60' },
 ] as const;
 
+// PACLOBUTRAZOL ยังต้องกรอก Area Inj. 1-3 แม้ผลตัวอย่างจะมาจากตาราง Internal standard
+function isPbzAreaFieldLabel(label: string) {
+  const kind = calculatedAiFieldKind(label);
+  return /^area\s*inj\.?\s*[1-3]$/i.test(label.trim()) || kind === 'areaAverage' || kind === 'areaRsd';
+}
+
 function aiFieldsForParameter(fields: ParameterValueField[]) {
   if (!fields.some((field) => calculatedAiFieldKind(field.label) === 'ai')) return fields;
   const byLabel = new Map(fields.map((field) => [field.label.trim().toLowerCase(), field]));
@@ -1841,7 +1847,8 @@ export default function LabTestingDetailPage() {
                                   <div className="grid grid-cols-1 gap-4 pl-2 sm:grid-cols-6">
                                     {/* %AI และช่อง Standard / CCS ไว้บนสุด แล้วจึงตามด้วยตาราง */}
                                     {fields.filter((field) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai').map(renderField)}
-                                    {fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label)) && !(field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai')).map(renderField)}
+                                    {/* ช่อง Area Inj. 1-3 / Average / %RSD อยู่ระหว่างข้อมูล Standard กับ CCS ตามลำดับ AI_FIELD_ORDER */}
+                                    {fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label) || isPbzAreaFieldLabel(field.label)) && !(field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai')).map(renderField)}
                                     <PaclobutrazolGrid
                                       values={srcValues}
                                       onChange={onPbzChange}
