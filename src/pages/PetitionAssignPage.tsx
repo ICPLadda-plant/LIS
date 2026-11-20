@@ -949,8 +949,8 @@ function PetitionCard({
   const canDrag = canDragRole;
 
   return (
+    // กดตัวการ์ดไม่เปิดหน้าคำร้อง (กันหลุดมือตอนลาก) — เปิดได้จากปุ่มเลขคำร้องเท่านั้น
     <Card
-      onOpen={onClick}
       draggable={canDrag}
       onDragStart={(e) => {
         if (!canDrag) { e.preventDefault(); return; }
