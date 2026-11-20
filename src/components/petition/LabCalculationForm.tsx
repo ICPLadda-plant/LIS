@@ -38,6 +38,7 @@ export const LAB_CALCULATION_CSS = `
 `;
 
 const BLANK = /^[-–—]?$/;
+const fmtDensity = (v?: string) => (v && Number.isFinite(Number(v)) ? Number(v).toFixed(3) : v || "");
 
 function values(page: LabReportPage, pattern: RegExp): string[] {
   return (page.rows ?? [])
@@ -153,7 +154,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
   const controlRange = control.low && control.high ? `${control.low} - ${control.high}` : control.low || control.high;
   const testedDate = name(page.sample.testedDate);
   const isWW = isGrWpSpCommonName(page.sample.name);
-  const densityValue = isWW ? "-" : firstValue(page, /density|ถ\.?\s*พ\.?/i, "1.000");
+  const densityValue = isWW ? "-" : fmtDensity(firstValue(page, /density|ถ\.?\s*พ\.?/i) || (page.rows ?? []).map((row) => /Density\s*:\s*([\d.]+)/i.exec(row.result ?? "")?.[1]).find(Boolean));
 
   return (
     <div className="brom-form-root">

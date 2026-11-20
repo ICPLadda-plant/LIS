@@ -139,7 +139,7 @@ function mergeDensityAndUnit(rows: LabReportRow[], name?: string): LabReportRow[
   const out = rows.filter((r) => !(ai && den && r === den));
   if (ai) {
     if (unit) { ai.testItem = ai.testItem.replace(/\(\s*%\s*\)\s*$/, `(${unit})`); if (ai.result !== DASH) ai.result += ` ${unit}`; }
-    if (den && den.result !== DASH) ai.result += `\nDensity : ${den.result}`;
+    if (den && den.result !== DASH) ai.result += `\nDensity : ${Number.isFinite(Number(den.result)) ? Number(den.result).toFixed(3) : den.result}`;
   }
   return out;
 }
