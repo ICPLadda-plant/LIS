@@ -668,8 +668,12 @@ router.get('/rejected-by-batch', async (req, res) => {
 router.get('/batch-exists', async (req, res) => {
   try {
     const batchNo = String(req.query.batchNo || '').trim();
+    const sampleName = String(req.query.sampleName || '').trim();
     if (!batchNo) return res.json({ exists: false });
-    const exists = await Petition.exists({ 'items.batchNo': batchNo, status: { $ne: 'deleted' } });
+    // Batch ซ้ำนับเฉพาะสารเดียวกัน: สารต่างชนิดใช้เลข batch ชนกันได้
+    const itemMatch = { batchNo };
+    if (sampleName) itemMatch.sampleName = sampleName;
+    const exists = await Petition.exists({ items: { $elemMatch: itemMatch }, status: { $ne: 'deleted' } });
     res.json({ exists: Boolean(exists) });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });

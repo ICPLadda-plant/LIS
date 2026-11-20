@@ -1066,9 +1066,10 @@ export const api = {
     const qs = new URLSearchParams({ batchNo, employeeId }).toString();
     return request<import("@/types/petition.types").Petition[]>(`/petitions/rejected-by-batch?${qs}`);
   },
-  batchExists: async (batchNo: string) => {
+  batchExists: async (batchNo: string, sampleName?: string) => {
     try {
-      return await request<{ exists: boolean }>(`/petitions/batch-exists?${new URLSearchParams({ batchNo }).toString()}`);
+      const qs = new URLSearchParams({ batchNo, ...(sampleName ? { sampleName } : {}) }).toString();
+      return await request<{ exists: boolean }>(`/petitions/batch-exists?${qs}`);
     } catch (error) {
       // Older deployments do not have the advisory duplicate-check route yet.
       // Keep request creation available; the server still validates the submitted payload.

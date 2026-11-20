@@ -1020,11 +1020,16 @@ export default function ProductionPetitionNewPage({
     // Production integration requests are already validated by the source system.
     // They do not have a LIS session, so avoid the session-protected duplicate check.
     if (!publicMode) {
-      const repeatedBatches = [...new Set(items.map((item) => String(item.batchNo ?? '').trim()).filter(Boolean))];
-      for (const batchNo of repeatedBatches) {
+      const batchKeys = new Map(
+        items
+          .map((item) => ({ batchNo: String(item.batchNo ?? '').trim(), sampleName: String(item.sampleName ?? '').trim() }))
+          .filter((key) => key.batchNo)
+          .map((key) => [`${key.sampleName}|${key.batchNo}`, key] as const),
+      );
+      for (const { batchNo, sampleName } of batchKeys.values()) {
         try {
-          const { exists } = await api.batchExists(batchNo);
-          if (exists && !window.confirm(`Batch ${batchNo} เคยส่งไปแล้ว ต้องการส่งอีกใช่ไหม?`)) return;
+          const { exists } = await api.batchExists(batchNo, sampleName);
+          if (exists && !window.confirm(`${sampleName ? `${sampleName} ` : ''}Batch ${batchNo} เคยส่งไปแล้ว ต้องการส่งอีกใช่ไหม?`)) return;
         } catch {
           setError('ตรวจสอบประวัติ batch ไม่สำเร็จ กรุณาลองใหม่');
           return;
