@@ -1,3 +1,4 @@
+import { itemSubmissionNoText } from '@/lib/petitionSampler';
 import { useEffect, useRef, useState, useCallback, useMemo, type ReactNode } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -1756,7 +1757,7 @@ export default function LabTestingDetailPage() {
                                       density={aiDensity(srcValues, condCtx, 'paclobutrazol', densityEntries, hasSgParam)}
                                       analyst={user?.name}
                                       header={{
-                                        sampleNo: item.submissionNo || petition.petitionNo,
+                                        sampleNo: itemSubmissionNoText(petition, item, 'lab') || petition.petitionNo,
                                         tradeName: item.sampleName,
                                         commonName: item.commonName,
                                         formula: /\d+(?:\.\d+)?\s*%\s*[A-Z]{2,3}\b/i.exec(String(item.sampleName ?? ''))?.[0],
