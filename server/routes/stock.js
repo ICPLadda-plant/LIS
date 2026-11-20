@@ -923,7 +923,13 @@ router.get('/standards/in-use', async (req, res) => {
     const standards = codes.length
       ? await StockStandard.find({ code: { $in: codes } }).select('code frequency').lean()
       : [];
-    res.json({ serverTime: new Date().toISOString(), items: buildInUseItems(txs, standards) });
+    const qrIds = [...new Set(txs.map((t) => t.qrId).filter(Boolean))];
+    const units = qrIds.length
+      ? await StockUnit.find({ qrId: { $in: qrIds } }).select('qrId itemCode labelCode labelRunNo labelRunYear').lean()
+      : [];
+    const labelByQr = new Map(units.map((u) => [String(u.qrId), standardUnitDisplayCode(u)]));
+    const items = buildInUseItems(txs, standards).map((it) => ({ ...it, labelCode: labelByQr.get(it.qrId) || '' }));
+    res.json({ serverTime: new Date().toISOString(), items });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
