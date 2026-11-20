@@ -932,7 +932,14 @@ export default function LabTestingDetailPage() {
     petition,
     buildLabReportPages(petition, [], calculationGroups),
     calculationGroups,
-    (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(savedResults, seq, findSgParameter(allParameters)),
+    (seq) => {
+      const sg = resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(savedResults, seq, findSgParameter(allParameters));
+      if (sg) return sg;
+      // ไม่มีพารามิเตอร์ ถพ. → %AI คำนวณด้วย ถพ. = 1.00 จึงแสดงค่าเดียวกันในแบบฟอร์ม (ยกเว้นยาน้ำ)
+      const item = petition.items?.find((entry) => entry.seq === seq);
+      if (!item || isWaterFormulationItem(item)) return '';
+      return hasSpecificGravityParam(matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources)) ? '' : DEFAULT_AI_DENSITY.toFixed(2);
+    },
   ).filter(hasCalculationFields);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
