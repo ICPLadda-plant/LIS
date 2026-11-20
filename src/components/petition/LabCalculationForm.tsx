@@ -4,6 +4,7 @@ import type { LabReportPage } from "@/lib/labReport";
 import { calculateCcs, ccsDifference, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
 import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { PBZ_PRINT_CSS, PaclobutrazolPrintSheet, paclobutrazolValues } from "./PaclobutrazolPrintSheet";
+import { calculatePaclobutrazol, pbzFixed } from "@/lib/paclobutrazolFields";
 export { ccsDifference } from "@/lib/aiCalculation";
 
 export const LAB_CALCULATION_FORM_CODE = "FM-QP-07-08-002-R02 (02/11/69) P1/1";
@@ -145,12 +146,14 @@ export default function LabCalculationForm({ page, variant = "default", standard
     firstValue(page, /^Area\s*Av/i),
     firstValue(page, /^Area\s*%?\s*RSD/i),
   ];
-  const sampleAverage = firstValue(page, /^%\s*Sample\s*Av/i, aiResult);
+  // PACLOBUTRAZOL: %Sample 1/2 = Mean Content ของ Sample 1/2 จากตาราง Internal standard
+  const pbzCalc = pbzValues ? calculatePaclobutrazol(pbzValues, null) : null;
+  const sampleAverage = firstValue(page, /^%\s*Sample\s*Av/i) || (pbzCalc ? pbzFixed(pbzCalc.average, 4) : aiResult);
   // PACLOBUTRAZOL ใช้แค่ Sample 1/2 — ไม่มีช่อง %Sample 3
   const isPbz = /paclobutrazol/i.test(page.sample.name ?? "") && !String(page.sample.name ?? "").includes("+");
   const sampleNos = isPbz ? [1, 2] : [1, 2, 3];
   const sample = [
-    ...sampleNos.map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i"))),
+    ...sampleNos.map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i")) || pbzFixed(pbzCalc?.sample[n - 1]?.meanContent, 4)),
     sampleAverage,
     firstValue(page, /^%\s*Sample\s*%?\s*RSD/i),
   ];
