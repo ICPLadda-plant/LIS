@@ -214,12 +214,12 @@ export default function LabTestingPage() {
     {
       key: 'petition',
       header: 'คำร้อง',
-      className: 'text-center align-top',
+      className: 'align-top',
       cell: (p) => {
         const labItems = labItemsFor(p);
         return (
           <>
-            <div className="flex items-center justify-center gap-1.5">
+            <div className="flex items-center gap-1.5">
               <span className="font-semibold text-sky-600">{p.petitionNo}</span>
               <UrgentBadge petition={p} />
               {returnedMap[p._id] && (
@@ -243,13 +243,13 @@ export default function LabTestingPage() {
     {
       key: 'items',
       header: 'รายการตัวอย่าง (Lab)',
-      className: 'max-w-[280px] text-center text-sm text-grey-600 align-top',
+      className: 'max-w-[280px] text-sm text-grey-600 align-top',
       cell: (p) => {
         const labItems = labItemsFor(p);
         return labItems.length > 0 ? (
           <div className="space-y-1">
             {labItems.map((it) => (
-              <div key={it.seq} className="flex items-center justify-center gap-1.5 flex-wrap">
+              <div key={it.seq} className="flex items-center gap-1.5 flex-wrap">
                 <span>{it.commonName || '-'}</span>
                 {it.batchNo && (
                   <Badge variant="blue-soft" className="font-normal text-[11px] px-1.5 py-0">
@@ -267,11 +267,11 @@ export default function LabTestingPage() {
     {
       key: 'status',
       header: 'สถานะ',
-      className: 'text-center align-top',
+      className: 'align-top',
       cell: (p) => {
         const b = labTrackStatusBadge(p);
         return (
-          <div className="space-y-1 [&>div]:justify-center">
+          <div className="space-y-1">
             <Badge variant={b.variant}>{b.label}</Badge>
             <PetitionStatusTimeline petition={p} compact track="lab" />
           </div>
@@ -281,7 +281,7 @@ export default function LabTestingPage() {
     {
       key: 'action',
       header: 'การดำเนินการ',
-      className: 'text-center align-top',
+      className: 'text-right align-top',
       cell: (p) =>
         needsAccept(p) ? (
           <Button

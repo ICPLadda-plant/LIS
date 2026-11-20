@@ -71,7 +71,7 @@ export function DataTable<T>({
           <TableHeader className="sticky top-0 z-10 bg-muted/50">
             <TableRow>
               {columns.map((c) => (
-                <TableHead key={c.key} className={c.className}>
+                <TableHead key={c.key} className={cn(c.className, "align-middle")}>
                   {c.header}
                 </TableHead>
               ))}
