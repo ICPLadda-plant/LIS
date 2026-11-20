@@ -5,6 +5,7 @@ import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { pesticideTestMethod } from "@/lib/pesticideTestMethods";
 import { itemSubmissionNoText } from "@/lib/petitionSampler";
 import { formatLabResultText } from "@/lib/resultNumberFormat";
+import { isPaclobutrazolItem } from "@/lib/paclobutrazolFields";
 
 export interface LabReportRow {
   testItem: string;
@@ -115,10 +116,13 @@ function methodForRow(label: string, parameterName: string, commonName?: string)
 function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string): LabReportRow[] {
   if (!group) return [];
   const out: LabReportRow[] = [];
+  // PACLOBUTRAZOL ใช้แค่ Sample 1/2 (Internal standard) — ไม่แสดงแถว Sample 3
+  const isPbz = isPaclobutrazolItem(commonName || group.commonName);
   group.params
     .filter((p) => p.scope === "lab" || /ถ\.?\s*พ|density/i.test(p.parameterName))
     .forEach((p) => {
       p.rows.forEach((r) => {
+        if (isPbz && /sample\s*3\b/i.test(r.label)) return;
         const unit = r.unit ? ` (${r.unit})` : "";
         out.push({
           testItem: `${r.label}${unit}`,
