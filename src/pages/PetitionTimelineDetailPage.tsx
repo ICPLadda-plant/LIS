@@ -38,7 +38,7 @@ import { normalizeRoles } from "@/lib/roles";
 import { hasLabTrack, petitionStatusBadge } from "@/lib/statusBadge";
 import { serviceLabRequestFor } from "@/lib/serviceLabRequest";
 import { cn } from "@/lib/utils";
-import { itemSubmissionNoText } from "@/lib/petitionSampler";
+import { itemSubmissionNoText, sampleLabelGroupKey } from "@/lib/petitionSampler";
 
 function timelinePercent(value: string | null, startAt: string, endAt: string): number | null {
   if (!value) return null;
@@ -346,12 +346,25 @@ export default function PetitionTimelineDetailPage() {
   const itemSeqs = useMemo(() => (petition?.items ?? []).map((item) => item.seq), [petition]);
   // seq ที่ค้างอยู่อาจหายไปหลังรีเฟรช → ถอยไปตัวแรกเสมอ
   const selectedItemSeq = activeItemSeq != null && itemSeqs.includes(activeItemSeq) ? activeItemSeq : itemSeqs[0] ?? null;
+  // รายการ batch + ส่วนเดียวกันรวมเป็นแท็บเดียว (เช่นแยกส่ง QC กับ LAB)
+  const itemTabGroups = useMemo(() => {
+    const groups = new Map<string, number[]>();
+    for (const item of petition?.items ?? []) {
+      const key = String(item.batchNo ?? "").trim() ? sampleLabelGroupKey(item) : `seq:${item.seq}`;
+      groups.set(key, [...(groups.get(key) ?? []), item.seq]);
+    }
+    return [...groups.values()];
+  }, [petition]);
+  const selectedSeqs = useMemo(
+    () => itemTabGroups.find((seqs) => selectedItemSeq != null && seqs.includes(selectedItemSeq)) ?? (selectedItemSeq != null ? [selectedItemSeq] : []),
+    [itemTabGroups, selectedItemSeq],
+  );
 
   const model = useMemo(
     () => petition && canViewPetition
-      ? buildTimelineDetailModel({ petition, parameters: visibleParameters, progressEntries, auditLogs, itemGroupIds: groupMembership, itemSeq: selectedItemSeq })
+      ? buildTimelineDetailModel({ petition, parameters: visibleParameters, progressEntries, auditLogs, itemGroupIds: groupMembership, itemSeq: selectedItemSeq, itemSeqs: selectedSeqs })
       : null,
-    [auditLogs, canViewPetition, groupMembership, petition, progressEntries, selectedItemSeq, visibleParameters],
+    [auditLogs, canViewPetition, groupMembership, petition, progressEntries, selectedItemSeq, selectedSeqs, visibleParameters],
   );
 
   const serviceLabRequest = useMemo(() => serviceLabRequestFor(petition, labRequests), [petition, labRequests]);
@@ -448,10 +461,17 @@ export default function PetitionTimelineDetailPage() {
     ...(petition.status === "approved" ? [{ key: "finalReport" as const, label: "Final Report", icon: FileCheck2, availableAt: petition.approvedAt, open: setFinalReportOpen }] : []),
     ...(canPrintChemAnalysisReport(petition) ? [{ key: "chemReport" as const, label: "ใบรายงานผลการวิเคราะห์", icon: FileCheck2, availableAt: petition.labApprovedAt || petition.approvedAt, open: setChemReportOpen }] : []),
   ]);
-  const itemTabLabel = (seq: number, fallback: string) => {
-    const raw = petition.items?.find((entry) => entry.seq === seq);
-    return (raw && itemSubmissionNoText(petition, raw)) || fallback;
+  const itemTabLabel = (seqs: number[], fallback: string) => {
+    const numbers = seqs.flatMap((seq) => {
+      const raw = petition.items?.find((entry) => entry.seq === seq);
+      return raw ? itemSubmissionNoText(petition, raw).split(",").map((no) => no.trim()) : [];
+    }).filter(Boolean);
+    // เรียง P ก่อน L
+    return [...new Set(numbers)].sort((a, b) => Number(a.startsWith("L")) - Number(b.startsWith("L"))).join(", ") || fallback;
   };
+  const itemTabs = itemTabGroups
+    .map((seqs) => ({ seqs, item: model.items.find((entry) => seqs.includes(entry.seq)) }))
+    .filter((tab): tab is { seqs: number[]; item: (typeof model.items)[number] } => Boolean(tab.item));
   const activeItem = model.items.find((item) => item.seq === selectedItemSeq) ?? null;
   const responsibleName = petition.assignedTo?.name || "ยังไม่มอบหมาย";
   const timelineDays = model.timeline.days.length
@@ -564,8 +584,11 @@ export default function PetitionTimelineDetailPage() {
 
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
       <div className="space-y-4">
-        {model.items.length > 1 && <div role="tablist" aria-label="ตัวอย่างในคำขอ" className="flex flex-wrap gap-2">
-          {model.items.map((item) => <button key={item.seq} type="button" role="tab" aria-selected={item.seq === selectedItemSeq} title={item.label} className={cn("max-w-[240px] truncate rounded-[8px] border px-3 py-1.5 text-xs font-medium transition-colors", item.seq === selectedItemSeq ? "border-primary-500 bg-primary-50 text-primary-600" : "border-black-50 bg-white text-grey-600 hover:bg-grey-50")} onClick={() => setActiveItemSeq(item.seq)}>{itemTabLabel(item.seq, item.label)}</button>)}
+        {itemTabs.length > 1 && <div role="tablist" aria-label="ตัวอย่างในคำขอ" className="flex flex-wrap gap-2">
+          {itemTabs.map(({ seqs, item }) => {
+            const selected = selectedItemSeq != null && seqs.includes(selectedItemSeq);
+            return <button key={item.seq} type="button" role="tab" aria-selected={selected} title={item.label} className={cn("max-w-[240px] truncate rounded-[8px] border px-3 py-1.5 text-xs font-medium transition-colors", selected ? "border-primary-500 bg-primary-50 text-primary-600" : "border-black-50 bg-white text-grey-600 hover:bg-grey-50")} onClick={() => setActiveItemSeq(item.seq)}>{itemTabLabel(seqs, item.label)}</button>;
+          })}
         </div>}
         <Card aria-label="petition timeline" className="border-black-50 shadow-none">
           <CardHeader className="pb-3">
