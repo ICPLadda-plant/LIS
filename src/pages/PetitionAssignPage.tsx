@@ -999,6 +999,14 @@ function PetitionCard({
           <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
             {petition.submittedBy?.name ?? '-'} · {petitionDepartmentLabel(petition)}
           </div>
+          {(() => {
+            const batches = [...new Set((petition.items ?? []).filter(shouldSendItemToLab).map((item) => item.batchNo?.trim()).filter(Boolean))];
+            return batches.length > 0 ? (
+              <div className="mt-0.5 truncate text-[11px] text-foreground" title={batches.join(', ')}>
+                <span className="text-muted-foreground">Batch:</span> {batches.join(', ')}
+              </div>
+            ) : null;
+          })()}
         </div>
       </div>
 
