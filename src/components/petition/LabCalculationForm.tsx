@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import type { LabReportPage } from "@/lib/labReport";
-import { calculateCcs, ccsDifference, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
+import { calculateAi, calculateCcs, ccsDifference, formatCalculatedAi, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
 import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { PBZ_PRINT_CSS, PaclobutrazolPrintSheet, paclobutrazolValues } from "./PaclobutrazolPrintSheet";
 import { calculatePaclobutrazol, pbzFixed } from "@/lib/paclobutrazolFields";
@@ -155,7 +155,8 @@ export default function LabCalculationForm({ page, variant = "default", standard
   const sample = [
     ...sampleNos.map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i")) || pbzFixed(pbzCalc?.sample[n - 1]?.meanContent, 4)),
     sampleAverage,
-    firstValue(page, /^%\s*Sample\s*%?\s*RSD/i),
+    // %RSD ใช้สูตรเดียวกับสารปกติ (SD แบบ n−1 × 100 ÷ Mean) จาก Mean Content ของ Sample 1/2
+    firstValue(page, /^%\s*Sample\s*%?\s*RSD/i) || (pbzCalc ? formatCalculatedAi(calculateAi(Object.fromEntries(pbzCalc.sample.map((s, i) => [`% Sample ${i + 1}`, s.meanContent]).filter(([, v]) => v != null))).sampleRsd) : ""),
   ];
   const standardNo = (page.rows ?? []).filter((row) => /standard/i.test(row.testItem) && !/conc|mid/i.test(row.testItem))
     .map((row) => row.result?.trim() ?? "").find((v) => !BLANK.test(v) && !/^u_/i.test(v)) ?? (standardOptions.length === 1 ? standardOptions[0] : "");
