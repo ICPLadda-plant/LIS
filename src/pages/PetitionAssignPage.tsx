@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -947,28 +947,18 @@ function PetitionCard({
   const blocked = groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode));
   // เปลี่ยนผู้รับงานแล้วคนใหม่ต้องกดเริ่มงานเอง
   const canDrag = canDragRole;
-  // กันคลิกหลอกที่เบราว์เซอร์ส่งมาหลังปล่อยการ์ด (โดยเฉพาะบนจอสัมผัส) ไม่ให้เปิดหน้าคำร้อง
-  const dragGuardUntilRef = useRef(0);
-  const openGuarded = () => {
-    if (dragging || Date.now() < dragGuardUntilRef.current) return;
-    onClick();
-  };
 
   return (
+    // กดตัวการ์ดไม่เปิดหน้าคำร้อง (กันหลุดมือตอนลาก) — เปิดได้จากปุ่มเลขคำร้องเท่านั้น
     <Card
-      onOpen={openGuarded}
       draggable={canDrag}
       onDragStart={(e) => {
         if (!canDrag) { e.preventDefault(); return; }
-        dragGuardUntilRef.current = Number.MAX_SAFE_INTEGER;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', petition._id);
         onDragStart();
       }}
-      onDragEnd={() => {
-        dragGuardUntilRef.current = Date.now() + 600;
-        onDragEnd();
-      }}
+      onDragEnd={onDragEnd}
       className={cn(
         'group rounded-lg border-border bg-card p-2.5 text-card-foreground shadow-sm transition hover:border-primary/40 hover:bg-accent/40 hover:shadow',
         canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
