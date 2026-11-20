@@ -709,9 +709,10 @@ router.get('/lab-free-assign', async (_req, res) => {
   }
 });
 
-router.get('/scan/:code', async (req, res) => {
+// รับรหัสทาง query (?code=) ได้ด้วย เพราะเลขนำส่งมี "/" (P122/69) และเว็บเซิร์ฟเวอร์หน้าบ้านตอบ 404 กับ %2F ใน path
+const scanPetitionHandler = async (req, res) => {
   try {
-    const code = decodeURIComponent(req.params.code || '').trim();
+    const code = (req.params.code !== undefined ? decodeURIComponent(req.params.code) : String(req.query.code || '')).trim();
     if (!code) return badRequest(res, 'ไม่พบรหัสจาก QR Code');
     if (code.startsWith('LIS-EXTRA-')) {
       const doc = await Petition.findOne({ 'additionalSampleRequests.qrCode': code }).lean();
@@ -762,7 +763,9 @@ router.get('/scan/:code', async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: { message: err.message } });
   }
-});
+};
+router.get('/scan', scanPetitionHandler);
+router.get('/scan/:code', scanPetitionHandler);
 
 // GET /api/petitions/:id/audit-logs → chronological status/event trail for a petition
 router.get('/:id/audit-logs', async (req, res) => {
