@@ -1684,9 +1684,14 @@ export default function LabTestingDetailPage() {
                               if (unit.key.split('::')[0] === STANDARD_NO_LABEL) {
                                 const substance = aiSubstanceFromKey(unit.key) || item.commonName || '';
                                 const options = standardNumbersForSubstance(standardsInUse, substance);
-                                const current = String(srcValues[unit.key] ?? '');
-                                if (!current && options.length === 1 && !fieldDisabled) {
-                                  queueMicrotask(() => onUnitChange(unit.key, options[0]));
+                                const saved = String(srcValues[unit.key] ?? '');
+                                // ค่าเก่าที่บันทึกเป็นรหัส QR (u_xxx) — แปลงเป็นเลขฉลากขวด ถ้าแปลงไม่ได้ถือว่ายังไม่ได้เลือก
+                                const fromQr = standardsInUse.find((s) => s.qrId === saved)?.labelCode ?? '';
+                                const isQrValue = /^u_/i.test(saved);
+                                const current = isQrValue ? fromQr : saved;
+                                const fill = current || (options.length === 1 ? options[0] : '');
+                                if (fill !== saved && (fill || isQrValue) && !fieldDisabled) {
+                                  queueMicrotask(() => onUnitChange(unit.key, fill));
                                 }
                                 const choices = current && !options.includes(current) ? [current, ...options] : options;
                                 return (
