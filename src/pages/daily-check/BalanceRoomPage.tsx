@@ -399,10 +399,6 @@ const BalanceRoomPage = () => {
       toast.error("ค่าน้ำหนักไม่ถูกต้อง");
       return;
     }
-    if (isOutOfControl("10", String(avg10)) || isOutOfControl("100", String(avg100))) {
-      toast.error("ค่าเฉลี่ยเกินเส้น Control (±2SD/±3SD) กรุณาแก้ค่าก่อนบันทึก");
-      return;
-    }
     const target = BALANCE_SCALES.find(s => s.id === id) ?? scale;
 
     createMutation.mutate({
@@ -815,7 +811,7 @@ const BalanceRoomPage = () => {
                 <RotateCcw className="h-4 w-4" /> บันทึกซ้ำ
               </Button>
             ) : (
-              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight || hasMeanOutOfControl}>
+              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight}>
                 <CheckCircle2 className="h-4 w-4" />
                 {savingThisScale ? "กำลังบันทึก..." : "บันทึกผล Calibrate"}
               </Button>
