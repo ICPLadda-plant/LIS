@@ -29,6 +29,7 @@ import { api } from '@/lib/api';
 import { hasAssignableLabParameter } from '@/lib/petitionTestItems';
 import { hasLabTrack } from '@/lib/statusBadge';
 import { shouldSendItemToLab } from '@/lib/petitionRouting';
+import { itemSubmissionNoText } from '@/lib/petitionSampler';
 import { isLabRecheckPending, isLabWorkAccepted, labAssignBoardStatusBadge, labReceivedAt } from '@/lib/receiveStatus';
 
 const createdTime = (p: Petition) => Date.parse(p.createdAt) || 0;
@@ -949,6 +950,11 @@ function PetitionCard({
 }: PetitionCardProps) {
   const statusCfg = labAssignBoardStatusBadge(petition, assigned);
   const showStatusBadge = hasLabTrack(petition);
+  // เลขใบนำส่งเป็นเลขหลักบนการ์ด (ยังไม่มีให้ใช้เลขคำร้องแทน)
+  const submissionNos = [...new Set((petition.items ?? [])
+    .filter(shouldSendItemToLab)
+    .flatMap((item) => itemSubmissionNoText(petition, item, 'lab').split(',').map((s) => s.trim()))
+    .filter((no) => no && no !== petition.petitionNo))];
   const machineCodes = (petition.assignedMachines ?? [])
     .map((m) => m.code)
     .filter(Boolean) as string[];
@@ -987,7 +993,7 @@ function PetitionCard({
               draggable={false}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              {petition.petitionNo}
+              {submissionNos.length > 0 ? submissionNos.join(', ') : petition.petitionNo}
             </button>
             <UrgentBadge petition={petition} />
             {showStatusBadge && (
@@ -997,6 +1003,7 @@ function PetitionCard({
             )}
           </div>
           <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {submissionNos.length > 0 && <>{petition.petitionNo} · </>}
             {petition.submittedBy?.name ?? '-'} · {petitionDepartmentLabel(petition)}
           </div>
           {(() => {
