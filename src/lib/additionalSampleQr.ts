@@ -34,6 +34,11 @@ export function extractScannedItemSeq(raw: string): number | null {
 }
 
 export async function fetchPetitionByScannedCode(code: string): Promise<Petition> {
+  // เลขนำส่งแบบ P122/69 มี "/" — ส่งทาง query เพราะ %2F ใน path ถูกเว็บเซิร์ฟเวอร์ตอบ 404
+  if (code.includes('/')) {
+    const response = await api.get<Petition>(`/petitions/scan?code=${encodeURIComponent(code)}`);
+    return response.data.data;
+  }
   try {
     const response = await api.get<Petition>(`/petitions/scan/${encodeURIComponent(code)}`);
     return response.data.data;
