@@ -643,6 +643,7 @@ export default function PetitionAssignPage() {
                 onClaimPetition={handleClaimPetition}
                 onEditSampleNumbers={openSampleNumbers}
                 onPetitionClick={(id) => navigate(`/petition/${id}`)}
+                openCardOnClick={isAdmin}
                 emptyPoolText="ไม่มีคำร้องที่รอ assign"
               />
             </div>
@@ -672,6 +673,8 @@ interface AssignBoardProps {
   onClaimPetition: (petitionId: string) => void;
   onEditSampleNumbers: (petition: Petition) => void;
   onPetitionClick: (id: string) => void;
+  /** admin กดที่ตัวการ์ดเพื่อเปิดคำร้องได้ */
+  openCardOnClick?: boolean;
   emptyPoolText: string;
 }
 
@@ -695,6 +698,7 @@ function AssignBoard({
   onClaimPetition,
   onEditSampleNumbers,
   onPetitionClick,
+  openCardOnClick = false,
   emptyPoolText,
 }: AssignBoardProps) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -718,6 +722,7 @@ function AssignBoard({
       onDragStart={() => setDraggingId(petition._id)}
       onDragEnd={() => setDraggingId(null)}
       onClick={() => onPetitionClick(petition._id)}
+      openOnCardClick={openCardOnClick}
     />
   );
 
@@ -896,6 +901,7 @@ function AssignBoard({
                         onDragStart={() => setDraggingId(petition._id)}
                         onDragEnd={() => setDraggingId(null)}
                         onClick={() => onPetitionClick(petition._id)}
+                        openOnCardClick={openCardOnClick}
                         assigned
                       />
                     ))
@@ -923,6 +929,7 @@ interface PetitionCardProps {
   onDragStart: () => void;
   onDragEnd: () => void;
   onClick: () => void;
+  openOnCardClick?: boolean;
   assigned?: boolean;
 }
 
@@ -937,6 +944,7 @@ function PetitionCard({
   onDragStart,
   onDragEnd,
   onClick,
+  openOnCardClick = false,
   assigned,
 }: PetitionCardProps) {
   const statusCfg = labAssignBoardStatusBadge(petition, assigned);
@@ -949,9 +957,10 @@ function PetitionCard({
   const canDrag = canDragRole;
 
   return (
-    // กดตัวการ์ดไม่เปิดหน้าคำร้อง (กันหลุดมือตอนลาก) — เปิดได้จากปุ่มเลขคำร้องเท่านั้น
+    // admin กดตัวการ์ดเพื่อเปิดคำร้องได้ (การลากไม่ยิง click) ส่วน role อื่นเปิดจากปุ่มเลขคำร้อง
     <Card
       draggable={canDrag}
+      onClick={openOnCardClick ? onClick : undefined}
       onDragStart={(e) => {
         if (!canDrag) { e.preventDefault(); return; }
         e.dataTransfer.effectAllowed = 'move';
@@ -961,7 +970,7 @@ function PetitionCard({
       onDragEnd={onDragEnd}
       className={cn(
         'group rounded-lg border-border bg-card p-2.5 text-card-foreground shadow-sm transition hover:border-primary/40 hover:bg-accent/40 hover:shadow',
-        canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
+        openOnCardClick ? 'cursor-pointer active:cursor-grabbing' : canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
         dragging && 'opacity-40',
       )}
     >
@@ -974,7 +983,7 @@ function PetitionCard({
             <button
               type="button"
               className="truncate font-semibold text-primary-500 hover:underline"
-              onClick={onClick}
+              onClick={(e) => { e.stopPropagation(); onClick(); }}
               draggable={false}
               onMouseDown={(e) => e.stopPropagation()}
             >
