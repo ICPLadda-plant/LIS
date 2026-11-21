@@ -11,7 +11,7 @@ import {
   resolveStandard,
   type ConditionContext,
 } from "@/lib/parameterValidation";
-import { describeResolvedStandard, describeStandard, formatLabelToleranceRange } from "@/lib/standardOperators";
+import { describeResolvedStandard, describeStandard, formatLabelToleranceNumber, formatLabelToleranceRange } from "@/lib/standardOperators";
 import { calculatedAiFieldKind } from "@/lib/aiCalculation";
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, stripAiSubstanceSuffix } from "@/lib/aiSubstanceFields";
 import { sampleRoundFor } from "@/lib/additionalSamples";
@@ -29,6 +29,8 @@ export interface ApprovalFieldRow {
   /** รูป/วิดีโอที่อัปโหลด (ช่องชนิด photo) ให้หน้าแสดงเป็นรูปย่อแทนข้อความ path */
   mediaUrls?: string[];
   standardText: string;
+  /** ข้อความสถานะแทน "ปกติ" เช่น ส่วนต่างจากเกณฑ์ 25% เมื่อผ่านเฉพาะเกณฑ์กรม */
+  statusText?: string;
   abnormal: boolean;
   note: string;
   phase: 1 | 2;
@@ -212,6 +214,7 @@ export function buildApprovalGroups(
                 // with no extra status note.
                 let rowStandardText: string;
                 let rowAbnormal: boolean;
+                let rowStatusText: string | undefined;
                 if (unit.labelTolerance) {
                   const rv = resolveLabelTolerance(unit.labelTolerance.std, unit.labelTolerance.rawSpec, raw);
                   const range = formatLabelToleranceRange(rv, unit.field.unit ?? "", {
@@ -222,6 +225,15 @@ export function buildApprovalGroups(
                   const statusNote = rv.status === "fail" ? "เกินช่วงที่อนุมัติได้" : "";
                   rowStandardText = [range, statusNote].filter(Boolean).join(" · ");
                   rowAbnormal = rv.status === "fail";
+                  const num = Number(asStr(raw));
+                  if (rv.status === "review" && rv.autoRange && Number.isFinite(num)) {
+                    const [lo, hi] = rv.autoRange;
+                    const bound = Math.abs(num - lo) <= Math.abs(num - hi) ? lo : hi;
+                    const diff = num - bound;
+                    const sign = diff > 0 ? "+" : "";
+                    const pct = bound !== 0 ? ` (${sign}${((diff / bound) * 100).toFixed(2)}%)` : "";
+                    rowStatusText = `ไม่ผ่านเกณฑ์ 25% ต่าง ${sign}${formatLabelToleranceNumber(diff, rv.center)}${pct}`;
+                  }
                 } else {
                   rowStandardText = hiddenStandard ? "" : (isOutputMode ? (outputRes?.text || (outputRes?.kind === "abnormal" ? "ตกเกณฑ์" : "")) : standardText);
                   rowAbnormal = hiddenStandard ? false : (isOutputMode ? outputRes?.kind === "abnormal" : isFieldAbnormal(effectiveField, raw));
@@ -233,6 +245,7 @@ export function buildApprovalGroups(
                   value: asStr(raw),
                   mediaUrls: mediaUrlsFromValue(raw),
                   standardText: rowStandardText,
+                  statusText: rowStatusText,
                   abnormal: rowAbnormal,
                   note,
                   phase,

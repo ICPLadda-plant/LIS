@@ -76,12 +76,14 @@ export default function LabResultGroups({ groups, renderGroupActions }: Props) {
                                 row.value || "-"
                               )}
                             </td>
-                            <td className="py-1.5 pr-3 text-muted-foreground break-words">{row.standardText || "-"}</td>
+                            <td className="py-1.5 pr-3 text-muted-foreground break-words whitespace-pre-line">{row.standardText || "-"}</td>
                             <td className="py-1.5 pr-3">
                               {row.abnormal ? (
                                 <span className="inline-flex items-center gap-1 text-destructive">
                                   <AlertTriangle className="h-3.5 w-3.5" /> ผิดปกติ
                                 </span>
+                              ) : row.statusText ? (
+                                <span className="text-amber-700 dark:text-amber-300">{row.statusText}</span>
                               ) : (
                                 <span className="text-green-700 dark:text-green-300">ปกติ</span>
                               )}
