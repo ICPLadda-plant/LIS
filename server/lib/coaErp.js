@@ -605,13 +605,14 @@ function findBestRequestItem(petitions, source, labRequests = []) {
       if (!itemNoMatch && !commonNameMatch) continue;
       const batchNo = text(item.batchNo || item.lotNo || labRequestBatch(labRequests, petition, item));
       if (!batchNo) continue;
-      const productionDate = normalizeIsoDate(item.productionDate)
-        || lotSnapshot(item.lotNo || item.batchNo).productionDate;
+      const productionDate = lotSnapshot(item.batchNo).productionDate
+        || normalizeIsoDate(item.productionDate)
+        || lotSnapshot(item.lotNo).productionDate;
       const productionTime = productionDate ? Date.parse(`${productionDate}T00:00:00.000Z`) : Number.NaN;
       const hasTargetAndProduction = Number.isFinite(targetTime) && Number.isFinite(productionTime);
       candidates.push({
         petition,
-        item: item.batchNo || item.lotNo ? item : { ...item, batchNo },
+        item: { ...(item.batchNo || item.lotNo ? item : { ...item, batchNo }), productionDate },
         identityTier: itemNoMatch ? 3 : nameMatch ? 2 : 1,
         identityScore: Number(Boolean(sourceCommonName) && normalizeText(item.commonName) === sourceCommonName) * 2
           + Number(Boolean(sourceSampleName) && normalizeText(item.sampleName) === sourceSampleName),
@@ -628,14 +629,16 @@ function findBestRequestItem(petitions, source, labRequests = []) {
     || String(right.petition.updatedAt || '').localeCompare(String(left.petition.updatedAt || '')));
   const best = candidates[0];
   if (!best) return null;
-  const bestProductionDate = normalizeIsoDate(best.item.productionDate)
-    || lotSnapshot(best.item.lotNo || best.item.batchNo).productionDate;
+  const bestProductionDate = lotSnapshot(best.item.batchNo).productionDate
+    || normalizeIsoDate(best.item.productionDate)
+    || lotSnapshot(best.item.lotNo).productionDate;
   const items = candidates
     .filter((candidate) => candidate.petition === best.petition
       && candidate.identityTier === best.identityTier
       && candidate.identityScore === best.identityScore
-      && (normalizeIsoDate(candidate.item.productionDate)
-        || lotSnapshot(candidate.item.lotNo || candidate.item.batchNo).productionDate) === bestProductionDate)
+      && (lotSnapshot(candidate.item.batchNo).productionDate
+        || normalizeIsoDate(candidate.item.productionDate)
+        || lotSnapshot(candidate.item.lotNo).productionDate) === bestProductionDate)
     .map((candidate) => candidate.item)
     .filter((item, index, rows) => rows.findIndex((row) => text(row.batchNo || row.lotNo) === text(item.batchNo || item.lotNo)) === index);
   return { ...best, items };
@@ -1040,6 +1043,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     requestedBatch && normalizeBatch(batchFromRow(row)) === normalizeBatch(requestedBatch)
   )) || mfBatchRows[0];
   const erpRequestProductionDate = normalizeIsoDate(sourceSample.productionDate)
+    || lotSnapshot(requestedBatch).productionDate
     || normalizeIsoDate(petitionItem?.productionDate)
     || lotSnapshot(requestedLot || requestedBatch).productionDate;
   const mfBatch = batchFromRow(mf);

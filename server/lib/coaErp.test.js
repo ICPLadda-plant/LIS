@@ -572,6 +572,29 @@ test('LIS petition keeps the label production date instead of deriving it from L
   assert.equal(result.sample.productionDate, '2026-10-15');
 });
 
+test('FG Batch keeps its encoded production date instead of a stale petition date', () => {
+  const source = {
+    selectedItemSeqs: [10000],
+    sampleSnapshots: [{ sampleName: 'ไคร์ลอฟ', commonName: 'THIAMETHOXAM 25% WG' }],
+    externalCoaRequest: { itemNo: 'FC-KLOFT-1X20', shipmentDate: '2026-11-21' },
+  };
+  const requestMatch = findBestRequestItem([{
+    updatedAt: '2026-11-21',
+    items: [{
+      itemNo: 'FC-KLOFT-1X20', sampleName: 'ไคร์ลอฟ', commonName: 'THIAMETHOXAM 25% WG',
+      batchNo: 'FG261121-012', productionDate: '2026-10-19',
+    }],
+  }], source);
+  const result = sampleFromSources(source, [{
+    item_no: 'FC-KLOFT-1X20', loca_code: 'NORMAL', lot_no: 'FG261121-012',
+    registering_date: '2026-11-21T00:00:00.000Z', stock_qty: 1400,
+  }], [], requestMatch.item);
+
+  assert.equal(requestMatch.item.productionDate, '2026-11-21');
+  assert.equal(result.sample.batchNo, 'FG261121-012');
+  assert.equal(result.sample.productionDate, '2026-11-21');
+});
+
 test('finished-good COA request can use the matching bulk production batch and date by common name', () => {
   const source = {
     sampleSnapshots: [{ sampleName: 'กะรัต 35', commonName: 'CYPERMETHRIN 35% W/V EC' }],
