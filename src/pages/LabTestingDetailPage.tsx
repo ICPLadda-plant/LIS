@@ -2026,7 +2026,7 @@ export default function LabTestingDetailPage() {
                             // PACLOBUTRAZOL แสดงช่อง Area Inj / Average / %RSD แบบไม่แยกสาร → ใช้ key เดียวกับที่แสดง
                             const pbzItem = isPaclobutrazolItem(item.commonName);
                             const aiUnitKeys = isAiParameterFields(param.valueFields ?? []) && !fieldDisabled
-                              ? [...new Set((param.valueFields ?? []).flatMap((field) => expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, true)
+                              ? [...new Set(fields.flatMap((field) => expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, true)
                                 .map((unit) => (pbzItem && isPbzAreaFieldLabel(field.label) ? field.label : unit.key))))]
                               : [];
                             const dailyKeys = aiUnitKeys.filter((key) => DAILY_CALIBRATION_LABELS.includes(key.split('::', 1)[0]));
