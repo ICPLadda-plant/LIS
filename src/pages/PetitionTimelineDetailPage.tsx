@@ -566,9 +566,10 @@ export default function PetitionTimelineDetailPage() {
           </div>
           <p className="text-xs text-grey-400">คำร้องโดย {petition.submittedBy?.name || "-"} · ผู้รับผิดชอบ {responsibleName}</p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
           <Metric label="Common name" value={activeItem?.commonName || "-"} />
           <Metric label="เลข Batch" value={activeItem?.batchNo || "-"} />
+          <Metric label="เลขใบนำส่ง" value={(activeItem && itemSubmissionNoText(petition, activeItem)) || "-"} />
           <Metric label={model.header.startKind === "received" ? "Start time" : "เวลายื่นคำร้อง"} value={formatDateTime(model.header.startAt)} />
           <Metric {...estimateMetric(model.header)} />
           <Metric label="Progress" value={progressLabel} />
