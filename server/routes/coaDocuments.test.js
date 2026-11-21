@@ -531,6 +531,17 @@ test('externalCoaRowsToDocuments maps only ERP rows that ask for COA', () => {
   assert.equal(docs[0].externalCoaRequest.appearance, 'เม็ดยาสีแดง');
 });
 
+test('externalCoaRowsToDocuments keeps duplicate SO lines when shipment dates differ', () => {
+  const docs = router.externalCoaRowsToDocuments([
+    { SaleOrderNo: 'SO26110144', Line: 10000, ShipmentDate: '2026-11-20', remark: 'COA' },
+    { SaleOrderNo: 'SO26110144', Line: 10000, ShipmentDate: '2026-11-21', remark: 'COA' },
+  ]);
+
+  assert.equal(docs.length, 2);
+  assert.deepEqual(docs.map((doc) => doc.externalCoaRequest.shipmentDate), ['2026-11-20', '2026-11-21']);
+  assert.equal(new Set(docs.map((doc) => doc._id)).size, 2);
+});
+
 test('externalCoaRowsToDocuments applies the confirmed label production date', () => {
   const [doc] = router.externalCoaRowsToDocuments([{
     SaleOrderNo: 'SO26110076', Line: 10000, ItemNo: 'FC-HODEN-250X24',

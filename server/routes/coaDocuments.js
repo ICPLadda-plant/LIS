@@ -184,6 +184,8 @@ function externalCoaKey(link) {
 function externalRequestMatchesDocument(doc, request) {
   if (doc.externalRequestId && doc.externalRequestId === request._id) return true;
   if (externalCoaKey(doc.externalCoaRequest) !== externalCoaKey(request.externalCoaRequest)) return false;
+  if (normalizeIsoDate(doc.externalCoaRequest?.shipmentDate)
+    !== normalizeIsoDate(request.externalCoaRequest?.shipmentDate)) return false;
   if (doc.externalCoaRequest?.outstandingQty != null) {
     return doc.externalCoaRequest.outstandingQty === request.externalCoaRequest?.outstandingQty;
   }
@@ -527,17 +529,26 @@ function externalCoaRowToDocument(row) {
 function externalCoaRowsToDocuments(payload) {
   const latestById = new Map();
   normalizeExternalPayload(payload).forEach((row, index) => {
-    const id = externalCoaRequestId(row);
+    const id = `${externalCoaRequestId(row)}\u0000${normalizeIsoDate(firstExternalValue(row, ['ShipmentDate']))}`;
     const timestamp = Date.parse(externalCoaDate(row) || '');
     const current = latestById.get(id);
     if (!current || (Number.isFinite(timestamp) ? timestamp : index) >= current.sortValue) {
       latestById.set(id, { row, sortValue: Number.isFinite(timestamp) ? timestamp : index });
     }
   });
-  const documents = [...latestById.values()]
+  let documents = [...latestById.values()]
     .map(({ row }) => row)
     .filter(isExternalCoaRequest)
     .map(externalCoaRowToDocument);
+  const duplicateIds = new Set(documents
+    .filter((doc, index, rows) => rows.findIndex((row) => row._id === doc._id) !== index)
+    .map((doc) => doc._id));
+  documents = documents.map((doc) => {
+    if (!duplicateIds.has(doc._id)) return doc;
+    const date = normalizeIsoDate(doc.externalCoaRequest?.shipmentDate) || 'no-date';
+    const id = `${doc._id}-shipment-${date}`;
+    return { ...doc, _id: id, petitionId: id };
+  });
   const groups = new Map();
   for (const doc of documents) {
     const key = [doc.petitionNoSnapshot, doc.customerSnapshot?.name, doc.customerSnapshot?.company,
