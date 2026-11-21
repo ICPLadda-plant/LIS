@@ -2023,13 +2023,17 @@ export default function LabTestingDetailPage() {
                             }
 
                             const onScalarChange = (label: string, val: unknown) => handleFieldChange(petition, item, param, label, val, effectivePhase);
-                            const dailyKeys = isAiParameterFields(param.valueFields ?? []) && !fieldDisabled
+                            const aiUnitKeys = isAiParameterFields(param.valueFields ?? []) && !fieldDisabled
                               ? (param.valueFields ?? []).flatMap((field) => expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, true).map((unit) => unit.key))
-                                .filter((key) => DAILY_CALIBRATION_LABELS.includes(key.split('::', 1)[0]))
                               : [];
+                            const dailyKeys = aiUnitKeys.filter((key) => DAILY_CALIBRATION_LABELS.includes(key.split('::', 1)[0]));
+                            const areaDerivedKeys = aiUnitKeys.flatMap((key) => {
+                              const kind = calculatedAiFieldKind(key.split('::', 1)[0]);
+                              return kind === 'areaAverage' || kind === 'areaRsd' ? [{ key, kind }] : [];
+                            });
                             return (
                               <>
-                                {dailyKeys.length > 0 && <DailyCalibrationPrefill keys={dailyKeys} values={phaseValues[k] ?? {}} onChange={onScalarChange} />}
+                                {dailyKeys.length > 0 && <DailyCalibrationPrefill keys={dailyKeys} values={phaseValues[k] ?? {}} onChange={onScalarChange} commonName={item.commonName ?? ''} areaDerivedKeys={areaDerivedKeys} />}
                                 {renderEditGrid(phaseValues[k] ?? {}, onScalarChange, phaseSaves[k], true)}
                               </>
                             );
