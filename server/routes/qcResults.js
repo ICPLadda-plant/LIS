@@ -310,10 +310,11 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
 // คืน { [label]: { any, bySubstance: { [สาร]: ค่า } } } โดยเลือกค่าล่าสุด
 router.get("/daily-calibration", async (req, res) => {
   try {
-    const LABELS = ["ค่า Correlation coefficient ( r ) ที่ได้", "Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)"];
+    const AREA_LABELS = ["Area Inj.1", "Area Inj.2", "Area Inj.3"];
+    const LABELS = ["ค่า Correlation coefficient ( r ) ที่ได้", "Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", ...AREA_LABELS];
     const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
     const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
-    const docs = await QCTestResult.find({ updatedAt: { $gte: dayStart } }).sort({ updatedAt: -1 }).select("values").limit(300).lean();
+    const docs = await QCTestResult.find({ updatedAt: { $gte: dayStart } }).sort({ updatedAt: -1 }).select("values commonName").limit(300).lean();
     const out = {};
     for (const doc of docs) {
       for (const [key, raw] of Object.entries(flattenLegacyDottedValues(doc.values) || {})) {
@@ -323,8 +324,10 @@ router.get("/daily-calibration", async (req, res) => {
         const label = LABELS.find((l) => l.toLowerCase() === base.trim().toLowerCase());
         if (!label) continue;
         const slot = (out[label] ??= { bySubstance: {} });
-        slot.any ??= value;
-        const sub = substance.trim().toLowerCase();
+        const isArea = AREA_LABELS.includes(label);
+        // Area Inj ต่างกันตามสาร → ไม่มีค่า any ใช้ได้เฉพาะสาร/ชื่อสามัญเดียวกัน
+        if (!isArea) slot.any ??= value;
+        const sub = (substance.trim() || (isArea ? String(doc.commonName ?? "").trim() : "")).toLowerCase();
         if (sub) slot.bySubstance[sub] ??= value;
       }
     }
