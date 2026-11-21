@@ -66,6 +66,8 @@ export default function LabTestingPage() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   // คำร้องที่กด "เริ่มงาน" แล้ว รอเลือกเครื่องใน dialog
   const [startTarget, setStartTarget] = useState<Petition | null>(null);
+  // คำร้องที่เริ่มงานแล้ว แต่ต้องการเปลี่ยนเครื่อง (เช่น เลือกผิด)
+  const [changeTarget, setChangeTarget] = useState<Petition | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const canClaimRole = normalizeRoles(user).some((r) => ['admin', 'lab-head', 'lab-analyze'].includes(r));
   const [freeAssign, setFreeAssign] = useState<LabFreeAssignState | null>(null);
@@ -189,6 +191,28 @@ export default function LabTestingPage() {
     .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p)));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
+  // ยังวิเคราะห์อยู่ (เริ่มงานแล้ว ยังไม่ส่งผล) เปลี่ยนเครื่องได้
+  const canChangeMachines = (p: Petition) =>
+    isLabWorkAccepted(p) && !p.labCompletedAt && labWorkReceived(p)
+    && (isFullAccess || isAssignedTo(p.assignedTo, user));
+
+  async function changeMachines(p: Petition, machines: PetitionAssignedMachine[]) {
+    if (acceptingId) return;
+    setAcceptingId(p._id);
+    try {
+      await api.put<Petition>(`/petitions/${p._id}/machines`, { employeeId: user?.employeeId, machines });
+      toast.success(`เปลี่ยนเครื่องของ ${p.petitionNo} แล้ว`);
+      setChangeTarget(null);
+      refresh();
+      if (isAdmin) refreshAdminOnly();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'เปลี่ยนเครื่องไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setAcceptingId(null);
+    }
+  }
+
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
   const flaggablePetitionIds = petitions
     .filter((p) => !!labReceivedAt(p))
@@ -295,6 +319,20 @@ export default function LabTestingPage() {
             {acceptingId === p._id ? 'กำลังเริ่มงาน...' : 'เริ่มงาน'}
           </Button>
         ) : labWorkReceived(p) ? (
+          <div className="flex justify-end gap-2">
+            {canChangeMachines(p) && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={acceptingId === p._id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setChangeTarget(p);
+                }}
+              >
+                เปลี่ยนเครื่อง
+              </Button>
+            )}
           <Button
             size="sm"
             onClick={(e) => {
@@ -304,6 +342,7 @@ export default function LabTestingPage() {
           >
             {p.labCompletedAt ? 'ดูรายละเอียด' : 'เข้าตรวจ'}
           </Button>
+          </div>
         ) : (
           <span className="text-xs text-grey-400">รอสแกนรับ</span>
         ),
@@ -344,6 +383,16 @@ export default function LabTestingPage() {
             saving={acceptingId === startTarget._id}
             onConfirm={(machines) => { void acceptPetition(startTarget, machines); }}
             onClose={() => setStartTarget(null)}
+          />
+        )}
+
+        {changeTarget && (
+          <LabStartWorkDialog
+            petition={changeTarget}
+            mode="change"
+            saving={acceptingId === changeTarget._id}
+            onConfirm={(machines) => { void changeMachines(changeTarget, machines); }}
+            onClose={() => setChangeTarget(null)}
           />
         )}
 
