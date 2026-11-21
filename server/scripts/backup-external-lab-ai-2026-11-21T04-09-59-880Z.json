@@ -1,0 +1,1985 @@
+{
+  "petitions": [
+    {
+      "_id": "6ae9a60e5a732277abda6857",
+      "petitionNo": "P-2611-0008",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P08",
+        "lab": "L04",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11533",
+        "name": "นายณัฐวุฒิ แซ่ตั้ง",
+        "email": "nattawut.s@icpladda.com",
+        "department": "ผลิต 3",
+        "submittedAt": "2026-11-03T09:14:54.905Z"
+      },
+      "sampledBy": {
+        "employeeId": "3",
+        "name": "นายพีรเดช อรุณสันติโรจน์ (ไฟฟ์)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "OXADIAZON 25% W/V EC",
+          "commonName": "OXADIAZON 25% W/V EC",
+          "batchNo": "26S-OXA25-024",
+          "lotNo": "26S-OXA25-024",
+          "productionDate": "2026-11-03",
+          "submissionNo": "P-2611-0008",
+          "packageUnit": "ออกซาไดอะซอน 25",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RS-OXA-25 | MF: MF26110026 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "100 CC",
+          "labelQuantities": [
+            "100 CC"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RS-OXA-25"
+        },
+        {
+          "seq": 2,
+          "sampleName": "OXADIAZON 25% W/V EC",
+          "commonName": "OXADIAZON 25% W/V EC",
+          "batchNo": "26S-OXA25-024",
+          "lotNo": "26S-OXA25-024",
+          "productionDate": "2026-11-03",
+          "submissionNo": "P-2611-0008",
+          "packageUnit": "ออกซาไดอะซอน 25",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": false,
+          "note": "Item: RS-OXA-25 | MF: MF26110026 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "500 CC",
+          "labelQuantities": [
+            "500 CC"
+          ],
+          "labelQuantitySides": [
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RS-OXA-25"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110026"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110309135899",
+        "requesterEmail": "nattawut.s@icpladda.com",
+        "lisPetitionNo": "P-2611-0008",
+        "petitionNo": "P-2611-0008",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-03T09:14:54.904Z",
+        "lastSyncAt": "2026-11-09T02:16:37.182Z",
+        "lastSyncKey": "analyzing||8c31d8898cd7"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-12T06:21:57.144Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-03T09:14:54.909Z",
+      "updatedAt": "2026-11-12T06:21:57.148Z",
+      "__v": 10,
+      "deliveredBy": {
+        "employeeId": "3",
+        "name": "นายพีรเดช อรุณสันติโรจน์ (ไฟฟ์)"
+      },
+      "sampleSentAt": "2026-11-09T02:12:24.142Z",
+      "qcReceivedAt": "2026-11-09T02:15:13.105Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-09T02:15:13.105Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-10T04:34:12.209Z",
+      "qcCompletedBy": "นางสาววธาธร สอนซี"
+    },
+    {
+      "_id": "6aeaff231ae6d90ca612a6e3",
+      "petitionNo": "P-2611-0016",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P16",
+        "lab": "L10",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11629",
+        "name": "น.ส.วรรณนภา  นราแก้ว",
+        "email": "wannapa.n@icpladda.com",
+        "department": "ผลิต 5",
+        "submittedAt": "2026-11-04T09:47:15.576Z"
+      },
+      "sampledBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-144",
+          "lotNo": "26S-CAH4-144",
+          "productionDate": "2026-11-05",
+          "submissionNo": "P-2611-0016",
+          "packageUnit": "พาซาแทป 4 จี",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RS-CAH-4 | MF: MF26110063 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-05",
+          "itemNo": "RS-CAH-4"
+        },
+        {
+          "seq": 2,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-145",
+          "lotNo": "26S-CAH4-145",
+          "productionDate": "2026-11-05",
+          "submissionNo": "P-2611-0016",
+          "packageUnit": "พาซาแทป 4 จี",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "ใช้เทคคาร์แทป 2 แบช | Item: RS-CAH-4 | MF: MF26110063 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-05",
+          "itemNo": "RS-CAH-4"
+        },
+        {
+          "seq": 3,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-145",
+          "lotNo": "26S-CAH4-145",
+          "productionDate": "2026-11-05",
+          "submissionNo": "P-2611-0016",
+          "packageUnit": "พาซาแทป 4 จี",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": false,
+          "note": "ใช้เทคคาร์แทป 2 แบช | Item: RS-CAH-4 | MF: MF26110063 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "500 G",
+          "labelQuantities": [
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-06",
+          "itemNo": "RS-CAH-4"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110063"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110409463011",
+        "requesterEmail": "wannapa.n@icpladda.com",
+        "lisPetitionNo": "P-2611-0016",
+        "petitionNo": "P-2611-0016",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-04T09:47:15.574Z",
+        "lastSyncAt": "2026-11-19T06:21:00.648Z",
+        "lastSyncKey": "analyzing||c52a8209f104"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:14:58.752Z",
+          "source": "qc-approval"
+        },
+        {
+          "seq": 2,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:14:58.752Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-04T09:47:15.579Z",
+      "updatedAt": "2026-11-19T06:21:03.645Z",
+      "__v": 11,
+      "deliveredBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "sampleSentAt": "2026-11-05T04:10:48.555Z",
+      "qcReceivedAt": "2026-11-05T04:12:16.025Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-05T04:12:16.025Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-05T09:27:38.514Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "labReceivedAt": "2026-11-19T06:20:58.391Z",
+      "labReceivedBy": "Dev Administrator",
+      "adminOnly": false
+    },
+    {
+      "_id": "6aebf7d41ae6d90ca613aa59",
+      "petitionNo": "P-2611-0018",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P18",
+        "lab": "L11",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "10029",
+        "name": "นางสาวจัญญา สายกระสุน",
+        "email": "janya.s@icpladda.com",
+        "department": "ผลิต 1",
+        "submittedAt": "2026-11-05T03:28:20.478Z"
+      },
+      "sampledBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "FENOBUCARB 50% EC (NRU+SOL)",
+          "commonName": "FENOBUCARB 50% EC (NRU+SOL)",
+          "batchNo": "26S-FNB50-030",
+          "lotNo": "26S-FNB50-030",
+          "productionDate": "2026-11-05",
+          "submissionNo": "P-2611-0018",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RS-FNB50 | MF: MF26110065 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "100 CC",
+          "labelQuantities": [
+            "100 CC"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-06",
+          "itemNo": "RS-FNB50"
+        },
+        {
+          "seq": 2,
+          "sampleName": "FENOBUCARB 50% EC (NRU+SOL)",
+          "commonName": "FENOBUCARB 50% EC (NRU+SOL)",
+          "batchNo": "26S-FNB50-031",
+          "lotNo": "26S-FNB50-031",
+          "productionDate": "2026-11-05",
+          "submissionNo": "P-2611-0018",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RS-FNB50 | MF: MF26110065 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "100 CC, 500 CC",
+          "labelQuantities": [
+            "100 CC",
+            "500 CC"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-06",
+          "itemNo": "RS-FNB50",
+          "sgConfirmedAt": "2026-11-06T01:41:22.432Z",
+          "sgConfirmedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+          "sgConfirmedTemperature": "30.0",
+          "sgConfirmedValue": "0.967"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110065"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110503270680",
+        "requesterEmail": "janya.s@icpladda.com",
+        "lisPetitionNo": "P-2611-0018",
+        "petitionNo": "P-2611-0018",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-05T03:28:20.477Z",
+        "lastSyncAt": "2026-11-10T01:14:46.214Z",
+        "lastSyncKey": "analyzing||571e630a2a6b"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:14:44.188Z",
+          "source": "qc-approval"
+        },
+        {
+          "seq": 2,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:14:44.188Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-05T03:28:20.482Z",
+      "updatedAt": "2026-11-10T01:14:46.214Z",
+      "__v": 6,
+      "deliveredBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "sampleSentAt": "2026-11-06T01:22:05.622Z",
+      "qcReceivedAt": "2026-11-06T01:36:04.906Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-06T01:36:04.906Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-07T01:51:06.522Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aec29c2b54be9e7f1c51f91",
+      "petitionNo": "P-2611-0024",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P24",
+        "lab": "L14",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11629",
+        "name": "น.ส.วรรณนภา  นราแก้ว",
+        "email": "wannapa.n@icpladda.com",
+        "department": "ผลิต 5",
+        "submittedAt": "2026-11-05T07:01:22.348Z"
+      },
+      "sampledBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-146",
+          "lotNo": "26S-CAH4-146",
+          "productionDate": "2026-11-06",
+          "submissionNo": "P-2611-0024",
+          "packageUnit": "พาซาแทป 4 จี",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RS-CAH-4 | MF: MF26110080 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-06",
+          "itemNo": "RS-CAH-4"
+        },
+        {
+          "seq": 2,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-147",
+          "lotNo": "26S-CAH4-147",
+          "productionDate": "2026-11-06",
+          "submissionNo": "P-2611-0024",
+          "packageUnit": "พาซาแทป 4 จี",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RS-CAH-4 | MF: MF26110080 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-06",
+          "itemNo": "RS-CAH-4"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110080"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110507010817",
+        "requesterEmail": "wannapa.n@icpladda.com",
+        "lisPetitionNo": "P-2611-0024",
+        "petitionNo": "P-2611-0024",
+        "lisStatus": "received",
+        "lisSent": true,
+        "sentAt": "2026-11-05T07:01:22.347Z",
+        "lastSyncAt": "2026-11-10T01:11:24.384Z",
+        "lastSyncKey": "received||2fdcdf6bc5f1"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:11:22.342Z",
+          "source": "qc-approval"
+        },
+        {
+          "seq": 2,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:11:22.342Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-05T07:01:22.351Z",
+      "updatedAt": "2026-11-17T02:15:25.446Z",
+      "__v": 7,
+      "deliveredBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "sampleSentAt": "2026-11-06T04:23:37.377Z",
+      "qcReceivedAt": "2026-11-06T06:19:45.606Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-06T06:19:45.606Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-06T08:57:01.956Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aed413155fb8c3711b3b83e",
+      "petitionNo": "P-2611-0025",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P25",
+        "lab": "L15",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11204",
+        "name": "นางอัจฉรา บุญไทย",
+        "email": "achara.b@icpladda.com",
+        "department": "ผลิต 4",
+        "submittedAt": "2026-11-06T02:53:37.170Z"
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "commonName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "batchNo": "26S-BRM0.005-LS-061",
+          "lotNo": "26S-BRM0.005-LS-061",
+          "productionDate": "2026-11-06",
+          "submissionNo": "P-2611-0025",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RSLS-BMO-0_005 | MF: MF26110068 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-07",
+          "itemNo": "RSLS-BMO-0_005"
+        },
+        {
+          "seq": 2,
+          "sampleName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "commonName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "batchNo": "26S-BRM0.005-LS-061",
+          "lotNo": "26S-BRM0.005-LS-061",
+          "productionDate": "2026-11-06",
+          "submissionNo": "P-2611-0025",
+          "packageUnit": "",
+          "sendToLab": true,
+          "sendToQc": false,
+          "note": "Item: RSLS-BMO-0_005 | MF: MF26110068 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "500 G",
+          "labelQuantities": [
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-07",
+          "itemNo": "RSLS-BMO-0_005"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110068"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110602530496",
+        "requesterEmail": "achara.b@icpladda.com",
+        "lisPetitionNo": "P-2611-0025",
+        "petitionNo": "P-2611-0025",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-06T02:53:37.168Z",
+        "lastSyncAt": "2026-11-06T08:59:46.556Z",
+        "lastSyncKey": "analyzing||16e77a316ac8"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:10:46.046Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-06T02:53:37.173Z",
+      "updatedAt": "2026-11-10T01:10:46.049Z",
+      "__v": 7,
+      "deliveredBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "sampleSentAt": "2026-11-06T08:39:23.627Z",
+      "qcReceivedAt": "2026-11-06T08:57:07.629Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-06T08:57:07.629Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-06T09:00:05.308Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aed7f886402f9eb133420c1",
+      "petitionNo": "P-2611-0034",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P34",
+        "lab": "L21",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11385",
+        "name": "นางสาวดวงพร ก้านทอง",
+        "email": "duangporn.k@icpladda.com",
+        "department": "ผลิต 3",
+        "submittedAt": "2026-11-06T07:19:36.610Z"
+      },
+      "sampledBy": {
+        "employeeId": "3",
+        "name": "นายพีรเดช อรุณสันติโรจน์ (ไฟฟ์)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "OXADIAZON 25% W/V EC",
+          "commonName": "OXADIAZON 25% W/V EC",
+          "batchNo": "26S-OXA25-025",
+          "lotNo": "26S-OXA25-025",
+          "productionDate": "2026-11-07",
+          "submissionNo": "P-2611-0034",
+          "packageUnit": "ออกซาไดอะซอน 25",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RS-OXA-25 | MF: MF26110092 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "100 CC, 500 CC",
+          "labelQuantities": [
+            "100 CC",
+            "500 CC"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-12",
+          "itemNo": "RS-OXA-25",
+          "sgConfirmedAt": "2026-11-12T01:53:58.584Z",
+          "sgConfirmedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+          "sgConfirmedTemperature": "30.0",
+          "sgConfirmedValue": "0.967"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110092"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110607175130",
+        "requesterEmail": "duangporn.k@icpladda.com",
+        "lisPetitionNo": "P-2611-0034",
+        "petitionNo": "P-2611-0034",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-06T07:19:36.608Z",
+        "lastSyncAt": "2026-11-12T01:53:58.357Z",
+        "lastSyncKey": "analyzing||b9bb94465d3a"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-18T03:31:59.130Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-06T07:19:36.615Z",
+      "updatedAt": "2026-11-18T03:31:59.133Z",
+      "__v": 7,
+      "deliveredBy": {
+        "employeeId": "3",
+        "name": "นายพีรเดช อรุณสันติโรจน์ (ไฟฟ์)"
+      },
+      "sampleSentAt": "2026-11-12T01:28:57.404Z",
+      "qcReceivedAt": "2026-11-12T01:49:21.385Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-12T01:49:21.385Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcHandlers": [
+        {
+          "employeeId": "11634",
+          "email": "pattranit.r@icpladda.com",
+          "name": "นางสาวภัทรานิษฐ์ รักพงศ์"
+        }
+      ],
+      "qcCompletedAt": "2026-11-14T02:17:29.412Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aee99a76402f9eb1334af28",
+      "petitionNo": "P-2611-0036",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P36",
+        "lab": "L23",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "10029",
+        "name": "นางสาวจัญญา สายกระสุน",
+        "email": "janya.s@icpladda.com",
+        "department": "ผลิต 1",
+        "submittedAt": "2026-11-07T03:23:19.098Z"
+      },
+      "sampledBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "FIPRONIL 5% W/V SC (PUBLIC HEALTH)",
+          "commonName": "FIPRONIL 5% W/V SC (PUBLIC HEALTH)",
+          "batchNo": "26S-FPN5-GMP-038",
+          "lotNo": "26S-FPN5-GMP-038",
+          "productionDate": "2026-11-07",
+          "submissionNo": "P-2611-0036",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RSPH-FPN-5 | MF: MFPH26110030 | Priority: normal",
+          "sampleQuantity": 3,
+          "labelQuantity": "500 CC, 500 CC, 500 CC",
+          "labelQuantities": [
+            "500 CC",
+            "500 CC",
+            "500 CC"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RSPH-FPN-5",
+          "sgConfirmedAt": "2026-11-09T04:18:51.937Z",
+          "sgConfirmedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+          "sgConfirmedTemperature": "30.0",
+          "sgConfirmedValue": "1.031"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MFPH26110030"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110703224677",
+        "requesterEmail": "janya.s@icpladda.com",
+        "lisPetitionNo": "P-2611-0036",
+        "petitionNo": "P-2611-0036",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-07T03:23:19.097Z",
+        "lastSyncAt": "2026-11-09T04:18:51.751Z",
+        "lastSyncKey": "analyzing||4638c1801e32"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:08:57.076Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-07T03:23:19.100Z",
+      "updatedAt": "2026-11-10T01:08:57.078Z",
+      "__v": 8,
+      "deliveredBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "sampleSentAt": "2026-11-09T02:09:59.997Z",
+      "qcReceivedAt": "2026-11-09T03:59:41.366Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-09T03:59:41.366Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-09T04:18:56.123Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aeea3ca6402f9eb1334c456",
+      "petitionNo": "P-2611-0039",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P39",
+        "lab": "L24",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11417",
+        "name": "นางสาวกิตติยาภรณ์ ศรีพุ่มไข่",
+        "email": "kittiyaporn.s@icpladda.com",
+        "department": "ผลิต 2",
+        "submittedAt": "2026-11-07T04:06:34.689Z"
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "commonName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "batchNo": "26S-ANF1.5+24D3.76-B-076",
+          "lotNo": "26S-ANF1.5+24D3.76-B-076",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0039",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "ใช้พรีมิกซ์แบช 080 แบชแรก | Item: RS-ANF1_5-24D3_76-B | MF: MF26110104 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RS-ANF1_5-24D3_76-B"
+        },
+        {
+          "seq": 2,
+          "sampleName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "commonName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "batchNo": "26S-ANF1.5+24D3.76-B-077",
+          "lotNo": "26S-ANF1.5+24D3.76-B-077",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0039",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RS-ANF1_5-24D3_76-B | MF: MF26110104 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RS-ANF1_5-24D3_76-B"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110104"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110704055679",
+        "requesterEmail": "kittiyaporn.s@icpladda.com",
+        "lisPetitionNo": "P-2611-0039",
+        "petitionNo": "P-2611-0039",
+        "lisStatus": "received",
+        "lisSent": true,
+        "sentAt": "2026-11-07T04:06:34.688Z",
+        "lastSyncAt": "2026-11-10T01:08:43.978Z",
+        "lastSyncKey": "received||260b096a116d"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:08:41.951Z",
+          "source": "qc-approval"
+        },
+        {
+          "seq": 2,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:08:41.951Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-07T04:06:34.691Z",
+      "updatedAt": "2026-11-17T02:15:25.403Z",
+      "__v": 8,
+      "deliveredBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "sampleSentAt": "2026-11-09T04:25:28.762Z",
+      "qcReceivedAt": "2026-11-09T06:20:59.349Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-09T06:20:59.349Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-09T07:17:40.844Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aeea8a16402f9eb1334c4b8",
+      "petitionNo": "P-2611-0041",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P41",
+        "lab": "L25",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11629",
+        "name": "น.ส.วรรณนภา  นราแก้ว",
+        "email": "wannapa.n@icpladda.com",
+        "department": "ผลิต 5",
+        "submittedAt": "2026-11-07T04:27:13.950Z"
+      },
+      "sampledBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-150",
+          "lotNo": "26S-CAH4-150",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0041",
+          "packageUnit": "พาซาแทป 4 จี",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RS-CAH-4 | MF: MF26110101 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RS-CAH-4"
+        },
+        {
+          "seq": 2,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-151",
+          "lotNo": "26S-CAH4-151",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0041",
+          "packageUnit": "พาซาแทป 4 จี",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "Item: RS-CAH-4 | MF: MF26110101 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RS-CAH-4"
+        },
+        {
+          "seq": 3,
+          "sampleName": "CARTAP HYDROCHLORIDE 4% GR",
+          "commonName": "CARTAP HYDROCHLORIDE 4% GR",
+          "batchNo": "26S-CAH4-151",
+          "lotNo": "26S-CAH4-151",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0041",
+          "packageUnit": "พาซาแทป 4 จี",
+          "sendToLab": true,
+          "sendToQc": false,
+          "note": "Item: RS-CAH-4 | MF: MF26110101 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "500 G",
+          "labelQuantities": [
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-10",
+          "itemNo": "RS-CAH-4"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110101"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110704255231",
+        "requesterEmail": "wannapa.n@icpladda.com",
+        "lisPetitionNo": "P-2611-0041",
+        "petitionNo": "P-2611-0041",
+        "lisStatus": "received",
+        "lisSent": true,
+        "sentAt": "2026-11-07T04:27:13.949Z",
+        "lastSyncAt": "2026-11-10T01:08:18.124Z",
+        "lastSyncKey": "received||75bb610eeaff"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:08:16.098Z",
+          "source": "qc-approval"
+        },
+        {
+          "seq": 2,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:08:16.098Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-07T04:27:13.952Z",
+      "updatedAt": "2026-11-17T02:15:25.388Z",
+      "__v": 9,
+      "deliveredBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "sampleSentAt": "2026-11-09T04:11:06.626Z",
+      "qcReceivedAt": "2026-11-09T04:23:48.414Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-09T04:23:48.414Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-09T08:56:12.489Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aeec74c6402f9eb1334d737",
+      "petitionNo": "P-2611-0042",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P42",
+        "lab": "L26",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11204",
+        "name": "นางอัจฉรา บุญไทย",
+        "email": "achara.b@icpladda.com",
+        "department": "ผลิต 4",
+        "submittedAt": "2026-11-07T06:38:04.627Z"
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "commonName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "batchNo": "26S-BRM0.005-LS-062",
+          "lotNo": "26S-BRM0.005-LS-062",
+          "productionDate": "2026-11-07",
+          "submissionNo": "P-2611-0042",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RSLS-BMO-0_005 | MF: MF26110069 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RSLS-BMO-0_005"
+        },
+        {
+          "seq": 2,
+          "sampleName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "commonName": "BROMADIOLONE 0.005% W/W  (LIVE STOCK)",
+          "batchNo": "26S-BRM0.005-LS-063",
+          "lotNo": "26S-BRM0.005-LS-063",
+          "productionDate": "2026-11-07",
+          "submissionNo": "P-2611-0042",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RSLS-BMO-0_005 | MF: MF26110086 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RSLS-BMO-0_005"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110069",
+        "MF26110086"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110706374851",
+        "requesterEmail": "achara.b@icpladda.com",
+        "lisPetitionNo": "P-2611-0042",
+        "petitionNo": "P-2611-0042",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-07T06:38:04.627Z",
+        "lastSyncAt": "2026-11-07T09:04:01.096Z",
+        "lastSyncKey": "analyzing||517337fde2db"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:07:59.564Z",
+          "source": "qc-approval"
+        },
+        {
+          "seq": 2,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:07:59.564Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-07T06:38:04.630Z",
+      "updatedAt": "2026-11-10T01:07:59.568Z",
+      "__v": 8,
+      "deliveredBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "sampleSentAt": "2026-11-07T08:57:58.418Z",
+      "qcReceivedAt": "2026-11-07T09:03:54.074Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-07T09:03:54.074Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-07T09:07:06.475Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6aeef08c6402f9eb1334ed75",
+      "petitionNo": "P-2611-0043",
+      "dept": "production",
+      "routeTargets": [
+        "lab"
+      ],
+      "sampleLabelNumbers": {
+        "lab": "L27",
+        "year": 2569
+      },
+      "status": "deliveringQC",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11417",
+        "name": "นางสาวกิตติยาภรณ์ ศรีพุ่มไข่",
+        "email": "kittiyaporn.s@icpladda.com",
+        "department": "ผลิต 2",
+        "submittedAt": "2026-11-07T09:34:04.402Z"
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR",
+          "commonName": "2,4-D-BUTYL 3.76% + BUTACHLOR 4% GR",
+          "batchNo": "26S-BTC4+24D3.76-112",
+          "lotNo": "26S-BTC4+24D3.76-112",
+          "productionDate": "2026-11-07",
+          "submissionNo": "P-2611-0043",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": false,
+          "note": "*ส่งวิเคราะห์ครั้งที่ 2 เติมยาปรับปรุงเคเซียแบช 103 แบชแรก จำนวน 210 กก. | Item: RS-BTC4-24D3_76 | MF: MF26110093 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "500 G",
+          "labelQuantities": [
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-09",
+          "itemNo": "RS-BTC4-24D3_76"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110093"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110709334743",
+        "requesterEmail": "kittiyaporn.s@icpladda.com",
+        "lisPetitionNo": "P-2611-0043",
+        "petitionNo": "P-2611-0043",
+        "lisStatus": "sent",
+        "lisSent": true,
+        "sentAt": "2026-11-07T09:34:04.400Z",
+        "lastSyncAt": "2026-11-07T09:34:06.342Z",
+        "lastSyncKey": "sent||6959512cc3a8"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": "2026-11-07T09:34:04.405Z",
+      "updatedAt": "2026-11-07T09:34:37.653Z",
+      "__v": 1
+    },
+    {
+      "_id": "6af13fe1d3753c133b81cff3",
+      "petitionNo": "P-2611-0046",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P45",
+        "lab": "L28",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "10029",
+        "name": "นางสาวจัญญา สายกระสุน",
+        "email": "janya.s@icpladda.com",
+        "department": "ผลิต 1",
+        "submittedAt": "2026-11-09T03:37:05.041Z"
+      },
+      "sampledBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "FIPRONIL 5% W/V SC (PUBLIC HEALTH)",
+          "commonName": "FIPRONIL 5% W/V SC (PUBLIC HEALTH)",
+          "batchNo": "26S-FPN5-GMP-039",
+          "lotNo": "26S-FPN5-GMP-039",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0046",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RSPH-FPN-5 | MF: MFPH26110035 | Priority: normal",
+          "sampleQuantity": 3,
+          "labelQuantity": "500 CC, 500 CC, 500 CC",
+          "labelQuantities": [
+            "500 CC",
+            "500 CC",
+            "500 CC"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-10",
+          "itemNo": "RSPH-FPN-5",
+          "sgConfirmedAt": "2026-11-10T07:00:30.942Z",
+          "sgConfirmedBy": "นางสาววธาธร สอนซี",
+          "sgConfirmedTemperature": "30",
+          "sgConfirmedValue": "1.028"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MFPH26110035"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110903364284",
+        "requesterEmail": "janya.s@icpladda.com",
+        "lisPetitionNo": "P-2611-0046",
+        "petitionNo": "P-2611-0046",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-09T03:37:05.037Z",
+        "lastSyncAt": "2026-11-10T07:00:32.350Z",
+        "lastSyncKey": "analyzing||dad1824da05e"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": "2026-11-09T03:37:05.049Z",
+      "updatedAt": "2026-11-10T07:00:37.302Z",
+      "__v": 7,
+      "deliveredBy": {
+        "employeeId": "2",
+        "name": "นายอติภัทร จารุณ (โนอา)"
+      },
+      "sampleSentAt": "2026-11-10T01:43:59.529Z",
+      "qcReceivedAt": "2026-11-10T02:32:59.601Z",
+      "qcReceivedBy": "นางสาววธาธร สอนซี",
+      "receivedAt": "2026-11-10T02:32:59.601Z",
+      "receivedBy": "นางสาววธาธร สอนซี",
+      "qcCompletedAt": "2026-11-10T07:00:37.300Z",
+      "qcCompletedBy": "นางสาววธาธร สอนซี"
+    },
+    {
+      "_id": "6af165dc5b958c81a729579d",
+      "petitionNo": "P-2611-0047",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P46",
+        "lab": "L29",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11204",
+        "name": "นางอัจฉรา บุญไทย",
+        "email": "achara.b@icpladda.com",
+        "department": "ผลิต 4",
+        "submittedAt": "2026-11-09T06:19:08.813Z"
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "commonName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "batchNo": "26S-BRM0.005-GMP(R)-242",
+          "lotNo": "26S-BRM0.005-GMP(R)-242",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0047",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RSPH-BML0_005-RD | MF: MFPH26110027 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-10",
+          "itemNo": "RSPH-BML0_005-RD"
+        },
+        {
+          "seq": 2,
+          "sampleName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "commonName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "batchNo": "26S-BRM0.005-GMP(R)-243",
+          "lotNo": "26S-BRM0.005-GMP(R)-243",
+          "productionDate": "2026-11-09",
+          "submissionNo": "P-2611-0047",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RSPH-BML0_005-RD | MF: MFPH26110031 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "labelSampledDate": "2026-11-10",
+          "itemNo": "RSPH-BML0_005-RD"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MFPH26110027",
+        "MFPH26110031"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26110906184888",
+        "requesterEmail": "achara.b@icpladda.com",
+        "lisPetitionNo": "P-2611-0047",
+        "petitionNo": "P-2611-0047",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-09T06:19:08.810Z",
+        "lastSyncAt": "2026-11-09T09:08:15.269Z",
+        "lastSyncKey": "analyzing||f20cfd02abfd"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [
+        {
+          "seq": 1,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:06:33.969Z",
+          "source": "qc-approval"
+        },
+        {
+          "seq": 2,
+          "side": "qc",
+          "status": "approved",
+          "conclusion": "pass",
+          "by": "นางสาวสิริพิชญ์ สงสมพันธ์",
+          "at": "2026-11-10T01:06:33.969Z",
+          "source": "qc-approval"
+        }
+      ],
+      "createdAt": "2026-11-09T06:19:08.820Z",
+      "updatedAt": "2026-11-10T01:06:33.972Z",
+      "__v": 8,
+      "deliveredBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "sampleSentAt": "2026-11-09T09:01:02.012Z",
+      "qcReceivedAt": "2026-11-09T09:05:01.401Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-09T09:05:01.401Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcCompletedAt": "2026-11-09T09:08:58.114Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6af28320ae935840cd6ed827",
+      "petitionNo": "P-2611-0055",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P54",
+        "lab": "L34",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11417",
+        "name": "นางสาวกิตติยาภรณ์ ศรีพุ่มไข่",
+        "email": "kittiyaporn.s@icpladda.com",
+        "department": "ผลิต 2",
+        "submittedAt": "2026-11-10T02:36:16.266Z"
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "commonName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "batchNo": "26S-ANF1.5+24D3.76-B-080",
+          "lotNo": "26S-ANF1.5+24D3.76-B-080",
+          "productionDate": "2026-11-11",
+          "submissionNo": "P-2611-0055",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": false,
+          "sendToQc": true,
+          "note": "ใช้พรีมิกซ์แบช 080 | Item: RS-ANF1_5-24D3_76-B | MF: MF26110117 | Priority: normal",
+          "sampleQuantity": 1,
+          "labelQuantity": "300 G",
+          "labelQuantities": [
+            "300 G"
+          ],
+          "labelQuantitySides": [
+            "qc"
+          ],
+          "lineRef": "142",
+          "labelSampledDate": "2026-11-11",
+          "itemNo": "RS-ANF1_5-24D3_76-B"
+        },
+        {
+          "seq": 2,
+          "sampleName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "commonName": "2,4-D-BUTYL 3.76% + ANILOFOS 1.5% GR (RED)",
+          "batchNo": "26S-ANF1.5+24D3.76-B-081",
+          "lotNo": "26S-ANF1.5+24D3.76-B-081",
+          "productionDate": "2026-11-11",
+          "submissionNo": "P-2611-0055",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "ใช้พรีมิกซ์แบช 080 | Item: RS-ANF1_5-24D3_76-B | MF: MF26110117 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "lineRef": "143",
+          "labelSampledDate": "2026-11-11",
+          "itemNo": "RS-ANF1_5-24D3_76-B"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MF26110117"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26111002355387",
+        "requesterEmail": "kittiyaporn.s@icpladda.com",
+        "lisPetitionNo": "P-2611-0055",
+        "petitionNo": "P-2611-0055",
+        "lisStatus": "received",
+        "lisSent": true,
+        "sentAt": "2026-11-10T02:36:16.265Z",
+        "lastSyncAt": "2026-11-12T01:12:58.726Z",
+        "lastSyncKey": "received||ad29afadbb1a"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": "2026-11-10T02:36:16.270Z",
+      "updatedAt": "2026-11-17T02:15:25.364Z",
+      "__v": 13,
+      "deliveredBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "sampleSentAt": "2026-11-11T06:48:16.571Z",
+      "qcReceivedAt": "2026-11-11T07:41:27.772Z",
+      "qcReceivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "receivedAt": "2026-11-11T07:41:27.772Z",
+      "receivedBy": "นางสาวภัทรานิษฐ์ รักพงศ์",
+      "qcHandlers": [
+        {
+          "employeeId": "11634",
+          "email": "pattranit.r@icpladda.com",
+          "name": "นางสาวภัทรานิษฐ์ รักพงศ์"
+        }
+      ],
+      "qcCompletedAt": "2026-11-11T07:42:02.059Z",
+      "qcCompletedBy": "นางสาวภัทรานิษฐ์ รักพงศ์"
+    },
+    {
+      "_id": "6af28ddd1d3cc31b36c5b6b2",
+      "petitionNo": "P-2611-0056",
+      "dept": "production",
+      "routeTargets": [],
+      "sampleLabelNumbers": {
+        "qc": "P55",
+        "lab": "L35",
+        "year": 2569
+      },
+      "status": "inProgress",
+      "priority": 0,
+      "labRecheckCount": 0,
+      "labEditSession": null,
+      "conclusion": null,
+      "submittedBy": {
+        "employeeId": "11204",
+        "name": "นางอัจฉรา บุญไทย",
+        "email": "achara.b@icpladda.com",
+        "department": "ผลิต 4",
+        "submittedAt": "2026-11-10T03:22:05.879Z"
+      },
+      "sampledBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "items": [
+        {
+          "seq": 1,
+          "sampleName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "commonName": "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)",
+          "batchNo": "26S-BRM0.005-GMP(R)-244",
+          "lotNo": "26S-BRM0.005-GMP(R)-244",
+          "productionDate": "2026-11-10",
+          "submissionNo": "P-2611-0056",
+          "packageUnit": "",
+          "testUnit": "",
+          "testItems": "",
+          "sendToLab": true,
+          "sendToQc": true,
+          "note": "Item: RSPH-BML0_005-RD | MF: MFPH26110032 | Priority: normal",
+          "sampleQuantity": 2,
+          "labelQuantity": "300 G, 500 G",
+          "labelQuantities": [
+            "300 G",
+            "500 G"
+          ],
+          "labelQuantitySides": [
+            "qc",
+            "lab"
+          ],
+          "lineRef": "manual:MFPH26110032:1794280794935:0:0.12481413378193118",
+          "labelSampledDate": "2026-11-11",
+          "itemNo": "RSPH-BML0_005-RD"
+        }
+      ],
+      "cause": "",
+      "labExpected": null,
+      "prodOrderNos": [
+        "MFPH26110032"
+      ],
+      "productionWorkflow": {
+        "requestNo": "SA26111003202416",
+        "requesterEmail": "achara.b@icpladda.com",
+        "lisPetitionNo": "P-2611-0056",
+        "petitionNo": "P-2611-0056",
+        "lisStatus": "analyzing",
+        "lisSent": true,
+        "sentAt": "2026-11-10T03:22:05.875Z",
+        "lastSyncAt": "2026-11-10T09:05:02.428Z",
+        "lastSyncKey": "analyzing||f8f9e9878068"
+      },
+      "currentPhase": 1,
+      "phase2UnlockedAt": null,
+      "phase2DueAt": null,
+      "phase2TriggeredBy": null,
+      "revisionOf": null,
+      "approvedAt": null,
+      "rejectedAt": null,
+      "deletedAt": null,
+      "deletedBy": "",
+      "reviewHistory": [],
+      "assignedMachines": [],
+      "additionalSampleRequests": [],
+      "itemApprovals": [],
+      "createdAt": "2026-11-10T03:22:05.884Z",
+      "updatedAt": "2026-11-10T09:09:44.021Z",
+      "__v": 5,
+      "deliveredBy": {
+        "employeeId": "4",
+        "name": "นายสรรสกุล เหล็กอิ่ม (เชพ)"
+      },
+      "sampleSentAt": "2026-11-10T08:35:42.025Z",
+      "qcReceivedAt": "2026-11-10T09:04:53.205Z",
+      "qcReceivedBy": "นางสาววธาธร สอนซี",
+      "receivedAt": "2026-11-10T09:04:53.205Z",
+      "receivedBy": "นางสาววธาธร สอนซี",
+      "qcCompletedAt": "2026-11-10T09:09:44.016Z",
+      "qcCompletedBy": "นางสาววธาธร สอนซี"
+    }
+  ],
+  "results": []
+}
