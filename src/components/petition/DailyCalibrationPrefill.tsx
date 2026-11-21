@@ -31,8 +31,9 @@ export function DailyCalibrationPrefill({ keys, values, onChange, commonName = "
       const filled = missing.filter((key) => {
         const slot = daily?.[baseLabel(key)];
         const isArea = AREA_LABELS.includes(baseLabel(key));
-        const substance = (aiSubstanceFromKey(key) || (isArea ? commonName.trim() : "")).toLowerCase();
-        const value = (substance ? slot?.bySubstance?.[substance] : undefined) ?? (isArea ? undefined : slot?.any);
+        // ลองชื่อสารจาก key ก่อน แล้วค่อยใช้ชื่อสามัญเต็ม (ผล Lab ที่ไม่ได้แยกช่องตามสารจะถูกเก็บด้วยชื่อสามัญ)
+        const candidates = [aiSubstanceFromKey(key), isArea ? commonName.trim().toLowerCase() : ""].filter(Boolean);
+        const value = candidates.map((name) => slot?.bySubstance?.[name]).find(Boolean) ?? (isArea ? undefined : slot?.any);
         if (!value) return false;
         next[key] = value;
         onChange(key, value);
