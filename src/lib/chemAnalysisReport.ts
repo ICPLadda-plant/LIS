@@ -3,6 +3,7 @@ import type { LabReportPage, LabReportRow } from "@/lib/labReport";
 import { buddhistDate } from "@/lib/labReport";
 import { itemRequiresSide } from "@/lib/itemApprovals";
 import { mediaUrlsFromText } from "@/lib/mediaUrls";
+import { formatSpecificGravity } from "@/lib/formSpecificGravity";
 
 /** ฟอร์ม F-CHM-01-01 Rev 04 มีช่องตัวอย่าง 7 ช่องต่อหนึ่งใบ */
 export const CHEM_REPORT_SAMPLES_PER_SHEET = 7;
@@ -140,7 +141,7 @@ export function buildChemAnalysisSheets(petition: Petition, labPages: LabReportP
       const sg = findRow(rows, SG_PATTERN);
       return {
         ai: clean(ai?.result),
-        sg: clean(item.sgConfirmedValue) || clean(sg?.result),
+        sg: formatSpecificGravity(clean(item.sgConfirmedValue) || clean(sg?.result)),
         batchNo: clean(page.sample.batchNo),
         productionDate: clean(page.sample.productionDate),
         testRound: String(testRound(petition, item)),

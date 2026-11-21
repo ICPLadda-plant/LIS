@@ -20,6 +20,14 @@ function isFilled(value: unknown): boolean {
   return value != null && value !== '';
 }
 
+// แสดงค่า ถพ. เป็นทศนิยม 3 ตำแหน่งเสมอ (1.59 -> 1.590); ค่าที่ไม่ใช่ตัวเลขคืนตามเดิม
+export function formatSpecificGravity(value: unknown): string {
+  if (value == null || value === '') return '';
+  const text = String(value).trim();
+  const num = Number(text.replace(/,/g, ''));
+  return text !== '' && Number.isFinite(num) ? num.toFixed(3) : text;
+}
+
 export function readSpecificGravityEntryValue(
   row: Record<string, unknown> | undefined,
   fieldLabel: string = SG_FIELD_LABEL,
@@ -78,5 +86,5 @@ export function resolveSpecificGravity(
   }
 
   const value = readSpecificGravityEntryValue(row, sgParam.fieldLabel);
-  return value == null || value === '' ? '' : String(value);
+  return formatSpecificGravity(value);
 }
