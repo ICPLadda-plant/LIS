@@ -48,6 +48,8 @@ interface Props {
   /** คำร้องที่กำลังจะเริ่มงาน; null = ปิด dialog */
   petition: Petition | null;
   saving: boolean;
+  /** change = เปลี่ยนเครื่องระหว่างวิเคราะห์ (เริ่มงานไปแล้ว) */
+  mode?: 'start' | 'change';
   onConfirm: (machines: PetitionAssignedMachine[]) => void;
   onClose: () => void;
 }
@@ -56,7 +58,9 @@ interface Props {
  * Dialog ตอนเจ้าหน้าที่กด "เริ่มงาน": เลือกเครื่องที่จะใช้ของแต่ละสาร
  * (สารในกลุ่มที่ใช้ method ประเภทเดียวกันใช้เครื่องร่วมกัน 1 เครื่อง)
  */
-export default function LabStartWorkDialog({ petition, saving, onConfirm, onClose }: Props) {
+export default function LabStartWorkDialog({ petition, saving, mode = 'start', onConfirm, onClose }: Props) {
+  const isChange = mode === 'change';
+  const actionLabel = isChange ? 'บันทึกเครื่อง' : 'เริ่มงาน';
   const { registryMethods, methodByCode, commonNameToSlots } = useLabMethodSlots();
   const { data: machines = [], isPending: machinesLoading, error: machinesError } = useQuery({
     queryKey: ['machines-active'],
@@ -164,10 +168,12 @@ export default function LabStartWorkDialog({ petition, saving, onConfirm, onClos
             <DialogHeader>
               <DialogTitle className="flex flex-wrap items-center gap-2">
                 <PlayCircle className="h-5 w-5 text-primary" />
-                เริ่มงาน <span className="text-primary">{petition.petitionNo}</span>
+                {isChange ? 'เปลี่ยนเครื่อง' : 'เริ่มงาน'} <span className="text-primary">{petition.petitionNo}</span>
               </DialogTitle>
               <DialogDescription>
-                เลือกเครื่องที่จะใช้วิเคราะห์ของแต่ละสาร ระบบจะเริ่มนับเวลาวิเคราะห์เมื่อกดเริ่มงาน
+                {isChange
+                  ? 'แก้เครื่องที่ใช้วิเคราะห์ของแต่ละสาร ผลที่บันทึกไว้และเวลาเริ่มงานยังคงเดิม'
+                  : 'เลือกเครื่องที่จะใช้วิเคราะห์ของแต่ละสาร ระบบจะเริ่มนับเวลาวิเคราะห์เมื่อกดเริ่มงาน'}
               </DialogDescription>
             </DialogHeader>
 
@@ -285,7 +291,7 @@ export default function LabStartWorkDialog({ petition, saving, onConfirm, onClos
                     <span className="inline-block">
                       <Button variant="primary" disabled>
                         <PlayCircle className="h-4 w-4" />
-                        เริ่มงาน
+                        {actionLabel}
                       </Button>
                     </span>
                   </TooltipTrigger>
@@ -294,7 +300,7 @@ export default function LabStartWorkDialog({ petition, saving, onConfirm, onClos
               ) : (
                 <Button variant="primary" disabled={saving || machinesLoading} onClick={handleConfirm}>
                   <PlayCircle className="h-4 w-4" />
-                  {saving ? 'กำลังเริ่มงาน...' : 'เริ่มงาน'}
+                  {saving ? 'กำลังบันทึก...' : actionLabel}
                 </Button>
               )}
             </DialogFooter>

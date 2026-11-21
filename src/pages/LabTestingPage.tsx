@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen } from 'lucide-react';
+import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import LabStartWorkDialog from '@/components/petition/LabStartWorkDialog';
@@ -42,6 +42,7 @@ import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
+const LAB_PAGE_SIZE = 50;
 
 const labItemsFor = (petition: Petition) => (petition.items ?? []).filter(
   (item) => isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(item),
@@ -56,6 +57,8 @@ export default function LabTestingPage() {
   const assignedToNames = !isFullAccess ? assigneeNamesForUser(user) : undefined;
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState<PetitionDept | ''>('');
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [search, dept]);
   const [labParameters, setLabParameters] = useState<Awaited<ReturnType<typeof api.getParameters>>>([]);
   const [parametersLoaded, setParametersLoaded] = useState(false);
   const [parametersError, setParametersError] = useState(false);
@@ -63,6 +66,8 @@ export default function LabTestingPage() {
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
   // คำร้องที่กด "เริ่มงาน" แล้ว รอเลือกเครื่องใน dialog
   const [startTarget, setStartTarget] = useState<Petition | null>(null);
+  // คำร้องที่เริ่มงานแล้ว แต่ต้องการเปลี่ยนเครื่อง (เช่น เลือกผิด)
+  const [changeTarget, setChangeTarget] = useState<Petition | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const canClaimRole = normalizeRoles(user).some((r) => ['admin', 'lab-head', 'lab-analyze'].includes(r));
   const [freeAssign, setFreeAssign] = useState<LabFreeAssignState | null>(null);
@@ -107,8 +112,41 @@ export default function LabTestingPage() {
     assignedToEmployeeId,
     assignedToNames,
     labPending: true,
-    limit: 50,
+    page,
+    limit: LAB_PAGE_SIZE,
   });
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / LAB_PAGE_SIZE));
+  const labPager = totalPages > 1 ? (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">
+        หน้า {page}/{totalPages} · {data?.total ?? 0} รายการ
+      </span>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          disabled={page <= 1}
+          onClick={() => setPage((n) => Math.max(1, n - 1))}
+          aria-label="หน้าก่อนหน้า"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          disabled={page >= totalPages}
+          onClick={() => setPage((n) => Math.min(totalPages, n + 1))}
+          aria-label="หน้าถัดไป"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  ) : null;
   // คำร้องเฉพาะ Admin ถูกซ่อนจากรายการปกติ จึงดึงแยกมารวมให้ Admin กรอกผลได้
   const isAdmin = normalizeRoles(user).includes('admin');
   const { data: adminOnlyData, refresh: refreshAdminOnly } = usePetitionList({
@@ -116,7 +154,7 @@ export default function LabTestingPage() {
     search,
     dept: dept || undefined,
     labPending: true,
-    limit: 50,
+    limit: 100,
     adminOnly: true,
   }, { enabled: isAdmin });
 
@@ -153,6 +191,28 @@ export default function LabTestingPage() {
     .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p)));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
+  // ยังวิเคราะห์อยู่ (เริ่มงานแล้ว ยังไม่ส่งผล) เปลี่ยนเครื่องได้
+  const canChangeMachines = (p: Petition) =>
+    isLabWorkAccepted(p) && !p.labCompletedAt && labWorkReceived(p)
+    && (isFullAccess || isAssignedTo(p.assignedTo, user));
+
+  async function changeMachines(p: Petition, machines: PetitionAssignedMachine[]) {
+    if (acceptingId) return;
+    setAcceptingId(p._id);
+    try {
+      await api.put<Petition>(`/petitions/${p._id}/machines`, { employeeId: user?.employeeId, machines });
+      toast.success(`เปลี่ยนเครื่องของ ${p.petitionNo} แล้ว`);
+      setChangeTarget(null);
+      refresh();
+      if (isAdmin) refreshAdminOnly();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || 'เปลี่ยนเครื่องไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setAcceptingId(null);
+    }
+  }
+
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
   const flaggablePetitionIds = petitions
     .filter((p) => !!labReceivedAt(p))
@@ -259,6 +319,20 @@ export default function LabTestingPage() {
             {acceptingId === p._id ? 'กำลังเริ่มงาน...' : 'เริ่มงาน'}
           </Button>
         ) : labWorkReceived(p) ? (
+          <div className="flex justify-end gap-2">
+            {canChangeMachines(p) && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={acceptingId === p._id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setChangeTarget(p);
+                }}
+              >
+                เปลี่ยนเครื่อง
+              </Button>
+            )}
           <Button
             size="sm"
             onClick={(e) => {
@@ -268,6 +342,7 @@ export default function LabTestingPage() {
           >
             {p.labCompletedAt ? 'ดูรายละเอียด' : 'เข้าตรวจ'}
           </Button>
+          </div>
         ) : (
           <span className="text-xs text-grey-400">รอสแกนรับ</span>
         ),
@@ -308,6 +383,16 @@ export default function LabTestingPage() {
             saving={acceptingId === startTarget._id}
             onConfirm={(machines) => { void acceptPetition(startTarget, machines); }}
             onClose={() => setStartTarget(null)}
+          />
+        )}
+
+        {changeTarget && (
+          <LabStartWorkDialog
+            petition={changeTarget}
+            mode="change"
+            saving={acceptingId === changeTarget._id}
+            onConfirm={(machines) => { void changeMachines(changeTarget, machines); }}
+            onClose={() => setChangeTarget(null)}
           />
         )}
 
@@ -371,6 +456,8 @@ export default function LabTestingPage() {
 
         {parametersError && <p role="alert" className="text-sm text-destructive">โหลดพารามิเตอร์ Lab ไม่สำเร็จ กรุณารีเฟรชหน้า</p>}
 
+        {labPager}
+
         <DataTable
           columns={columns}
           data={petitions}
@@ -382,6 +469,7 @@ export default function LabTestingPage() {
           }}
           emptyTitle="ไม่มีคำร้อง Lab ที่รอตรวจ"
         />
+        {labPager}
       </div>
     </AppLayout>
   );

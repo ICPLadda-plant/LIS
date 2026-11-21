@@ -13,6 +13,7 @@ import {
   Send,
   ShieldAlert,
   Printer,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
@@ -42,7 +43,10 @@ import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, c
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
+import { DailyCalibrationPrefill, DAILY_CALIBRATION_LABELS } from '@/components/petition/DailyCalibrationPrefill';
 import { matchSubstanceKey } from '@/lib/substances';
+import { standardNumbersForSubstance } from '@/lib/standardInUse';
+import type { StandardInUseItem } from '@/types/stock';
 import { missingValuesBeforePhaseTrigger, phaseTriggerBlockedReason, visibleFieldsForPhase } from '@/lib/phaseRetest';
 import AdditionalSampleRequestDialog from '@/components/petition/AdditionalSampleRequestDialog';
 import { createResultAutosaveQueue, currentSampleResults, pendingAdditionalSample, sampleRoundFor, sampleRoundIdFor } from '@/lib/additionalSamples';
@@ -59,7 +63,8 @@ import {
 } from '@/types/petition.types';
 import { Button } from '@/components/ui/button';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
-import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationFields } from '@/components/petition/LabCalculationForm';
+import LabCalculationForm, { LAB_CALCULATION_CSS, hasCalculationFields, isPaclobutrazolPage, type LabCalculationVariant } from '@/components/petition/LabCalculationForm';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { buildApprovalGroups } from '@/lib/qcApprovalRows';
 import { buildLabReportPages } from '@/lib/labReport';
 import { buildLabCalculationPages } from '@/lib/labCalculation';
@@ -125,6 +130,12 @@ const AI_FIELD_SECTIONS = [
   { title: 'ผลตัวอย่าง', labels: ['% Sample 1', '% Sample 2', '% Sample 3', '% Sample Average', '% Sample %RSD'], className: 'border-emerald-200 border-l-4 border-l-emerald-400 bg-emerald-50 shadow-sm dark:bg-emerald-950/60' },
   { title: 'ผลวิเคราะห์', labels: ['%AI'], className: 'border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 shadow-sm dark:bg-teal-950/60' },
 ] as const;
+
+// PACLOBUTRAZOL ยังต้องกรอก Area Inj. 1-3 แม้ผลตัวอย่างจะมาจากตาราง Internal standard
+function isPbzAreaFieldLabel(label: string) {
+  const kind = calculatedAiFieldKind(label);
+  return /^area\s*inj\.?\s*[1-3]$/i.test(label.trim()) || kind === 'areaAverage' || kind === 'areaRsd';
+}
 
 function aiFieldsForParameter(fields: ParameterValueField[]) {
   if (!fields.some((field) => calculatedAiFieldKind(field.label) === 'ai')) return fields;
@@ -518,7 +529,7 @@ export default function LabTestingDetailPage() {
     && Date.parse(requestedPetition.updatedAt) >= Date.parse(currentPetition.updatedAt)
     ? requestedPetition : currentPetition;
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
-  const [calculationPrintOpen, setCalculationPrintOpen] = useState(false);
+  const [calculationVariant, setCalculationVariant] = useState<LabCalculationVariant | null>(null);
   const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
   const pendingSample = pendingAdditionalSample(petition, 'lab');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
@@ -584,6 +595,14 @@ export default function LabTestingDetailPage() {
   }, []);
 
   // Load instrument sources once (for the live-pull button).
+  // ขวด standard ที่กำลังใช้งานอยู่ — ช่อง "เลขที่ Standard" ต้องเลือกจากรายการนี้ของสารนั้น
+  const [standardsInUse, setStandardsInUse] = useState<StandardInUseItem[]>([]);
+  useEffect(() => {
+    api.getStandardsInUse()
+      .then((res) => setStandardsInUse(res?.items ?? []))
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     api.getInstrumentSources()
       .then((rows) => setInstrumentSources(rows ?? []))
@@ -1301,16 +1320,33 @@ export default function LabTestingDetailPage() {
                 ผู้นำส่ง: {petition.submittedBy?.name ?? '-'}
                 {labReceivedBy(petition) && ` · ผู้รับงาน: ${labReceivedBy(petition)}`}
               </span>
-              <Button
-                type="button"
-                variant="primary-outline"
-                className="gap-2"
-                disabled={calculationPages.length === 0}
-                onClick={() => setCalculationPrintOpen(true)}
-              >
-                <Printer className="h-4 w-4" />
-                พิมพ์เอกสาร
-              </Button>
+              {calculationPages.some(isPaclobutrazolPage) ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="primary-outline" className="gap-2">
+                      <Printer className="h-4 w-4" />
+                      พิมพ์เอกสาร
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">เลือกเอกสารที่ต้องการพิมพ์</DropdownMenuLabel>
+                    <DropdownMenuItem className="cursor-pointer" onSelect={() => setCalculationVariant('default')}>ใบคำนวณ (แบบเดิม)</DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer" onSelect={() => setCalculationVariant('standard')}>ใบคำนวณ (แบบมาตรฐาน)</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button
+                  type="button"
+                  variant="primary-outline"
+                  className="gap-2"
+                  disabled={calculationPages.length === 0}
+                  onClick={() => setCalculationVariant('default')}
+                >
+                  <Printer className="h-4 w-4" />
+                  พิมพ์เอกสาร
+                </Button>
+              )}
             </div>
           }
         />
@@ -1651,6 +1687,36 @@ export default function LabTestingDetailPage() {
                                     };
                                   })()
                                 : null;
+                              if (unit.key.split('::')[0] === STANDARD_NO_LABEL) {
+                                const substance = aiSubstanceFromKey(unit.key) || item.commonName || '';
+                                const options = standardNumbersForSubstance(standardsInUse, substance);
+                                const saved = String(srcValues[unit.key] ?? '');
+                                // ค่าเก่าที่บันทึกเป็นรหัส QR (u_xxx) — แปลงเป็นเลขฉลากขวด ถ้าแปลงไม่ได้ถือว่ายังไม่ได้เลือก
+                                const fromQr = standardsInUse.find((s) => s.qrId === saved)?.labelCode ?? '';
+                                const isQrValue = /^u_/i.test(saved);
+                                const current = isQrValue ? fromQr : saved;
+                                const fill = current || (options.length === 1 ? options[0] : '');
+                                if (fill !== saved && (fill || isQrValue) && !fieldDisabled) {
+                                  queueMicrotask(() => onUnitChange(unit.key, fill));
+                                }
+                                return (
+                                  <div key={unit.key} className={cn(aiGridClass(unit.field.label), 'space-y-1')}>
+                                    <label className="text-sm font-medium text-foreground" htmlFor={`std-no-${unit.key}`}>{unit.field.label}</label>
+                                    <input
+                                      id={`std-no-${unit.key}`}
+                                      list={`std-no-list-${unit.key}`}
+                                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm disabled:opacity-60"
+                                      value={current}
+                                      disabled={fieldDisabled}
+                                      placeholder={options.length ? 'เลือกหรือพิมพ์เลขที่ Standard' : 'พิมพ์เลขที่ Standard'}
+                                      onChange={(e) => onUnitChange(unit.key, e.target.value)}
+                                    />
+                                    <datalist id={`std-no-list-${unit.key}`}>
+                                      {options.map((qr) => <option key={qr} value={qr} />)}
+                                    </datalist>
+                                  </div>
+                                );
+                              }
                               return (
                                 <div key={unit.key} className={aiGridClass(unit.field.label)}>
                                   <TestField
@@ -1778,10 +1844,22 @@ export default function LabTestingDetailPage() {
                                   });
                                 };
                                 return (
-                                  <div className="grid grid-cols-1 gap-4 pl-2 sm:grid-cols-6">
-                                    {/* %AI และช่อง Standard / CCS ไว้บนสุด แล้วจึงตามด้วยตาราง */}
-                                    {fields.filter((field) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai').map(renderField)}
-                                    {fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label)) && !(field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai')).map(renderField)}
+                                  <div className="space-y-4 pl-2">
+                                    {/* แยกกล่องสีเหมือนสารอื่น: Standard / Area Injection / CCS / ผลวิเคราะห์ แล้วจึงตามด้วยตาราง */}
+                                    {(() => {
+                                      const aiOnly = (field: ParameterValueField) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai';
+                                      const shown = fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label) || isPbzAreaFieldLabel(field.label)) && !aiOnly(field));
+                                      const knownLabels = new Set<string>(AI_FIELD_SECTIONS.flatMap((section) => [...section.labels]));
+                                      return [
+                                        ...AI_FIELD_SECTIONS.map((section) => ({ ...section, fields: section.title === 'ผลวิเคราะห์' ? fields.filter(aiOnly) : shown.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
+                                        { title: 'ข้อมูลเพิ่มเติม', labels: [], className: 'border-border bg-card', fields: shown.filter((field) => !knownLabels.has(field.label)) },
+                                      ].filter((section) => section.fields.length > 0).map((section) => (
+                                        <section key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
+                                          <h4 className="text-base font-semibold text-foreground">{section.title}</h4>
+                                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">{section.fields.map(renderField)}</div>
+                                        </section>
+                                      ));
+                                    })()}
                                     <PaclobutrazolGrid
                                       values={srcValues}
                                       onChange={onPbzChange}
@@ -1944,11 +2022,16 @@ export default function LabTestingDetailPage() {
                               );
                             }
 
-                            return renderEditGrid(
-                              phaseValues[k] ?? {},
-                              (label, val) => handleFieldChange(petition, item, param, label, val, effectivePhase),
-                              phaseSaves[k],
-                              true,
+                            const onScalarChange = (label: string, val: unknown) => handleFieldChange(petition, item, param, label, val, effectivePhase);
+                            const dailyKeys = isAiParameterFields(param.valueFields ?? []) && !fieldDisabled
+                              ? (param.valueFields ?? []).flatMap((field) => expandAiAwareFieldForItem(field, item.commonName, { category: petitionCategory }, true).map((unit) => unit.key))
+                                .filter((key) => DAILY_CALIBRATION_LABELS.includes(key.split('::', 1)[0]))
+                              : [];
+                            return (
+                              <>
+                                {dailyKeys.length > 0 && <DailyCalibrationPrefill keys={dailyKeys} values={phaseValues[k] ?? {}} onChange={onScalarChange} />}
+                                {renderEditGrid(phaseValues[k] ?? {}, onScalarChange, phaseSaves[k], true)}
+                              </>
                             );
                           })()}
                           <ParameterRemarkField
@@ -2281,14 +2364,14 @@ export default function LabTestingDetailPage() {
 
         {calculationPages.length > 0 && (
           <PrintPreviewDialog
-            open={calculationPrintOpen}
-            onOpenChange={setCalculationPrintOpen}
+            open={calculationVariant !== null}
+            onOpenChange={(open) => { if (!open) setCalculationVariant(null); }}
             docType="coa"
             title="ใบคำนวณผลวิเคราะห์"
             css={LAB_CALCULATION_CSS}
           >
             {calculationPages.map((page, index) => (
-              <LabCalculationForm key={`${page.reportNo}-${index}`} page={page} />
+              <LabCalculationForm key={`${page.reportNo}-${index}`} page={page} variant={calculationVariant ?? 'default'} standardOptions={standardNumbersForSubstance(standardsInUse, page.sample.name)} />
             ))}
           </PrintPreviewDialog>
         )}

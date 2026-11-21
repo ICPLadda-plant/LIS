@@ -60,11 +60,15 @@ export default function RmPetitionNewPage() {
       return;
     }
 
-    const repeatedBatches = [...new Set(items.map((item) => item.batchNo.trim()))];
-    for (const batchNo of repeatedBatches) {
+    const batchKeys = new Map<string, { batchNo: string; sampleName: string }>(items.map((item) => {
+      const batchNo = item.batchNo.trim();
+      const sampleName = String(item.sampleName ?? '').trim();
+      return [`${sampleName}|${batchNo}`, { batchNo, sampleName }] as const;
+    }));
+    for (const { batchNo, sampleName } of batchKeys.values()) {
       try {
-        const { exists } = await api.batchExists(batchNo);
-        if (exists && !window.confirm(`Batch ${batchNo} เคยส่งไปแล้ว ต้องการส่งอีกใช่ไหม?`)) return;
+        const { exists } = await api.batchExists(batchNo, sampleName);
+        if (exists && !window.confirm(`${sampleName ? `${sampleName} ` : ''}Batch ${batchNo} เคยส่งไปแล้ว ต้องการส่งอีกใช่ไหม?`)) return;
       } catch {
         toast.error('ตรวจสอบประวัติ batch ไม่สำเร็จ กรุณาลองใหม่');
         return;

@@ -154,6 +154,8 @@ export interface StandardInUseItem {
   itemCode: string;
   itemName: string;
   qrId: string;
+  /** เลขที่ Standard บนฉลากขวด เช่น 690001 */
+  labelCode?: string;
   weights: number[];
   totalMg: number;
   instrumentGroup: "gc" | "hplc" | null;

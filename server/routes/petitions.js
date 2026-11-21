@@ -668,8 +668,12 @@ router.get('/rejected-by-batch', async (req, res) => {
 router.get('/batch-exists', async (req, res) => {
   try {
     const batchNo = String(req.query.batchNo || '').trim();
+    const sampleName = String(req.query.sampleName || '').trim();
     if (!batchNo) return res.json({ exists: false });
-    const exists = await Petition.exists({ 'items.batchNo': batchNo, status: { $ne: 'deleted' } });
+    // Batch ซ้ำนับเฉพาะสารเดียวกัน: สารต่างชนิดใช้เลข batch ชนกันได้
+    const itemMatch = { batchNo };
+    if (sampleName) itemMatch.sampleName = sampleName;
+    const exists = await Petition.exists({ items: { $elemMatch: itemMatch }, status: { $ne: 'deleted' } });
     res.json({ exists: Boolean(exists) });
   } catch (err) {
     res.status(500).json({ error: { message: err.message } });
@@ -1760,6 +1764,45 @@ router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
       actor: name,
       note: `${assignee.name} เริ่มงาน${machineNote}`,
       metadata: { side: 'lab', assignee: doc.assignedTo, machines: doc.assignedMachines },
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
+// PUT /api/petitions/:id/machines { machines } → เปลี่ยนเครื่องระหว่างวิเคราะห์ (เริ่มงานแล้ว ยังไม่ส่งผล)
+router.put('/:id/machines', serializePetitionWrite(async (req, res) => {
+  try {
+    const user = await currentUser(req);
+    if (!user) return res.status(401).json({ error: { message: 'กรุณาเข้าสู่ระบบ' } });
+    const doc = await Petition.findOne(petitionQuery(req.params.id));
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const assignee = doc.assignedTo;
+    if (!assignee?.acceptedAt) return res.status(409).json({ error: { message: 'งานนี้ยังไม่ได้เริ่ม' } });
+    if (['success', 'approved', 'rejected'].includes(doc.status) || doc.labCompletedAt) {
+      return badRequest(res, 'ส่งผลวิเคราะห์แล้ว เปลี่ยนเครื่องไม่ได้');
+    }
+    if (!Array.isArray(req.body?.machines) || req.body.machines.length === 0) return badRequest(res, 'กรุณาเลือกเครื่อง');
+    const name = user.name || user.email;
+    const employeeId = user.employeeId || (!user._id ? String(req.body?.employeeId || '').trim() : '');
+    const isAssignee = (employeeId && employeeId === assignee.employeeId)
+      || (name && String(name).trim() === assignee.name);
+    if (!isAssignee && !isLabAssignHead(user)) {
+      return res.status(403).json({ error: { message: `งานนี้มอบหมายให้ ${assignee.name}` } });
+    }
+    const previous = (doc.assignedMachines || []).map((m) => m.code).join(', ') || '-';
+    doc.assignedMachines = await normalizeAssignedMachines(req.body.machines);
+    refreshLabExpected(doc);
+    await doc.save();
+    const next = doc.assignedMachines.map((m) => m.code).join(', ') || '-';
+    logAudit(doc, {
+      event: 'machinesChanged',
+      fromStatus: doc.status,
+      toStatus: doc.status,
+      actor: name,
+      note: `เปลี่ยนเครื่องจาก ${previous} เป็น ${next}`,
+      metadata: { side: 'lab', machines: doc.assignedMachines },
     });
     res.json(doc);
   } catch (err) {

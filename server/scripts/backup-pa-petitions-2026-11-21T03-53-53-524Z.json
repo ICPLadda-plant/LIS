@@ -1,0 +1,4323 @@
+{
+ "petitions": [
+  {
+   "_id": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "dept": "production",
+   "routeTargets": [],
+   "sampleLabelNumbers": {
+    "qc": "AP03",
+    "year": 2569,
+    "groups": [
+     {
+      "key": "1|",
+      "qc": "AP03"
+     }
+    ]
+   },
+   "status": "inProgress",
+   "priority": 0,
+   "sampleSentAt": "2026-11-19T09:07:43.287Z",
+   "receivedAt": "2026-11-19T09:07:43.287Z",
+   "receivedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "labRecheckCount": 0,
+   "labEditSession": null,
+   "conclusion": null,
+   "submittedBy": {
+    "employeeId": "11650",
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com",
+    "department": "IT",
+    "submittedAt": "2026-11-19T09:07:43.291Z"
+   },
+   "items": [
+    {
+     "seq": 1,
+     "sampleName": "PACLOBUTRAZOL 25% SC",
+     "commonName": "PACLOBUTRAZOL 25% SC",
+     "batchNo": "1",
+     "lotNo": "",
+     "productionDate": "2026-11-19",
+     "submissionNo": "PA-2611-0001",
+     "packageUnit": "",
+     "testUnit": "",
+     "testItems": "",
+     "sendToLab": true,
+     "sendToQc": true,
+     "note": "",
+     "sampleQuantity": 1,
+     "labelQuantity": "500",
+     "labelQuantities": [
+      "500"
+     ],
+     "labelQuantitySides": [],
+     "itemNo": "RS-PCB25-SC",
+     "sgConfirmedAt": "2026-11-19T09:41:36.944Z",
+     "sgConfirmedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "sgConfirmedTemperature": "30",
+     "sgConfirmedValue": "1.000"
+    }
+   ],
+   "cause": "",
+   "adminOnly": true,
+   "assignedTo": {
+    "employeeId": "11650",
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "department": "IT",
+    "position": "IT Staff",
+    "assignedAt": "2026-11-19T09:07:43.287Z",
+    "assignedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "acceptedAt": "2026-11-19T09:07:53.797Z",
+    "acceptedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล"
+   },
+   "labExpected": {
+    "startedAt": "2026-11-19T09:07:53.797Z",
+    "at": "2026-11-19T13:07:53.797Z",
+    "minutes": 240,
+    "estimated": true,
+    "basis": [
+     {
+      "code": "LD-003",
+      "name": "GC 7890A",
+      "minutes": 240,
+      "source": "default",
+      "standardTimeId": "",
+      "estimatedSource": ""
+     }
+    ]
+   },
+   "prodOrderNos": [],
+   "currentPhase": 1,
+   "phase2UnlockedAt": null,
+   "phase2DueAt": null,
+   "phase2TriggeredBy": null,
+   "revisionOf": null,
+   "approvedAt": null,
+   "rejectedAt": null,
+   "deletedAt": "2026-11-20T02:02:45.825Z",
+   "deletedBy": "admin (codex)",
+   "reviewHistory": [],
+   "assignedMachines": [
+    {
+     "machineId": "6a16590c7f6c6274325c6be3",
+     "code": "LD-003",
+     "name": "GC 7890A",
+     "location": "ห้องวิเคราะห์สาร",
+     "sampleName": "PACLOBUTRAZOL 25% SC",
+     "commonName": "PACLOBUTRAZOL 25% SC"
+    }
+   ],
+   "additionalSampleRequests": [],
+   "itemApprovals": [],
+   "createdAt": "2026-11-19T09:07:43.295Z",
+   "updatedAt": "2026-11-20T02:02:45.827Z",
+   "__v": 5,
+   "qcHandlers": [
+    {
+     "employeeId": "11650",
+     "email": "prompiriya.t@icpladda.com",
+     "name": "พรหมพิริยะ ทองรุ่งรัตนกุล"
+    }
+   ]
+  },
+  {
+   "_id": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "dept": "production",
+   "routeTargets": [],
+   "sampleLabelNumbers": {
+    "qc": "AP04",
+    "year": 2569,
+    "groups": [
+     {
+      "key": "1|",
+      "qc": "AP04"
+     }
+    ]
+   },
+   "status": "inProgress",
+   "priority": 0,
+   "sampleSentAt": "2026-11-20T06:13:10.714Z",
+   "receivedAt": "2026-11-20T06:13:10.714Z",
+   "receivedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "labRecheckCount": 0,
+   "labEditSession": null,
+   "conclusion": null,
+   "submittedBy": {
+    "employeeId": "11650",
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com",
+    "department": "IT",
+    "submittedAt": "2026-11-20T06:13:10.717Z"
+   },
+   "items": [
+    {
+     "seq": 1,
+     "sampleName": "PACLOBUTRAZOL 25% SC",
+     "commonName": "PACLOBUTRAZOL 25% SC",
+     "batchNo": "1",
+     "lotNo": "",
+     "productionDate": "2026-11-20",
+     "submissionNo": "PA-2611-0001",
+     "packageUnit": "",
+     "testUnit": "",
+     "testItems": "",
+     "sendToLab": true,
+     "sendToQc": true,
+     "note": "",
+     "sampleQuantity": 1,
+     "labelQuantity": "100",
+     "labelQuantities": [
+      "100"
+     ],
+     "labelQuantitySides": [],
+     "itemNo": "RS-PCB25-SC",
+     "sgConfirmedAt": "2026-11-20T06:13:27.028Z",
+     "sgConfirmedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "sgConfirmedTemperature": "30",
+     "sgConfirmedValue": "1.055"
+    }
+   ],
+   "cause": "",
+   "adminOnly": true,
+   "assignedTo": {
+    "employeeId": "11650",
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "department": "IT",
+    "position": "IT Staff",
+    "assignedAt": "2026-11-20T06:13:10.714Z",
+    "assignedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "acceptedAt": "2026-11-20T06:13:35.044Z",
+    "acceptedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล"
+   },
+   "labExpected": {
+    "startedAt": "2026-11-20T06:13:35.044Z",
+    "at": "2026-11-20T10:13:35.044Z",
+    "minutes": 240,
+    "estimated": true,
+    "basis": [
+     {
+      "code": "LD-003",
+      "name": "GC 7890A",
+      "minutes": 240,
+      "source": "default",
+      "standardTimeId": "",
+      "estimatedSource": ""
+     }
+    ]
+   },
+   "prodOrderNos": [],
+   "currentPhase": 1,
+   "phase2UnlockedAt": null,
+   "phase2DueAt": null,
+   "phase2TriggeredBy": null,
+   "revisionOf": null,
+   "approvedAt": null,
+   "rejectedAt": null,
+   "deletedAt": null,
+   "deletedBy": "",
+   "reviewHistory": [],
+   "assignedMachines": [
+    {
+     "machineId": "6a16590c7f6c6274325c6be3",
+     "code": "LD-003",
+     "name": "GC 7890A",
+     "location": "ห้องวิเคราะห์สาร",
+     "sampleName": "PACLOBUTRAZOL 25% SC",
+     "commonName": "PACLOBUTRAZOL 25% SC"
+    }
+   ],
+   "additionalSampleRequests": [],
+   "itemApprovals": [],
+   "createdAt": "2026-11-20T06:13:10.721Z",
+   "updatedAt": "2026-11-20T06:13:35.060Z",
+   "__v": 2,
+   "qcHandlers": [
+    {
+     "employeeId": "11650",
+     "email": "prompiriya.t@icpladda.com",
+     "name": "พรหมพิริยะ ทองรุ่งรัตนกุล"
+    }
+   ]
+  }
+ ],
+ "qctestresults": [
+  {
+   "_id": "6afebc7fd5313b1a03689c42",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "itemSeq": 1,
+   "parameterId": "6a13ae4abcb0f3bbdd70d053",
+   "__v": 0,
+   "commonName": "PACLOBUTRAZOL 25% SC",
+   "enteredAt": "2026-11-19T09:08:15.621Z",
+   "enteredBy": {
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com"
+   },
+   "entries": [
+    {
+     "ค่าถพ.::paclobutrazol": "1.000",
+     "อุณหภูมิ": 30,
+     "อุณหภูมิ__source": {
+      "source": "instrument",
+      "instrument": "DMA 501",
+      "sampleName": "26S-PFN50-003 1",
+      "fetchedAt": "2026-11-19T09:41:23.870Z",
+      "tSet": 30,
+      "tBlock": 30
+     },
+     "ค่าถพ.::paclobutrazol__source": null
+    }
+   ],
+   "parameterName": "ค่า ถพ.",
+   "petitionNo": "PA-2611-0001",
+   "remark": "",
+   "sampleName": "PACLOBUTRAZOL 25% SC",
+   "sampleRoundId": "",
+   "updatedAt": "2026-11-19T09:41:32.613Z",
+   "updatedBy": {
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com"
+   },
+   "values": {},
+   "valuesPhase2": {}
+  },
+  {
+   "_id": "6afebc9ed5313b1a03689c43",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "itemSeq": 1,
+   "parameterId": "6a153cb2d1b37e2d6e343adc",
+   "__v": 0,
+   "enteredAt": "2026-11-19T09:08:46.833Z",
+   "enteredBy": {
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com"
+   },
+   "parameterName": "%AI",
+   "petitionNo": "PA-2611-0001",
+   "remark": "",
+   "sampleName": "PACLOBUTRAZOL 25% SC",
+   "sampleRoundId": "",
+   "updatedAt": "2026-11-19T09:44:42.730Z",
+   "updatedBy": {
+    "name": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+    "email": "kadkanok.s@icpladda.com"
+   },
+   "values": {
+    "PBZ Dilution Std": "50",
+    "PBZ Dilution Sample": "50",
+    "PBZ %Std": "97.3",
+    "%AI::paclobutrazol": "97.77",
+    "PBZ Sample 1 wt/mg": "29.73",
+    "PBZ Sample 1 Peak area 1": "153.20734",
+    "PBZ Sample 1 Peak area 2": "153.20734",
+    "PBZ Std 1 wt/mg": "48",
+    "PBZ Std 2 wt/mg": "50.39",
+    "PBZ Std 1 Peak area 1": "250.67163",
+    "PBZ Std 1 Internal std 1": "440.76376",
+    "PBZ Std 1 Peak area 2": "251.18158",
+    "PBZ Std 1 Internal std 2": "441.44995",
+    "PBZ Std 2 Peak area 1": "258.44995",
+    "PBZ Std 2 Internal std 1": "435.72043",
+    "PBZ Std 2 Peak area 2": "258.77509",
+    "PBZ Std 2 Internal std 2": "436.32666",
+    "PBZ Sample 2 wt/mg": "27.84",
+    "PBZ Sample 2 Peak area 1": "140.77888",
+    "PBZ Sample 2 Peak area 2": "140.77888",
+    "PBZ Sample 1 Internal std 1": "429.9451",
+    "PBZ Sample 1 Internal std 2": "429.9451",
+    "PBZ Sample 2 Internal std 1": "430.36499",
+    "PBZ Sample 2 Internal std 2": "430.36499"
+   },
+   "valuesPhase2": {}
+  },
+  {
+   "_id": "6affe4fed5313b1a03689d7f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "itemSeq": 1,
+   "parameterId": "6a13ae4abcb0f3bbdd70d053",
+   "__v": 0,
+   "commonName": "PACLOBUTRAZOL 25% SC",
+   "enteredAt": "2026-11-20T06:13:18.433Z",
+   "enteredBy": {
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com"
+   },
+   "entries": [
+    {
+     "ค่าถพ.::paclobutrazol": "1.055",
+     "อุณหภูมิ": "30"
+    }
+   ],
+   "parameterName": "ค่า ถพ.",
+   "petitionNo": "PA-2611-0001",
+   "remark": "",
+   "sampleName": "PACLOBUTRAZOL 25% SC",
+   "sampleRoundId": "",
+   "updatedAt": "2026-11-20T06:13:26.813Z",
+   "updatedBy": {
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com"
+   },
+   "values": {},
+   "valuesPhase2": {}
+  },
+  {
+   "_id": "6affe511d5313b1a03689d80",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "itemSeq": 1,
+   "parameterId": "6a153cb2d1b37e2d6e343adc",
+   "__v": 0,
+   "enteredAt": "2026-11-20T06:13:37.242Z",
+   "enteredBy": {
+    "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "email": "prompiriya.t@icpladda.com"
+   },
+   "parameterName": "%AI",
+   "petitionNo": "PA-2611-0001",
+   "remark": "",
+   "sampleName": "PACLOBUTRAZOL 25% SC",
+   "sampleRoundId": "",
+   "updatedAt": "2026-11-20T09:15:07.961Z",
+   "updatedBy": {
+    "name": "Dev Administrator",
+    "email": "admin-dept-dept-5ys6kj.dev@icpladda.com"
+   },
+   "values": {
+    "PBZ Dilution Std": "50",
+    "PBZ Dilution Sample": "50",
+    "PBZ Std 1 wt/mg": "48.0",
+    "PBZ Std 2 wt/mg": "50.39",
+    "PBZ %Std": "97.3",
+    "%AI::paclobutrazol": "24.09",
+    "PBZ Std 1 Internal std 1": "431.46738",
+    "PBZ Std 1 Internal std 2": "432.83942",
+    "PBZ Std 2 Internal std 1": "444.86353",
+    "PBZ Std 2 Internal std 2": "442.37241",
+    "PBZ Std 1 Peak area 1": "245.25937",
+    "PBZ Std 1 Peak area 2": "245.92659",
+    "PBZ Std 2 Peak area 1": "263.28464",
+    "PBZ Std 2 Peak area 2": "261.61206",
+    "เลขที่ Standard": "606802",
+    "ค่า Correlation coefficient ( r ) ที่ได้": "0.5464",
+    "Area Average": "475.00",
+    "Area %RSD": "2.11",
+    "% Sample Average": "22.83",
+    "% Sample %RSD": "",
+    "CCS Conc. (mg/mL)": "45.564",
+    "% Difference": "-2.11",
+    "CCS Result": "Pass",
+    "Mid-level Standard Conc. (mg/mL)": "46.5464",
+    "PBZ Sample 1 wt/mg": "196.5",
+    "PBZ Sample 1 Peak area 1": "305.407",
+    "PBZ Sample 1 Peak area 2": "305.407",
+    "PBZ Sample 1 Internal std 1": "561.0736",
+    "PBZ Sample 1 Internal std 2": "561.0736",
+    "PBZ Sample 2 wt/mg": "206",
+    "PBZ Sample 2 Peak area 1": "323.911",
+    "PBZ Sample 2 Peak area 2": "323.911",
+    "PBZ Sample 2 Internal std 1": "568.9565",
+    "PBZ Sample 2 Internal std 2": "568.9565",
+    "Area Inj.1": "465",
+    "Area Inj.2": "485",
+    "Area Inj.3": "475"
+   },
+   "valuesPhase2": {}
+  }
+ ],
+ "labrequests": [
+  {
+   "_id": "6afebc5f9c92dc88aa4046b7",
+   "labRequestNo": "L-2611-0035",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "batchNo": "1",
+   "sampleSeq": 1,
+   "requester": {
+    "fullName": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "department": "IT",
+    "address": "151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000",
+    "phone": "034-305281-2",
+    "fax": "",
+    "email": "prompiriya.t@icpladda.com",
+    "contactName": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "position": ""
+   },
+   "serviceAgreement": {
+    "sampleDelivery": "self",
+    "testMethod": "standard",
+    "testMethodDoneBefore": null,
+    "testMethodDetail": "",
+    "testDuration": "normal",
+    "testDurationDays": null,
+    "requireUncertainty": false,
+    "uncertaintyValue": ""
+   },
+   "reportCustomerName": "ICP Ladda Co., LTD.",
+   "reportAddressType": "default",
+   "reportAddressOther": "",
+   "invoiceAddressType": "default",
+   "invoiceAddressOther": "",
+   "testDelivery": [
+    "email"
+   ],
+   "storageCondition": [
+    "room"
+   ],
+   "packageType": [
+    "plasticBag"
+   ],
+   "packageTypeOther": "",
+   "sampleReturn": "return",
+   "deletedAt": null,
+   "deletedBy": "",
+   "createdAt": "2026-11-19T09:07:43.605Z",
+   "updatedAt": "2026-11-19T09:07:43.605Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe4f6fee05f2769ebd034",
+   "labRequestNo": "L-2611-0040",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "batchNo": "1",
+   "sampleSeq": 1,
+   "requester": {
+    "fullName": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "department": "IT",
+    "address": "151 ม.8 ต.สามควายเผือก อ.เมืองนครปฐม จ.นครปฐม 73000",
+    "phone": "034-305281-2",
+    "fax": "",
+    "email": "prompiriya.t@icpladda.com",
+    "contactName": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+    "position": ""
+   },
+   "serviceAgreement": {
+    "sampleDelivery": "self",
+    "testMethod": "standard",
+    "testMethodDoneBefore": null,
+    "testMethodDetail": "",
+    "testDuration": "normal",
+    "testDurationDays": null,
+    "requireUncertainty": false,
+    "uncertaintyValue": ""
+   },
+   "reportCustomerName": "ICP Ladda Co., LTD.",
+   "reportAddressType": "default",
+   "reportAddressOther": "",
+   "invoiceAddressType": "default",
+   "invoiceAddressOther": "",
+   "testDelivery": [
+    "email"
+   ],
+   "storageCondition": [
+    "room"
+   ],
+   "packageType": [
+    "plasticBag"
+   ],
+   "packageTypeOther": "",
+   "sampleReturn": "return",
+   "deletedAt": null,
+   "deletedBy": "",
+   "createdAt": "2026-11-20T06:13:10.841Z",
+   "updatedAt": "2026-11-20T06:13:10.841Z",
+   "__v": 0
+  }
+ ],
+ "petitionauditlogs": [
+  {
+   "_id": "6afebc5f9c92dc88aa404696",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "created",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "สร้างคำร้องใหม่",
+   "createdAt": "2026-11-19T09:07:43.308Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc699c92dc88aa40477f",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "accepted",
+   "fromStatus": "inProgress",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "พรหมพิริยะ ทองรุ่งรัตนกุล เริ่มงาน (เครื่อง: LD-003)",
+   "metadata": {
+    "side": "lab",
+    "assignee": {
+     "employeeId": "11650",
+     "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "department": "IT",
+     "position": "IT Staff",
+     "assignedAt": "2026-11-19T09:07:43.287Z",
+     "assignedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "acceptedAt": "2026-11-19T09:07:53.797Z",
+     "acceptedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล"
+    },
+    "machines": [
+     {
+      "machineId": "6a16590c7f6c6274325c6be3",
+      "code": "LD-003",
+      "name": "GC 7890A",
+      "location": "ห้องวิเคราะห์สาร",
+      "sampleName": "PACLOBUTRAZOL 25% SC",
+      "commonName": "PACLOBUTRAZOL 25% SC"
+     }
+    ]
+   },
+   "createdAt": "2026-11-19T09:07:53.820Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc7f9c92dc88aa404915",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:15.642Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc829c92dc88aa404931",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:18.080Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc839c92dc88aa40495b",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:19.489Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc859c92dc88aa40496f",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:21.149Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc869c92dc88aa404982",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:22.634Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc879c92dc88aa4049fb",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:23.914Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc939c92dc88aa404ae2",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:35.939Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc979c92dc88aa404b1b",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › อุณหภูมิ (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "อุณหภูมิ",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:08:39.568Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc989c92dc88aa404b25",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "fromStatus": "inProgress",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ยืนยันค่า ถพ. batch 1: 1.055 ที่ 30 °C",
+   "metadata": {
+    "kind": "sgConfirmed",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "value": "1.055",
+    "temperature": "30",
+    "previous": null,
+    "releasedToLab": false,
+    "audience": "qc"
+   },
+   "createdAt": "2026-11-19T09:08:40.090Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc9e9c92dc88aa404bac",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Dilution Std (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Dilution Std",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:08:46.841Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc9e9c92dc88aa404bb8",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Dilution Sample (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Dilution Sample",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:08:46.954Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc9f9c92dc88aa404bc1",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ %Std (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ %Std",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:08:47.071Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afebc9f9c92dc88aa404bca",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:08:47.176Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec21b9c92dc88aa408032",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:32:11.779Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec21b9c92dc88aa40803b",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:32:11.913Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2659c92dc88aa40837b",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC แก้ค่า %AI › PBZ Sample 1 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:25.852Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2659c92dc88aa408386",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:25.974Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2689c92dc88aa4083e8",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:28.979Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2699c92dc88aa4083f2",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:29.090Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2699c92dc88aa4083fc",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:29.211Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2759c92dc88aa408478",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC แก้ค่า %AI › PBZ Sample 1 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:41.834Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2759c92dc88aa408483",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC แก้ค่า %AI › PBZ Sample 1 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:41.954Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec2769c92dc88aa40848e",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:33:42.080Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec39d9c92dc88aa408f69",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:37.186Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec39d9c92dc88aa408f72",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:37.302Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3a19c92dc88aa408fbd",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:41.101Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3a19c92dc88aa408fc6",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:41.206Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3a69c92dc88aa408ff5",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:46.958Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3a79c92dc88aa408ffe",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:47.073Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3ad9c92dc88aa409062",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:53.212Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3ad9c92dc88aa409087",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:53.543Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3b09c92dc88aa4090a3",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:56.571Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3b09c92dc88aa4090ac",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:38:56.684Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3b49c92dc88aa4090f4",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:00.117Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3b49c92dc88aa4090fd",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:00.232Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3b79c92dc88aa409153",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:03.613Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3b79c92dc88aa40915c",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:03.721Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3bc9c92dc88aa409178",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:08.036Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3bc9c92dc88aa409181",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:08.143Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3bf9c92dc88aa4091dc",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:11.495Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3bf9c92dc88aa4091e5",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:11.617Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3c29c92dc88aa409221",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:14.874Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3c39c92dc88aa40922a",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:15.055Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3c69c92dc88aa409244",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:18.417Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3c69c92dc88aa409265",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:18.963Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3c79c92dc88aa409270",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:19.073Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3ca9c92dc88aa4092ad",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:22.043Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3ca9c92dc88aa4092b6",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:22.164Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3ca9c92dc88aa4092bf",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:22.280Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3cd9c92dc88aa40934b",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:25.371Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3cd9c92dc88aa40935d",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:25.504Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3cd9c92dc88aa409368",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:25.620Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3d19c92dc88aa4093cc",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:29.456Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3d19c92dc88aa4093d5",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:29.571Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3d19c92dc88aa4093e7",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:29.686Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3d59c92dc88aa409428",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:33.005Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3d59c92dc88aa409431",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:33.125Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec3d59c92dc88aa40943a",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:39:33.252Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4389c92dc88aa409908",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:12.695Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4389c92dc88aa409909",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "แก้ไขค่า ถพ. หลังยืนยัน (PACLOBUTRAZOL 25% SC): ค่าถพ.::paclobutrazol 1.055 → 1",
+   "metadata": {
+    "kind": "sgEditedAfterConfirm",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "before": "1.055",
+    "after": "1"
+   },
+   "createdAt": "2026-11-19T09:41:12.696Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec43a9c92dc88aa409967",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:14.896Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec43a9c92dc88aa409968",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "แก้ไขค่า ถพ. หลังยืนยัน (PACLOBUTRAZOL 25% SC): ค่าถพ.::paclobutrazol 1 → ",
+   "metadata": {
+    "kind": "sgEditedAfterConfirm",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "before": "1",
+    "after": ""
+   },
+   "createdAt": "2026-11-19T09:41:14.896Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4469c92dc88aa409a0b",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › อุณหภูมิ (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "อุณหภูมิ",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:26.338Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4469c92dc88aa409a1c",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › อุณหภูมิ__source (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "อุณหภูมิ__source",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:26.541Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4469c92dc88aa409a27",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:26.744Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4469c92dc88aa409a28",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "แก้ไขค่า ถพ. หลังยืนยัน (PACLOBUTRAZOL 25% SC): ค่าถพ.::paclobutrazol  → 1.121",
+   "metadata": {
+    "kind": "sgEditedAfterConfirm",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "before": "",
+    "after": 1.121
+   },
+   "createdAt": "2026-11-19T09:41:26.744Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4469c92dc88aa409a37",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol__source (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol__source",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:26.944Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4499c92dc88aa409a8d",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:29.377Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4499c92dc88aa409a8e",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "แก้ไขค่า ถพ. หลังยืนยัน (PACLOBUTRAZOL 25% SC): ค่าถพ.::paclobutrazol 1.121 → ",
+   "metadata": {
+    "kind": "sgEditedAfterConfirm",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "before": 1.121,
+    "after": ""
+   },
+   "createdAt": "2026-11-19T09:41:29.377Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4499c92dc88aa409a9f",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol__source (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol__source",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:29.569Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec44a9c92dc88aa409aad",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:30.780Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec44a9c92dc88aa409aae",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "แก้ไขค่า ถพ. หลังยืนยัน (PACLOBUTRAZOL 25% SC): ค่าถพ.::paclobutrazol  → 1",
+   "metadata": {
+    "kind": "sgEditedAfterConfirm",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "before": "",
+    "after": "1"
+   },
+   "createdAt": "2026-11-19T09:41:30.780Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec44b9c92dc88aa409abe",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "แก้ไขค่า ถพ. หลังยืนยัน (PACLOBUTRAZOL 25% SC): ค่าถพ.::paclobutrazol 1 → 1.00",
+   "metadata": {
+    "kind": "sgEditedAfterConfirm",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "before": "1",
+    "after": "1.00"
+   },
+   "createdAt": "2026-11-19T09:41:31.719Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec44b9c92dc88aa409abd",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:31.719Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec44c9c92dc88aa409ad2",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "แก้ไขค่า ถพ. หลังยืนยัน (PACLOBUTRAZOL 25% SC): ค่าถพ.::paclobutrazol 1.00 → 1.000",
+   "metadata": {
+    "kind": "sgEditedAfterConfirm",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "before": "1.00",
+    "after": "1.000"
+   },
+   "createdAt": "2026-11-19T09:41:32.621Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec44c9c92dc88aa409ad1",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-19T09:41:32.621Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec44d9c92dc88aa409b02",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "fromStatus": "inProgress",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ยืนยันค่า ถพ. ใหม่ batch 1: 1.000 ที่ 30 °C (เดิม 1.055 ที่ 30 °C)",
+   "metadata": {
+    "kind": "sgConfirmed",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "value": "1.000",
+    "temperature": "30",
+    "previous": {
+     "at": "2026-11-19T09:08:40.082Z",
+     "by": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "value": "1.055",
+     "temperature": "30"
+    },
+    "releasedToLab": false,
+    "audience": "qc"
+   },
+   "createdAt": "2026-11-19T09:41:33.554Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec4509c92dc88aa409b35",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "fromStatus": "inProgress",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ยืนยันค่า ถพ. ใหม่ batch 1: 1.000 ที่ 30 °C (เดิม 1.000 ที่ 30 °C)",
+   "metadata": {
+    "kind": "sgConfirmed",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "value": "1.000",
+    "temperature": "30",
+    "previous": {
+     "at": "2026-11-19T09:41:33.548Z",
+     "by": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "value": "1.000",
+     "temperature": "30"
+    },
+    "releasedToLab": false,
+    "audience": "qc"
+   },
+   "createdAt": "2026-11-19T09:41:36.949Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec50a9c92dc88aa40a67e",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC แก้ค่า %AI › PBZ Sample 2 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:44:42.629Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afec50a9c92dc88aa40a689",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "นางสาวเกศกนก  สิริเหล่าตระกูล",
+   "note": "QC แก้ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-19T09:44:42.737Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affaa45ec123edf0f71e72a",
+   "petitionId": "6afebc5f9c92dc88aa404694",
+   "petitionNo": "PA-2611-0001",
+   "event": "deleted",
+   "fromStatus": "inProgress",
+   "actor": "admin (codex)",
+   "note": "ลบคำร้อง",
+   "createdAt": "2026-11-20T02:02:45.815Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe4f6fee05f2769ebd02b",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "created",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "สร้างคำร้องใหม่",
+   "createdAt": "2026-11-20T06:13:10.733Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe4fefee05f2769ebd094",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-20T06:13:18.441Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe502fee05f2769ebd0f9",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-20T06:13:22.053Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe504fee05f2769ebd180",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC แก้ค่า ค่า ถพ. › ค่าถพ.::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "ค่าถพ.::paclobutrazol",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-20T06:13:24.460Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe506fee05f2769ebd1b5",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า ค่า ถพ. › อุณหภูมิ (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "qc",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "commonName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a13ae4abcb0f3bbdd70d053",
+    "parameterName": "ค่า ถพ.",
+    "fieldLabel": "อุณหภูมิ",
+    "phase": 1,
+    "entryIndex": 0
+   },
+   "createdAt": "2026-11-20T06:13:26.821Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe507fee05f2769ebd1bf",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "updated",
+   "fromStatus": "inProgress",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ยืนยันค่า ถพ. batch 1: 1.055 ที่ 30 °C",
+   "metadata": {
+    "kind": "sgConfirmed",
+    "itemSeq": 1,
+    "batchNo": "1",
+    "value": "1.055",
+    "temperature": "30",
+    "previous": null,
+    "releasedToLab": false,
+    "audience": "qc"
+   },
+   "createdAt": "2026-11-20T06:13:27.035Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe50ffee05f2769ebd249",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "accepted",
+   "fromStatus": "inProgress",
+   "toStatus": "inProgress",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "พรหมพิริยะ ทองรุ่งรัตนกุล เริ่มงาน (เครื่อง: LD-003)",
+   "metadata": {
+    "side": "lab",
+    "assignee": {
+     "employeeId": "11650",
+     "name": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "department": "IT",
+     "position": "IT Staff",
+     "assignedAt": "2026-11-20T06:13:10.714Z",
+     "assignedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+     "acceptedAt": "2026-11-20T06:13:35.044Z",
+     "acceptedBy": "พรหมพิริยะ ทองรุ่งรัตนกุล"
+    },
+    "machines": [
+     {
+      "machineId": "6a16590c7f6c6274325c6be3",
+      "code": "LD-003",
+      "name": "GC 7890A",
+      "location": "ห้องวิเคราะห์สาร",
+      "sampleName": "PACLOBUTRAZOL 25% SC",
+      "commonName": "PACLOBUTRAZOL 25% SC"
+     }
+    ]
+   },
+   "createdAt": "2026-11-20T06:13:35.068Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe511fee05f2769ebd275",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Dilution Std (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Dilution Std",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:13:37.249Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe511fee05f2769ebd281",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Dilution Sample (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Dilution Sample",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:13:37.352Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe511fee05f2769ebd28a",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:13:37.460Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe511fee05f2769ebd293",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:13:37.566Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe511fee05f2769ebd29c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ %Std (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ %Std",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:13:37.682Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe511fee05f2769ebd2a5",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:13:37.790Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe7df38d95eec17fa241b",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:25:35.510Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe7df38d95eec17fa2423",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:25:35.544Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe7df38d95eec17fa242b",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:25:35.574Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe7df38d95eec17fa2433",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:25:35.670Z",
+   "__v": 0
+  },
+  {
+   "_id": "6affe7df38d95eec17fa243b",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T06:25:35.762Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afff9c34cdb4c7ff0608526",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T07:41:55.242Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afff9c34cdb4c7ff060852f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 1 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 1 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T07:41:55.360Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afff9c34cdb4c7ff0608538",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T07:41:55.471Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afff9c34cdb4c7ff0608541",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › PBZ Std 2 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Std 2 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T07:41:55.584Z",
+   "__v": 0
+  },
+  {
+   "_id": "6afff9c34cdb4c7ff0608556",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "พรหมพิริยะ ทองรุ่งรัตนกุล",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T07:41:55.723Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000203ec766a86d51e2bdf",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › เลขที่ Standard (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "เลขที่ Standard",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:17:07.261Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0003191d97317d86ded188",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › เลขที่ Standard (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "เลขที่ Standard",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:21:45.381Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b00031a1d97317d86ded195",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › เลขที่ Standard (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "เลขที่ Standard",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:21:46.914Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009482d8865546861ce68",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › ค่า Correlation coefficient ( r ) ที่ได้ (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "ค่า Correlation coefficient ( r ) ที่ได้",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:08.843Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009482d8865546861ce70",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:08.901Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009482d8865546861ce78",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:08.940Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009492d8865546861ce80",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:09.009Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009492d8865546861ce88",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:09.044Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009492d8865546861ce90",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:09.115Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b00094c2d8865546861ce9f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › เลขที่ Standard (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "เลขที่ Standard",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:12.595Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861cea7",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › CCS Conc. (mg/mL) (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "CCS Conc. (mg/mL)",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.299Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861ceaf",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.334Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861ceb7",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.387Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861cebf",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.422Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861cec7",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.453Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861cecf",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.513Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861ced7",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Difference (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Difference",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.550Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009502d8865546861cedf",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › CCS Result (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "CCS Result",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:16.612Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf02",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › CCS Conc. (mg/mL) (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "CCS Conc. (mg/mL)",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.141Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf0c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.200Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf14",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.244Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf1c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.295Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf24",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.340Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf2c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.376Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf34",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Difference (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Difference",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.413Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009522d8865546861cf3c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › CCS Result (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "CCS Result",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:18.454Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009542d8865546861cf47",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Mid-level Standard Conc. (mg/mL) (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Mid-level Standard Conc. (mg/mL)",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:20.756Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009542d8865546861cf4f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:20.812Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009542d8865546861cf57",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:20.844Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009542d8865546861cf5f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:20.877Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009542d8865546861cf67",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:20.910Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009542d8865546861cf6f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:20.959Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009542d8865546861cf77",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Difference (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Difference",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:20.993Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009552d8865546861cf7f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › CCS Result (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "CCS Result",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:21.049Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cf87",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Mid-level Standard Conc. (mg/mL) (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Mid-level Standard Conc. (mg/mL)",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.018Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cf91",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.085Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cf99",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.121Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cfa1",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.177Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cfa9",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.214Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cfb1",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.261Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cfb9",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › % Difference (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Difference",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.294Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009582d8865546861cfc3",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › CCS Result (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "CCS Result",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:48:24.340Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009e32d8865546861d19c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:43.334Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009e32d8865546861d1a4",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:43.484Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009e52d8865546861d1b2",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › PBZ Sample 1 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:45.544Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009e52d8865546861d1bc",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:45.657Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009ec2d8865546861d1e8",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:52.102Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009ec2d8865546861d1f0",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:52.136Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009ec2d8865546861d1f8",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:52.193Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009ef2d8865546861d206",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:55.818Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009ef2d8865546861d20e",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 1 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 1 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:55.866Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009ef2d8865546861d216",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:50:55.917Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009f42d8865546861d245",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 wt/mg (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 wt/mg",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:00.433Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009f42d8865546861d24d",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:00.467Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009f82d8865546861d25e",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Peak area 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Peak area 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:04.129Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009f82d8865546861d266",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Peak area 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Peak area 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:04.160Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009f82d8865546861d26e",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:04.220Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009fb2d8865546861d27c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Internal std 1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Internal std 1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:07.525Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009fb2d8865546861d284",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › PBZ Sample 2 Internal std 2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "PBZ Sample 2 Internal std 2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:07.603Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b0009fb2d8865546861d28c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T08:51:07.642Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8a2d8865546861e66c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Inj.1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Inj.1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:50.672Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8a2d8865546861e674",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:50.829Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8a2d8865546861e67c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:50.893Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8a2d8865546861e684",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:50.973Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8b2d8865546861e68c",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:51.153Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8b2d8865546861e694",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:51.256Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8e2d8865546861e6b9",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Inj.2 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Inj.2",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:54.433Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8e2d8865546861e6c1",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:54.590Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8e2d8865546861e6cb",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:54.655Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8e2d8865546861e6d3",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:54.764Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8e2d8865546861e6dd",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:54.887Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f8e2d8865546861e6e5",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:54.967Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f922d8865546861e6ef",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › Area Inj.3 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Inj.3",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:58.785Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f922d8865546861e6f7",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:58.853Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f922d8865546861e701",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:58.891Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f922d8865546861e70b",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:58.925Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f922d8865546861e715",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:58.999Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f932d8865546861e71d",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:59.031Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f932d8865546861e727",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area Inj.3 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Inj.3",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:59.639Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f932d8865546861e731",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:59.680Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f932d8865546861e73b",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:59.744Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f932d8865546861e745",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:59.781Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f932d8865546861e74f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:59.854Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f932d8865546861e757",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:14:59.891Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f9b2d8865546861e77f",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area Inj.1 (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Inj.1",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:15:07.747Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f9b2d8865546861e789",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:15:07.791Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f9b2d8865546861e793",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › Area %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "Area %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:15:07.828Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f9b2d8865546861e79d",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › % Sample Average (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample Average",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:15:07.865Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f9b2d8865546861e7a7",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultEntered",
+   "actor": "Dev Administrator",
+   "note": "QC ใส่ค่า %AI › % Sample %RSD (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "% Sample %RSD",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:15:07.933Z",
+   "__v": 0
+  },
+  {
+   "_id": "6b000f9b2d8865546861e7af",
+   "petitionId": "6affe4f6fee05f2769ebd029",
+   "petitionNo": "PA-2611-0001",
+   "event": "resultUpdated",
+   "actor": "Dev Administrator",
+   "note": "QC แก้ค่า %AI › %AI::paclobutrazol (PACLOBUTRAZOL 25% SC)",
+   "metadata": {
+    "side": "lab",
+    "itemSeq": 1,
+    "sampleName": "PACLOBUTRAZOL 25% SC",
+    "parameterId": "6a153cb2d1b37e2d6e343adc",
+    "parameterName": "%AI",
+    "fieldLabel": "%AI::paclobutrazol",
+    "phase": 1
+   },
+   "createdAt": "2026-11-20T09:15:07.970Z",
+   "__v": 0
+  }
+ ]
+}

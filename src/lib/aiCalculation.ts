@@ -90,7 +90,9 @@ export function calculateAi(values: Record<string, unknown>, density: number | n
   // ใช้ค่าทั้งหมด (Std / %Std / Dilution) — valuesForSubstance เก็บไว้เฉพาะคีย์ Area Inj / Sample
   if (Object.keys(values).some((key) => key.startsWith('PBZ '))) {
     const pbz = calculatePaclobutrazol(values, density != null && Number(density) > 0 ? Number(density) : null);
-    return { areaAverage: null, sampleAverage: pbz.average, areaRsd: null, sampleRsd: null, ai: pbz.report == null ? null : Number(pbz.report.toFixed(2)) };
+    const pbzAreas = numberValues(valuesForSubstance(values, substance), /area\s*inj\.?\s*[1-3]/i);
+    const pbzAreaAverage = average(pbzAreas);
+    return { areaAverage: pbzAreaAverage, sampleAverage: pbz.average, areaRsd: rsd(pbzAreas, pbzAreaAverage), sampleRsd: null, ai: pbz.report == null ? null : Number(pbz.report.toFixed(2)) };
   }
   const own = valuesForSubstance(values, substance);
   const areas = numberValues(own, /area\s*inj\.?\s*[1-3]/i);
@@ -182,8 +184,9 @@ export function aiGridClass(label: string) {
   if (kind === 'ai') return 'sm:col-span-6';
   if (isControlSampleLabel(label)) return 'sm:col-span-2';
   if ([STANDARD_NO_LABEL, CORRELATION_LABEL].includes(label)) return 'sm:col-span-3';
-  if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(label)) return 'sm:col-span-2';
-  if ([CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL].includes(label)) return 'sm:col-span-1';
+  // แถว CCS: ชิดล่าง ให้กรอบกรอกตรงกันแม้ป้ายของช่องแคบ (CCS Result) ขึ้นสองบรรทัด
+  if ([MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL].includes(label)) return 'sm:col-span-2 sm:self-end';
+  if ([CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL].includes(label)) return 'sm:col-span-1 sm:self-end';
   if (kind === 'areaAverage' || kind === 'areaRsd' || kind === 'sampleAverage' || kind === 'sampleRsd') return 'sm:col-span-3';
   if (/^(area\s*inj\.?|%\s*sample)/i.test(label.trim())) return 'sm:col-span-2';
   return '';

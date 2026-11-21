@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import type { LabReportPage } from "@/lib/labReport";
-import { calculateCcs, ccsDifference, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
+import { calculateAi, calculateCcs, ccsDifference, formatCalculatedAi, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
 import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { PBZ_PRINT_CSS, PaclobutrazolPrintSheet, paclobutrazolValues } from "./PaclobutrazolPrintSheet";
+import { calculatePaclobutrazol, pbzFixed } from "@/lib/paclobutrazolFields";
 export { ccsDifference } from "@/lib/aiCalculation";
 
 export const LAB_CALCULATION_FORM_CODE = "FM-QP-07-08-002-R02 (02/11/69) P1/1";
@@ -120,11 +121,18 @@ function Check({ checked, label, field }: { checked: boolean; label: string; fie
   return <span className="brom-form-check"><span className="brom-form-box" data-field={field}>{checked ? "✓" : ""}</span>{label}</span>;
 }
 
+/** PACLOBUTRAZOL มีใบคำนวณให้เลือก 2 แบบ: แบบเดิม (Internal standard) และแบบมาตรฐานเหมือนสารอื่น */
+export function isPaclobutrazolPage(page: LabReportPage): boolean {
+  return paclobutrazolValues(page) != null;
+}
+
+export type LabCalculationVariant = "default" | "standard";
+
 /** ใบคำนวณผลวิเคราะห์ FM-QP-07-08-002-R02 (A4 แนวนอน) */
-export default function LabCalculationForm({ page }: { page: LabReportPage }) {
-  // PACLOBUTRAZOL ใช้ใบคำนวณ Internal standard (FM-QP-07-08-002-R01) ตามแบบ Excel
+export default function LabCalculationForm({ page, variant = "default", standardOptions = [] }: { page: LabReportPage; variant?: LabCalculationVariant; /** เลขที่ Standard ของขวดที่กำลังใช้งานของสารนี้ ใช้เมื่อยังไม่ได้บันทึกค่า */ standardOptions?: string[] }) {
+  // PACLOBUTRAZOL: "default" = ใบ Internal standard แบบเดิม (FM-QP-07-08-002-R01), "standard" = ใบคำนวณแบบสารอื่น
   const pbzValues = paclobutrazolValues(page);
-  if (pbzValues) {
+  if (pbzValues && variant === "default") {
     return (
       <div className="brom-form-root">
         <style>{LAB_CALCULATION_CSS}</style>
@@ -138,14 +146,20 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
     firstValue(page, /^Area\s*Av/i),
     firstValue(page, /^Area\s*%?\s*RSD/i),
   ];
-  const sampleAverage = firstValue(page, /^%\s*Sample\s*Av/i, aiResult);
+  // PACLOBUTRAZOL: %Sample 1/2 = Mean Content ของ Sample 1/2 จากตาราง Internal standard
+  const pbzCalc = pbzValues ? calculatePaclobutrazol(pbzValues, null) : null;
+  const sampleAverage = firstValue(page, /^%\s*Sample\s*Av/i) || (pbzCalc ? pbzFixed(pbzCalc.average, 4) : aiResult);
+  // PACLOBUTRAZOL ใช้แค่ Sample 1/2 — ไม่มีช่อง %Sample 3
+  const isPbz = /paclobutrazol/i.test(page.sample.name ?? "") && !String(page.sample.name ?? "").includes("+");
+  const sampleNos = isPbz ? [1, 2] : [1, 2, 3];
   const sample = [
-    ...[1, 2, 3].map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i"))),
+    ...sampleNos.map((n) => firstValue(page, new RegExp("^%\\s*Sample\\s*" + n, "i")) || pbzFixed(pbzCalc?.sample[n - 1]?.meanContent, 4)),
     sampleAverage,
-    firstValue(page, /^%\s*Sample\s*%?\s*RSD/i),
+    // %RSD ใช้สูตรเดียวกับสารปกติ (SD แบบ n−1 × 100 ÷ Mean) จาก Mean Content ของ Sample 1/2
+    firstValue(page, /^%\s*Sample\s*%?\s*RSD/i) || (pbzCalc ? formatCalculatedAi(calculateAi(Object.fromEntries(pbzCalc.sample.map((s, i) => [`% Sample ${i + 1}`, s.meanContent]).filter(([, v]) => v != null))).sampleRsd) : ""),
   ];
   const standardNo = (page.rows ?? []).filter((row) => /standard/i.test(row.testItem) && !/conc|mid/i.test(row.testItem))
-    .map((row) => row.result?.trim() ?? "").find((v) => !BLANK.test(v)) ?? "";
+    .map((row) => row.result?.trim() ?? "").find((v) => !BLANK.test(v) && !/^u_/i.test(v)) ?? (standardOptions.length === 1 ? standardOptions[0] : "");
   const correlation = firstValue(page, /correlation|^r(\s*·|\s*\(|$)/i);
   const midConc = firstValue(page, /mid[-\s]*level/i);
   const ccsConc = firstValue(page, /^ccs\s*conc/i);
@@ -207,7 +221,7 @@ export default function LabCalculationForm({ page }: { page: LabReportPage }) {
         </div>
 
         <div className="brom-form-bar">Analytical Results</div>
-        <Columns labels={["%Sample 1", "%Sample 2", "%Sample 3", "Average", "%RSD (ไม่เกิน 5)"]} items={sample} field="sample" />
+        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample} field="sample" />
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>

@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/petition/PaclobutrazolGrid.tsx"
+        ],
+        "createdAt": "2026-11-20T09:18:49.772Z",
+        "reason": "user requested same colored sections as other AI field groups, which use border-l-4 accents in LabTestingDetailPage AI_FIELD_SECTIONS"
+      }
+    ]
+  }
+}

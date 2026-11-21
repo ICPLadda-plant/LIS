@@ -955,6 +955,8 @@ export const api = {
     const qs = new URLSearchParams({ excludePetitionId }).toString();
     return request<{ std1?: string; std2?: string; stdPct?: string; petitionNo?: string; enteredAt?: string; internalStd?: Record<string, string> }>(`/qc-results/paclobutrazol-std-weights?${qs}`);
   },
+  getDailyCalibration: () =>
+    request<Record<string, { any?: string; bySubstance?: Record<string, string> }>>("/qc-results/daily-calibration"),
   getReturnedFlags: (petitionIds: string[]) => {
     if (petitionIds.length === 0) return Promise.resolve({} as Record<string, boolean>);
     const qs = new URLSearchParams({ petitionIds: petitionIds.join(",") }).toString();
@@ -1064,9 +1066,10 @@ export const api = {
     const qs = new URLSearchParams({ batchNo, employeeId }).toString();
     return request<import("@/types/petition.types").Petition[]>(`/petitions/rejected-by-batch?${qs}`);
   },
-  batchExists: async (batchNo: string) => {
+  batchExists: async (batchNo: string, sampleName?: string) => {
     try {
-      return await request<{ exists: boolean }>(`/petitions/batch-exists?${new URLSearchParams({ batchNo }).toString()}`);
+      const qs = new URLSearchParams({ batchNo, ...(sampleName ? { sampleName } : {}) }).toString();
+      return await request<{ exists: boolean }>(`/petitions/batch-exists?${qs}`);
     } catch (error) {
       // Older deployments do not have the advisory duplicate-check route yet.
       // Keep request creation available; the server still validates the submitted payload.

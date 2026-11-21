@@ -59,14 +59,16 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
 
   return (
     <div className="space-y-4 sm:col-span-6">
+    <section className="space-y-3 rounded-lg border border-indigo-200 border-l-4 border-l-indigo-400 bg-indigo-50 p-3 shadow-sm dark:bg-indigo-950/60">
+    <h4 className="text-base font-semibold text-foreground">ตาราง Internal standard</h4>
     <div className="flex flex-wrap gap-x-6 gap-y-2">
       {setting(PBZ_STD_PCT, "% Std =", "%")}
       {setting(PBZ_DIL_STD, "Dilution Std =")}
       {setting(PBZ_DIL_SAMPLE, "Dilution Sample =")}
     </div>
-    <div className="overflow-x-auto rounded-lg border bg-card shadow-sm">
+    <div className="overflow-x-auto rounded-lg border border-indigo-200 bg-card shadow-sm">
       <table className="w-full text-sm">
-        <thead className="bg-muted text-muted-foreground">
+        <thead className="bg-indigo-100 text-indigo-900 dark:bg-indigo-900/60 dark:text-indigo-100">
           <tr>
             <th className="px-3 py-2 text-left font-medium" />
             {PBZ_COLS.map((col) => (
@@ -76,8 +78,8 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
         </thead>
         <tbody className="divide-y">
           {PBZ_ROWS.map((row) => (
-            <tr key={row}>
-              <th scope="row" className="px-3 py-2 text-left font-medium text-foreground">{row}</th>
+            <tr key={row} className={row.startsWith("Std") ? "bg-sky-50 dark:bg-sky-950/40" : "bg-emerald-50 dark:bg-emerald-950/40"}>
+              <th scope="row" className={`px-3 py-2 text-left font-medium ${row.startsWith("Std") ? "text-sky-800 dark:text-sky-200" : "text-emerald-800 dark:text-emerald-200"}`}>{row}</th>
               {PBZ_COLS.map((col) => {
                 const key = pbzKey(row, col);
                 const readOnly = isPbzReadOnly(row, col);
@@ -102,6 +104,7 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
         wt/mg ของ Std ใช้ค่าล่าสุดอัตโนมัติจนกว่าจะเบิก Std PACLOBUTRAZOL ขวดใหม่ · Peak area และ Internal std ของ Std ใช้ค่าที่กรอกแล้วในวันนี้ (ครั้งแรกของวันต้องกรอกเอง) · Sample ครั้งที่ 2 ใช้ค่าเดียวกับครั้งที่ 1
       </p>
     </div>
+    </section>
     <PaclobutrazolSheet values={values} density={density} header={header} analyst={analyst} />
     </div>
   );

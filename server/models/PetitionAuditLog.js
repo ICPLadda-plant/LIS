@@ -15,6 +15,7 @@ const PetitionAuditLogSchema = new mongoose.Schema(
         'created', 'statusChanged', 'assigned', 'reviewed', 'updated', 'deleted',
         'received',        // Lab/QC สแกนรับตัวอย่าง
         'accepted',        // เจ้าหน้าที่ Lab กดรับงานที่หัวหน้า assign
+        'machinesChanged', // เปลี่ยนเครื่องระหว่างวิเคราะห์
         'unassigned',      // หัวหน้า Lab ดึงงานที่ยังไม่เริ่มกลับไปรอมอบหมาย
         'resultEntered',   // QC ใส่ค่าพารามิเตอร์ครั้งแรก
         'resultUpdated',   // QC แก้ค่าพารามิเตอร์
