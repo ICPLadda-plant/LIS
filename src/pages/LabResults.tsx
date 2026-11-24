@@ -4,9 +4,9 @@ import AppLayout from "@/components/lis/AppLayout";
 import { usePetitionList } from "@/hooks/usePetition";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { rankSearchResults } from "@/lib/searchRanking";
-import { formatDate } from "@/lib/dateTime";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import type { Petition } from "@/types/petition.types";
+import { fullThaiTitle } from "@/lib/labReport";
 
 const resultItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
@@ -56,12 +56,12 @@ export default function LabResults() {
           <table className="w-full text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
-                <th className="px-3 py-2">เลขคำร้อง</th>
+                <th className="px-3 py-2">เลขที่คำร้อง</th>
                 <th className="px-3 py-2">เลขที่ตัวอย่าง</th>
                 <th className="px-3 py-2">ชื่อยา / Batch</th>
-                <th className="px-3 py-2">ผู้วิเคราะห์</th>
-                <th className="px-3 py-2">แผนก</th>
-                <th className="px-3 py-2">วันที่ออกผล Lab</th>
+                <th className="px-3 py-2">แผนก / ผู้นำส่ง</th>
+                <th className="px-3 py-2">ผู้ทดสอบ</th>
+                <th className="px-3 py-2">จำนวนรายการ</th>
               </tr>
             </thead>
             <tbody>
@@ -95,11 +95,12 @@ export default function LabResults() {
                       ))}
                     </div>
                   </td>
-                  <td className="px-3 py-2">{p.labCompletedBy || p.assignedTo?.name || "-"}</td>
-                  <td className="px-3 py-2">{petitionDepartmentLabel(p)}</td>
                   <td className="px-3 py-2">
-                    {formatDate(p.labApprovedAt)}
+                    <div>{petitionDepartmentLabel(p)}</div>
+                    <div className="text-muted-foreground">{p.submittedBy?.name || "-"}</div>
                   </td>
+                  <td className="px-3 py-2">{fullThaiTitle(p.labCompletedBy) || "-"}</td>
+                  <td className="px-3 py-2">{resultItems(p).length} รายการ</td>
                 </tr>
               ))}
             </tbody>
