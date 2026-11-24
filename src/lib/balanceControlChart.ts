@@ -23,7 +23,7 @@ export interface BalanceScale {
 export const BALANCE_SCALES: BalanceScale[] = [
   { id: "scale-1", code: "LD-005", name: "LD-005 - เครื่องชั่งดิจิตอล 2 ตำแหน่ง", model: "Balance A", decimals: 2, controlWeight: 10, primaryCalibrationWeight: 500 },
   { id: "scale-2", code: "LD-006", name: "LD-006 - เครื่องชั่งดิจิตอล 4 ตำแหน่ง", model: "Balance B", decimals: 4, controlWeight: 100, primaryCalibrationWeight: 100 },
-  { id: "scale-3", code: "LD-021", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C", decimals: 5, controlWeight: 100, primaryCalibrationWeight: 100 },
+  { id: "scale-3", code: "LD-021", name: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance C", decimals: 5, weights100Decimals: 4, controlWeight: 100, primaryCalibrationWeight: 100 },
   { id: "scale-4", code: "LD-047", name: "LD-047 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance D", decimals: 5, weights100Decimals: 4, controlWeight: 100, primaryCalibrationWeight: 100 },
   { id: "scale-5", code: "LD-048", name: "LD-048 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง", model: "Balance E", decimals: 5, controlWeight: 100, primaryCalibrationWeight: 100 },
 ];

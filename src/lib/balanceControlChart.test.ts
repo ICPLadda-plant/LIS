@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BALANCE_CONTROL_DEFAULTS,
+  BALANCE_SCALES,
   buildMonthlySeries,
   controlBaselineValues,
   chartDomain,
@@ -146,6 +147,9 @@ describe("chartDomain / formatSd", () => {
 
 describe("config defaults / validation", () => {
   const baselineValues = Array.from({ length: 20 }, (_, index) => 100 + index / 1000);
+  it("LD-021 และ LD-047 กำหนดตุ้ม 100 g เป็นทศนิยม 4 ตำแหน่ง", () => {
+    expect(BALANCE_SCALES.filter(({ code }) => code === "LD-021" || code === "LD-047").map(({ weights100Decimals }) => weights100Decimals)).toEqual([4, 4]);
+  });
   it("มีค่าเริ่มต้นครบ 2 ตุ้มต่อเครื่องและยังไม่มีค่า Control", () => {
     expect(BALANCE_CONTROL_DEFAULTS).toHaveLength(10);
     expect(BALANCE_CONTROL_DEFAULTS.filter((config) => config.scaleId === "scale-1").map((config) => config.nominal)).toEqual([500, 10]);

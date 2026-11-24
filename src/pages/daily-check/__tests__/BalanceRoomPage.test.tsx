@@ -154,6 +154,14 @@ describe("BalanceRoomPage", () => {
     expect(apiMock.createDailyCheck).not.toHaveBeenCalled();
   });
 
+  it.each(["LD-021", "LD-047"])("limits %s 100 g readings to four decimals", (code) => {
+    renderPage();
+    fireEvent.click(screen.getByText(new RegExp(`^${code} -`)).closest("button")!);
+    const input = screen.getAllByPlaceholderText("ครั้งที่ 1")[1];
+    fireEvent.change(input, { target: { value: "99.99999" } });
+    expect(input).toHaveValue("99.9999");
+  });
+
   it("fills the selected weight with the value read from a photo", async () => {
     const { container } = renderPage();
     fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 500 กรัม ครั้งที่ 1" }));
@@ -286,6 +294,31 @@ describe("BalanceRoomPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" }));
     expect(screen.getByRole("button", { name: "แสดงบันทึกตุ้ม 500 g" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("cell", { name: "500.00" })).toHaveLength(4);
+  });
+
+  it("shows LD-021 100 g history with four decimals", async () => {
+    apiMock.getDailyChecks.mockImplementation((params?: { scaleId?: string; from?: string }) =>
+      Promise.resolve(params?.scaleId === "scale-3" && params.from ? [{
+        _id: "daily-ld021",
+        scaleId: "scale-3",
+        scaleName: "LD-021 - เครื่องชั่งดิจิตอล 5 ตำแหน่ง",
+        date: `${currentMonthStr()}-12`,
+        weights100: [99.99994, 99.99994, 99.99994],
+        weights10: [10, 10, 10],
+        avg100: 99.99994,
+        avg10: 10,
+        status100: "pass",
+        status10: "pass",
+        status: "pass",
+        tolerance: 0.05,
+        recorder: "Dev Administrator",
+        checkedAt: `${currentMonthStr()}-12T08:00:00.000Z`,
+      }] : []),
+    );
+    renderPage();
+    fireEvent.click(screen.getByText(/^LD-021 -/).closest("button")!);
+
+    expect(await screen.findAllByRole("cell", { name: "99.9999" })).toHaveLength(4);
   });
 
   it("loads the selected scale records for the current month", async () => {
