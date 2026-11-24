@@ -198,6 +198,14 @@ function suffixDatedLotFromRow(row) {
   return '';
 }
 
+function lotDescriptionFromRow(row) {
+  for (const key of ['Lot Description', 'LotDescription', 'lot_description', 'lotDescription']) {
+    const value = text(row?.[key]);
+    if (/([0-3]\d)([01]\d)(\d{2})$/.test(value) && lotDate(value)) return value;
+  }
+  return '';
+}
+
 function lotFromRow(row) {
   return suffixDatedLotFromRow(row) || pick(row, [
     'Lot Description', 'LotDescription', 'lot_description', 'lotDescription',
@@ -1053,7 +1061,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
       || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
   });
-  const datedStock = stockCandidates.find((row) => suffixDatedLotFromRow(row));
+  const datedStock = stockCandidates.find((row) => lotDescriptionFromRow(row));
   const newestFgStock = stockCandidates.find((row) => isFgLotDescription(lotFromRow(row)));
   const stock = matchingStock || datedStock || newestFgStock || stockCandidates[0];
   const newestFgLot = newestFgStock
@@ -1062,9 +1070,13 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const matchingStockLot = matchingStock
     ? lotSnapshot(lotFromRow(matchingStock), productionDateFromRow(matchingStock))
     : null;
-  const authoritativeErpLot = stock && suffixDatedLotFromRow(stock)
-    ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
-    : null;
+  const lotDescriptionCandidates = stockCandidates.map((row) => {
+    const description = lotDescriptionFromRow(row);
+    return description ? lotSnapshot(description) : null;
+  }).filter(Boolean);
+  const authoritativeErpLot = lotDescriptionCandidates.find((snapshot) => (
+    requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch)
+  )) || lotDescriptionCandidates[0] || null;
   const erpStockProductionDate = stock
     ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock)).productionDate
     : '';
@@ -1074,14 +1086,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const petitionStockProductionDate = petitionStock
     ? lotSnapshot(lotFromRow(petitionStock), productionDateFromRow(petitionStock)).productionDate
     : '';
-  const erpProductionDate = erpRequestLot
-    ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
-    : authoritativeErpLot?.productionDate
-      || erpRequestProductionDate
-      || petitionStockProductionDate
-      || normalizeIsoDate(mfDate)
-      || matchingStockLot?.productionDate
-      || erpStockProductionDate;
+  const erpProductionDate = authoritativeErpLot?.productionDate || '';
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
   const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;

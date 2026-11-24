@@ -449,7 +449,7 @@ test('ERP Lot Description supplies the batch and its trailing date', () => {
   assert.equal(result.sample.productionDate, '2026-10-15');
 });
 
-test('matching ERP Lot Description supplies production date before an existing request date', () => {
+test('Lot Description trailing DDMMYY overrides request, MF, registration, and shipment dates', () => {
   const result = sampleFromSources({
     selectedItemSeqs: [10000],
     sampleSnapshots: [{
@@ -464,7 +464,12 @@ test('matching ERP Lot Description supplies production date before an existing r
     'Lot Description': '26S-PCB25-480-091069',
     registering_date: '2026-10-10T00:00:00.000Z',
     stock_qty: 100,
-  }], []);
+  }], [{
+    item_no: 'F-TWI25-1000X12',
+    batch_no: '480',
+    create_date: '2026-06-17T00:00:00.000Z',
+    registering_date: '2026-06-18T00:00:00.000Z',
+  }]);
 
   assert.equal(result.sample.lotNo, '26S-PCB25-480-091069');
   assert.equal(result.sample.batchNo, '480');
