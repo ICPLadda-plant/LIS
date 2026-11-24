@@ -7,7 +7,7 @@ import { rankSearchResults } from "@/lib/searchRanking";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import type { Petition } from "@/types/petition.types";
 import { fullThaiTitle } from "@/lib/labReport";
-import { labLabelNumbersForItems } from "@/lib/petitionSampler";
+import { formatLabSampleNo, labLabelNumbersForItems } from "@/lib/petitionSampler";
 
 const resultItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
@@ -82,7 +82,7 @@ export default function LabResults() {
                   <td className="px-3 py-2 align-top">
                     <div className="space-y-2">
                       {resultItems(p).map((item) => (
-                        <div key={item.seq} className="font-semibold text-primary">{item.sampleId}</div>
+                        <div key={item.seq} className="font-semibold text-primary">{formatLabSampleNo(p, item.sampleId)}</div>
                       ))}
                     </div>
                   </td>

@@ -126,6 +126,16 @@ export function labLabelNumbersForItems(
   return [...new Set(items.flatMap((item) => itemSampleLabelNumbers(petition, item, ["lab"])))];
 }
 
+export function formatLabSampleNo(
+  petition: Pick<Petition, "sampleLabelNumbers">,
+  sampleId?: string,
+): string {
+  const value = sampleId?.trim() || "";
+  if (!/^\d+$/.test(value)) return value || "-";
+  const year = petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543;
+  return `${value}/${String(year % 100).padStart(2, "0")}`;
+}
+
 function legacyItemLabelSides(petition: Pick<Petition, "sampleLabelNumbers">, item: SampleLabelGroupItem): Set<SampleLabelSide> | null {
   const full = petition as Petition;
   const raw = item as Petition["items"][number];

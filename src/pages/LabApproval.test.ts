@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Petition } from "@/types/petition.types";
-import { labApprovalItems, labApprovalSampleNo, labApprovalTesterName } from "./LabApproval";
+import { formatLabSampleNo } from "@/lib/petitionSampler";
+import { labApprovalItems, labApprovalTesterName } from "./LabApproval";
 
 const petition = {
   sampleLabelNumbers: { year: 2569 },
@@ -17,7 +18,7 @@ describe("LabApproval list", () => {
   });
 
   it("แสดงเลขที่ตัวอย่างพร้อมปีสองหลัก", () => {
-    expect(labApprovalSampleNo(petition, "3523")).toBe("3523/69");
+    expect(formatLabSampleNo(petition, "3523")).toBe("3523/69");
   });
 
   it("แสดงผู้ล็อกอินที่ส่งผลพร้อมคำนำหน้าเต็ม", () => {

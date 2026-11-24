@@ -16,17 +16,10 @@ import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import { fullThaiTitle } from "@/lib/labReport";
-import { labLabelNumbersForItems } from "@/lib/petitionSampler";
+import { formatLabSampleNo, labLabelNumbersForItems } from "@/lib/petitionSampler";
 
 export const labApprovalItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
-
-export function labApprovalSampleNo(petition: Petition, sampleId?: string): string {
-  const value = sampleId?.trim() || "";
-  if (!/^\d+$/.test(value)) return value || "-";
-  const year = petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543;
-  return `${value}/${String(year % 100).padStart(2, "0")}`;
-}
 
 export const labApprovalTesterName = (petition: Petition) => fullThaiTitle(petition.labCompletedBy) || "-";
 
@@ -96,7 +89,7 @@ const LabApproval = () => {
     {
       key: "no",
       header: "เลขที่คำร้อง",
-      className: "font-semibold text-primary",
+      className: "w-28 align-top font-semibold text-primary",
       cell: (p) => (
         <div>
           <div className="flex items-center gap-1.5">
@@ -130,12 +123,12 @@ const LabApproval = () => {
       ),
     },
     {
-      key: "sampleNos", header: "เลขที่ตัวอย่าง", className: "align-top",
+      key: "sampleNos", header: "เลขที่ตัวอย่าง", className: "w-28 align-top",
       cell: (p) => (
         <div className="space-y-2">
           {labApprovalItems(p).map((item) => (
             <div key={item.seq} className="font-semibold text-primary">
-              {labApprovalSampleNo(p, item.sampleId)}
+              {formatLabSampleNo(p, item.sampleId)}
             </div>
           ))}
         </div>
@@ -155,7 +148,7 @@ const LabApproval = () => {
       ),
     },
     {
-      key: "deptSubmitter", header: "แผนก / ผู้นำส่ง", className: "align-top",
+      key: "deptSubmitter", header: "แผนก / ผู้นำส่ง", className: "min-w-40 align-top",
       cell: (p) => (
         <div className="space-y-2">
           <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge>
@@ -164,13 +157,13 @@ const LabApproval = () => {
       ),
     },
     {
-      key: "testers", header: "ผู้ทดสอบ", className: "max-w-[200px] text-sm text-muted-foreground align-top",
+      key: "testers", header: "ผู้ทดสอบ", className: "min-w-36 max-w-[200px] align-top text-sm text-muted-foreground",
       cell: labApprovalTesterName,
     },
-    { key: "count", header: "จำนวนรายการ", cell: (p) => `${labApprovalItems(p).length} รายการ` },
-    { key: "status", header: "สถานะ", cell: (p) => { const b = petitionStatusBadge(p); return <Badge variant={b.variant}>{b.label}</Badge>; } },
+    { key: "count", header: "จำนวนรายการ", className: "w-24 align-top", cell: (p) => `${labApprovalItems(p).length} รายการ` },
+    { key: "status", header: "สถานะ", className: "w-28 align-top", cell: (p) => { const b = petitionStatusBadge(p); return <Badge variant={b.variant}>{b.label}</Badge>; } },
     {
-      key: "action", header: "การดำเนินการ", className: "text-right",
+      key: "action", header: "การดำเนินการ", className: "w-28 align-top text-right",
       cell: (p) => (
         <div className="flex flex-col items-end gap-2">
           <Button size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/lab-approval/${p._id}`); }}>
