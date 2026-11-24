@@ -257,8 +257,9 @@ async function latestAiLabData(petitions, sample) {
   const commonName = manualText(sample?.commonName);
   const selection = findLatestAiLabItems(petitions, sample);
   const hasBatch = Boolean(manualText(sample?.batchNo || sample?.lotNo));
-  const exactBatchCandidates = selection.candidates.filter((candidate) => candidate.matchKind === 'exact');
-  const candidates = (hasBatch ? exactBatchCandidates : selection.candidates).slice(0, 100);
+  const allowCoverage = ['grWpSp', 'liquid'].includes(formKindForCommonName(commonName));
+  const batchCandidates = selection.candidates.filter((candidate) => candidate.matchKind === 'exact' || (allowCoverage && ['previous', 'sample'].includes(candidate.matchKind)));
+  const candidates = (hasBatch ? batchCandidates : selection.candidates).slice(0, 100);
   if (candidates.length) {
     const petitionIds = [...new Set(candidates.map((candidate) => String(candidate.petition._id)))];
     const itemSeqs = [...new Set(candidates.flatMap((candidate) => candidate.items.map((item) => Number(item.seq))))];
@@ -1258,6 +1259,12 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         testItem: 'Date of analysis', criteria: '-', result: resultData.analysisDate, unit: '', method: '',
       });
     }
+    const analysisMatch = aiLabData.best || lab.best;
+    if (analysisMatch && analysisMatch.matchKind !== 'exact') {
+      sample.analysisBatchNo = manualText(analysisMatch.item?.batchNo || analysisMatch.item?.lotNo);
+    } else if (legacyMatch?.matchKind === 'productHistory' && authoritativeBatch) {
+      sample.analysisBatchNo = legacyMatch.batchNo;
+    }
     let density = resultData.density;
     if (sample.batchNo) {
       const densityBatchFromLot = manualText(sample.lotNo).match(/^(.+)-[0-3]\d[01]\d\d{2}$/)?.[1] || '';
@@ -1398,6 +1405,7 @@ router.get('/lab-ai-lookup', async (req, res) => {
       petitionNo: lab.best.petition.petitionNo,
       itemSeq: Number(lab.best.item.seq),
       batchNo: lab.best.item.batchNo || lab.best.item.lotNo || batchNo,
+      matchKind: lab.best.matchKind,
     } : lab.historyMatch;
     return res.json({
       batchNo,

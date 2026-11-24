@@ -126,6 +126,9 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
 
   useEffect(() => {
     if (!active || !labAi.data?.ai) return;
+    setSamples((current) => current.map((sample) => sample.itemSeq === active.itemSeq
+      ? { ...sample, analysisBatchNo: labAi.data.match?.matchKind !== "exact" ? labAi.data.match?.batchNo : undefined }
+      : sample));
     setForms((current) => {
       const value = current[active.itemSeq] || emptyResultForm();
       return { ...current, [active.itemSeq]: { ...value, aiResult: value.aiResult || formatCoaAiResult(labAi.data.ai?.result), analysisDate: value.analysisDate || labAi.data.analysisDate || "", aiCriteria: resolveAiToleranceCriteria(active.commonName, value.aiCriteria || labAi.data.ai?.criteria) || value.aiCriteria } };

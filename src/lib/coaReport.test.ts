@@ -3,6 +3,18 @@ import { buildCoaReportPages } from "./coaReport";
 import type { CoaDocument } from "@/types/coa.types";
 
 describe("buildCoaReportPages", () => {
+  it("แสดง Batch ผลวิเคราะห์ที่ครอบคลุม Batch ยาทรายและยาน้ำ", () => {
+    const doc = {
+      _id: "coverage", sourceType: "erpManual", revision: 0, status: "draft", petitionId: "", petitionNoSnapshot: "SO-COVER", selectedItemSeqs: [1, 2, 3, 4],
+      sampleSnapshots: [152, 153, 154, 155].map((batchNo, index) => ({ itemSeq: index + 1, sampleName: "Product", commonName: "PRODUCT 10% SL", batchNo: String(batchNo), analysisBatchNo: "151", productionDate: "2026-11-19" })),
+      resultSnapshots: [1, 2, 3, 4].map((itemSeq) => ({ itemSeq, testItem: "%AI content (W/V)", result: "10.10%", criteria: "10% ± 0.50" })),
+    } as CoaDocument;
+
+    const pages = buildCoaReportPages(doc);
+
+    expect(pages).toHaveLength(4);
+    expect(pages[0].samples[0].batchLabel).toBe("151 ครอบคลุม\nแบช 152, 153, 154, 155");
+  });
   it("prints manually entered ERP results in product-specific templates", () => {
     const doc = {
       sourceType: "erpManual",

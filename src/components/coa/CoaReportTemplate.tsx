@@ -98,7 +98,7 @@ function SelectedCoaRows({ sample, hideDensity = false }: { sample: CoaReportSam
   return (
     <>
       {renderRows(appearanceRows)}
-      <tr><td colSpan={2}>BATCH NO.</td><td>{sample.batchLabel === "-" ? "" : sample.batchLabel}</td></tr>
+      <tr><td colSpan={2}>BATCH NO.</td><td style={{ whiteSpace: "pre-line" }}>{sample.batchLabel === "-" ? "" : sample.batchLabel}</td></tr>
       {renderRows(remainingRows)}
     </>
   );
@@ -140,7 +140,7 @@ function SpecialCoaPage({ page, index }: { page: CoaReportPage; index: number })
           </tr>
           <tr>
             <td colSpan={2}>BATCH NO.</td>
-            <td>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
+            <td style={{ whiteSpace: "pre-line" }}>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
           </tr>
           <tr>
             <td>%AI content (W/W)</td>
@@ -201,7 +201,7 @@ function LiquidCoaPage({ page, index }: { page: CoaReportPage; index: number }) 
           </tr>
           <tr>
             <td colSpan={2}>BATCH NO.</td>
-            <td>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
+            <td style={{ whiteSpace: "pre-line" }}>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
           </tr>
           <tr>
             <td>%AI content (W/V)</td>
@@ -266,7 +266,7 @@ function BromadioloneCoaPage({ page, index }: { page: CoaReportPage; index: numb
           </tr>
           <tr>
             <td colSpan={2}>BATCH NO.</td>
-            <td>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
+            <td style={{ whiteSpace: "pre-line" }}>{sample?.batchLabel === "-" ? "" : sample?.batchLabel}</td>
           </tr>
           <tr>
             <td>%AI content (W/W)</td>

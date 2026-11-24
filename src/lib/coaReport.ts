@@ -81,11 +81,19 @@ function productLabel(sample: CoaSampleSnapshot): string {
   return tradeName || commonName || "-";
 }
 
-function batchLabel(sample: CoaSampleSnapshot): string {
+function batchLabel(sample: CoaSampleSnapshot, samples: CoaSampleSnapshot[]): string {
   if (isBromadiolone0005CommonName(sample.commonName)) {
     const batchNo = sample.batchNo?.trim();
     if (!batchNo) return "-";
     return batchNo.match(/(\d+)$/)?.[1] || batchNo;
+  }
+  const analysisBatchNo = sample.analysisBatchNo?.trim();
+  if (analysisBatchNo && analysisBatchNo !== sample.batchNo?.trim()) {
+    const covered = [...new Set(samples
+      .filter((item) => item.analysisBatchNo?.trim() === analysisBatchNo && normalizeCommonName(item.commonName) === normalizeCommonName(sample.commonName))
+      .map((item) => item.batchNo?.trim())
+      .filter(Boolean))];
+    return analysisBatchNo + " ครอบคลุม\nแบช " + covered.join(", ");
   }
   return [sample.lotNo?.trim(), sample.batchNo?.trim()].filter(Boolean).join(" / ") || "-";
 }
@@ -155,7 +163,7 @@ export function buildCoaReportPages(doc: CoaDocument): CoaReportPage[] {
       product: productLabel(sample),
       manufacturingDate: formatGregorianDate(sample.productionDate),
       expiredDate: addYears(sample.productionDate, 2),
-      batchLabel: batchLabel(sample),
+      batchLabel: batchLabel(sample, doc.sampleSnapshots || []),
       aiContentResult: aiContentResult(rows),
       aiContentCriteria: resolvedAiContentCriteria,
       densityResult: densityResult(rows),

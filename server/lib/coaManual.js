@@ -11,7 +11,7 @@ function manualCoaSnapshots(input, itemSeq) {
     const sampleSeq = Number(sample?.itemSeq || (index === 0 ? itemSeq : 0));
     if (!Number.isInteger(sampleSeq) || sampleSeq < 1) fail();
     const snapshot = { itemSeq: sampleSeq };
-    for (const key of ['sampleName', 'commonName', 'batchNo', 'lotNo', 'productionDate', 'sampleId', 'condition', 'manufacturer']) {
+    for (const key of ['sampleName', 'commonName', 'batchNo', 'lotNo', 'productionDate', 'sampleId', 'condition', 'manufacturer', 'analysisBatchNo']) {
       snapshot[key] = clean(sample[key]);
     }
     snapshot.productionDate = lotSnapshot(snapshot.batchNo).productionDate

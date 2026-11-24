@@ -46,6 +46,7 @@ export type CoaSampleSnapshot = {
   sampleId?: string;
   condition?: string;
   manufacturer?: string;
+  analysisBatchNo?: string;
 };
 
 export type CoaResultSnapshot = {
@@ -209,6 +210,7 @@ export type CoaLabAiLookup = {
     petitionNo?: string;
     itemSeq: number;
     batchNo?: string;
+    matchKind?: "exact" | "previous" | "close" | "sample" | "none";
   } | null;
 };
 

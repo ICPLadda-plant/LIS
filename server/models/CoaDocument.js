@@ -21,6 +21,7 @@ const SampleSnapshotSchema = new mongoose.Schema(
     sampleId: String,
     condition: String,
     manufacturer: String,
+    analysisBatchNo: String,
   },
   { _id: false },
 );

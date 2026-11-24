@@ -2067,7 +2067,7 @@ test('real-time Lab AI lookup averages duplicate results from the exact batch', 
   }
 });
 
-test('real-time Lab AI lookup returns no AI when only a previous batch has results', async () => {
+test('real-time Lab AI lookup uses the previous batch for liquid coverage', async () => {
   const originals = {
     petitionFind: Petition.find,
     legacyFind: LegacyLabResult.find,
@@ -2100,9 +2100,10 @@ test('real-time Lab AI lookup returns no AI when only a previous batch has resul
       query: { batchNo: '081', commonName: 'GLYPHOSATE 48% W/V SL', sampleName: 'ช้างมาร์กี้' },
     });
     assert.equal(fallback.statusCode, 200);
-    assert.equal(fallback.body.ai, null);
-    assert.equal(fallback.body.analysisDate, '');
-    assert.equal(fallback.body.match, null);
+    assert.equal(fallback.body.ai.result, '48.15%');
+    assert.equal(fallback.body.analysisDate, '2026-10-08');
+    assert.equal(fallback.body.match.batchNo, '080');
+    assert.equal(fallback.body.match.matchKind, 'previous');
   } finally {
     Petition.find = originals.petitionFind;
     LegacyLabResult.find = originals.legacyFind;
@@ -2110,7 +2111,7 @@ test('real-time Lab AI lookup returns no AI when only a previous batch has resul
   }
 });
 
-test('real-time Lab AI lookup returns no AI when only another batch has results', async () => {
+test('real-time Lab AI lookup uses the nearest same-product batch for liquid coverage', async () => {
   const originals = {
     petitionFind: Petition.find,
     legacyFind: LegacyLabResult.find,
@@ -2133,8 +2134,9 @@ test('real-time Lab AI lookup returns no AI when only another batch has results'
     });
 
     assert.equal(res.statusCode, 200);
-    assert.equal(res.body.ai, null);
-    assert.equal(res.body.match, null);
+    assert.equal(res.body.ai.result, '50.12%');
+    assert.equal(res.body.match.batchNo, '030');
+    assert.equal(res.body.match.matchKind, 'sample');
   } finally {
     Petition.find = originals.petitionFind;
     LegacyLabResult.find = originals.legacyFind;
