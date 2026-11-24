@@ -87,6 +87,32 @@ describe('stock label OCR route', () => {
   });
 });
 
+describe('petition label OCR route', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsOpenAIConfigured.mockReturnValue(true);
+  });
+
+  test('normalizes label and petition numbers without guessing other text', async () => {
+    mockGenerateJSONFromImage.mockResolvedValue({
+      labelCode: ' l 01 / 69 ',
+      candidates: ['P-2611-0008', 'Batch 265-ANF1'],
+      rawText: 'เลขใต้ QR L01/69',
+    });
+    const handler = routeHandler('/petition-label-ocr');
+    const res = mockResponse();
+
+    await handler({ body: { imageDataUrl: 'data:image/jpeg;base64,abc' } }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({
+      labelCode: 'L01/69',
+      candidates: ['L01/69', 'P-2611-0008'],
+      rawText: 'เลขใต้ QR L01/69',
+    });
+  });
+});
+
 describe('balance display OCR route', () => {
   beforeEach(() => {
     jest.clearAllMocks();
