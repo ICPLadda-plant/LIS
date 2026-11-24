@@ -79,6 +79,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     getParameters: mocks.getParameters,
     getQCResults: mocks.getQCResults,
+    getStandardsInUse: vi.fn().mockResolvedValue({ items: [] }),
   },
 }));
 
@@ -105,7 +106,7 @@ function openPrintMenu() {
 }
 
 function labResultMenuItem() {
-  return screen.getByRole('menuitem', { name: /ผลวิเคราะห์ Lab/ });
+  return screen.getByRole('menuitem', { name: /ใบผลวิเคราะห์ \(COA\)/ });
 }
 
 beforeEach(() => {

@@ -122,6 +122,19 @@ const LabApproval = () => {
         </div>
       ),
     },
+    {
+      key: "samples", header: "ชื่อยา / Batch / เลขที่ตัวอย่าง", className: "min-w-[260px] align-top",
+      cell: (p) => (p.items?.length ? (
+        <div className="space-y-2">
+          {p.items.map((item) => (
+            <div key={item.seq}>
+              <div className="font-medium text-foreground">{item.sampleName || item.commonName || "-"}</div>
+              <div className="text-xs text-muted-foreground">Batch: {item.batchNo || "-"} · เลขที่ตัวอย่าง: {item.sampleId || "-"}</div>
+            </div>
+          ))}
+        </div>
+      ) : "-"),
+    },
     { key: "dept", header: "แผนก", cell: (p) => <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge> },
     { key: "submitter", header: "ผู้นำส่ง", cell: (p) => p.submittedBy?.name ?? "-" },
     {
@@ -194,7 +207,7 @@ const LabApproval = () => {
           isLoading={loading}
           onRowClick={(p) => navigate(`/lab-approval/${p._id}`)}
           emptyTitle="ไม่มีคำร้องที่รอออกผล Lab"
-          tableClassName="min-w-[700px]"
+          tableClassName="min-w-[960px]"
         />
       </div>
     </AppLayout>

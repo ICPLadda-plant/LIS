@@ -72,10 +72,27 @@ describe("LabCalculationForm", () => {
       row("CCS Conc. (mg/mL)", "0.510"),
       row("Solvent Blank", "ไม่พบ Peak"),
     ])} />);
-    expect(field(container, "ccs-2")).toBe("2.00");
+    expect(field(container, "ccs-2")).toBe("2.000");
     expect(field(container, "ccs-3")).toBe("Pass");
     expect(field(container, "blankNotFound")).toBe("✓");
     expect(field(container, "blankFound")).toBe("");
+  });
+
+  it("prints System Suitability, CCS and Analytical Results with three decimals", () => {
+    const { container } = render(<LabCalculationForm page={page([
+      row("Area Inj.1", "152.61829"),
+      row("Area Average", "153.84"),
+      row("Mid-level Standard Conc. (mg/mL)", "97.352224"),
+      row("CCS Conc. (mg/mL)", "99.17921"),
+      row("% Sample 1", "45.998766"),
+      row("% Sample Average", "30.89"),
+    ])} />);
+    expect(field(container, "area-0")).toBe("152.618");
+    expect(field(container, "area-3")).toBe("153.840");
+    expect(field(container, "ccs-0")).toBe("97.352");
+    expect(field(container, "ccs-1")).toBe("99.179");
+    expect(field(container, "sample-0")).toBe("45.999");
+    expect(field(container, "sample-3")).toBe("30.890");
   });
 
   it("calculates CCS % difference and Control result only from complete numbers", () => {
@@ -85,14 +102,14 @@ describe("LabCalculationForm", () => {
     expect(controlResult("0.25", "", "0.27")).toBe("");
   });
 
-  it("reports %W/W and blanks Density for GR/WP/SP samples, %W/V with a density value otherwise", () => {
-    const base = page([]);
+  it("uses the recorded Density and reports the unit by formulation", () => {
+    const base = page([row("Density", "1")]);
     const liquid = render(<LabCalculationForm page={base} />);
     expect(field(liquid.container, "density")).toBe("1.000");
     expect(liquid.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/V");
 
     const granule = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, name: "FIPRONIL 0.3% GR" } }} />);
-    expect(field(granule.container, "density")).toBe("-");
+    expect(field(granule.container, "density")).toBe("1.000");
     expect(granule.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/W");
   });
 });

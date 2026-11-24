@@ -154,6 +154,9 @@ describe('petition search ranking', () => {
     ['analysis results', <AnalysisResults />, '/'],
   ] as const)('%s ranks codes without changing matching or equal-score order', async (label, component, entry) => {
     if (label === 'analysis results') mocks.items = mocks.items.map((item) => ({ ...item, status: 'approved' }));
+    if (label === 'Lab results') mocks.items = mocks.items.map((item) => ({
+      ...item, items: item.items.map((sample) => ({ ...sample, sampleId: 'S-' + sample.seq })),
+    }));
     renderPage(component, entry);
     await screen.findByText('ROW-exact');
     fireEvent.change(screen.getAllByPlaceholderText(/ค้นหาเลข/)[0], { target: { value: '  r100  ' } });
@@ -229,11 +232,17 @@ describe('petition search ranking', () => {
     expect(screen.queryByText('ROW-forbidden')).not.toBeInTheDocument();
   });
 
-  it.each([<LabResults />, <AnalysisResults />])('uses petition numbers when codes are missing and keeps name matching', async (component) => {
+  it.each([
+    ['Lab results', <LabResults />],
+    ['analysis results', <AnalysisResults />],
+  ] as const)('%s uses petition numbers when codes are missing and keeps name matching', async (label, component) => {
     mocks.items = [petition('ROW-name'), petition('ROW-P100-prefix'), petition('ROW-P100')]
       .map((item) => ({ ...item, status: 'approved' as const, submittedBy: { ...item.submittedBy, name: 'ROW-P100' } }));
     mocks.items.push(petition('ROW-unmatched', undefined, {
       status: 'approved', submittedBy: { name: 'Unrelated', submittedAt: '2026-09-19T00:00:00.000Z' },
+    }));
+    if (label === 'Lab results') mocks.items = mocks.items.map((item) => ({
+      ...item, items: item.items.map((sample) => ({ ...sample, sampleId: 'S-' + sample.seq })),
     }));
     renderPage(component);
     fireEvent.change(screen.getByPlaceholderText(/ค้นหาเลข/), { target: { value: 'ROW-P100' } });
@@ -258,9 +267,32 @@ describe('petition search ranking', () => {
     mocks.items.push(petition('ROW-code-only', 'R100', {
       submittedBy: { name: 'Unrelated', submittedAt: '2026-09-19T00:00:00.000Z' },
     }));
+    mocks.items = mocks.items.map((item) => ({
+      ...item, items: item.items.map((sample) => ({ ...sample, sampleId: 'S-' + sample.seq })),
+    }));
     renderPage(<LabResults />);
     fireEvent.change(screen.getByPlaceholderText(/ค้นหาเลข/), { target: { value: 'R100' } });
     expect(petitionOrder()).toEqual(['ROW-multiple', 'ROW-name']);
+  });
+
+  it('shows only received Lab samples with their analyst and a separate sample number column', () => {
+    mocks.items = [petition('ROW-result', 'R100', {
+      labCompletedBy: 'นักวิเคราะห์ Lab',
+      items: [
+        { seq: 1, itemNo: 'R100', sampleName: 'Received sample', batchNo: 'B-1', sampleId: 'S-123', sendToLab: true },
+        { seq: 2, itemNo: 'R101', sampleName: 'Unreceived sample', batchNo: 'B-2', sendToLab: true },
+      ],
+    }), petition('ROW-unreceived', 'R102', {
+      items: [{ seq: 1, itemNo: 'R102', sampleName: 'No sample number', batchNo: 'B-3', sendToLab: true }],
+    })];
+
+    renderPage(<LabResults />);
+
+    expect(screen.getByRole('columnheader', { name: 'เลขที่ตัวอย่าง' })).toBeInTheDocument();
+    expect(screen.getByText('S-123')).toHaveClass('font-semibold', 'text-primary');
+    expect(screen.getByText('นักวิเคราะห์ Lab')).toBeInTheDocument();
+    expect(screen.queryByText('Unreceived sample')).not.toBeInTheDocument();
+    expect(screen.queryByText('ROW-unreceived')).not.toBeInTheDocument();
   });
 
   it('keeps analysis conclusion filtering before ranking', () => {

@@ -127,6 +127,26 @@ export async function readStockLabelCodeFromImage(imageDataUrl: string): Promise
   }
 }
 
+export async function readPetitionLabelCodeFromImage(imageDataUrl: string): Promise<StockLabelOcrResult> {
+  try {
+    const res = await fetch(`${AI_BASE}/petition-label-ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageDataUrl }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = (await res.json().catch(() => ({}))) as Partial<StockLabelOcrResult> & { error?: string };
+    if (!res.ok) return { labelCode: '', candidates: [], error: body.error || `OCR failed: ${res.status}` };
+    return {
+      labelCode: typeof body.labelCode === 'string' ? body.labelCode : '',
+      candidates: Array.isArray(body.candidates) ? body.candidates.filter((value): value is string => typeof value === 'string') : [],
+      rawText: typeof body.rawText === 'string' ? body.rawText : '',
+    };
+  } catch (err) {
+    return { labelCode: '', candidates: [], error: (err as Error).message || 'OCR failed' };
+  }
+}
+
 export interface BalanceDisplayOcrResult {
   value: string;
   rawText?: string;

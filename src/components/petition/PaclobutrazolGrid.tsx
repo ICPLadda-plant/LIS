@@ -32,7 +32,7 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
     const isKeys = (["Std 1", "Std 2"] as const).flatMap((row) => (["Peak area 1", "Internal std 1", "Peak area 2", "Internal std 2"] as const).map((col) => pbzKey(row, col)));
     const missingIs = isKeys.filter((key) => !String(values[key] ?? ""));
     if (hasWeights && hasPct && !missingIs.length) return;
-    api.getPaclobutrazolStdWeights(petitionId ?? "")
+    api.getPaclobutrazolStdWeights(petitionId ?? "", header?.commonName ?? "")
       .then((res) => {
         if (!hasWeights && res.std1) onChange(std1Key, res.std1);
         if (!hasWeights && res.std2) onChange(std2Key, res.std2);
@@ -41,7 +41,7 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
         missingIs.forEach((key) => { const v = res.internalStd?.[key]; if (v) onChange(key, v); });
       })
       .catch(() => undefined);
-  }, [disabled, onChange, petitionId, std1Key, std2Key, values]);
+  }, [disabled, header?.commonName, onChange, petitionId, std1Key, std2Key, values]);
 
   const handle = (key: string, val: string) => {
     onChange(key, val);

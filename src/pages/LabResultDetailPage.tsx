@@ -113,9 +113,19 @@ export default function LabResultDetailPage() {
 
   // รวมเอกสารพิมพ์ทั้งหมดไว้ในปุ่มเดียว ผู้ใช้เลือกจากชื่อและคำอธิบาย แทนการไล่อ่านหลายปุ่ม
   const printOptions: PrintDocumentOption[] = [
+    ...(chemReportPrintable
+      ? [{
+          key: "chemReport",
+          label: "ใบรายงานผลวิเคราะห์",
+          description: "แบบฟอร์ม F-CHM-01-01 สำหรับส่งออก",
+          icon: FileCheck2,
+          enabled: true,
+          open: () => setChemReportOpen(true),
+        }]
+      : []),
     {
       key: "labResult",
-      label: "ผลวิเคราะห์ Lab",
+      label: "ใบผลวิเคราะห์ (COA)",
       description: labResultPrintable ? "ผลวิเคราะห์ของทุกตัวอย่างในคำร้องนี้" : "พิมพ์ได้หลังหัวหน้า Lab อนุมัติผล",
       icon: FileText,
       enabled: labResultPrintable,
@@ -124,29 +134,19 @@ export default function LabResultDetailPage() {
     ...(calcPages.length > 0
       ? [{
           key: "calculation",
-          label: hasPbz ? "ใบคำนวณ (แบบเดิม)" : "ใบคำนวณ",
+          label: hasPbz ? "ใบคำนวณผล (แบบเดิม)" : "ใบคำนวณผล",
           description: calcPrintable ? "ค่าดิบและการคำนวณสารสำคัญ" : "พิมพ์ได้หลัง Lab ออกผล",
           icon: Calculator,
           enabled: calcPrintable,
           open: () => setCalcVariant("default"),
         }, ...(hasPbz ? [{
           key: "calculationStandard",
-          label: "ใบคำนวณ (แบบมาตรฐาน)",
+          label: "ใบคำนวณผล (แบบมาตรฐาน)",
           description: calcPrintable ? "รูปแบบเดียวกับใบคำนวณสารอื่น" : "พิมพ์ได้หลัง Lab ออกผล",
           icon: Calculator,
           enabled: calcPrintable,
           open: () => setCalcVariant("standard"),
         }] : [])]
-      : []),
-    ...(chemReportPrintable
-      ? [{
-          key: "chemReport",
-          label: "ใบรายงานผลการวิเคราะห์",
-          description: "แบบฟอร์ม F-CHM-01-01 สำหรับส่งออก",
-          icon: FileCheck2,
-          enabled: true,
-          open: () => setChemReportOpen(true),
-        }]
       : []),
   ];
   const anyPrintable = printOptions.some((option) => option.enabled);

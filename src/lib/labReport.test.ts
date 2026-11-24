@@ -33,8 +33,9 @@ const petition = {
   labReceivedAt: "2026-01-11T00:00:00.000Z",
   firstResultAt: "2026-01-12T00:00:00.000Z",
   labCompletedBy: "นุชจรินทร์",
+  assignedTo: { name: "น.ส.แก้ววิศา วาระเพียง" },
   labApprovedAt: "2026-01-15T00:00:00.000Z",
-  labApprovedBy: "นคร",
+  labApprovedBy: "นายนคร อ่อนคง",
 } as unknown as Petition;
 
 const labRequests = [
@@ -111,8 +112,8 @@ describe("buildLabReportPages", () => {
     expect(p.sample.receivedDate).toBe("11/01/2569");
     expect(p.sample.reportedDate).toBe("15/01/2569");
     expect(p.sample.condition).toBe("ปกติ");
-    expect(p.analystName).toBe("นุชจรินทร์");
-    expect(p.labHeadName).toBe("นคร");
+    expect(p.analystName).toBe("นางสาวแก้ววิศา วาระเพียง");
+    expect(p.labHeadName).toBe("นายนคร อ่อนคง");
   });
 
   it("เติมปี พ.ศ. แบบย่อให้เลขตัวอย่างที่เลือกตอน Assign", () => {

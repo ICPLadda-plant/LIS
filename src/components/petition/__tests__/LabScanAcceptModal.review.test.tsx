@@ -52,17 +52,38 @@ function renderModal() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(api.get).mockResolvedValue({ data: { data: petition } } as never);
-  vi.mocked(api.patch).mockResolvedValue({ data: { data: { ...petition, labReceivedAt: '2026-11-10' } } } as never);
+  vi.mocked(api.get).mockImplementation(async (url) => ({
+    data: { data: url.includes('lab-sample-number-options') ? ['3450'] : petition },
+  }) as never);
+  vi.mocked(api.patch).mockImplementation(async (url) => ({
+    data: { data: url.endsWith('/receive') ? { ...petition, labReceivedAt: '2026-11-10' } : petition },
+  }) as never);
 });
 
+async function selectSampleNumber() {
+  fireEvent.change(await screen.findByPlaceholderText('พิมพ์หรือเลือกเลขตัวอย่าง'), { target: { value: '3450' } });
+}
+
 describe('LabScanAcceptModal ทบทวนคำขอก่อนรับงาน', () => {
+  it('ยังพิมพ์เลขตัวอย่างได้เมื่อโหลดรายการเลขแนะนำไม่สำเร็จ', async () => {
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (url.includes('lab-sample-number-options')) throw new Error('API Error');
+      return { data: { data: petition } } as never;
+    });
+    vi.mocked(fetchLabRequestsByPetition).mockResolvedValue([]);
+
+    renderModal();
+
+    expect(await screen.findByPlaceholderText('พิมพ์หรือเลือกเลขตัวอย่าง')).toBeInTheDocument();
+  });
+
   it('ยังไม่ทบทวน → กดรับงานแล้วเปิดฟอร์มทบทวน และรับตัวอย่างหลังบันทึกว่าพร้อมรับงาน', async () => {
     vi.mocked(fetchLabRequestsByPetition).mockResolvedValue([{ _id: 'l1', serviceAgreement: { testMethod: 'standard' } }] as never);
     vi.mocked(saveLabAgreementReview).mockResolvedValue({ updated: 1, review: reviewed(true) } as never);
     renderModal();
 
     expect(await screen.findByText('ต้องทบทวนก่อนรับงาน')).toBeInTheDocument();
+    await selectSampleNumber();
     fireEvent.click(screen.getByRole('button', { name: 'รับงาน' }));
     expect(api.patch).not.toHaveBeenCalled();
 
@@ -75,6 +96,7 @@ describe('LabScanAcceptModal ทบทวนคำขอก่อนรับง
     vi.mocked(saveLabAgreementReview).mockResolvedValue({ updated: 1, review: reviewed(false) } as never);
     renderModal();
 
+    await selectSampleNumber();
     fireEvent.click(await screen.findByRole('button', { name: 'รับงาน' }));
     fireEvent.click(await screen.findByRole('button', { name: /บันทึกการทบทวน/ }));
     expect(await screen.findByText(/ไม่พร้อมรับงาน \(เครื่องเสีย\)/)).toBeInTheDocument();
@@ -86,8 +108,13 @@ describe('LabScanAcceptModal ทบทวนคำขอก่อนรับง
     renderModal();
 
     expect(await screen.findByText('พร้อมรับงาน')).toBeInTheDocument();
+    await selectSampleNumber();
     fireEvent.click(screen.getByRole('button', { name: 'รับงาน' }));
-    await waitFor(() => expect(api.patch).toHaveBeenCalled());
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.patch).mock.calls).toEqual([
+      ['/petitions/pet1/lab-sample-numbers', { sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] }],
+      ['/petitions/pet1/receive', expect.objectContaining({ side: 'lab' })],
+    ]);
     expect(screen.queryByRole('button', { name: /บันทึกการทบทวน/ })).not.toBeInTheDocument();
   });
 });

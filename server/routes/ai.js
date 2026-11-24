@@ -15,6 +15,11 @@ const STOCK_LABEL_OCR_SYSTEM = `คุณอ่านข้อความจา
 ห้ามเดา ถ้าอ่านไม่ชัดให้คืนค่าว่าง
 ตอบเป็น JSON object เท่านั้น รูปแบบ {"labelCode":"","candidates":[],"rawText":""}`;
 
+const PETITION_LABEL_OCR_SYSTEM = `คุณอ่านข้อความเลขที่พิมพ์ใต้ QR บนใบนำส่งตัวอย่าง Lab
+เลขที่ต้องการมีรูปแบบ L01/69, P01/69 หรือเลขคำร้อง P-2611-0008
+ข้ามชื่อผลิตภัณฑ์, Batch, วันที่ และรหัสเอกสารอื่น ห้ามเดา ถ้าอ่านไม่ชัดให้คืนค่าว่าง
+ตอบเป็น JSON object เท่านั้น รูปแบบ {"labelCode":"","candidates":[],"rawText":""}`;
+
 const BALANCE_DISPLAY_OCR_SYSTEM = `คุณอ่านข้อความจากหน้าจอดิจิทัลของเครื่องชั่งในห้องแล็บ
 อ่านเฉพาะค่าตัวเลขน้ำหนักหลักที่แสดงบนหน้าจอ รวมเครื่องหมายลบและจุดทศนิยม
 ข้ามหน่วย g, mg, สัญลักษณ์สถานะ และตัวเลขอื่นรอบหน้าจอ
@@ -35,6 +40,19 @@ function stockLabelCandidatesFromOcr(payload) {
   values.push(...rawText.match(/\d[\d\s-]{3,}\d/g) || []);
 
   return [...new Set(values.map(normalizeStockLabelCandidate).filter(Boolean))];
+}
+
+function normalizePetitionLabelCandidate(value) {
+  const text = String(value ?? '').toUpperCase().replace(/[–—]/g, '-').replace(/\s+/g, '');
+  const petition = text.match(/P-?(\d{4})-?(\d{4})/);
+  if (petition) return `P-${petition[1]}-${petition[2]}`;
+  const label = text.match(/([LP])(\d{2,4})[\/\\](\d{2})/);
+  return label ? `${label[1]}${label[2]}/${label[3]}` : '';
+}
+
+function petitionLabelCandidatesFromOcr(payload) {
+  const values = [payload?.labelCode, ...(Array.isArray(payload?.candidates) ? payload.candidates : []), payload?.rawText];
+  return [...new Set(values.map(normalizePetitionLabelCandidate).filter(Boolean))];
 }
 
 function isSupportedImageDataUrl(value) {
@@ -380,6 +398,30 @@ router.post('/stock-label-ocr', async (req, res) => {
     const rawText = typeof generated?.rawText === 'string' ? generated.rawText.trim() : '';
     const candidates = stockLabelCandidatesFromOcr(generated);
 
+    res.json({ labelCode: candidates[0] || '', candidates, rawText });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'ocr failed' });
+  }
+});
+
+// POST /api/ai/petition-label-ocr
+// Body: { imageDataUrl }
+// Returns: { labelCode, candidates, rawText }
+router.post('/petition-label-ocr', async (req, res) => {
+  try {
+    const imageDataUrl = String(req.body?.imageDataUrl || '').trim();
+    if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl required' });
+    if (!isSupportedImageDataUrl(imageDataUrl)) return res.status(400).json({ error: 'unsupported image data URL' });
+    if (imageDataUrl.length > 9_500_000) return res.status(413).json({ error: 'image too large' });
+    if (!isOcrConfigured()) return res.status(503).json({ error: 'OCR ยังไม่ได้ตั้งค่า OCR_API_KEY / OCR_MODEL' });
+
+    const generated = await generateJSONFromImage(
+      'อ่านเลขที่พิมพ์ใต้ QR บนใบนำส่งตัวอย่าง Lab จากรูปนี้',
+      imageDataUrl,
+      { system: PETITION_LABEL_OCR_SYSTEM, temperature: 0, maxTokens: 200 },
+    );
+    const rawText = typeof generated?.rawText === 'string' ? generated.rawText.trim() : '';
+    const candidates = petitionLabelCandidatesFromOcr(generated);
     res.json({ labelCode: candidates[0] || '', candidates, rawText });
   } catch (err) {
     res.status(500).json({ error: err.message || 'ocr failed' });

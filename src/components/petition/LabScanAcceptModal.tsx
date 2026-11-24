@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { AlertCircle, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Petition } from '@/types/petition.types';
 import { PETITION_STATUS_CONFIG } from '@/types/petition.types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { normalizeRoles } from '@/lib/roles';
@@ -21,9 +22,15 @@ import { fetchLabRequestsByPetition, saveLabAgreementReview } from '@/hooks/useP
 import { isReadyToReceive } from '@/lib/labAgreementReview';
 import type { LabAgreementReview, LabRequest } from '@/types/labRequest.types';
 import { toast } from 'sonner';
+import { readPetitionLabelCodeFromImage } from '@/lib/aiApi';
 
 const READER_ID = 'lab-accept-qr-reader';
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
+
+function apiErrorMessage(err: unknown, fallback: string) {
+  const data = (err as { response?: { data?: { message?: string; error?: { message?: string } } } })?.response?.data;
+  return data?.error?.message ?? data?.message ?? (err instanceof Error && err.message ? err.message : fallback);
+}
 
 const labReceivableItems = (petition: Petition) =>
   isResearchAndDevelopmentPetition(petition)
@@ -66,6 +73,10 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
   const receiveBusy = useRef(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [manualCode, setManualCode] = useState('');
+  const [sampleNumberOptions, setSampleNumberOptions] = useState<string[]>([]);
+  const [sampleNumbers, setSampleNumbers] = useState<Record<number, string>>({});
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrMsg, setOcrMsg] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   useEffect(() => {
@@ -83,6 +94,10 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setPendingId('');
       setErrorMsg('');
       setManualCode('');
+      setSampleNumberOptions([]);
+      setSampleNumbers({});
+      setOcrBusy(false);
+      setOcrMsg('');
     }
   }, [open]);
 
@@ -101,6 +116,12 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setAdditionalRequest(request ?? null);
       setLabelChoices(null);
       setLabelKeys([]);
+      const sampleItems = (found.items ?? []).filter(shouldSendItemToLab);
+      if (!request && isFullAccess && sampleItems.length) {
+        setSampleNumbers(Object.fromEntries(sampleItems.map((item) => [item.seq, item.sampleId ?? ''])));
+        const options = await api.get<string[]>(`/petitions/lab-sample-number-options${found.adminOnly ? '?adminOnly=1' : ''}`).catch(() => null);
+        setSampleNumberOptions(options?.data.data ?? []);
+      }
 
       // Must have at least one lab item
       if (labReceivableItems(found).length === 0) {
@@ -152,8 +173,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setPendingId(found._id);
       setPhase('confirming');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? (err instanceof Error ? err.message : 'ไม่พบข้อมูลคำร้อง');
-      setErrorMsg(msg);
+      setErrorMsg(apiErrorMessage(err, 'ไม่พบข้อมูลคำร้อง'));
       setPhase('error');
     }
   }, [claimOnReceive, isFullAccess, onAccepted, user]);
@@ -169,7 +189,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
 
     (async () => {
       const scanner = new Html5Qrcode(READER_ID);
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      const config = { fps: 15 };
       const onScan = (text: string) => {
         if (!active) return;
         fetchAndCheck(text);
@@ -180,7 +200,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
 
       try {
         try {
-          await startWith({ facingMode: { exact: 'environment' } });
+          await startWith({ facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } });
         } catch {
           const cameras = await Html5Qrcode.getCameras();
           if (cameras.length === 0) {
@@ -189,7 +209,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
           }
           const back = cameras.find((c) => /back|environment|rear|หลัง|后|背面/i.test(c.label));
           const cam = back ?? (cameras.length > 1 ? cameras[cameras.length - 1] : cameras[0]);
-          await startWith(cam.id);
+          await startWith({ deviceId: { exact: cam.id }, width: { ideal: 1920 }, height: { ideal: 1080 } });
         }
         if (!active) { scanner.stop().catch(() => {}); return; }
         scannerRef.current = scanner;
@@ -218,13 +238,46 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     };
   }, [open, phase, manualOnly, fetchAndCheck, initialCode]);
 
+  async function readPrintedCode() {
+    const video = document.getElementById(READER_ID)?.querySelector('video');
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+      setOcrMsg('กล้องยังไม่พร้อม กรุณาลองอีกครั้ง');
+      return;
+    }
+    const scale = Math.min(1, 1280 / video.videoWidth, 1280 / video.videoHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    setOcrBusy(true);
+    setOcrMsg('กำลังอ่านเลขใต้ QR...');
+    const result = await readPetitionLabelCodeFromImage(canvas.toDataURL('image/jpeg', 0.85));
+    setOcrBusy(false);
+    if (!result.labelCode) {
+      setOcrMsg(result.error || 'อ่านเลขไม่สำเร็จ กรุณาจัดภาพให้ชัดแล้วลองใหม่');
+      return;
+    }
+    setOcrMsg(`พบเลข ${result.labelCode}`);
+    void fetchAndCheck(result.labelCode);
+  }
+
   async function confirmAccept() {
     const id = petition?._id || pendingId;
-    if (!id || receiveBusy.current || phase !== 'confirming' || (labelChoices && !labelKeys.length)) return;
+    const sampleItems = petition ? (petition.items ?? []).filter(shouldSendItemToLab) : [];
+    const needsSampleNumbers = isFullAccess && !additionalRequest && sampleItems.length > 0;
+    if (!id || receiveBusy.current || phase !== 'confirming' || (labelChoices && !labelKeys.length) || (needsSampleNumbers && sampleItems.some((item) => !sampleNumbers[item.seq]?.trim()))) return;
     receiveBusy.current = true;
     setPhase('loading');
     try {
       let updated = petition as Petition;
+      if (needsSampleNumbers) {
+        const saved = await api.patch<Petition>(`/petitions/${id}/lab-sample-numbers`, {
+          sampleNumbers: sampleItems.map((item) => ({ itemSeq: item.seq, sampleId: sampleNumbers[item.seq].trim() })),
+        });
+        updated = saved.data.data;
+      }
       if (additionalRequest || !petition?.labReceivedAt) {
         const received = await api.patch<Petition>(`/petitions/${id}/receive`, {
           actor: user?.name || user?.email,
@@ -248,9 +301,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setPhase('success');
       onAccepted();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? (err instanceof Error && err.message ? err.message : 'เกิดข้อผิดพลาด กรุณาลองใหม่');
-      setErrorMsg(msg);
+      setErrorMsg(apiErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่'));
       setPhase('error');
     }
   }
@@ -298,12 +349,18 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     setPetition(null);
     setPendingId('');
     setErrorMsg('');
+    setSampleNumberOptions([]);
+    setSampleNumbers({});
+    setOcrBusy(false);
+    setOcrMsg('');
     setPhase('scanning');
   }
 
   if (!open) return null;
 
   const labItemCount = petition ? labReceivableItems(petition).length : 0;
+  const sampleItems = petition ? (petition.items ?? []).filter(shouldSendItemToLab) : [];
+  const needsSampleNumbers = isFullAccess && !additionalRequest && sampleItems.length > 0;
   const labelStatus = labelChoices ? labelReceiptStatus(labelChoices, labelKeys) : null;
   const labHeadline = petition
     ? (labelChoices ? labelChoices.filter((label) => labelKeys.includes(label.key)).map((label) => label.label).join(', ') : sideLabelText(petition, 'lab'))
@@ -333,8 +390,13 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
           <div className={phase === 'scanning' && !manualOnly ? 'block' : 'hidden'}>
             <div id={READER_ID} className="w-full rounded-lg overflow-hidden border" />
             <p className="mt-2 text-center text-sm text-muted-foreground">
-              เล็งกล้องไปที่ QR Code บนใบคำร้องเพื่อรับงาน
+              เล็งกล้องไปที่ QR หรือกดอ่านเลขที่พิมพ์ใต้ QR
             </p>
+            <Button type="button" variant="outline" className="mt-2 w-full gap-2" disabled={ocrBusy} onClick={() => void readPrintedCode()}>
+              <Camera className="h-4 w-4" />
+              {ocrBusy ? 'กำลังอ่านเลข...' : 'อ่านเลขใต้ QR'}
+            </Button>
+            {ocrMsg && <p className="mt-2 text-center text-xs text-muted-foreground">{ocrMsg}</p>}
           </div>
           {phase !== 'scanning' && <div id={READER_ID} className="hidden" />}
 
@@ -412,11 +474,30 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
                 )}
               </div>
               {labelChoices && <LabelReceiptPicker labels={labelChoices} selected={labelKeys} onChange={setLabelKeys} />}
+              {needsSampleNumbers && (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-3">
+                  <p className="text-sm font-semibold text-foreground">เลือกเลขตัวอย่าง Lab</p>
+                  {sampleItems.map((item) => (
+                    <label key={item.seq} className="grid gap-1.5 text-sm">
+                      <span className="font-medium">{item.sampleName} · {item.batchNo || `รายการ ${item.seq}`}</span>
+                      <Input
+                        list={`lab-accept-sample-number-${item.seq}`}
+                        placeholder="พิมพ์หรือเลือกเลขตัวอย่าง"
+                        value={sampleNumbers[item.seq] ?? ''}
+                        onChange={(event) => setSampleNumbers((current) => ({ ...current, [item.seq]: event.target.value }))}
+                      />
+                      <datalist id={`lab-accept-sample-number-${item.seq}`}>
+                        {[item.sampleId, ...sampleNumberOptions].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index && !Object.entries(sampleNumbers).some(([seq, picked]) => Number(seq) !== item.seq && picked === value)).map((value) => <option key={value} value={value} />)}
+                      </datalist>
+                    </label>
+                  ))}
+                </div>
+              )}
               <div className="flex gap-2 pt-2">
                 <Button variant="ghost" className="flex-1" onClick={rescan}>
                   {manualOnly ? 'กรอกใหม่' : 'สแกนใหม่'}
                 </Button>
-                <Button variant="primary" className="flex-1" onClick={handleAcceptClick} disabled={!!labelChoices && !labelKeys.length}>
+                <Button variant="primary" className="flex-1" onClick={handleAcceptClick} disabled={(!!labelChoices && !labelKeys.length) || (needsSampleNumbers && sampleItems.some((item) => !sampleNumbers[item.seq]?.trim()))}>
                   รับงาน
                 </Button>
               </div>

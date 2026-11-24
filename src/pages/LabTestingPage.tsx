@@ -310,6 +310,7 @@ export default function LabTestingPage() {
         needsAccept(p) ? (
           <Button
             size="sm"
+            variant="success"
             disabled={acceptingId === p._id}
             onClick={(e) => {
               e.stopPropagation();
@@ -335,12 +336,13 @@ export default function LabTestingPage() {
             )}
           <Button
             size="sm"
+            variant={p.labCompletedAt ? 'secondary' : 'primary'}
             onClick={(e) => {
               e.stopPropagation();
               navigate(`/lab-testing/${p._id}`);
             }}
           >
-            {p.labCompletedAt ? 'ดูรายละเอียด' : 'เข้าตรวจ'}
+            {p.labCompletedAt ? 'ดูรายละเอียด' : 'คำนวณผลวิเคราะห์'}
           </Button>
           </div>
         ) : (
