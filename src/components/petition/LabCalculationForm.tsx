@@ -41,6 +41,10 @@ ${PBZ_PRINT_CSS}`;
 
 const BLANK = /^[-–—]?$/;
 const fmtDensity = (v?: string) => (v && Number.isFinite(Number(v)) ? Number(v).toFixed(3) : v || "");
+const fmtPrintDecimal = (value: string) => {
+  const number = Number(value.replace(/,/g, ""));
+  return value && Number.isFinite(number) ? number.toFixed(3) : value;
+};
 
 function values(page: LabReportPage, pattern: RegExp): string[] {
   return (page.rows ?? [])
@@ -202,10 +206,10 @@ export default function LabCalculationForm({ page, variant = "default", standard
         </div>
 
         <div className="brom-form-bar">System Suitability Test</div>
-        <Columns labels={["Area Inj. 1", "Area Inj. 2", "Area Inj. 3", "Average", "%RSD (ไม่เกิน 2%)"]} items={area} field="area" />
+        <Columns labels={["Area Inj. 1", "Area Inj. 2", "Area Inj. 3", "Average", "%RSD (ไม่เกิน 2%)"]} items={area.map(fmtPrintDecimal)} field="area" />
 
         <div className="brom-form-bar">Continuing Calibration Standard Test ; CCS</div>
-        <Columns labels={["Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", "% Difference", "Result"]} items={[ccs.mid, ccs.conc, ccs.diff, ccs.result]} field="ccs" />
+        <Columns labels={["Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", "% Difference", "Result"]} items={[ccs.mid, ccs.conc, ccs.diff].map(fmtPrintDecimal).concat(ccs.result)} field="ccs" />
 
         <div className="brom-form-bar" style={{ marginTop: "4mm" }}>
           <span style={{ width: "30mm" }}>Solvent Blank</span>
@@ -221,7 +225,7 @@ export default function LabCalculationForm({ page, variant = "default", standard
         </div>
 
         <div className="brom-form-bar">Analytical Results</div>
-        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample} field="sample" />
+        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample.map(fmtPrintDecimal)} field="sample" />
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>
