@@ -759,6 +759,10 @@ export default function CoaCenterPage() {
     mutationFn: (id: string) => api.deleteCoaDocument(id, { _user: actor }),
     onSuccess: invalidateCoaDocuments,
   });
+  const dismissExternalRequest = useMutation({
+    mutationFn: (id: string) => api.dismissExternalCoaRequest(id, { _user: actor }),
+    onSuccess: invalidateCoaDocuments,
+  });
 
   function handleReject(doc: CoaDocument) {
     setRejectDoc(doc);
@@ -870,6 +874,11 @@ export default function CoaCenterPage() {
       return;
     }
     deleteCoa.mutate(doc._id);
+  }
+
+  function handleDismissExternalRequest(doc: CoaDocument) {
+    if (!window.confirm(`ยืนยันลบคำขอ ERP ${doc.petitionNoSnapshot || doc._id}? รายการนี้จะไม่แสดงอีก`)) return;
+    dismissExternalRequest.mutate(doc._id);
   }
 
   function handleSaveDemoEdit() {
@@ -1437,6 +1446,15 @@ export default function CoaCenterPage() {
                               onClick={(event) => { event.stopPropagation(); handleCreate(doc); }}>
                               สร้าง COA
                             </Button>
+                            {canDeleteCoa && (
+                              <Button type="button" variant="destructive" size="sm" className="gap-2"
+                                disabled={dismissExternalRequest.isPending}
+                                aria-label={`ลบคำขอ ERP ${doc.petitionNoSnapshot || doc._id}`}
+                                onClick={(event) => { event.stopPropagation(); handleDismissExternalRequest(doc); }}>
+                                <Trash2 className="h-4 w-4" />
+                                ลบ
+                              </Button>
+                            )}
                             {externalRequest.shipmentDate && <span>กำหนดส่ง {formatProductionDate(externalRequest.shipmentDate)}</span>}
                           </div>
                         )}

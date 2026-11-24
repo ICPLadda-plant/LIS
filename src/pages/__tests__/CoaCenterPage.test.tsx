@@ -142,6 +142,7 @@ vi.mock("@/lib/api", () => ({
     approveCoaDocument: vi.fn().mockResolvedValue({}),
     rejectCoaDocument: vi.fn().mockResolvedValue({}),
     deleteCoaDocument: vi.fn().mockResolvedValue({ ok: true }),
+    dismissExternalCoaRequest: vi.fn().mockResolvedValue({ ok: true }),
     getPrinterConfigs: vi.fn().mockResolvedValue([]),
   },
 }));
@@ -465,6 +466,7 @@ describe("CoaCenterPage", () => {
     expect(within(requestedRow).getByText("pending shipment")).toBeInTheDocument();
     expect(within(requestedRow).getByText("ERP")).toBeInTheDocument();
     expect(within(requestedRow).getByRole("button", { name: /สร้าง COA/ })).toBeInTheDocument();
+    expect(within(requestedRow).getByRole("button", { name: /ลบคำขอ ERP/ })).toBeInTheDocument();
 
     fireEvent.click(requestedRow);
 

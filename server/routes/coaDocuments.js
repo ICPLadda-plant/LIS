@@ -7,6 +7,7 @@ const LabRequest = require('../models/LabRequest');
 const QCTestResult = require('../models/QCTestResult');
 const ResultDensity = require('../models/ResultDensity');
 const LegacyLabResult = require('../models/LegacyLabResult');
+const ExternalCoaRequestDismissal = require('../models/ExternalCoaRequestDismissal');
 const Parameter = require('../models/Parameter');
 const User = require('../models/User');
 const Role = require('../models/Role');
@@ -1021,7 +1022,7 @@ router.get('/', async (req, res) => {
           return { stockRows: [], mfRows: [] };
         })
       : Promise.resolve({ stockRows: [], mfRows: [] });
-    const [documents, requestedRows, externalRows, erpReferences, productionPetitions] = await Promise.all([
+    const [documents, requestedRows, externalRows, erpReferences, productionPetitions, dismissedExternalRows] = await Promise.all([
       CoaDocument.find(filter).sort({ updatedAt: -1 }).lean(),
       shouldIncludeRequestedRows(req.query)
         ? requestedCoaRows({ petitionNo: req.query.petitionNo })
@@ -1031,7 +1032,9 @@ router.get('/', async (req, res) => {
       shouldFetchExternal
         ? Petition.find({ status: { $ne: 'rejected' } }).sort({ updatedAt: -1 }).limit(500).lean()
         : Promise.resolve([]),
+      shouldFetchExternal ? ExternalCoaRequestDismissal.find({}).select({ externalRequestId: 1 }).lean() : Promise.resolve([]),
     ]);
+    const dismissedExternalIds = new Set(dismissedExternalRows.map((row) => row.externalRequestId));
     const externalItemNos = [...new Set(externalRows
       .map((row) => row.externalCoaRequest?.itemNo)
       .filter(Boolean))];
@@ -1063,11 +1066,29 @@ router.get('/', async (req, res) => {
         ...documents,
         ...requestedRows,
         ...filterExternalCoaDocuments(enrichedExternalRows, req.query)
+          .filter((row) => !dismissedExternalIds.has(row._id))
           .filter((row) => !linkedExternalRequests.some((doc) => externalRequestMatchesDocument(doc, row))),
       ]),
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.delete('/external-request/:externalRequestId', async (req, res) => {
+  try {
+    const actor = await actorFromRequest(req.body);
+    if (!isQcHead(actor)) return res.status(403).json({ error: 'ลบคำขอ ERP ได้เฉพาะ QC Head' });
+    const externalRequestId = decodeURIComponent(String(req.params.externalRequestId || '')).trim();
+    if (!externalRequestId) return res.status(400).json({ error: 'ไม่พบรหัสคำขอ ERP' });
+    await ExternalCoaRequestDismissal.findOneAndUpdate(
+      { externalRequestId },
+      { $set: { dismissedBy: actor } },
+      { upsert: true, new: true },
+    );
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(errorStatus(error)).json({ error: error.message });
   }
 });
 
