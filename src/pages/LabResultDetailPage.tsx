@@ -12,6 +12,7 @@ import { useItemGroupMembership } from "@/hooks/useItemGroupMembership";
 import { buildApprovalGroups } from "@/lib/qcApprovalRows";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
 import { buildLabCalculationPages } from "@/lib/labCalculation";
+import { findSgParameter, resolveSpecificGravity } from "@/lib/formSpecificGravity";
 import { labReportPagesWithResults } from "@/lib/labReport";
 import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
@@ -106,7 +107,14 @@ export default function LabResultDetailPage() {
   const chemReportPrintable = petition ? canPrintChemAnalysisReport(petition) && chemSheets.length > 0 : false;
   // ใบคำนวณใช้ได้ทุกสาร: หัวกระดาษจากหน้ารายงาน แต่ค่าดิบ (Area Inj / % Sample) มาจาก groups
   // ของหน้านี้ ซึ่งเปิด includeResultOnlyFields — รายงาน Lab ปกติไม่มีแถวเหล่านี้
-  const calcPages = petition ? buildLabCalculationPages(petition, pages, groups).filter(hasCalculationData) : [];
+  const calcPages = petition
+    ? buildLabCalculationPages(
+        petition,
+        pages,
+        groups,
+        (seq) => resolveSpecificGravity(results, seq, findSgParameter(parameters)),
+      ).filter(hasCalculationData)
+    : [];
   // พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ
   const calcPrintable = Boolean(petition && (petition.labCompletedAt || petition.labApprovedAt) && calcPages.length > 0);
   const hasPbz = calcPages.some(isPaclobutrazolPage);

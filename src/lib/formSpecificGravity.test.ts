@@ -89,7 +89,7 @@ describe('resolveSpecificGravity', () => {
       { itemSeq: 1, parameterId: 'sg1', values: { [SG_FIELD_LABEL]: 1.1 } },
       { itemSeq: 2, parameterId: 'sg1', values: { [SG_FIELD_LABEL]: 2.2 } },
     ];
-    expect(resolveSpecificGravity(results as any, 2, matched)).toBe('2.2');
+    expect(resolveSpecificGravity(results as any, 2, matched)).toBe('2.200');
   });
 
   it('returns empty string when no result for the seq', () => {
