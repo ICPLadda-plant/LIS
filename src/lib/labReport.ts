@@ -47,7 +47,7 @@ function cleanText(value?: string | null): string {
   return value?.trim() || "";
 }
 
-function fullThaiTitle(value?: string | null): string {
+export function fullThaiTitle(value?: string | null): string {
   return cleanText(value).replace(/^น\.?\s*ส\.?\s*/, "นางสาว");
 }
 

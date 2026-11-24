@@ -15,8 +15,7 @@ import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
-
-const API_BASE = import.meta.env.BASE_URL + "api";
+import { fullThaiTitle } from "@/lib/labReport";
 
 export const labApprovalItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
@@ -27,6 +26,8 @@ export function labApprovalSampleNo(petition: Petition, sampleId?: string): stri
   const year = petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543;
   return `${value}/${String(year % 100).padStart(2, "0")}`;
 }
+
+export const labApprovalTesterName = (petition: Petition) => fullThaiTitle(petition.labCompletedBy) || "-";
 
 function priorityScore(
   petition: Petition,
@@ -50,7 +51,6 @@ const LabApproval = () => {
   const { data, loading } = usePetitionList({ awaitingLabApproval: true, limit: 100 });
   const petitions = data?.items ?? [];
 
-  const [testersMap, setTestersMap] = useState<Record<string, string[]>>({});
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
@@ -75,19 +75,12 @@ const LabApproval = () => {
 
   useEffect(() => {
     if (petitions.length === 0) {
-      setTestersMap({});
       setAbnormalMap({});
       setReturnedMap({});
       return;
     }
     const ids = petitions.map((p) => p._id);
     let alive = true;
-    fetch(`${API_BASE}/qc-results/testers?scope=lab&petitionIds=${encodeURIComponent(ids.join(","))}`, {
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((map: Record<string, string[]>) => { if (alive) setTestersMap(map || {}); })
-      .catch(() => { if (alive) setTestersMap({}); });
     api.getAbnormalFlags(ids, { includeRestricted: false })
       .then((map) => { if (alive) setAbnormalMap(map || {}); })
       .catch(() => { if (alive) setAbnormalMap({}); });
@@ -160,14 +153,18 @@ const LabApproval = () => {
         </div>
       ),
     },
-    { key: "dept", header: "แผนก", cell: (p) => <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge> },
-    { key: "submitter", header: "ผู้นำส่ง", cell: (p) => p.submittedBy?.name ?? "-" },
+    {
+      key: "deptSubmitter", header: "แผนก / ผู้นำส่ง", className: "align-top",
+      cell: (p) => (
+        <div className="space-y-2">
+          <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge>
+          <div>{p.submittedBy?.name ?? "-"}</div>
+        </div>
+      ),
+    },
     {
       key: "testers", header: "ผู้ทดสอบ", className: "max-w-[200px] text-sm text-muted-foreground align-top",
-      cell: (p) => {
-        const t = testersMap[p._id] ?? [];
-        return t.length > 0 ? <div className="flex flex-col gap-0.5">{t.map((n) => <span key={n}>{n}</span>)}</div> : "-";
-      },
+      cell: labApprovalTesterName,
     },
     { key: "count", header: "จำนวนรายการ", cell: (p) => `${labApprovalItems(p).length} รายการ` },
     { key: "status", header: "สถานะ", cell: (p) => { const b = petitionStatusBadge(p); return <Badge variant={b.variant}>{b.label}</Badge>; } },
