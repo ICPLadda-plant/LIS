@@ -451,6 +451,7 @@ test('ERP Lot Description supplies the batch and its trailing date', () => {
 
 test('Lot Description trailing DDMMYY overrides request, MF, registration, and shipment dates', () => {
   const result = sampleFromSources({
+    strictLotDescriptionDate: true,
     selectedItemSeqs: [10000],
     sampleSnapshots: [{
       sampleName: 'Trade A',

@@ -1012,6 +1012,7 @@ function mergeResultRows(primaryRows, fallbackRows) {
 }
 
 function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
+  const strictLotDescriptionDate = source?.strictLotDescriptionDate === true;
   const itemNo = text(source?.externalCoaRequest?.itemNo || source?.sampleSnapshots?.[0]?.sampleId);
   const commonName = text(source?.sampleSnapshots?.[0]?.commonName);
   const normalizedItemNo = itemCode(itemNo);
@@ -1061,7 +1062,7 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     return (requestedLot && normalizeBatch(snapshot.lotNo) === normalizeBatch(requestedLot))
       || (requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch));
   });
-  const datedStock = stockCandidates.find((row) => lotDescriptionFromRow(row));
+  const datedStock = stockCandidates.find((row) => suffixDatedLotFromRow(row));
   const newestFgStock = stockCandidates.find((row) => isFgLotDescription(lotFromRow(row)));
   const stock = matchingStock || datedStock || newestFgStock || stockCandidates[0];
   const newestFgLot = newestFgStock
@@ -1074,9 +1075,13 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
     const description = lotDescriptionFromRow(row);
     return description ? lotSnapshot(description) : null;
   }).filter(Boolean);
-  const authoritativeErpLot = lotDescriptionCandidates.find((snapshot) => (
+  const lotDescriptionErpLot = lotDescriptionCandidates.find((snapshot) => (
     requestedBatch && normalizeBatch(snapshot.batchNo) === normalizeBatch(requestedBatch)
   )) || lotDescriptionCandidates[0] || null;
+  const stockErpLot = stock && suffixDatedLotFromRow(stock)
+    ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock))
+    : null;
+  const authoritativeErpLot = strictLotDescriptionDate ? lotDescriptionErpLot || stockErpLot : stockErpLot;
   const erpStockProductionDate = stock
     ? lotSnapshot(lotFromRow(stock), productionDateFromRow(stock)).productionDate
     : '';
@@ -1086,7 +1091,16 @@ function sampleFromSources(source, stockRows, mfRows, petitionItem = null) {
   const petitionStockProductionDate = petitionStock
     ? lotSnapshot(lotFromRow(petitionStock), productionDateFromRow(petitionStock)).productionDate
     : '';
-  const erpProductionDate = authoritativeErpLot?.productionDate || '';
+  const erpProductionDate = strictLotDescriptionDate
+    ? lotDescriptionErpLot?.productionDate || ''
+    : erpRequestLot
+      ? erpRequestProductionDate || erpStockProductionDate || normalizeIsoDate(mfDate)
+      : authoritativeErpLot?.productionDate
+        || erpRequestProductionDate
+        || petitionStockProductionDate
+        || normalizeIsoDate(mfDate)
+        || matchingStockLot?.productionDate
+        || erpStockProductionDate;
   const sourceLot = sourceBatch ? lotSnapshot(requestedLot || sourceBatch) : null;
   const requestedBatchLot = requestedBatch ? lotSnapshot(requestedBatch) : null;
   const requestedLotSnapshot = requestedLot ? lotSnapshot(requestedLot) : null;

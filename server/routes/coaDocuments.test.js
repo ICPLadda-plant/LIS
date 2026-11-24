@@ -1541,7 +1541,7 @@ test('revision approval aborts without activating the revision when supersession
   }
 });
 
-test('ERP autofill rejects nearby-Batch AI while averaging matching density readings', async () => {
+test('ERP autofill leaves production date blank without Lot Description', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1586,7 +1586,7 @@ test('ERP autofill rejects nearby-Batch AI while averaging matching density read
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '095');
     assert.equal(res.body.sample.lotNo, '26S-ACT50-095-171069');
-    assert.equal(res.body.sample.productionDate, '2026-10-17');
+    assert.equal(res.body.sample.productionDate, '');
     assert.equal(res.body.match, null);
     assert.equal(res.body.results.find((row) => row.testItem === '%AI content'), undefined);
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '1.158');
@@ -1750,7 +1750,7 @@ test('ERP autofill averages duplicate legacy Lab results and excludes the named 
   }
 });
 
-test('ERP autofill keeps the LIS label production date instead of deriving it from Lot', async () => {
+test('ERP autofill ignores LIS label date when Lot Description is absent', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1793,7 +1793,7 @@ test('ERP autofill keeps the LIS label production date instead of deriving it fr
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'FG260912-001');
-    assert.equal(res.body.sample.productionDate, '2026-06-16');
+    assert.equal(res.body.sample.productionDate, '');
   } finally {
     global.fetch = originals.fetch;
     Petition.find = originals.petitionFind;
@@ -1805,7 +1805,7 @@ test('ERP autofill keeps the LIS label production date instead of deriving it fr
   }
 });
 
-test('ERP autofill keeps the label withdrawal date over the closed MF date', async () => {
+test('ERP autofill ignores label withdrawal and closed MF dates without Lot Description', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1854,7 +1854,7 @@ test('ERP autofill keeps the label withdrawal date over the closed MF date', asy
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, 'B-CUSTOMER');
     assert.equal(res.body.sample.lotNo, 'LOT-CUSTOMER');
-    assert.equal(res.body.sample.productionDate, '2026-06-16');
+    assert.equal(res.body.sample.productionDate, '');
     assert.equal(res.body.dataSources.mf, true);
   } finally {
     global.fetch = originals.fetch;
@@ -1867,7 +1867,7 @@ test('ERP autofill keeps the label withdrawal date over the closed MF date', asy
   }
 });
 
-test('ERP autofill resolves the production batch from Density while retaining the FG lot', async () => {
+test('ERP autofill resolves the production batch but not a date without Lot Description', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1913,7 +1913,7 @@ test('ERP autofill resolves the production batch from Density while retaining th
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '526');
     assert.equal(res.body.sample.lotNo, 'FG260917-001');
-    assert.equal(res.body.sample.productionDate, '2026-09-17');
+    assert.equal(res.body.sample.productionDate, '');
     assert.equal(res.body.legacyMatch, null);
     assert.match(res.body.warnings.join(' '), /Density/);
   } finally {
@@ -1927,7 +1927,7 @@ test('ERP autofill resolves the production batch from Density while retaining th
   }
 });
 
-test('ERP autofill keeps ERP production date while using legacy appearance and density', async () => {
+test('ERP autofill ignores ERP date without Lot Description while using legacy results', async () => {
   const originals = {
     fetch: global.fetch,
     petitionFind: Petition.find,
@@ -1993,7 +1993,7 @@ test('ERP autofill keeps ERP production date while using legacy appearance and d
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.sample.batchNo, '20260430');
     assert.equal(res.body.sample.lotNo, 'FG260404-002');
-    assert.equal(res.body.sample.productionDate, '2026-04-04');
+    assert.equal(res.body.sample.productionDate, '');
     assert.equal(res.body.results.find((row) => row.testItem === 'Appearance').result, 'Conform');
     assert.equal(res.body.results.find((row) => row.testItem === '%AI content').result, '2.09 % W/V');
     assert.equal(res.body.results.find((row) => /Density/.test(row.testItem)).result, '0.946');

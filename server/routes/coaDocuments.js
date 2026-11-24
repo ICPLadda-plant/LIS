@@ -1133,6 +1133,7 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
       : source.sampleSnapshots?.[0] || {};
     const sampleSource = {
       ...source,
+      strictLotDescriptionDate: true,
       selectedItemSeqs: [Number(sourceSample.itemSeq)].filter(Number.isFinite),
       sampleSnapshots: [sourceSample],
     };
