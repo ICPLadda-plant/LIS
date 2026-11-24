@@ -922,7 +922,7 @@ async function requestedCoaRows({ petitionNo } = {}) {
 function shouldIncludeRequestedRows(query = {}) {
   if (query.needsApproval === '1') return false;
   if (query.coaNo) return false;
-  return !query.status || query.status === 'requested';
+  return query.includeLabPetitions === '1' && (!query.status || query.status === 'requested');
 }
 
 function sortCoaRows(items = []) {

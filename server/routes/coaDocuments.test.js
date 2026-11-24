@@ -13,6 +13,7 @@ const LabRequest = require('../models/LabRequest');
 const QCTestResult = require('../models/QCTestResult');
 const ResultDensity = require('../models/ResultDensity');
 const LegacyLabResult = require('../models/LegacyLabResult');
+const ExternalCoaRequestDismissal = require('../models/ExternalCoaRequestDismissal');
 const Parameter = require('../models/Parameter');
 const User = require('../models/User');
 const Role = require('../models/Role');
@@ -388,11 +389,12 @@ test('actorFromRequest accepts synthetic dev users when dev status is enabled', 
   }
 });
 
-test('GET / includes requested COA rows for Lab-approved petitions without COA documents', async () => {
+test('GET / excludes Lab sample petitions unless explicitly requested', async () => {
   const originals = {
     coaFind: CoaDocument.find,
     petitionFind: Petition.find,
     labRequestFind: LabRequest.find,
+    dismissalFind: ExternalCoaRequestDismissal.find,
     fetch: global.fetch,
   };
   try {
@@ -410,9 +412,15 @@ test('GET / includes requested COA rows for Lab-approved petitions without COA d
       reportCustomerName: 'Customer A',
       requester: { fullName: 'Requester Name', department: 'R&D', email: 'requester@example.com', phone: '1234' },
     }] });
+    ExternalCoaRequestDismissal.find = () => ({ select: () => ({ lean: async () => [] }) });
     global.fetch = async () => ({ ok: true, status: 200, text: async () => '[]', json: async () => [] });
 
-    const res = await invoke('/', 'get');
+    const hidden = await invoke('/', 'get');
+
+    assert.equal(hidden.statusCode, 200);
+    assert.equal(hidden.body.items.length, 0);
+
+    const res = await invoke('/', 'get', { query: { includeLabPetitions: '1' } });
 
     assert.equal(res.statusCode, 200);
     assert.equal(res.body.items.length, 1);
@@ -442,6 +450,7 @@ test('GET / includes requested COA rows for Lab-approved petitions without COA d
     CoaDocument.find = originals.coaFind;
     Petition.find = originals.petitionFind;
     LabRequest.find = originals.labRequestFind;
+    ExternalCoaRequestDismissal.find = originals.dismissalFind;
     global.fetch = originals.fetch;
   }
 });
