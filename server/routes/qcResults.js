@@ -390,6 +390,7 @@ router.put("/", serializePetitionWrite(async (req, res) => {
       enteredBy,
       overrideReason,
       phase, // 1 = Phase 1 (default), 2 = Phase 2 (after)
+      autoFilled, // true = หน้าเว็บเติมค่าประจำวัน/เลขที่ Standard ให้เอง ไม่ใช่คนกรอก
     } = req.body;
 
     if (!petitionId || itemSeq == null || !parameterId || !fieldLabel) {
@@ -435,15 +436,17 @@ router.put("/", serializePetitionWrite(async (req, res) => {
     const newRound = String(existing?.sampleRoundId || '') !== roundContext.sampleRoundId;
     if (existing) filter.sampleRoundId = existing.sampleRoundId || { $in: ['', null] };
     const isNew = !existing;
+    // ค่าที่ระบบเติมให้เองไม่นับเป็นผู้บันทึกผล — คนที่กรอกค่าจริงคนแรกจะได้ชื่อแทน
+    const isAutoFill = autoFilled === true;
 
     const baseSet = {
       petitionNo, sampleId, sampleName, commonName, parameterName,
-      updatedBy: enteredBy,
       updatedAt: now,
       sampleRoundId: roundContext.sampleRoundId,
     };
+    if (!isAutoFill) baseSet.updatedBy = enteredBy;
     if (newRound) Object.assign(baseSet, { values: {}, valuesPhase2: {}, entries: [], remark: '' });
-    if (isNew || newRound || !existing?.enteredBy) {
+    if (!isAutoFill && (isNew || newRound || !existing?.enteredBy)) {
       baseSet.enteredBy = enteredBy;
       baseSet.enteredAt = now;
     }
@@ -484,7 +487,7 @@ router.put("/", serializePetitionWrite(async (req, res) => {
         petitionId: petitionObjId,
         petitionNo,
         event: isClosed ? 'updated' : auditEvent,
-        actor: enteredBy?.name || enteredBy?.email || 'system',
+        actor: isAutoFill ? 'ระบบ (เติมค่าประจำวัน)' : (enteredBy?.name || enteredBy?.email || 'system'),
         note: isClosed ? `แก้ไขผลหลังปิดงาน: ${String(overrideReason).trim()} · ${qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName })}` : qcResultNote(auditEvent, { parameterName, parameterId, fieldLabel, sampleName }),
         metadata: { side: paramForCheck?.scope === 'lab' ? 'lab' : 'qc', itemSeq, sampleName, commonName, parameterId, parameterName, fieldLabel, phase: phaseNum, entryIndex, overrideReason: isClosed ? String(overrideReason).trim() : undefined, audience: isClosed ? 'qc' : undefined, recipientRoles: isClosed ? ['qc-head'] : undefined },
       }).catch((err) => {

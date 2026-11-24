@@ -392,6 +392,8 @@ export interface SaveQCResultPayload {
   // For multiEntry parameters — which entry row this field write targets.
   entryIndex?: number;
   enteredBy: { name: string; email: string };
+  // true = ระบบเติมค่าให้เอง (ค่าประจำวัน/เลขที่ Standard) — ไม่นับคนที่เปิดหน้าเป็นผู้บันทึกผล
+  autoFilled?: boolean;
   // 1 = Phase 1 (default, ค่าก่อน), 2 = Phase 2 retest values
   phase?: PetitionPhase;
   overrideReason?: string;

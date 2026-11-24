@@ -754,6 +754,7 @@ export default function LabTestingDetailPage() {
       fieldLabel: string,
       newVal: unknown,
       phase: PetitionPhase = 1,
+      options: { autoFilled?: boolean } = {},
     ) => {
       if (pendingDensity || pendingAdditionalSample(petition, 'lab') || additionalSampleOpen || submitting) return;
       if (phase === 2 && ((sampleRoundFor(petition, 'lab', item.seq) ?? petition).currentPhase ?? 1) === 1) return;
@@ -803,6 +804,7 @@ export default function LabTestingDetailPage() {
               email: user?.email ?? '',
             },
             phase,
+            ...(options.autoFilled ? { autoFilled: true } : {}),
           });
           const now = new Date();
           setStatesFn((prev) => ({
@@ -1585,7 +1587,7 @@ export default function LabTestingDetailPage() {
                             const renderEditUnit = (
                               unit: RenderFieldUnit,
                               srcValues: Record<string, unknown>,
-                              onUnitChange: (label: string, val: unknown) => void,
+                              onUnitChange: (label: string, val: unknown, options?: { autoFilled?: boolean }) => void,
                               saveInfoSrc: Record<string, FieldSaveInfo> | undefined,
                               scalarExtras: boolean,
                             ) => {
@@ -1697,7 +1699,7 @@ export default function LabTestingDetailPage() {
                                 const current = isQrValue ? fromQr : saved;
                                 const fill = current || (options.length === 1 ? options[0] : '');
                                 if (fill !== saved && (fill || isQrValue) && !fieldDisabled) {
-                                  queueMicrotask(() => onUnitChange(unit.key, fill));
+                                  queueMicrotask(() => onUnitChange(unit.key, fill, { autoFilled: true }));
                                 }
                                 return (
                                   <div key={unit.key} className={cn(aiGridClass(unit.field.label), 'space-y-1')}>
@@ -1807,7 +1809,7 @@ export default function LabTestingDetailPage() {
                             // Field-grid for one value-object (flat dict or one entry).
                             const renderEditGrid = (
                               srcValues: Record<string, unknown>,
-                              onUnitChange: (label: string, val: unknown) => void,
+                              onUnitChange: (label: string, val: unknown, options?: { autoFilled?: boolean }) => void,
                               saveInfoSrc: Record<string, FieldSaveInfo> | undefined,
                               scalarExtras: boolean,
                             ) => {
@@ -2029,7 +2031,7 @@ export default function LabTestingDetailPage() {
                               );
                             }
 
-                            const onScalarChange = (label: string, val: unknown) => handleFieldChange(petition, item, param, label, val, effectivePhase);
+                            const onScalarChange = (label: string, val: unknown, options?: { autoFilled?: boolean }) => handleFieldChange(petition, item, param, label, val, effectivePhase, options);
                             // PACLOBUTRAZOL แสดงช่อง Area Inj / Average / %RSD แบบไม่แยกสาร → ใช้ key เดียวกับที่แสดง
                             const pbzItem = isPaclobutrazolItem(item.commonName);
                             const aiUnitKeys = isAiParameterFields(param.valueFields ?? []) && !fieldDisabled

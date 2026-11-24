@@ -8,7 +8,7 @@ export const DAILY_CALIBRATION_LABELS = [CORRELATION_LABEL, MID_LEVEL_STANDARD_L
 type Props = {
   keys: string[];
   values: Record<string, unknown>;
-  onChange: (key: string, value: unknown) => void;
+  onChange: (key: string, value: unknown, options?: { autoFilled?: boolean }) => void;
   /** ชื่อสามัญของรายการ ใช้จับคู่ Area Inj กรณีช่องไม่ได้แยกตามสาร */
   commonName?: string;
   /** key ของ Area Average / Area %RSD ให้คำนวณต่อหลังเติม Area Inj */
@@ -17,6 +17,7 @@ type Props = {
 
 const baseLabel = (key: string) => key.split("::", 1)[0];
 const suffix = (key: string) => (key.includes("::") ? "::" + key.split("::")[1] : "");
+const AUTO = { autoFilled: true };
 
 /** ค่า r / Mid-level Standard / CCS Conc. / Area Inj.1-3: ครั้งแรกของวันกรอกเอง รายการหรือสารถัดไปใช้ค่าที่กรอกไว้แล้ววันนี้ */
 export function DailyCalibrationPrefill({ keys, values, onChange, commonName = "", areaDerivedKeys = [] }: Props) {
@@ -36,20 +37,20 @@ export function DailyCalibrationPrefill({ keys, values, onChange, commonName = "
         const value = candidates.map((name) => slot?.bySubstance?.[name]).find(Boolean) ?? (isArea ? undefined : slot?.any);
         if (!value) return false;
         next[key] = value;
-        onChange(key, value);
+        onChange(key, value, AUTO);
         return true;
       });
       // เติม Mid-level / CCS แล้วคำนวณ % Difference และผล CCS ต่อทันที
       new Set(filled.filter((key) => baseLabel(key) !== CORRELATION_LABEL && !AREA_LABELS.includes(baseLabel(key))).map(suffix)).forEach((sfx) => {
         const ccs = calculateCcsFromValues(next, sfx.slice(2));
-        onChange(CCS_DIFFERENCE_LABEL + sfx, ccs.difference == null ? "" : ccs.difference.toFixed(2));
-        onChange(CCS_RESULT_LABEL + sfx, ccs.result);
+        onChange(CCS_DIFFERENCE_LABEL + sfx, ccs.difference == null ? "" : ccs.difference.toFixed(2), AUTO);
+        onChange(CCS_RESULT_LABEL + sfx, ccs.result, AUTO);
       });
       // เติม Area Inj แล้วคำนวณ Area Average / %RSD ต่อทันที
       const areaSuffixes = new Set(filled.filter((key) => AREA_LABELS.includes(baseLabel(key))).map(suffix));
       areaDerivedKeys.filter(({ key }) => areaSuffixes.has(suffix(key))).forEach(({ key, kind }) => {
         const substance = aiSubstanceFromKey(key);
-        onChange(key, formatCalculatedAi(calculateAi(next, 1, substance)[kind]));
+        onChange(key, formatCalculatedAi(calculateAi(next, 1, substance)[kind]), AUTO);
       });
     }).catch(() => undefined);
   }, [keys, values, onChange, commonName, areaDerivedKeys]);

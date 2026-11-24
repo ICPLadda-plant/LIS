@@ -11,8 +11,9 @@ const petitionId = '507f1f77bcf86cd799439011';
 const parameterId = '507f1f77bcf86cd799439012';
 
 // PUT /qc-results บนใบหลัก (ไม่มีรอบตัวอย่างเพิ่ม) — mock ทุก model ไม่แตะ DB จริง
-async function put(context, petition, phase) {
+async function put(context, petition, phase, extraBody = {}) {
   const writes = [];
+  const audits = [];
   context.mock.method(User, 'findOne', () => ({ lean: async () => null }));
   context.mock.method(Petition, 'findById', () => ({ lean: async () => ({
     _id: petitionId, petitionNo: 'P-1', status: 'inProgress', items: [{ seq: 1 }],
@@ -26,16 +27,33 @@ async function put(context, petition, phase) {
     writes.push(update);
     return update.$set;
   });
-  context.mock.method(PetitionAuditLog, 'create', async (entry) => entry);
+  context.mock.method(PetitionAuditLog, 'create', async (entry) => { audits.push(entry); return entry; });
 
   const layer = qcResults.stack.find((entry) => entry.route?.path === '/' && entry.route.methods.put);
   const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
   await layer.route.stack[0].handle({
-    body: { petitionId, petitionNo: 'P-1', itemSeq: 1, parameterId, parameterName: 'กายภาพ', fieldLabel: 'สี', value: 'แดง', phase },
+    body: { petitionId, petitionNo: 'P-1', itemSeq: 1, parameterId, parameterName: 'กายภาพ', fieldLabel: 'สี', value: 'แดง', phase, ...extraBody },
     headers: {}, ip: '10.0.0.5', get: () => undefined,
   }, res);
-  return { res, writes };
+  return { res, writes, audits };
 }
+
+test('ค่าที่ระบบเติมให้เอง (ค่าประจำวัน) ไม่บันทึกคนที่เปิดหน้าเป็นผู้บันทึกผล', async (context) => {
+  const viewer = { name: 'คนเปิดหน้า', email: 'viewer@x' };
+  const { res, writes, audits } = await put(context, { currentPhase: 1 }, 1, { enteredBy: viewer, autoFilled: true });
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  assert.equal(writes[0].$set.enteredBy, undefined);
+  assert.equal(writes[0].$set.updatedBy, undefined);
+  assert.deepEqual(writes[0].$set.values, { 'สี': 'แดง' });
+  assert.notEqual(audits[0].actor, viewer.name);
+});
+
+test('ค่าที่คนกรอกเองยังบันทึกชื่อผู้บันทึกผลตามเดิม', async (context) => {
+  const tester = { name: 'ผู้ทดสอบ', email: 'tester@x' };
+  const { writes } = await put(context, { currentPhase: 1 }, 1, { enteredBy: tester });
+  assert.deepEqual(writes[0].$set.enteredBy, tester);
+  assert.deepEqual(writes[0].$set.updatedBy, tester);
+});
 
 test('บันทึก Phase 2 ของใบหลักที่ยังอยู่ Phase 1 ไม่ได้ (409) และไม่เขียนผล', async (context) => {
   const { res, writes } = await put(context, { currentPhase: 1, phase2DueAt: null }, 2);
