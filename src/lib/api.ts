@@ -1068,8 +1068,10 @@ export const api = {
   getEligibleCoaPetitions: () => request<{ items: EligibleCoaPetition[] }>("/coa-documents/eligible-petitions"),
   createErpManualCoaDocument: (body: ManualCoaInput) =>
     request<CoaDocument>("/coa-documents/erp-manual", { method: "POST", body: JSON.stringify(body) }),
-  getErpCoaAutofill: (externalRequestId: string) =>
-    request<CoaErpAutofill>(`/coa-documents/erp-autofill/${encodeURIComponent(externalRequestId)}`),
+  getErpCoaAutofill: (externalRequestId: string, itemSeq?: number) => {
+    const query = Number.isFinite(itemSeq) ? `?itemSeq=${encodeURIComponent(String(itemSeq))}` : "";
+    return request<CoaErpAutofill>(`/coa-documents/erp-autofill/${encodeURIComponent(externalRequestId)}${query}`);
+  },
   getCoaLabAiByBatch: (params: { batchNo: string; commonName: string; sampleName?: string }) => {
     const query = new URLSearchParams({ batchNo: params.batchNo, commonName: params.commonName });
     if (params.sampleName) query.set("sampleName", params.sampleName);

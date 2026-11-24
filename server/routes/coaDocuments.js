@@ -1105,7 +1105,15 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     const source = requests.find((row) => row._id === externalRequestId);
     if (!source) throw errorWithStatus('ไม่พบคำขอ COA จาก ERP กรุณาโหลดรายการใหม่', 404);
 
-    const sourceSample = source.sampleSnapshots?.[0] || {};
+    const requestedItemSeq = Number(req.query?.itemSeq);
+    const sourceSample = Number.isFinite(requestedItemSeq)
+      ? source.sampleSnapshots?.find((sample) => Number(sample.itemSeq) === requestedItemSeq) || source.sampleSnapshots?.[0] || {}
+      : source.sampleSnapshots?.[0] || {};
+    const sampleSource = {
+      ...source,
+      selectedItemSeqs: [Number(sourceSample.itemSeq)].filter(Number.isFinite),
+      sampleSnapshots: [sourceSample],
+    };
     const petitionMatchClauses = [];
     if (source.externalCoaRequest?.itemNo) {
       petitionMatchClauses.push({
@@ -1149,10 +1157,10 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         : Promise.resolve([]),
       LegacyLabResult.find({}).lean(),
     ]);
-    const requestMatch = findBestRequestItem(petitions, source, labRequests);
-    const coaHistoryMatch = findBestCoaHistorySample(coaHistory, source);
+    const requestMatch = findBestRequestItem(petitions, sampleSource, labRequests);
+    const coaHistoryMatch = findBestCoaHistorySample(coaHistory, sampleSource);
     const sourceData = sampleFromSources(
-      source,
+      sampleSource,
       references.stockRows,
       references.mfRows,
       requestMatch?.item || coaHistoryMatch?.sample,
@@ -1167,9 +1175,9 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
     let legacyLookupSample = authoritativeBatch
       ? sample
       : { ...sample, batchNo: '', lotNo: '' };
-    let legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+    let legacyMatch = findBestLegacyLabResult(legacyLabRows, sampleSource, legacyLookupSample);
     const legacyHistoryMatch = authoritativeBatch
-      ? findBestLegacyLabResult(legacyLabRows, source, { ...sample, batchNo: '', lotNo: '' })
+      ? findBestLegacyLabResult(legacyLabRows, sampleSource, { ...sample, batchNo: '', lotNo: '' })
       : legacyMatch;
     let densityBatchMatch = null;
     let densityIdentityRows = [];
@@ -1179,12 +1187,12 @@ router.get('/erp-autofill/:externalRequestId', async (req, res) => {
         const pattern = new RegExp(`^${escapeRegex(family)}-\\d+(?:-P\\d+)?$`, 'i');
         densityIdentityRows = await ResultDensity.find({ 'Sample name': pattern })
           .sort({ _id: -1 }).limit(5000).lean();
-        densityBatchMatch = findBestDensityBatch(densityIdentityRows, source, legacyHistoryMatch.batchNo);
+        densityBatchMatch = findBestDensityBatch(densityIdentityRows, sampleSource, legacyHistoryMatch.batchNo);
         if (densityBatchMatch) {
           sample.batchNo = densityBatchMatch.batchNo;
           authoritativeBatch = densityBatchMatch.batchNo;
           legacyLookupSample = sample;
-          legacyMatch = findBestLegacyLabResult(legacyLabRows, source, legacyLookupSample);
+          legacyMatch = findBestLegacyLabResult(legacyLabRows, sampleSource, legacyLookupSample);
         }
       }
     }

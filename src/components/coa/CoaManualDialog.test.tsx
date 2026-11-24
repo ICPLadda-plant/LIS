@@ -23,6 +23,29 @@ describe("CoaManualDialog", () => {
     vi.clearAllMocks();
   });
 
+  it("ดึงผล Lab แยกตาม itemSeq ให้ครบทุกใบในคำขอเดียว", async () => {
+    vi.mocked(api.getErpCoaAutofill).mockImplementation(async (_id, itemSeq) => ({
+      externalRequestId: "request-multi", source: {},
+      sample: { itemSeq: itemSeq || 1, sampleName: `Trade ${itemSeq}`, commonName: "PRODUCT 10% SL", batchNo: `B-${itemSeq}`, productionDate: "2026-11-19" },
+      results: [{ itemSeq: itemSeq || 1, testItem: "%AI content (W/V)", result: itemSeq === 2 ? "10.20%" : "10.10%", criteria: "10% ± 0.50" }],
+      match: null, candidates: [], stockCandidates: [], mfCandidates: [],
+      form: { template: "liquid", aiCriteria: "10% ± 0.50", needsDensity: true }, warnings: [],
+      dataSources: { erp: true, stock: false, mf: false, lab: true, density: false },
+    }));
+    const request = {
+      _id: "request-multi", sourceType: "erp", externalRequestId: "request-multi", revision: 0, status: "requested", petitionId: "", petitionNoSnapshot: "SO-MULTI", selectedItemSeqs: [1, 2],
+      sampleSnapshots: [1, 2].map((itemSeq) => ({ itemSeq, sampleName: `Trade ${itemSeq}`, commonName: "PRODUCT 10% SL" })), resultSnapshots: [],
+    } as CoaDocument;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(<QueryClientProvider client={client}><CoaManualDialog open onOpenChange={vi.fn()} request={request} onSaved={vi.fn()} /></QueryClientProvider>);
+
+    await waitFor(() => expect(api.getErpCoaAutofill).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/V) *")).toHaveValue("10.10%"));
+    fireEvent.click(screen.getByRole("button", { name: "B-2" }));
+    await waitFor(() => expect(screen.getByLabelText("%AI content (W/V) *")).toHaveValue("10.20%"));
+  });
+
   it("uses the plus-minus criterion from the common name instead of a legacy range", async () => {
     const request = {
       _id: "manual-coa-criteria",

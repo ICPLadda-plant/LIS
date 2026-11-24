@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
@@ -66,11 +66,22 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
   const [forms, setForms] = useState<Record<number, ResultForm>>({});
   const [step, setStep] = useState(0);
   const [remark, setRemark] = useState("");
+  const appliedAutofills = useRef(new WeakSet<object>());
   const active = samples[step];
   const review = step === samples.length;
   const form = active ? forms[active.itemSeq] || emptyResultForm() : emptyResultForm();
 
-  const autofill = useQuery({ queryKey: ["coa", "erp-autofill", request.externalRequestId || request._id], queryFn: () => api.getErpCoaAutofill(request.externalRequestId || request._id), enabled: open && !editing });
+  const autofillTargets = request.sampleSnapshots.length
+    ? request.sampleSnapshots
+    : [{ itemSeq: request.selectedItemSeqs[0] || 1 }];
+  const autofills = useQueries({
+    queries: autofillTargets.map((sample) => ({
+      queryKey: ["coa", "erp-autofill", request.externalRequestId || request._id, sample.itemSeq],
+      queryFn: () => api.getErpCoaAutofill(request.externalRequestId || request._id, sample.itemSeq),
+      enabled: open && !editing,
+    })),
+    combine: (results) => ({ data: results.flatMap((result) => result.data ? [result.data] : []), isFetching: results.some((result) => result.isFetching) }),
+  });
   const labAi = useQuery({
     queryKey: ["coa", "lab-ai-lookup", active?.batchNo, active?.commonName, active?.sampleName],
     queryFn: () => api.getCoaLabAiByBatch({ batchNo: active?.batchNo || "", commonName: active?.commonName || "", sampleName: active?.sampleName }),
@@ -94,14 +105,24 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
     const initial = (request.sampleSnapshots.length ? request.sampleSnapshots : [{ itemSeq: request.selectedItemSeqs[0] || 1 }]).map((sample) => ({ ...sample, productionDate: productionDateForSample(sample) }));
     setSamples(initial);
     setForms(Object.fromEntries(initial.map((sample) => [sample.itemSeq, formFromRows(request.resultSnapshots.filter((row) => row.itemSeq === sample.itemSeq), sample.commonName)])));
+    appliedAutofills.current = new WeakSet<object>();
     setStep(0); setRemark(request.remark || ""); save.reset();
   }, [open, request]);
 
   useEffect(() => {
-    if (!autofill.data || editing) return;
-    setSamples((current) => current.map((sample, index) => index ? sample : { ...sample, ...autofill.data.sample, productionDate: productionDateForSample({ ...sample, ...autofill.data.sample }) }));
-    setForms((current) => ({ ...current, [autofill.data.sample.itemSeq]: formFromRows(autofill.data.results, autofill.data.sample.commonName) }));
-  }, [autofill.data, editing]);
+    if (!autofills.data.length || editing) return;
+    const pending = autofills.data.filter((data) => !appliedAutofills.current.has(data));
+    if (!pending.length) return;
+    pending.forEach((data) => appliedAutofills.current.add(data));
+    setSamples((current) => current.map((sample) => {
+      const data = pending.find((entry) => entry.sample.itemSeq === sample.itemSeq);
+      return data ? { ...sample, ...data.sample, productionDate: productionDateForSample({ ...sample, ...data.sample }) } : sample;
+    }));
+    setForms((current) => Object.fromEntries([
+      ...Object.entries(current),
+      ...pending.map((data) => [data.sample.itemSeq, formFromRows(data.results, data.sample.commonName)]),
+    ]));
+  }, [autofills.data, editing]);
 
   useEffect(() => {
     if (!active || !labAi.data?.ai) return;
@@ -127,7 +148,7 @@ export default function CoaManualDialog({ open, onOpenChange, request, onSaved }
     </div>
     {!review && active && <div className="space-y-4">
       <div className="flex items-center justify-between rounded-lg border bg-muted/50 px-3 py-2 text-sm"><span className="font-semibold">Batch {step + 1} จาก {samples.length}</span><span className="text-muted-foreground">{active.batchNo || "ยังไม่ระบุ Batch"}</span></div>
-      {autofill.isFetching && step === 0 && <p className="text-sm text-muted-foreground">กำลังดึงข้อมูล ERP, MF, Stock และผล Lab...</p>}
+      {autofills.isFetching && <p className="text-sm text-muted-foreground">กำลังดึงข้อมูล ERP, MF, Stock และผล Lab...</p>}
       <div className="grid gap-3 sm:grid-cols-2">{([[
         "sampleName", "ชื่อการค้า *", "text"], ["commonName", "ชื่อสามัญ *", "text"], ["batchNo", "Batch No. *", "text"], ["productionDate", "วันที่ผลิต *", "date"], ["lotNo", "Lot No.", "text"], ["manufacturer", "ผู้ผลิต", "text"],
       ] as Array<[keyof CoaSampleSnapshot, string, string]>).map(([key, label, type]) => <div key={key} className="space-y-1"><Label htmlFor={`manual-${active.itemSeq}-${key}`}>{label}</Label><Input id={`manual-${active.itemSeq}-${key}`} type={type} value={String(active[key] || "")} onChange={(event) => updateSample(key, event.target.value)} /></div>)}</div>
