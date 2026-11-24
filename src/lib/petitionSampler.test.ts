@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatSampleLabelDocumentNumber, itemSubmissionNoText, labelManufacturerName, labelSampledByName, presetDelivererFor, serviceRequestSubmissionNo } from "./petitionSampler";
+import { formatSampleLabelDocumentNumber, itemSubmissionNoText, labLabelNumbersForItems, labelManufacturerName, labelSampledByName, presetDelivererFor, serviceRequestSubmissionNo } from "./petitionSampler";
 
 describe("itemSubmissionNoText", () => {
   const grouped = {
@@ -15,6 +15,26 @@ describe("itemSubmissionNoText", () => {
   it("รายงาน LAB ใช้เลข L ก่อน และคงเลขที่ผู้ใช้กรอกเอง", () => {
     expect(itemSubmissionNoText(grouped, { submissionNo: "", batchNo: "001" }, "lab")).toBe("L01/69");
     expect(itemSubmissionNoText(grouped, { submissionNo: "TA-999", batchNo: "001" }, "lab")).toBe("TA-999");
+  });
+});
+
+describe("labLabelNumbersForItems", () => {
+  it("คืนเลข L ของรายการ Lab โดยไม่ซ้ำ", () => {
+    const petition = {
+      sampleLabelNumbers: {
+        year: 2569,
+        groups: [
+          { key: "B1|", lab: "L01" },
+          { key: "B2|", lab: "L02" },
+        ],
+      },
+    };
+
+    expect(labLabelNumbersForItems(petition, [
+      { batchNo: "B1" },
+      { batchNo: "B1" },
+      { batchNo: "B2" },
+    ])).toEqual(["L01/69", "L02/69"]);
   });
 });
 

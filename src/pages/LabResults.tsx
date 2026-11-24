@@ -7,6 +7,7 @@ import { rankSearchResults } from "@/lib/searchRanking";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import type { Petition } from "@/types/petition.types";
 import { fullThaiTitle } from "@/lib/labReport";
+import { labLabelNumbersForItems } from "@/lib/petitionSampler";
 
 const resultItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
@@ -24,7 +25,7 @@ export default function LabResults() {
     if (!q) return items;
     const matches = items.filter((p) => {
       const sampleText = resultItems(p).map((item) => `${item.sampleName} ${item.commonName ?? ""} ${item.batchNo} ${item.sampleId}`).join(" ");
-      return `${p.petitionNo} ${p.submittedBy?.name ?? ""} ${p.labCompletedBy ?? p.assignedTo?.name ?? ""} ${sampleText}`.toLowerCase().includes(q);
+      return `${p.petitionNo} ${labLabelNumbersForItems(p, resultItems(p)).join(" ")} ${p.submittedBy?.name ?? ""} ${p.labCompletedBy ?? p.assignedTo?.name ?? ""} ${sampleText}`.toLowerCase().includes(q);
     });
     return rankSearchResults(matches, search, (petition) => {
       const itemNos = (petition.items ?? []).map((item) => item.itemNo).filter((itemNo) => itemNo?.trim());
@@ -77,7 +78,7 @@ export default function LabResults() {
                   onClick={() => navigate(`/lab-results/${p._id}`)}
                   className="cursor-pointer border-t border-border hover:bg-accent/60"
                 >
-                  <td className="px-3 py-2 font-medium">{p.petitionNo}</td>
+                  <td className="px-3 py-2 font-medium">{labLabelNumbersForItems(p, resultItems(p)).join(", ") || "-"}</td>
                   <td className="px-3 py-2 align-top">
                     <div className="space-y-2">
                       {resultItems(p).map((item) => (

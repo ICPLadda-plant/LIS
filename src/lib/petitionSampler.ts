@@ -119,6 +119,13 @@ export function itemSampleLabelNumbers(
     .map((side) => source[side]).filter(Boolean).map((seq) => `${seq}/${year}`);
 }
 
+export function labLabelNumbersForItems(
+  petition: Pick<Petition, "sampleLabelNumbers">,
+  items: SampleLabelGroupItem[],
+): string[] {
+  return [...new Set(items.flatMap((item) => itemSampleLabelNumbers(petition, item, ["lab"])))];
+}
+
 function legacyItemLabelSides(petition: Pick<Petition, "sampleLabelNumbers">, item: SampleLabelGroupItem): Set<SampleLabelSide> | null {
   const full = petition as Petition;
   const raw = item as Petition["items"][number];

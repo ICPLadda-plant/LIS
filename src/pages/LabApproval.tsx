@@ -16,6 +16,7 @@ import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import { fullThaiTitle } from "@/lib/labReport";
+import { labLabelNumbersForItems } from "@/lib/petitionSampler";
 
 export const labApprovalItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
@@ -99,7 +100,7 @@ const LabApproval = () => {
       cell: (p) => (
         <div>
           <div className="flex items-center gap-1.5">
-            <span>{p.petitionNo}</span>
+            <span>{labLabelNumbersForItems(p, labApprovalItems(p)).join(", ") || "-"}</span>
             <UrgentBadge petition={p} />
             {returnedMap[p._id] && (
               <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
