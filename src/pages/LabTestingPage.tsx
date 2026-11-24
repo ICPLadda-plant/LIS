@@ -40,6 +40,7 @@ import { isLabAwaitingSgConfirmation } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
+import { itemSubmissionNoText } from '@/lib/petitionSampler';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
 const LAB_PAGE_SIZE = 50;
@@ -256,6 +257,10 @@ export default function LabTestingPage() {
             <div className="text-xs text-grey-500 mt-0.5">
               โดย {p.submittedBy?.name ?? '-'} จาก {petitionDepartmentLabel(p)}
             </div>
+            {(() => {
+              const nos = [...new Set(labItems.map((item) => itemSubmissionNoText(p, item, 'lab')).filter(Boolean))];
+              return nos.length ? <div className="text-xs text-grey-500 mt-0.5">ใบนำส่ง {nos.join(', ')}</div> : null;
+            })()}
             <div className="text-xs text-grey-500 mt-0.5">{labItems.length} รายการ Lab</div>
             {labReceivedBy(p) && (
               <div className="text-xs text-grey-400 mt-0.5">รับโดย {labReceivedBy(p)}</div>
