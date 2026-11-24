@@ -83,7 +83,8 @@ function numericCriteriaParts(text: string): string[] {
         .replace(/[^\d.,+–—<>≤≥=±%\s-]/gu, " ")
         .replace(/\s*([-–—])\s*/g, "$1")
         .replace(/\s+/g, " ")
-        .trim(),
+        .trim()
+        .replace(/\d+(?:[.,]\d+)?/g, (value) => Number(value.replace(",", ".")).toFixed(2)),
     )
     .filter((part) => /\d/.test(part));
 }
@@ -117,11 +118,11 @@ function methodForRow(label: string, parameterName: string, commonName?: string)
   return DASH;
 }
 
-function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string): LabReportRow[] {
+function rowsForItem(group: ApprovalItemGroup | undefined, sampleName?: string): LabReportRow[] {
   if (!group) return [];
   const out: LabReportRow[] = [];
   // PACLOBUTRAZOL ใช้แค่ Sample 1/2 (Internal standard) — ไม่แสดงแถว Sample 3
-  const isPbz = isPaclobutrazolItem(commonName || group.commonName);
+  const isPbz = isPaclobutrazolItem(sampleName || group.commonName);
   group.params
     .filter((p) => p.scope === "lab" || /ถ\.?\s*พ|density/i.test(p.parameterName))
     .forEach((p) => {
@@ -132,22 +133,22 @@ function rowsForItem(group: ApprovalItemGroup | undefined, commonName?: string):
           testItem: `${r.label}${unit}`,
           result: r.value ? formatLabResultText(r.value) : DASH,
           criteria: r.standardText ? labReportCriteriaText(r.standardText) : DASH,
-          method: methodForRow(r.label, p.parameterName, commonName || group.commonName),
+          method: methodForRow(r.label, p.parameterName, sampleName || group.commonName),
         });
       });
     });
-  return mergeDensityAndUnit(out, commonName || group.commonName);
+  return mergeDensityAndUnit(out).map((row) => ({ ...row, testItem: sampleName || group.commonName || DASH }));
 }
 
-// ใส่หน่วย %W/W|%W/V ตามชื่อตัวอย่าง และย้าย Density ไปบรรทัดใต้ค่า %AI
-function mergeDensityAndUnit(rows: LabReportRow[], name?: string): LabReportRow[] {
-  const unit = /W\s*\/\s*V/i.test(name || "") ? "% W/V" : /W\s*\/\s*W/i.test(name || "") ? "% W/W" : "";
+// มี Density จึงรายงาน % W/V; ถ้าไม่มีให้รายงานค่าฐานน้ำหนัก % W/W
+function mergeDensityAndUnit(rows: LabReportRow[]): LabReportRow[] {
   const isDensity = (r: LabReportRow) => /ถพ|density/i.test(r.testItem);
-  const ai = rows.find((r) => AI_CONTENT_PATTERN.test(r.testItem) && !isDensity(r));
+  const ai = rows.find((r) => (AI_CONTENT_PATTERN.test(r.testItem) || r.method !== DASH) && !isDensity(r));
   const den = rows.find(isDensity);
+  const unit = den?.result && den.result !== DASH ? "% W/V" : "% W/W";
   const out = rows.filter((r) => !(ai && den && r === den));
   if (ai) {
-    if (unit) { ai.testItem = ai.testItem.replace(/\(\s*%\s*\)\s*$/, `(${unit})`); if (ai.result !== DASH) ai.result += ` ${unit}`; }
+    if (ai.result !== DASH) ai.result += ` ${unit}`;
     if (den && den.result !== DASH) ai.result += `\nDensity : ${Number.isFinite(Number(den.result)) ? Number(den.result).toFixed(3) : den.result}`;
   }
   return out;
@@ -221,7 +222,7 @@ export function buildLabReportPages(
         reportedDate: reportedDate || "",
         condition: physicalDescription(group) || conditionText(item.condition),
       },
-      rows: rowsForItem(group, item.commonName),
+      rows: rowsForItem(group, item.commonName || item.sampleName),
       analystName,
       labHeadName,
       remark: petition.conclusionNote || "",
