@@ -15,7 +15,7 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-box { position: relative; margin-top: 2.8mm; padding: 2.2mm 3mm 1.4mm; border: 0.8pt solid #000; border-radius: 2mm; }
 .ca-tag { position: absolute; top: -2.6mm; left: 4mm; padding: 0 2mm; background: #fff; font-weight: 700; }
 .ca-line { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 2mm; row-gap: 0.6mm; margin-top: 0.8mm; }
-.ca-field { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 1mm; max-width: 100%; }
+.ca-field { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 1mm; min-width: 0; max-width: 100%; }
 .ca-grow { flex: 1 1 45mm; }
 .ca-label { white-space: nowrap; }
 .ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 5mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; }
@@ -25,8 +25,9 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 13pt !important; overflow-wrap: normal; }
 .ca-tbl td.ca-cell { font-size: 12pt !important; overflow-wrap: anywhere; word-break: normal; }
 .ca-tbl td.ca-cell-long { font-size: 10pt !important; line-height: 1.05 !important; }
-.ca-sign { display: flex; align-items: flex-end; justify-content: flex-end; gap: 1.5mm; margin-top: 1.8mm; white-space: nowrap; }
-.ca-sign .ca-val { flex: 0 0 48mm; text-align: center; }
+.ca-sign { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 1.5mm; margin-top: 1.8mm; text-align: center; }
+.ca-sign .ca-val { flex: 0 1 48mm; min-width: 26mm; text-align: center; }
+.ca-sign > span { min-width: 0; overflow-wrap: anywhere; }
 .ca-cb { display: inline-block; width: 3.4mm; height: 3.4mm; margin-right: 1.5mm; border: 0.8pt solid #000; vertical-align: -0.6mm; text-align: center; line-height: 3mm; font-weight: 700; }
 .ca-note { margin-top: 1mm; }
 .ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: right; font-size: 13pt !important; }

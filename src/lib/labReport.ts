@@ -47,6 +47,10 @@ function cleanText(value?: string | null): string {
   return value?.trim() || "";
 }
 
+function fullThaiTitle(value?: string | null): string {
+  return cleanText(value).replace(/^น\.?\s*ส\.?\s*/, "นางสาว");
+}
+
 export function buddhistDate(iso?: string | null): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -184,8 +188,8 @@ export function buildLabReportPages(
 
   const reportedDate = buddhistDate(petition.labApprovedAt);
   // ผู้วิเคราะห์: คนที่กดเสร็จ ถ้ายังไม่เสร็จใช้คนที่ได้รับ assign
-  const analystName = petition.labCompletedBy || petition.assignedTo?.name || DASH;
-  const labHeadName = petition.labApprovedBy || DASH;
+  const analystName = fullThaiTitle(petition.assignedTo?.name || petition.labCompletedBy) || DASH;
+  const labHeadName = fullThaiTitle(petition.labApprovedBy) || DASH;
 
   return (petition.items ?? []).map((item) => {
     const lr = labRequestForItem(item, labRequests);

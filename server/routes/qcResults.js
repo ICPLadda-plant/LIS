@@ -273,6 +273,7 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
   try {
     const STD1 = "PBZ Std 1 wt/mg";
     const STD2 = "PBZ Std 2 wt/mg";
+    const commonName = String(req.query.commonName || "").trim();
     const excludePetitionId = String(req.query.excludePetitionId || "").trim();
     const filter = { $or: [{ [`values.${STD1}`]: { $nin: [null, ""] } }, { [`values.${STD2}`]: { $nin: [null, ""] } }] };
     if (mongoose.isValidObjectId(excludePetitionId)) filter.petitionId = { $ne: excludePetitionId };
@@ -287,6 +288,7 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
     const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
     const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
     const isFilter = { updatedAt: { $gte: dayStart }, $or: IS_KEYS.map((k) => ({ [`values.${k}`]: { $nin: [null, ""] } })) };
+    if (commonName) isFilter.commonName = commonName;
     if (filter.petitionId) isFilter.petitionId = filter.petitionId;
     const isDocs = await QCTestResult.find(isFilter).sort({ updatedAt: -1 }).select("values").limit(50).lean();
     // เลือกค่าล่าสุดของวันนี้แยกทีละช่อง

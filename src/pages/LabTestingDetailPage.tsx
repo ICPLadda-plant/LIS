@@ -965,7 +965,7 @@ export default function LabTestingDetailPage() {
     buildLabReportPages(petition, [], calculationGroups),
     calculationGroups,
     (seq) => resolveSpecificGravity(liveResults, seq, findSgParameter(allParameters)) || resolveSpecificGravity(savedResults, seq, findSgParameter(allParameters)) || anySg(liveResults, seq) || anySg(savedResults, seq),
-  ).map((page) => ({ ...page, analystName: name(page.analystName) || user?.name || '', labHeadName: name(page.labHeadName) || 'นุชจรินทร์ ดวงเนตร' })).filter(hasCalculationFields);
+  ).map((page) => ({ ...page, analystName: name(page.analystName) || user?.name || '', labHeadName: name(page.labHeadName) || 'นางสาวนุชจรินทร์ ดวงเนตร' })).filter(hasCalculationFields);
   const hasLabOwnedParams = paramsLoaded && labItems.some((item) =>
     matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((param) => param.scope === 'lab'),
   );
@@ -1843,15 +1843,16 @@ export default function LabTestingDetailPage() {
                                     });
                                   });
                                 };
+                                const aiOnly = (field: ParameterValueField) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai';
+                                const pbzAiFields = fields.filter(aiOnly);
                                 return (
                                   <div className="space-y-4 pl-2">
-                                    {/* แยกกล่องสีเหมือนสารอื่น: Standard / Area Injection / CCS / ผลวิเคราะห์ แล้วจึงตามด้วยตาราง */}
+                                    {/* แยกกล่องสีเหมือนสารอื่น โดยผลวิเคราะห์อยู่ใต้ตาราง Internal standard */}
                                     {(() => {
-                                      const aiOnly = (field: ParameterValueField) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai';
                                       const shown = fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label) || isPbzAreaFieldLabel(field.label)) && !aiOnly(field));
                                       const knownLabels = new Set<string>(AI_FIELD_SECTIONS.flatMap((section) => [...section.labels]));
                                       return [
-                                        ...AI_FIELD_SECTIONS.map((section) => ({ ...section, fields: section.title === 'ผลวิเคราะห์' ? fields.filter(aiOnly) : shown.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
+                                        ...AI_FIELD_SECTIONS.filter((section) => section.title !== 'ผลวิเคราะห์').map((section) => ({ ...section, fields: shown.filter((field) => (section.labels as readonly string[]).includes(field.label)) })),
                                         { title: 'ข้อมูลเพิ่มเติม', labels: [], className: 'border-border bg-card', fields: shown.filter((field) => !knownLabels.has(field.label)) },
                                       ].filter((section) => section.fields.length > 0).map((section) => (
                                         <section key={section.title} className={cn('space-y-3 rounded-lg border p-3', section.className)}>
@@ -1874,6 +1875,12 @@ export default function LabTestingDetailPage() {
                                         formula: /\d+(?:\.\d+)?\s*%\s*[A-Z]{2,3}\b/i.exec(String(item.sampleName ?? ''))?.[0],
                                       }}
                                     />
+                                    {pbzAiFields.length > 0 && (
+                                      <section className="space-y-3 rounded-lg border border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 p-3 shadow-sm dark:bg-teal-950/60">
+                                        <h4 className="text-base font-semibold text-foreground">ผลวิเคราะห์</h4>
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">{pbzAiFields.map(renderField)}</div>
+                                      </section>
+                                    )}
                                   </div>
                                 );
                               }

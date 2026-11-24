@@ -151,7 +151,7 @@ export function PaclobutrazolSheet({ values, density = null, header, analyst }: 
 
       <div className="space-y-2">
         {summaryRow("Average", pbzFixed(calc.average, 4), "% W/W")}
-        {summaryRow("Density", density != null ? String(density) : "", <>g/cm<sup>3</sup></>)}
+        {summaryRow("Density", density != null ? density.toFixed(3) : "", <>g/cm<sup>3</sup></>)}
         {summaryRow("Report", pbzFixed(calc.report, 2), "% W/V")}
         {summaryRow("Date", new Date().toLocaleDateString("th-TH"), null)}
         {summaryRow("Analyst", analyst ?? "", null)}

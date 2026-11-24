@@ -951,8 +951,8 @@ export const api = {
     const qs = new URLSearchParams({ commonName, parameterId, excludePetitionId }).toString();
     return request<{ petitionNo?: string; enteredAt?: string; values?: Record<string, unknown> }>(`/qc-results/last-values?${qs}`);
   },
-  getPaclobutrazolStdWeights: (excludePetitionId: string) => {
-    const qs = new URLSearchParams({ excludePetitionId }).toString();
+  getPaclobutrazolStdWeights: (excludePetitionId: string, commonName: string) => {
+    const qs = new URLSearchParams({ excludePetitionId, commonName }).toString();
     return request<{ std1?: string; std2?: string; stdPct?: string; petitionNo?: string; enteredAt?: string; internalStd?: Record<string, string> }>(`/qc-results/paclobutrazol-std-weights?${qs}`);
   },
   getDailyCalibration: () =>
