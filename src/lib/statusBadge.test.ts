@@ -68,7 +68,7 @@ describe("petitionStatusBadge", () => {
       qcCompletedAt: "2026-07-02",
       labCompletedAt: "2026-07-02",
     } as Petition);
-    expect(b.label).toBe("รอตรวจ");
+    expect(b.label).toBe("รอออกผล");
     expect(b.variant).toBe("yellow-soft");
   });
 

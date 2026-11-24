@@ -51,7 +51,7 @@ export function petitionStatusBadge(petition: Petition): StatusBadge {
   // สาขา qcCompletedAt ด้านล่าง ไม่งั้นจะถูกกลืนเป็น "รอส่วนอื่น" ทั้งที่ Lab ตรวจครบแล้ว
   // (เช่น P-2606-0018: qcCompletedAt + labCompletedAt แต่ยังไม่ labApprovedAt)
   if (hasQc && petition.qcCompletedAt && petition.labCompletedAt && !petition.labApprovedAt) {
-    return toneBadge("warning", "รอตรวจ");
+    return toneBadge("warning", "รอออกผล");
   }
   if (hasQc && petition.qcCompletedAt) return toneBadge("warning", "QC ตรวจครบ · รอส่วนอื่น");
   if (petition.labApprovedAt) return toneBadge("warning", hasQc ? "ผล Lab ออกแล้ว · รอ QC" : "ผล Lab ออกแล้ว · รอ Final Result");
