@@ -12,7 +12,7 @@ import { useItemGroupMembership } from "@/hooks/useItemGroupMembership";
 import { buildApprovalGroups } from "@/lib/qcApprovalRows";
 import { buildLabResultReportPages } from "@/lib/labResultReport";
 import { buildLabCalculationPages } from "@/lib/labCalculation";
-import { findSgParameter, resolveSpecificGravity } from "@/lib/formSpecificGravity";
+import { findSgParameter, resolveSpecificGravityForItem } from "@/lib/formSpecificGravity";
 import { labReportPagesWithResults } from "@/lib/labReport";
 import { canPrintLabResult } from "@/lib/petitionPrintability";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
@@ -112,7 +112,7 @@ export default function LabResultDetailPage() {
         petition,
         pages,
         groups,
-        (seq) => resolveSpecificGravity(results, seq, findSgParameter(parameters)),
+        (seq) => resolveSpecificGravityForItem(results, petition.items, seq, findSgParameter(parameters)),
       ).filter(hasCalculationData)
     : [];
   // พิมพ์ได้ทันทีที่ Lab ออกผล ไม่ต้องรอ QC อนุมัติ
