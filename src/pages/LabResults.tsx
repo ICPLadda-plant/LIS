@@ -18,9 +18,10 @@ export default function LabResults() {
     const items = (data?.items ?? []) as Petition[];
     const q = search.trim().toLowerCase();
     if (!q) return items;
-    const matches = items.filter((p) =>
-      `${p.petitionNo} ${p.submittedBy?.name ?? ""}`.toLowerCase().includes(q),
-    );
+    const matches = items.filter((p) => {
+      const sampleText = (p.items ?? []).map((item) => `${item.sampleName} ${item.commonName ?? ""} ${item.batchNo} ${item.sampleId ?? ""}`).join(" ");
+      return `${p.petitionNo} ${p.submittedBy?.name ?? ""} ${sampleText}`.toLowerCase().includes(q);
+    });
     return rankSearchResults(matches, search, (petition) => {
       const itemNos = (petition.items ?? []).map((item) => item.itemNo).filter((itemNo) => itemNo?.trim());
       return {
@@ -42,7 +43,7 @@ export default function LabResults() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาเลขคำร้อง / ผู้ส่ง"
+            placeholder="ค้นหาเลขคำร้อง / ชื่อยา / Batch / เลขที่ตัวอย่าง / ผู้ส่ง"
             className="rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -52,6 +53,7 @@ export default function LabResults() {
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">เลขคำร้อง</th>
+                <th className="px-3 py-2">ชื่อยา / Batch / เลขที่ตัวอย่าง</th>
                 <th className="px-3 py-2">แผนก</th>
                 <th className="px-3 py-2">ผู้ส่ง</th>
                 <th className="px-3 py-2">วันที่ออกผล Lab</th>
@@ -59,10 +61,10 @@ export default function LabResults() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">กำลังโหลด…</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">กำลังโหลด…</td></tr>
               )}
               {!loading && rows.length === 0 && (
-                <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">ยังไม่มีคำร้องที่หัวหน้า Lab ออกผล</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">ยังไม่มีคำร้องที่หัวหน้า Lab ออกผล</td></tr>
               )}
               {rows.map((p) => (
                 <tr
@@ -71,6 +73,18 @@ export default function LabResults() {
                   className="cursor-pointer border-t border-border hover:bg-accent/60"
                 >
                   <td className="px-3 py-2 font-medium">{p.petitionNo}</td>
+                  <td className="min-w-[260px] px-3 py-2 align-top">
+                    {p.items?.length ? (
+                      <div className="space-y-2">
+                        {p.items.map((item) => (
+                          <div key={item.seq}>
+                            <div className="font-medium text-foreground">{item.sampleName || item.commonName || "-"}</div>
+                            <div className="text-xs text-muted-foreground">Batch: {item.batchNo || "-"} · เลขที่ตัวอย่าง: {item.sampleId || "-"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : "-"}
+                  </td>
                   <td className="px-3 py-2">{petitionDepartmentLabel(p)}</td>
                   <td className="px-3 py-2">{p.submittedBy?.name ?? "-"}</td>
                   <td className="px-3 py-2">

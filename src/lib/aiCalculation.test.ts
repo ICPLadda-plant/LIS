@@ -10,6 +10,11 @@ describe('calculateAi', () => {
     expect(result.ai).toBeCloseTo(0.0018);
   });
 
+  it('divides the sample average by the number of filled samples', () => {
+    const result = calculateAi({ '% Sample 1': '45.998766', '% Sample 2': '46.659601', '% Sample 3': '' });
+    expect(result.sampleAverage).toBeCloseTo((45.998766 + 46.659601) / 2);
+  });
+
   it('leaves %AI empty until a specific gravity is available', () => {
     expect(calculateAi({ '% Sample 1': '2' }).ai).toBeNull();
     expect(calculateAi({ '% Sample 1': '2' }, 0).ai).toBeNull();

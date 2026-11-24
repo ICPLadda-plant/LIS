@@ -23,6 +23,7 @@ export const CCS_RESULT_LABEL = 'CCS Result';
 const numberValues = (values: Record<string, unknown>, matcher: RegExp) =>
   Object.entries(values)
     .filter(([label]) => matcher.test(label))
+    .filter(([, value]) => value != null && String(value).trim() !== '')
     .map(([, value]) => (typeof value === 'number' ? value : Number(String(value).trim())))
     .filter((value) => Number.isFinite(value));
 
