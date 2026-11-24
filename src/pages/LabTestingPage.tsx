@@ -342,7 +342,7 @@ export default function LabTestingPage() {
               navigate(`/lab-testing/${p._id}`);
             }}
           >
-            {p.labCompletedAt ? 'ดูรายละเอียด' : 'เข้าตรวจ'}
+            {p.labCompletedAt ? 'ดูรายละเอียด' : 'คำนวณผลวิเคราะห์'}
           </Button>
           </div>
         ) : (
