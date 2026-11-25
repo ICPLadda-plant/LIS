@@ -316,7 +316,15 @@ router.get("/daily-calibration", async (req, res) => {
     const LABELS = ["ค่า Correlation coefficient ( r ) ที่ได้", "Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", ...AREA_LABELS];
     const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
     const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
-    const docs = await QCTestResult.find({ updatedAt: { $gte: dayStart } }).sort({ updatedAt: -1 }).select("values commonName").limit(300).lean();
+    const docs = await QCTestResult.find({ updatedAt: { $gte: dayStart } }).sort({ updatedAt: -1 }).select("values commonName petitionId itemSeq").limit(300).lean();
+    // ผลฝั่ง Lab มักไม่ได้บันทึก commonName → ดึงจากรายการในคำร้องแทน
+    const missingIds = [...new Set(docs.filter((d) => !d.commonName && d.petitionId).map((d) => String(d.petitionId)))]
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (missingIds.length) {
+      const petitions = await Petition.find({ _id: { $in: missingIds } }).select("items.seq items.commonName").lean();
+      const names = new Map(petitions.flatMap((p) => (p.items || []).map((i) => [`${p._id}:${i.seq}`, i.commonName])));
+      for (const d of docs) if (!d.commonName) d.commonName = names.get(`${d.petitionId}:${d.itemSeq}`) || "";
+    }
     const out = {};
     for (const doc of docs) {
       for (const [key, raw] of Object.entries(flattenLegacyDottedValues(doc.values) || {})) {
