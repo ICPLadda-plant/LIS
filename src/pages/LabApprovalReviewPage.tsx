@@ -21,7 +21,8 @@ import { useConfirm, releaseBodyPointerLock } from "@/context/ConfirmDialog";
 import { useCanAccessPath } from "@/hooks/useCanAccessPath";
 import LabAgreementReviewDialog from "@/components/review/LabAgreementReviewDialog";
 import LabAgreementReviewView from "@/components/review/LabAgreementReviewView";
-import { isReviewFilled } from "@/lib/labAgreementReview";
+import { currentAgreementReview, isReviewFilled } from "@/lib/labAgreementReview";
+import type { LabAgreementReview } from "@/types/labRequest.types";
 
 export default function LabApprovalReviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -45,7 +46,9 @@ export default function LabApprovalReviewPage() {
   const { data: labRequests, refresh: refreshLabRequests } = useLabRequestsByPetition(id);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [recheckOpen, setRecheckOpen] = useState(false);
-  const currentReview = labRequests?.[0]?.labAgreementReview ?? null;
+  // ผลที่เพิ่งบันทึกในหน้านี้ (คำร้องที่ไม่มีใบ L จะเก็บผลไว้ที่คำร้อง)
+  const [savedReview, setSavedReview] = useState<LabAgreementReview | null>(null);
+  const currentReview = savedReview ?? currentAgreementReview(labRequests, petition?.labAgreementReview);
 
   useEffect(() => {
     api.getParameters()
@@ -106,7 +109,8 @@ export default function LabApprovalReviewPage() {
   const handleSaveReview = useCallback(async (draft) => {
     if (!petition) return;
     try {
-      await saveLabAgreementReview(petition._id, draft, user?.name ?? "system");
+      const { review } = await saveLabAgreementReview(petition._id, draft, user?.name ?? "system");
+      setSavedReview(review);
       toast.success("บันทึกการทบทวนข้อตกลงเรียบร้อย");
       refreshLabRequests();
       // if this dialog was opened by the Approve button, remember to approve after it closes
@@ -199,8 +203,7 @@ export default function LabApprovalReviewPage() {
           </div>
         )}
 
-        {(labRequests?.length ?? 0) > 0 && (
-          <Card className="overflow-hidden">
+        <Card className="overflow-hidden">
             <CardHeader className="pb-3 bg-muted">
               <CardTitle className="text-base flex items-center justify-between gap-2 flex-wrap">
                 <span className="inline-flex items-center gap-2">
@@ -225,8 +228,7 @@ export default function LabApprovalReviewPage() {
                 <p className="text-sm text-muted-foreground italic">ยังไม่กรอกการทบทวน</p>
               )}
             </CardContent>
-          </Card>
-        )}
+        </Card>
 
         <LabResultGroups groups={groups} />
 

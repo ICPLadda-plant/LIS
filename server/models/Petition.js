@@ -199,6 +199,8 @@ const PetitionSchema = new mongoose.Schema(
     labRecheckRequestedAt: Date,
     labRecheckRequestedBy: String,
     labRecheckReason: String,
+    // ผลทบทวนคำขอของหัวหน้า Lab — ใช้เมื่อคำร้องไม่มีใบ L (ถ้ามีใบ L จะเขียนลงใบ L ด้วย)
+    labAgreementReview: { type: mongoose.Schema.Types.Mixed, default: undefined },
     labRecheckCount: { type: Number, default: 0 },
     // แก้ไขผล Lab ที่บันทึกแล้ว: snapshot ก่อนแก้ (ใช้คืนค่าตอนยกเลิก + เก็บ log ค่าเดิม)
     labEditSession: { type: mongoose.Schema.Types.Mixed, default: null },
