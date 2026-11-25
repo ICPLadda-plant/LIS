@@ -153,6 +153,14 @@ function isLabelReceived(petition, side, key) {
   return (petition?.labelReceipts ?? []).some((receipt) => receipt.side === side && receipt.key === key);
 }
 
+// ป้ายของฝั่งนั้นที่ยังไม่ได้สแกนรับ (คำขอที่รับทีละป้าย) — [] เมื่อรับครบ/รับแบบเดิมทั้งคำขอ
+function pendingSideLabels(petition, side) {
+  if (petition?.[`${side}ReceivedAt`]) return [];
+  const groups = sideLabelGroups(petition, side);
+  if (groups.length < 2) return [];
+  return groups.filter((group) => !isLabelReceived(petition, side, group.key));
+}
+
 // วางแผนการรับตัวอย่างทีละป้าย
 // - คืน null เมื่อคำขอนี้รับแบบเดิมทั้งคำขอ (มีเลขป้ายฝั่งนี้เลขเดียว / คำขอเก่า / รับฝั่งนี้ครบแล้ว)
 // - body.labelKeys = กลุ่มที่เลือกรับ, body.itemSeq = รายการจาก QR บนป้าย, ไม่ระบุ = รับทุกป้ายที่ค้าง
@@ -190,4 +198,4 @@ function planLabelReceipt(petition, side, body = {}) {
   };
 }
 
-module.exports = { formatSampleLabelNo, sampleLabelSides, sampleLabelGroupKey, sampleLabelGroups, sideLabelGroups, planLabelReceipt, assignMissingSampleLabelNumbers };
+module.exports = { formatSampleLabelNo, sampleLabelSides, sampleLabelGroupKey, sampleLabelGroups, sideLabelGroups, pendingSideLabels, planLabelReceipt, assignMissingSampleLabelNumbers };

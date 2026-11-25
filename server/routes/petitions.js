@@ -40,7 +40,7 @@ const {
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
 const { canEditWholePetition } = require('../lib/productionPetitionEdit');
-const { assignMissingSampleLabelNumbers, planLabelReceipt } = require('../lib/sampleLabelNumber');
+const { assignMissingSampleLabelNumbers, planLabelReceipt, pendingSideLabels } = require('../lib/sampleLabelNumber');
 const { sendProductionCancel } = require('../lib/productionCallback');
 const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
 const { recordQcHandlerFromRequest } = require('../lib/qcHandlers');
@@ -898,6 +898,10 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
     const redoExplanation = String(req.body?.redoExplanation || '').trim();
     const additionalError = await additionalCompletionError(doc, [side]);
     if (additionalError) return res.status(409).json({ error: { message: additionalError } });
+    const pendingLabels = pendingSideLabels(doc, side);
+    if (pendingLabels.length) {
+      return res.status(409).json({ error: { message: `ยังไม่ได้รับป้าย ${pendingLabels.map((g) => g.label).join(', ')} ฝั่ง ${side === 'qc' ? 'QC' : 'Lab'} กรุณาสแกนรับให้ครบก่อนบันทึกผล` } });
+    }
     if (side === 'qc') {
       if (!requiresQcTrack(doc)) return badRequest(res, 'คำขอ R&D ไม่ต้องส่ง QC');
       if (doc.qcReturnNote && !redoExplanation) {
