@@ -20,7 +20,7 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-label { white-space: nowrap; }
 .ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 5.5mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; }
 .ca-tbl { width: 100%; margin-top: 1.5mm; border-collapse: collapse; table-layout: fixed; }
-.ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; padding: 0.55mm 0.4mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
+.ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; height: 6.5mm; padding: 0.8mm 0.5mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
 .ca-tbl th { font-weight: 700; }
 .ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 10pt !important; overflow-wrap: normal; }
 .ca-tbl td.ca-cell { font-size: 9pt !important; overflow-wrap: anywhere; word-break: normal; }
