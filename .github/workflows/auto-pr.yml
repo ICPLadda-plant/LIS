@@ -18,6 +18,14 @@ jobs:
       REPO: ${{ github.repository }}
       BRANCH: ${{ github.ref_name }}
     steps:
+      - name: หา GitHub CLI บนเครื่อง server
+        run: |
+          $ghDir = 'C:\Program Files\GitHub CLI'
+          if (Test-Path "$ghDir\gh.exe") { Add-Content -Path $env:GITHUB_PATH -Value $ghDir }
+          elseif (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+            Write-Error "ยังไม่ได้ติดตั้ง GitHub CLI บน server: รัน winget install GitHub.cli แล้ว restart runner"; exit 1
+          }
+
       - name: เปิด PR เข้า main (ถ้ายังไม่มี PR ที่เปิดอยู่)
         run: |
           $open = gh pr list --repo $env:REPO --head $env:BRANCH --base main --state open --json number --jq '.[0].number'
