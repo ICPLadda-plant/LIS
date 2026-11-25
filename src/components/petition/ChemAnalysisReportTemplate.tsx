@@ -4,40 +4,40 @@ import { CHEM_REPORT_SAMPLES_PER_SHEET, type ChemReportSample, type ChemReportSh
 import { A4_PRINT_FONT_FAMILY } from "@/lib/printConfig";
 
 export const CHEM_ANALYSIS_REPORT_CSS = `
-.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: 10pt; line-height: 1.2; }
+.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: 12pt; line-height: 1.25; }
 .ca-page { width: 210mm; height: 297mm; padding: 6mm 12mm 5mm; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
 .ca-page + .ca-page { margin-top: 6mm; page-break-before: always; break-before: page; }
 .ca-head { display: flex; align-items: center; gap: 3mm; padding-bottom: 2mm; border-bottom: 0.8pt solid #000; }
 .ca-logo { height: 10mm; }
-.ca-company { font-weight: 700; font-size: 10pt !important; }
-.ca-title { margin-top: 1.5mm; text-align: center; font-weight: 700; font-size: 13pt !important; line-height: 1 !important; }
+.ca-company { font-weight: 700; font-size: 11pt !important; }
+.ca-title { margin-top: 2mm; text-align: center; font-weight: 700; font-size: 15pt !important; line-height: 1 !important; }
 .ca-sub { text-align: center; font-weight: 700; }
-.ca-box { position: relative; margin-top: 2.8mm; padding: 2.2mm 3mm 1.4mm; border: 0.8pt solid #000; border-radius: 2mm; }
+.ca-box { position: relative; margin-top: 3.5mm; padding: 3mm 3mm 2.2mm; border: 0.8pt solid #000; border-radius: 2mm; }
 .ca-tag { position: absolute; top: -2.6mm; left: 4mm; padding: 0 2mm; background: #fff; font-weight: 700; }
-.ca-line { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 2mm; row-gap: 0.6mm; margin-top: 0.8mm; }
+.ca-line { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 2mm; row-gap: 0.8mm; margin-top: 1.2mm; }
 .ca-field { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 1mm; min-width: 0; max-width: 100%; }
 .ca-grow { flex: 1 1 45mm; }
 .ca-label { white-space: nowrap; }
-.ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 5mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; }
+.ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 5.5mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; }
 .ca-tbl { width: 100%; margin-top: 1.5mm; border-collapse: collapse; table-layout: fixed; }
-.ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; padding: 0.3mm 0.4mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
+.ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; padding: 0.55mm 0.4mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
 .ca-tbl th { font-weight: 700; }
-.ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 9pt !important; overflow-wrap: normal; }
-.ca-tbl td.ca-cell { font-size: 8pt !important; overflow-wrap: anywhere; word-break: normal; }
-.ca-tbl td.ca-cell-long { font-size: 7pt !important; line-height: 1.05 !important; }
-.ca-sign { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 1.5mm; margin-top: 1.8mm; text-align: center; }
+.ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 10pt !important; overflow-wrap: normal; }
+.ca-tbl td.ca-cell { font-size: 9pt !important; overflow-wrap: anywhere; word-break: normal; }
+.ca-tbl td.ca-cell-long { font-size: 8pt !important; line-height: 1.05 !important; }
+.ca-sign { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 1.5mm; margin-top: 2.5mm; text-align: center; }
 .ca-sign .ca-val { flex: 0 1 48mm; min-width: 26mm; text-align: center; }
 .ca-sign > span { min-width: 0; overflow-wrap: anywhere; }
 .ca-sign-lab { display: grid; grid-template-columns: 40mm minmax(0, 54mm) minmax(0, 72mm); column-gap: 2mm; }
 .ca-sign-lab .ca-val { min-width: 0; }
 .ca-sign-lab > span:last-child { text-align: left; }
 .ca-cb { display: inline-block; width: 3.4mm; height: 3.4mm; margin-right: 1.5mm; border: 0.8pt solid #000; vertical-align: -0.6mm; text-align: center; line-height: 3mm; font-weight: 700; }
-.ca-check-row { display: grid; grid-template-columns: 20mm 4mm 25mm minmax(0, 1fr); align-items: end; column-gap: 1.5mm; margin-top: 0.8mm; }
+.ca-check-row { display: grid; grid-template-columns: 20mm 4mm 25mm minmax(0, 1fr); align-items: end; column-gap: 1.5mm; margin-top: 1.2mm; }
 .ca-check-row-simple { grid-template-columns: 4mm 25mm minmax(0, 1fr); }
 .ca-check-heading { align-self: center; white-space: nowrap; }
 .ca-check-row .ca-cb { margin-right: 0; align-self: center; }
 .ca-check-row .ca-val { width: 100%; }
-.ca-note { margin-top: 1mm; }
+.ca-note { margin-top: 1.5mm; }
 .ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: right; font-size: 8pt !important; }
 @media screen { .ca-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 @media print { .ca-box, .ca-tbl tr { break-inside: avoid; page-break-inside: avoid; } }
