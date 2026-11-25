@@ -980,6 +980,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ side, actor, redoExplanation }),
     }),
+  completeLabSlip: (petitionId: string, slip: string, itemSeqs: number[], actor: string) =>
+    request<import("@/types/petition.types").Petition>(`/petitions/${petitionId}/lab-slip-complete`, {
+      method: "POST",
+      body: JSON.stringify({ slip, itemSeqs, actor }),
+    }),
   labApprovePetition: (petitionId: string, actor: string) =>
     request<import("@/types/petition.types").Petition>(`/petitions/${petitionId}/lab-approve`, {
       method: "POST",

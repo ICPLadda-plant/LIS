@@ -952,6 +952,33 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
 }));
 
 // POST /api/petitions/:id/lab-approve  → หัวหน้า Lab ออกผล Lab. success เกิดเมื่อครบทุก track.
+// POST /api/petitions/:id/lab-slip-complete → บันทึกผล Lab เฉพาะใบนำส่งเดียว (ใบอื่นยังกรอกต่อได้)
+router.post('/:id/lab-slip-complete', serializePetitionWrite(async (req, res) => {
+  try {
+    const slip = String(req.body?.slip || '').trim();
+    const itemSeqs = (Array.isArray(req.body?.itemSeqs) ? req.body.itemSeqs : []).map(Number).filter(Number.isFinite);
+    if (!slip || !itemSeqs.length) return badRequest(res, 'ต้องระบุใบนำส่งและรายการ');
+    const doc = await Petition.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const actor = await additionalActor(req, res, doc, 'lab');
+    if (!actor) return;
+    if (['approved', 'rejected'].includes(doc.status) || doc.labCompletedAt) {
+      return res.status(409).json({ error: { message: 'บันทึกผล Lab ของคำร้องนี้แล้ว' } });
+    }
+    const slips = (doc.labCompletedSlips || []).filter((s) => s.slip !== slip);
+    slips.push({ slip, itemSeqs, completedAt: new Date(), completedBy: actor });
+    doc.labCompletedSlips = slips;
+    await doc.save();
+    logAudit(doc, {
+      event: 'updated', toStatus: doc.status, actor,
+      note: `Lab บันทึกผลใบนำส่ง ${slip}`, metadata: { side: 'lab', kind: 'labSlipCompleted', slip, itemSeqs },
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
   try {
     const doc = await Petition.findById(req.params.id);
