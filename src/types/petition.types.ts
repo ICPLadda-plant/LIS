@@ -292,6 +292,8 @@ interface PetitionBase {
   labRecheckRequestedAt?: string | null;
   labRecheckRequestedBy?: string;
   labRecheckReason?: string;
+  /** ผลทบทวนคำขอ — ใช้เมื่อคำร้องไม่มีใบ L */
+  labAgreementReview?: import('./labRequest.types').LabAgreementReview;
   labRecheckCount?: number;
   /** เวลาที่คาดว่าจะได้รับผล Lab — บันทึกตอนกด "เริ่มงาน" / เปลี่ยนเครื่อง / Re-check */
   labExpected?: {

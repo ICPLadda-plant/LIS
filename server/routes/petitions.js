@@ -1201,6 +1201,8 @@ router.post('/:id/lab-agreement-review', async (req, res) => {
       { petitionId: petition._id },
       { $set: { labAgreementReview: review } },
     );
+    // เก็บที่คำร้องด้วย เพื่อให้ตัวอย่างที่ไม่มีใบ L ต้องทบทวนก่อนรับงานเหมือนกัน
+    await Petition.updateOne({ _id: petition._id }, { $set: { labAgreementReview: review } });
     const updated = result.modifiedCount ?? result.nModified ?? 0;
     res.json({ updated, review });
   } catch (err) {
@@ -1568,7 +1570,12 @@ router.patch('/:id/lab-sample-numbers', serializePetitionWrite(async (req, res) 
 // คำร้องที่ไม่มีใบ L (เช่น QC อย่างเดียว / ข้อมูลเก่า) ไม่ต้องทบทวน
 async function labAgreementReviewError(petition) {
   const requests = await LabRequest.find({ petitionId: petition._id, deletedAt: null }, { labAgreementReview: 1 }).lean();
-  if (!requests?.length) return null;
+  if (!requests?.length) {
+    // ไม่มีใบ L ก็ต้องทบทวนคำขอก่อนรับงาน — ใช้ผลทบทวนที่เก็บไว้ที่คำร้อง
+    if (!petition.labAgreementReview?.reviewedAt) return 'กรุณาทบทวนคำขอก่อนรับงาน Lab';
+    if (petition.labAgreementReview.acceptable === false) return 'ผลทบทวนคำขอคือ "ไม่พร้อมรับงาน" จึงรับตัวอย่างไม่ได้';
+    return null;
+  }
   if (requests.some((request) => !request.labAgreementReview?.reviewedAt)) return 'กรุณาทบทวนคำขอก่อนรับงาน Lab';
   if (requests.some((request) => request.labAgreementReview.acceptable === false)) {
     return 'ผลทบทวนคำขอคือ "ไม่พร้อมรับงาน" จึงรับตัวอย่างไม่ได้';

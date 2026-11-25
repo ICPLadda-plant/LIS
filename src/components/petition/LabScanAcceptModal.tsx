@@ -19,7 +19,7 @@ import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
 import LabelReceiptPicker from '@/components/petition/LabelReceiptPicker';
 import LabAgreementReviewDialog from '@/components/review/LabAgreementReviewDialog';
 import { fetchLabRequestsByPetition, saveLabAgreementReview } from '@/hooks/usePetition';
-import { isReadyToReceive } from '@/lib/labAgreementReview';
+import { currentAgreementReview, isReadyToReceive } from '@/lib/labAgreementReview';
 import type { LabAgreementReview, LabRequest } from '@/types/labRequest.types';
 import { toast } from 'sonner';
 import { readPetitionLabelCodeFromImage } from '@/lib/aiApi';
@@ -306,7 +306,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     }
   }
 
-  const reviewRequired = !additionalRequest && !petition?.labReceivedAt && labRequests.length > 0 && !isReadyToReceive(labRequests);
+  // ทุกตัวอย่างต้องทบทวนคำขอก่อนรับงาน แม้คำร้องไม่มีใบ L (ใช้ผลที่เก็บที่คำร้องแทน)
+  const reviewRequired = !!petition && !additionalRequest && !petition.labReceivedAt
+    && !isReadyToReceive(labRequests, petition.labAgreementReview);
 
   function handleAcceptClick() {
     if (!reviewRequired) { void confirmAccept(); return; }
@@ -319,6 +321,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     try {
       const { review } = await saveLabAgreementReview(petition._id, draft, user?.name || user?.email || 'system');
       setLabRequests((prev) => prev.map((request) => ({ ...request, labAgreementReview: review })));
+      setPetition((prev) => (prev ? { ...prev, labAgreementReview: review } : prev));
       reviewOutcomeRef.current = { accept: review.acceptable !== false, reason: review.notAcceptableReason };
     } catch {
       toast.error('บันทึกการทบทวนไม่สำเร็จ');
@@ -469,7 +472,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
                 {petition.assignedTo && (
                   <p>มอบหมายให้: <span className="font-medium text-primary">{petition.assignedTo.name}</span></p>
                 )}
-                {labRequests.length > 0 && (
+                {!additionalRequest && !petition.labReceivedAt && (
                   <p>ทบทวนคำขอ: <span className="text-foreground">{reviewRequired ? 'ต้องทบทวนก่อนรับงาน' : 'พร้อมรับงาน'}</span></p>
                 )}
               </div>
@@ -533,7 +536,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       <LabAgreementReviewDialog
         open={reviewOpen}
         onOpenChange={handleReviewOpenChange}
-        initial={labRequests[0]?.labAgreementReview ?? null}
+        initial={currentAgreementReview(labRequests, petition?.labAgreementReview)}
         onSave={handleSaveReview}
         testMethod={labRequests[0]?.serviceAgreement?.testMethod}
       />
