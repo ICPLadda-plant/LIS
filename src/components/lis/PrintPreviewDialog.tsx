@@ -357,7 +357,7 @@ export default function PrintPreviewDialog({
       } else {
         toast.success(`ส่งพิมพ์ไปยัง ${res.printer} (${res.copies} ชุด)`);
       }
-      if (mode === "server") onOpenChange(false);
+      onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "พิมพ์ไม่สำเร็จ");
     } finally {

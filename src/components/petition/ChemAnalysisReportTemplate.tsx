@@ -30,6 +30,7 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-sign > span { min-width: 0; overflow-wrap: anywhere; }
 .ca-sign-lab { display: grid; grid-template-columns: 40mm minmax(0, 54mm) minmax(0, 72mm); column-gap: 2mm; }
 .ca-sign-lab .ca-val { min-width: 0; }
+.ca-sign-lab > span:last-child { text-align: left; }
 .ca-cb { display: inline-block; width: 3.4mm; height: 3.4mm; margin-right: 1.5mm; border: 0.8pt solid #000; vertical-align: -0.6mm; text-align: center; line-height: 3mm; font-weight: 700; }
 .ca-note { margin-top: 1mm; }
 .ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: right; font-size: 13pt !important; }

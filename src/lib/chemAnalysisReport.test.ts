@@ -37,9 +37,9 @@ describe("buildChemAnalysisSheets", () => {
       { seq: 2, side: "lab", status: "approved", conclusion: "accepted-oos", by: "ผู้จัดการ QA", at: "2026-11-02T02:00:00Z" },
       { seq: 3, side: "qc", status: "rejected", by: "หัวหน้า QC", at: "2026-11-02T03:00:00Z" },
     ]);
-    const [sheet] = buildChemAnalysisSheets(p, [page("B1", "35.1"), page("B2", "32.9"), page("B3", "30.0")]);
+    const [sheet] = buildChemAnalysisSheets(p, [page("B1", "35.1 % W/V\nDensity : 1.050"), page("B2", "32.9"), page("B3", "30.0")]);
     expect(sheet.lab.samples.map((s) => s.ai)).toEqual(["35.1", "32.9", "30.0"]);
-    expect(sheet.lab.samples[0].sg).toBe("1.05");
+    expect(sheet.lab.samples[0].sg).toBe("1.050");
     expect(sheet.qc.passBatches).toBe("B1");
     expect(sheet.qc.failBatches).toBe("B2, B3");
     expect(sheet.qc.usableBatches).toBe("B2");

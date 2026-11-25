@@ -58,6 +58,11 @@ const clean = (value?: string | null) => {
   return text === "-" ? "" : text;
 };
 
+const aiValue = (value?: string | null) => {
+  const firstLine = clean(value).split(/\r?\n/, 1)[0];
+  return firstLine.match(/[-+]?\d+(?:[.,]\d+)?/)?.[0] ?? firstLine;
+};
+
 const unique = (values: Array<string | undefined | null>) => [...new Set(values.map((v) => clean(v)).filter(Boolean))];
 
 /**
@@ -140,7 +145,7 @@ export function buildChemAnalysisSheets(petition: Petition, labPages: LabReportP
       const ai = aiRow(rows, item);
       const sg = findRow(rows, SG_PATTERN);
       return {
-        ai: clean(ai?.result),
+        ai: aiValue(ai?.result),
         sg: formatSpecificGravity(clean(item.sgConfirmedValue) || clean(sg?.result)),
         batchNo: clean(page.sample.batchNo),
         productionDate: clean(page.sample.productionDate),
