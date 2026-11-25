@@ -4,6 +4,7 @@ import type { LabReportPage } from "@/lib/labReport";
 import { calculateAi, calculateCcs, ccsDifference, formatCalculatedAi, CONTROL_HIGH_LABEL, CONTROL_LOW_LABEL, CONTROL_SAMPLE_LABEL } from "@/lib/aiCalculation";
 import { isGrWpSpCommonName } from "@/lib/coaFormulation";
 import { PBZ_PRINT_CSS, PaclobutrazolPrintSheet, paclobutrazolValues } from "./PaclobutrazolPrintSheet";
+import { MCZ_PRINT_CSS, MancozebPrintSheet, mancozebValues } from "./MancozebPrintSheet";
 import { calculatePaclobutrazol, pbzFixed } from "@/lib/paclobutrazolFields";
 export { ccsDifference } from "@/lib/aiCalculation";
 
@@ -37,7 +38,8 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-sign-name { grid-column: 2; grid-row: 2; text-align: center; margin-top: 1.5mm; }
 .brom-form-footer { margin-top: auto; padding-top: 6mm; font-size: 8pt; }
 @media screen { .brom-form-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
-${PBZ_PRINT_CSS}`;
+${PBZ_PRINT_CSS}
+${MCZ_PRINT_CSS}`;
 
 const BLANK = /^[-–—]?$/;
 const fmtDensity = (v?: string) => (v && Number.isFinite(Number(v)) ? Number(v).toFixed(3) : v || "");
@@ -70,11 +72,11 @@ const SAMPLE_N = /^%\s*Sample\s*\d/i;
 
 /** หน้าไหนมีข้อมูลพอสำหรับใบคำนวณ (มีค่า Area Inj หรือ % Sample) */
 export function hasCalculationData(page: LabReportPage): boolean {
-  return values(page, AREA_INJ).length > 0 || values(page, SAMPLE_N).length > 0 || values(page, /^PBZ /).length > 0;
+  return values(page, AREA_INJ).length > 0 || values(page, SAMPLE_N).length > 0 || values(page, /^(PBZ|MCZ) /).length > 0;
 }
 
 export function hasCalculationFields(page: LabReportPage): boolean {
-  return (page.rows ?? []).some((row) => AREA_INJ.test(row.testItem) || SAMPLE_N.test(row.testItem) || /^%\s*AI/i.test(row.testItem) || /^PBZ /.test(row.testItem));
+  return (page.rows ?? []).some((row) => AREA_INJ.test(row.testItem) || SAMPLE_N.test(row.testItem) || /^%\s*AI/i.test(row.testItem) || /^(PBZ|MCZ) /.test(row.testItem));
 }
 
 function triple(list: string[]): string[] {
@@ -134,6 +136,16 @@ export type LabCalculationVariant = "default" | "standard";
 
 /** ใบคำนวณผลวิเคราะห์ FM-QP-07-08-002-R02 (A4 แนวนอน) */
 export default function LabCalculationForm({ page, variant = "default", standardOptions = [] }: { page: LabReportPage; variant?: LabCalculationVariant; /** เลขที่ Standard ของขวดที่กำลังใช้งานของสารนี้ ใช้เมื่อยังไม่ได้บันทึกค่า */ standardOptions?: string[] }) {
+  // MANCOZEB ใช้ใบคำนวณไทเทรต 0.1 N I2 แทนใบคำนวณมาตรฐาน
+  const mczValues = mancozebValues(page);
+  if (mczValues) {
+    return (
+      <div className="brom-form-root">
+        <style>{LAB_CALCULATION_CSS}</style>
+        <MancozebPrintSheet page={page} values={mczValues} />
+      </div>
+    );
+  }
   // PACLOBUTRAZOL: "default" = ใบ Internal standard แบบเดิม (FM-QP-07-08-002-R01), "standard" = ใบคำนวณแบบสารอื่น
   const pbzValues = paclobutrazolValues(page);
   if (pbzValues && variant === "default") {

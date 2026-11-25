@@ -43,6 +43,8 @@ import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, c
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
+import { isMancozebItem } from '@/lib/mancozebFields';
+import { MancozebGrid } from '@/components/petition/MancozebGrid';
 import { DailyCalibrationPrefill, DAILY_CALIBRATION_LABELS } from '@/components/petition/DailyCalibrationPrefill';
 import { matchSubstanceKey } from '@/lib/substances';
 import { standardNumbersForSubstance } from '@/lib/standardInUse';
@@ -1830,6 +1832,46 @@ export default function LabTestingDetailPage() {
                                 return units.map((unit) => renderEditUnit(unit, srcValues, onUnitChange, saveInfoSrc, scalarExtras));
                               };
                               const aiSubstances = isAiParameter ? aiSubstancesForItem(item.commonName) : [];
+                              if (isAiParameter && isMancozebItem(item.commonName)) {
+                                // MANCOZEB: ใบคำนวณไทเทรต 0.1 N I2 แทนชุด Area Inj / % Sample
+                                const mczNext: Record<string, unknown> = { ...srcValues };
+                                const onMczChange = (key: string, val: unknown) => {
+                                  onUnitChange(key, val);
+                                  mczNext[key] = val;
+                                  fields.forEach((candidate) => {
+                                    if (calculatedAiFieldKind(candidate.label) !== 'ai') return;
+                                    expandAiAwareFieldForItem(candidate, item.commonName, { category: petitionCategory }, true).forEach((derivedUnit) => {
+                                      const substance = aiSubstanceFromKey(derivedUnit.key);
+                                      onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(mczNext, aiDensity(mczNext, condCtx, substance, densityEntries, hasSgParam), substance).ai));
+                                    });
+                                  });
+                                };
+                                const mczAiOnly = (field: ParameterValueField) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai';
+                                const mczAiFields = fields.filter(mczAiOnly);
+                                const mczOther = fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label)) && !mczAiOnly(field));
+                                return (
+                                  <div className="space-y-4 pl-2">
+                                    {mczOther.length > 0 && (
+                                      <section className="space-y-3 rounded-lg border border-border bg-card p-3">
+                                        <h4 className="text-base font-semibold text-foreground">ข้อมูลเพิ่มเติม</h4>
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">{mczOther.map(renderField)}</div>
+                                      </section>
+                                    )}
+                                    <MancozebGrid
+                                      values={srcValues}
+                                      onChange={onMczChange}
+                                      disabled={fieldDisabled}
+                                      density={aiDensity(srcValues, condCtx, 'mancozeb', densityEntries, hasSgParam)}
+                                    />
+                                    {mczAiFields.length > 0 && (
+                                      <section className="space-y-3 rounded-lg border border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 p-3 shadow-sm dark:bg-teal-950/60">
+                                        <h4 className="text-base font-semibold text-foreground">ผลวิเคราะห์</h4>
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">{mczAiFields.map(renderField)}</div>
+                                      </section>
+                                    )}
+                                  </div>
+                                );
+                              }
                               if (isAiParameter && isPaclobutrazolItem(item.commonName)) {
                                 // PACLOBUTRAZOL: ตาราง Internal standard แทนชุด Area Inj / % Sample
                                 // %AI = Report %W/V ของใบคำนวณ — คำนวณใหม่ทุกครั้งที่แก้ค่าในตาราง
