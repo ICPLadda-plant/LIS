@@ -40,7 +40,7 @@ import { isLabAwaitingSgConfirmation } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
-import { itemSubmissionNoText } from '@/lib/petitionSampler';
+import { formatLabSampleNo, itemSubmissionNoText } from '@/lib/petitionSampler';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
 const LAB_PAGE_SIZE = 50;
@@ -238,14 +238,20 @@ export default function LabTestingPage() {
   const columns: DataTableColumn<Petition>[] = [
     {
       key: 'petition',
-      header: 'คำร้อง',
+      header: 'เลขที่ตัวอย่าง',
       className: 'align-top',
       cell: (p) => {
         const labItems = labItemsFor(p);
         return (
           <>
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-sky-600">{p.petitionNo}</span>
+            <div className="flex items-start gap-1.5">
+              <div className="space-y-0.5 font-semibold text-primary">
+                {labItems.some((item) => item.sampleId?.trim())
+                  ? labItems.filter((item) => item.sampleId?.trim()).map((item) => (
+                    <div key={item.seq}>{formatLabSampleNo(p, item.sampleId)}</div>
+                  ))
+                  : '-'}
+              </div>
               <UrgentBadge petition={p} />
               {returnedMap[p._id] && (
                 <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
