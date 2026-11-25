@@ -774,8 +774,17 @@ export default function LabTestingDetailPage() {
         && matchLabParametersForItem(petition, candidate, allParameters, groupMembership.get(itemGroupKey(candidate)) ?? [], densitySources)
           .some((candidateParam) => candidateParam._id === param._id),
       );
-      const isFirstSameDrugItem = sameDrugItems[0]?.seq === item.seq;
-      const targets = isFirstSameDrugItem && isSharedDailyAiField(fieldLabel) ? sameDrugItems.slice(1) : [];
+      // กรอกจากตัวอย่างไหนก็ได้ แล้วเติมให้ตัวอย่างยาชื่อเดียวกันที่ยังว่าง หรือยังมีค่าเท่ากับค่าเดิมที่เคยเติมร่วมกัน
+      const currentValues = phase === 2 ? valuesPhase2 : values;
+      const previousVal = currentValues[resultKey(item.seq, param._id!)]?.[fieldLabel];
+      const isBlank = (v: unknown) => v == null || String(v).trim() === '';
+      const targets = isSharedDailyAiField(fieldLabel)
+        ? sameDrugItems.filter((candidate) => {
+            if (candidate.seq === item.seq) return false;
+            const existing = currentValues[resultKey(candidate.seq, param._id!)]?.[fieldLabel];
+            return isBlank(existing) || String(existing) === String(previousVal ?? '');
+          })
+        : [];
       const writes = [item, ...targets].map((target) => ({ item: target, key: resultKey(target.seq, param._id!) }));
 
       setValuesFn((prev) => Object.fromEntries([
@@ -829,7 +838,7 @@ export default function LabTestingDetailPage() {
         }
       }, write.key));
     },
-    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity, allParameters, densitySources, groupMembership],
+    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity, allParameters, densitySources, groupMembership, values, valuesPhase2],
   );
 
   // multiEntry write: field write into entry `entryIndex` of a multiEntry param.

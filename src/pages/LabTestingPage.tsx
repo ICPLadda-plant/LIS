@@ -189,6 +189,7 @@ export default function LabTestingPage() {
     // ตัวอย่างกลุ่มน้ำที่ QC ยังไม่ยืนยันค่า ถพ. ยังไม่ปล่อยมาให้ Lab
     .filter((p) => !isLabAwaitingSgConfirmation(p))
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
+    .filter((p) => labItemsFor(p).length > 0)
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
     // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
     .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p)));

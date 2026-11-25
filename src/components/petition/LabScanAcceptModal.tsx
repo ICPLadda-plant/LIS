@@ -165,7 +165,10 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       }
       if (labelPick && 'labels' in labelPick) {
         setLabelChoices(labelPick.labels);
-        setLabelKeys(labelPick.keys);
+        // หัวหน้ากรอกเลขตัวอย่างครบทุกรายการในรอบเดียว → เลือกทุกป้ายที่ค้างไว้ก่อน (เอาออกได้)
+        setLabelKeys(!request && isFullAccess
+          ? labelPick.labels.filter((label) => !label.received).map((label) => label.key)
+          : labelPick.keys);
       }
 
       setLabRequests(request || found.labReceivedAt ? [] : await fetchLabRequestsByPetition(found._id).catch(() => []));
