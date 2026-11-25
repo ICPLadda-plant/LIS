@@ -32,8 +32,9 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-sign-lab .ca-val { min-width: 0; }
 .ca-sign-lab > span:last-child { text-align: left; }
 .ca-cb { display: inline-block; width: 3.4mm; height: 3.4mm; margin-right: 1.5mm; border: 0.8pt solid #000; vertical-align: -0.6mm; text-align: center; line-height: 3mm; font-weight: 700; }
-.ca-check-row { display: grid; grid-template-columns: 13mm 4mm 25mm minmax(0, 1fr); align-items: end; column-gap: 1.5mm; margin-top: 0.8mm; }
+.ca-check-row { display: grid; grid-template-columns: 20mm 4mm 25mm minmax(0, 1fr); align-items: end; column-gap: 1.5mm; margin-top: 0.8mm; }
 .ca-check-row-simple { grid-template-columns: 4mm 25mm minmax(0, 1fr); }
+.ca-check-heading { align-self: center; white-space: nowrap; }
 .ca-check-row .ca-cb { margin-right: 0; align-self: center; }
 .ca-check-row .ca-val { width: 100%; }
 .ca-note { margin-top: 1mm; }
@@ -113,7 +114,7 @@ function Sheet({ sheet }: { sheet: ChemReportSheet }) {
 
       <div className="ca-box">
         <span className="ca-tag">(สำหรับส่วนควบคุมคุณภาพ)</span>
-        <div className="ca-check-row"><span>ผลทดสอบ</span><Check checked={Boolean(qc.passBatches)} /><span>ผ่าน Batch</span><span className="ca-val">{qc.passBatches}</span></div>
+        <div className="ca-check-row"><span className="ca-check-heading">ผลทดสอบ</span><Check checked={Boolean(qc.passBatches)} /><span>ผ่าน Batch</span><span className="ca-val">{qc.passBatches}</span></div>
         <div className="ca-check-row"><span /><Check checked={Boolean(qc.failBatches)} /><span>ไม่ผ่าน Batch</span><span className="ca-val">{qc.failBatches}</span></div>
         <div className="ca-line"><Field grow label="หมายเหตุ" value={qc.remark} /></div>
         <div className="ca-sign"><span>ผู้รายงาน</span><span className="ca-val">{qc.qcHeadName}</span><span>หัวหน้าฝ่ายควบคุมคุณภาพ</span></div>
