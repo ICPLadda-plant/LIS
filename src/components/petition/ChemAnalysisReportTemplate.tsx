@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import { CHEM_REPORT_SAMPLES_PER_SHEET, type ChemReportSample, type ChemReportSheet } from "@/lib/chemAnalysisReport";
-import { A4_PRINT_FONT_FAMILY, A4_PRINT_FONT_SIZE } from "@/lib/printConfig";
+import { A4_PRINT_FONT_FAMILY } from "@/lib/printConfig";
 
 export const CHEM_ANALYSIS_REPORT_CSS = `
-.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: ${A4_PRINT_FONT_SIZE}; line-height: 1.2; }
+.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: 10pt; line-height: 1.2; }
 .ca-page { width: 210mm; height: 297mm; padding: 6mm 12mm 5mm; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
 .ca-page + .ca-page { margin-top: 6mm; page-break-before: always; break-before: page; }
 .ca-head { display: flex; align-items: center; gap: 3mm; padding-bottom: 2mm; border-bottom: 0.8pt solid #000; }
 .ca-logo { height: 10mm; }
-.ca-company { font-weight: 700; font-size: 13pt !important; }
-.ca-title { margin-top: 1.5mm; text-align: center; font-weight: 700; font-size: 18pt !important; line-height: 1 !important; }
+.ca-company { font-weight: 700; font-size: 10pt !important; }
+.ca-title { margin-top: 1.5mm; text-align: center; font-weight: 700; font-size: 13pt !important; line-height: 1 !important; }
 .ca-sub { text-align: center; font-weight: 700; }
 .ca-box { position: relative; margin-top: 2.8mm; padding: 2.2mm 3mm 1.4mm; border: 0.8pt solid #000; border-radius: 2mm; }
 .ca-tag { position: absolute; top: -2.6mm; left: 4mm; padding: 0 2mm; background: #fff; font-weight: 700; }
@@ -22,9 +22,9 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-tbl { width: 100%; margin-top: 1.5mm; border-collapse: collapse; table-layout: fixed; }
 .ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; padding: 0.3mm 0.4mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
 .ca-tbl th { font-weight: 700; }
-.ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 13pt !important; overflow-wrap: normal; }
-.ca-tbl td.ca-cell { font-size: 12pt !important; overflow-wrap: anywhere; word-break: normal; }
-.ca-tbl td.ca-cell-long { font-size: 10pt !important; line-height: 1.05 !important; }
+.ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 9pt !important; overflow-wrap: normal; }
+.ca-tbl td.ca-cell { font-size: 8pt !important; overflow-wrap: anywhere; word-break: normal; }
+.ca-tbl td.ca-cell-long { font-size: 7pt !important; line-height: 1.05 !important; }
 .ca-sign { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 1.5mm; margin-top: 1.8mm; text-align: center; }
 .ca-sign .ca-val { flex: 0 1 48mm; min-width: 26mm; text-align: center; }
 .ca-sign > span { min-width: 0; overflow-wrap: anywhere; }
@@ -38,7 +38,7 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-check-row .ca-cb { margin-right: 0; align-self: center; }
 .ca-check-row .ca-val { width: 100%; }
 .ca-note { margin-top: 1mm; }
-.ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: right; font-size: 13pt !important; }
+.ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: right; font-size: 8pt !important; }
 @media screen { .ca-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 @media print { .ca-box, .ca-tbl tr { break-inside: avoid; page-break-inside: avoid; } }
 `;
