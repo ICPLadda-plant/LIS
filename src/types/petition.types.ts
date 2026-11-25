@@ -305,6 +305,7 @@ interface PetitionBase {
   } | null;
   /** มีค่าเมื่อผู้รับผิดชอบกด "แก้ไข" ผล Lab ที่บันทึกแล้วและยังไม่กดบันทึก/ยกเลิก */
   labEditSession?: { startedAt: string; startedBy?: string; reason: string } | null;
+  labCompletedSlips?: { slip: string; itemSeqs: number[]; completedAt: string; completedBy?: string }[];
   labReturnNote?: string;
   qcReturnNote?: string;
   labRedoExplanation?: string;

@@ -1120,9 +1120,9 @@ export default function LabTestingDetailPage() {
   const abnormalCount = countAbnormal();
 
   // Validate the currently-active phase only — Phase 2 submit doesn't require Phase 1 re-edit.
-  const validate = (): string[] => {
+  const validate = (items: PetitionItem[] = labItems): string[] => {
     const missing: string[] = [];
-    labItems.forEach((item) => {
+    items.forEach((item) => {
       const phaseToCheck = effectivePhaseForItem(item);
       const phaseValues = valuesForPhase(phaseToCheck);
       const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
@@ -1177,6 +1177,38 @@ export default function LabTestingDetailPage() {
 
   // required ครบทุกช่องของ phase ปัจจุบัน → ปุ่มเปลี่ยนจาก "บันทึกแบบร่าง" เป็น "บันทึก" (ปิด track)
   const isComplete = hasAllLabOwnedParams && validate().length === 0;
+
+  // บันทึกทีละใบนำส่ง: คำร้องที่มีหลายใบ (เช่น L03/69, L04/69) ปิดผลใบที่กรอกครบก่อนได้
+  const slipOf = (item: PetitionItem) => itemSubmissionNoText(petition, item, 'lab') || `รายการที่ ${item.seq}`;
+  const savedSlips = new Set((petition.labCompletedSlips ?? []).map((s) => s.slip));
+  const isSlipSaved = (item: PetitionItem) => !petition.labCompletedAt && savedSlips.has(slipOf(item));
+  const multiSlip = new Set(labItems.map(slipOf)).size > 1;
+  const activeLabItem = labItems.find((it) => it.seq === activeItemSeq) ?? labItems[0];
+  const activeSlip = activeLabItem ? slipOf(activeLabItem) : '';
+  const activeSlipItems = labItems.filter((it) => slipOf(it) === activeSlip);
+  const canSaveSlip = multiSlip && !isComplete && !petition.labCompletedAt && !!activeLabItem && !savedSlips.has(activeSlip)
+    && activeSlipItems.every((item) => matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((p) => p.scope === 'lab'))
+    && validate(activeSlipItems).length === 0;
+
+  const handleSaveSlip = async () => {
+    if (pendingSample || submitting || !canSaveSlip) return;
+    const ok = await confirm({
+      title: `ยืนยันบันทึกผลใบนำส่ง ${activeSlip}`,
+      description: 'หลังบันทึกแล้วจะแก้ไขผลของใบนี้ไม่ได้ ใบนำส่งอื่นยังกรอกต่อได้ตามปกติ',
+    });
+    if (!ok) return;
+    setSubmitting(true);
+    try {
+      await autosaves.flush();
+      const updated = await api.completeLabSlip(petition._id, activeSlip, activeSlipItems.map((it) => it.seq), user?.name ?? 'system');
+      setRequestedPetition(updated);
+      toast.success(`บันทึกผลใบนำส่ง ${activeSlip} เรียบร้อย`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'บันทึกผลไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSaveDraft = async () => {
     if (pendingSample || submitting) return;
@@ -1463,6 +1495,7 @@ export default function LabTestingDetailPage() {
                 onClick={() => setActiveItemSeq(item.seq)}
               >
                 {/^\d+$/.test(item.sampleId || '') ? `${item.sampleId}/${String((petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100).padStart(2, '0')}` : item.sampleId || `รายการที่ ${item.seq}`}
+                {multiSlip && <span className="ml-1 text-xs opacity-80">· {slipOf(item)}{isSlipSaved(item) ? ' ✓' : ''}</span>}
               </Button>
             ))}
           </div>
@@ -1486,6 +1519,11 @@ export default function LabTestingDetailPage() {
               <CardHeader className="bg-muted pb-3">
                 <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                   <span>รายการที่ {item.seq}: {item.commonName || item.sampleName || '-'}</span>
+                  {multiSlip && (
+                    <Badge variant={isSlipSaved(item) ? 'green-soft' : 'gray-soft'} className="font-normal">
+                      ใบนำส่ง {slipOf(item)}{isSlipSaved(item) ? ' · บันทึกผลแล้ว' : ''}
+                    </Badge>
+                  )}
                   {item.batchNo && (
                     <Badge variant="blue-soft" className="font-normal">
                       Batch: {item.batchNo}
@@ -1590,7 +1628,7 @@ export default function LabTestingDetailPage() {
                             )}
                           </div>
                           {(() => {
-                            const fieldDisabled = isLocked || viewOnly || phaseLocked || labelPending || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
+                            const fieldDisabled = isLocked || viewOnly || isSlipSaved(item) || phaseLocked || labelPending || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
 
                             // Render a single editable render-unit. `srcValues` is the
                             // value-object to read/display from; `onUnitChange` persists a
@@ -2105,7 +2143,7 @@ export default function LabTestingDetailPage() {
                           })()}
                           <ParameterRemarkField
                             value={remarkOf(item, param)}
-                            disabled={isLocked || viewOnly || submitting}
+                            disabled={isLocked || viewOnly || isSlipSaved(item) || submitting}
                             onSave={(remark) => saveRemark(item, param, remark)}
                           />
                         </div>
@@ -2418,6 +2456,13 @@ export default function LabTestingDetailPage() {
                 </Button>
               </>
             ) : (
+              <>
+              {canSaveSlip && (
+                <Button variant="primary" onClick={handleSaveSlip} disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey} className="gap-2">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  บันทึกใบนำส่ง {activeSlip}
+                </Button>
+              )}
               <Button
                 variant={isComplete ? 'primary' : 'outline'}
                 onClick={isComplete ? handleSubmitResult : handleSaveDraft}
@@ -2427,6 +2472,7 @@ export default function LabTestingDetailPage() {
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isComplete ? <Send className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                 {isComplete ? 'บันทึก' : 'บันทึกแบบร่าง'}
               </Button>
+              </>
             )}
           </div>
         )}

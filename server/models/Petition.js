@@ -184,6 +184,11 @@ const PetitionSchema = new mongoose.Schema(
     // required track is done (QC always; Lab when there is a lab-batch item).
     labCompletedAt: Date,
     labCompletedBy: String,
+    // บันทึกผล Lab ทีละใบนำส่ง (L03/69 ...) — labCompletedAt ตั้งเมื่อครบทุกใบ
+    labCompletedSlips: {
+      type: [new mongoose.Schema({ slip: String, itemSeqs: [Number], completedAt: Date, completedBy: String }, { _id: false })],
+      default: undefined,
+    },
     qcCompletedAt: Date,
     qcCompletedBy: String,
     // คนที่ทำงานฝั่ง QC ของคำขอนี้ (รับตัวอย่าง/บันทึกผล/ยืนยันผล) — ใช้แจ้งเตือน "งานของตัวเอง"
@@ -332,4 +337,8 @@ PetitionSchema.index({ petitionNo: 1, deletedAt: 1 }, { unique: true });
 PetitionSchema.index({ 'additionalSampleRequests.qrCode': 1 }, { sparse: true });
 
 PetitionSchema.plugin(softDeletePlugin);
+// ล้างผล/ส่งกลับ/ขึ้น phase ใหม่ (labCompletedAt → null) ต้องเริ่มบันทึกรายใบนำส่งใหม่ด้วย
+PetitionSchema.pre('save', function resetLabSlips() {
+  if (this.isModified('labCompletedAt') && !this.labCompletedAt) this.labCompletedSlips = undefined;
+});
 module.exports = mongoose.model('Petition', PetitionSchema);
