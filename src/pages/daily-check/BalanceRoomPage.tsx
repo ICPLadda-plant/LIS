@@ -479,10 +479,12 @@ const BalanceRoomPage = () => {
     return { weight, value, limits: panelLimits, status: classifyPoint(value, panelLimits) };
   });
 
-  const fmt = (value: number | null | undefined) => formatControlNumber(value, scale.decimals);
+  const weightDecimals = (weight: number) =>
+    weight === scale.primaryCalibrationWeight ? scale.weights100Decimals ?? scale.decimals : scale.decimals;
+  const fmt = (value: number | null | undefined, weight: number) => formatControlNumber(value, weightDecimals(weight));
   const formatReading = (value: string | number | null | undefined) => {
     const numeric = Number(value);
-    return value == null || value === "" || !Number.isFinite(numeric) ? "—" : formatControlNumber(numeric, scale.decimals);
+    return value == null || value === "" || !Number.isFinite(numeric) ? "—" : formatControlNumber(numeric, weightDecimals(historyPanel.weight));
   };
 
   const infoItems = [
@@ -550,7 +552,7 @@ const BalanceRoomPage = () => {
         )}
         {showResult && savedAvg != null && (
           <p className={cn("mt-1 text-xs", savedStatus === "pass" ? "text-green-600" : "text-destructive")}>
-            ค่าเฉลี่ย: {savedAvg.toFixed(scale.decimals)} g {savedStatus === "pass" ? "อยู่ในเกณฑ์" : "เกินเกณฑ์"} (±{TOLERANCE}g)
+            ค่าเฉลี่ย: {savedAvg.toFixed(weightDecimals(nominalWeight))} g {savedStatus === "pass" ? "อยู่ในเกณฑ์" : "เกินเกณฑ์"} (±{TOLERANCE}g)
           </p>
         )}
       </div>
@@ -780,7 +782,7 @@ const BalanceRoomPage = () => {
                   <div key={panel.weight} className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold tabular-nums text-foreground">
-                        ตุ้ม {panel.weight} g · {panel.value == null ? "—" : `${fmt(panel.value)} g`}
+                        ตุ้ม {panel.weight} g · {panel.value == null ? "—" : `${fmt(panel.value, panel.weight)} g`}
                       </p>
                       {panel.value != null && panel.limits && (
                         <p className="text-xs text-muted-foreground">
@@ -968,9 +970,9 @@ const BalanceRoomPage = () => {
                       {[0, 1, 2].map(index => (
                         <td key={index} className="px-3 py-2 text-right tabular-nums">{formatReading(readings[index])}</td>
                       ))}
-                      <td className="px-3 py-2 text-right tabular-nums">{formatControlNumber(point.value, scale.decimals)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{formatControlNumber(point.value, weightDecimals(historyPanel.weight))}</td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {historyPanel.limits ? signed(point.value - historyPanel.limits.mean, historyPanel.digits) : "—"}
+                        {historyPanel.limits ? signed(point.value - historyPanel.limits.mean, weightDecimals(historyPanel.weight)) : "—"}
                       </td>
                       <td className="px-3 py-2">
                         {status ? (

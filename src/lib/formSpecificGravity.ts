@@ -1,5 +1,5 @@
 import type { ParameterItem } from '@/lib/api';
-import type { QCTestResult } from '@/types/petition.types';
+import type { PetitionItem, QCTestResult } from '@/types/petition.types';
 
 // Field label that QC enters the specific-gravity reading into, inside the
 // shared QC parameter "ค่า ถพ.". Matching by field label (not parameter _id)
@@ -46,7 +46,7 @@ export function findSgParameter(parameters: ParameterItem[] | null | undefined):
     const source = p.specificGravitySource;
     const configuredField = p.valueFields?.find((f) => f.label === SG_FIELD_LABEL);
     const fieldSource = configuredField?.requestValueSource;
-    if (fieldSource?.mode === 'manual' || source?.mode === 'manual') continue;
+    if (fieldSource?.mode === 'manual' || (!fieldSource && source?.mode === 'manual')) continue;
     // New config lives on the value field. Keep legacy parameter-level config readable.
     if (fieldSource?.mode === 'collection' || fieldSource?.mode === 'manual') {
       if (p.scope !== 'qc' || !p.shareWithLab || !p._id) continue;
@@ -87,4 +87,27 @@ export function resolveSpecificGravity(
 
   const value = readSpecificGravityEntryValue(row, sgParam.fieldLabel);
   return formatSpecificGravity(value);
+}
+
+export function resolveSpecificGravityForItem(
+  qcResults: QCTestResult[] | null | undefined,
+  items: PetitionItem[] | null | undefined,
+  seq: number,
+  sgParam: SgParameter | null,
+): string {
+  const direct = resolveSpecificGravity(qcResults, seq, sgParam);
+  if (direct) return direct;
+
+  const target = (items ?? []).find((item) => item.seq === seq);
+  const batch = target?.batchNo.trim().toLowerCase();
+  const sample = (target?.commonName || target?.sampleName || '').trim().toLowerCase();
+  if (!batch || !sample) return '';
+
+  for (const item of items ?? []) {
+    if (item.seq === seq || item.batchNo.trim().toLowerCase() !== batch) continue;
+    if ((item.commonName || item.sampleName || '').trim().toLowerCase() !== sample) continue;
+    const sibling = resolveSpecificGravity(qcResults, item.seq, sgParam);
+    if (sibling) return sibling;
+  }
+  return '';
 }

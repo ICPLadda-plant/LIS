@@ -125,11 +125,28 @@ describe("buildLabReportPages", () => {
     const p = pages[0];
     expect(p.rows).toHaveLength(1); // qc row ถูกตัดออก
     expect(p.rows[0]).toEqual({
-      testItem: "Glyphosate (%w/v)",
-      result: "48.20",
-      criteria: "45.5-50.5",
+      testItem: "Glyphosate",
+      result: "48.20 % W/W",
+      criteria: "45.50-50.50",
       method: "HPLC\nJ. Henriet and H.H. Povlsen. 1988. Analysis of Technical and Formulated Pesticides. CIPAC Handbook. Vol. D. P. 100-105.",
     });
+  });
+
+  it("เมื่อมี Density แสดงผลเป็น % W/V และคง Density ไว้ใต้ผล", () => {
+    const densityGroups: ApprovalItemGroup[] = [{
+      ...groups[0],
+      params: [
+        groups[0].params[0],
+        {
+          parameterId: "density", parameterName: "Density", scope: "lab", hasPhases: false,
+          rows: [{ key: "density", label: "Density", value: "1.05", standardText: "", abnormal: false, note: "", phase: 1 }],
+        },
+      ],
+    }];
+    const [page] = buildLabReportPages(petition, labRequests, densityGroups);
+
+    expect(page.rows[0].testItem).toBe("Glyphosate");
+    expect(page.rows[0].result).toBe("48.20 % W/V\nDensity : 1.050");
   });
 
   it("แถวที่ไม่ใช่สารออกฤทธิ์ยังแสดงวิธีทดสอบเป็น '-'", () => {

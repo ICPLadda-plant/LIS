@@ -14,8 +14,14 @@ import { getAiStatus, streamDraftNote } from "@/lib/aiApi";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
+import { shouldSendItemToLab } from "@/lib/petitionRouting";
+import { fullThaiTitle } from "@/lib/labReport";
+import { formatLabSampleNo, labLabelNumbersForItems } from "@/lib/petitionSampler";
 
-const API_BASE = import.meta.env.BASE_URL + "api";
+export const labApprovalItems = (petition: Petition) => (petition.items ?? [])
+  .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
+
+export const labApprovalTesterName = (petition: Petition) => fullThaiTitle(petition.labCompletedBy) || "-";
 
 function priorityScore(
   petition: Petition,
@@ -39,7 +45,6 @@ const LabApproval = () => {
   const { data, loading } = usePetitionList({ awaitingLabApproval: true, limit: 100 });
   const petitions = data?.items ?? [];
 
-  const [testersMap, setTestersMap] = useState<Record<string, string[]>>({});
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   const [returnedMap, setReturnedMap] = useState<Record<string, boolean>>({});
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
@@ -48,11 +53,13 @@ const LabApproval = () => {
 
   const sortedPetitions = useMemo(
     () =>
-      [...petitions].sort(
-        (a, b) =>
-          Number(isUrgentPetition(b)) - Number(isUrgentPetition(a)) ||
-          priorityScore(b, abnormalMap, returnedMap) - priorityScore(a, abnormalMap, returnedMap),
-      ),
+      [...petitions]
+        .filter((petition) => labApprovalItems(petition).length > 0)
+        .sort(
+          (a, b) =>
+            Number(isUrgentPetition(b)) - Number(isUrgentPetition(a)) ||
+            priorityScore(b, abnormalMap, returnedMap) - priorityScore(a, abnormalMap, returnedMap),
+        ),
     [petitions, abnormalMap, returnedMap],
   );
 
@@ -62,19 +69,12 @@ const LabApproval = () => {
 
   useEffect(() => {
     if (petitions.length === 0) {
-      setTestersMap({});
       setAbnormalMap({});
       setReturnedMap({});
       return;
     }
     const ids = petitions.map((p) => p._id);
     let alive = true;
-    fetch(`${API_BASE}/qc-results/testers?scope=lab&petitionIds=${encodeURIComponent(ids.join(","))}`, {
-      cache: "no-store",
-    })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((map: Record<string, string[]>) => { if (alive) setTestersMap(map || {}); })
-      .catch(() => { if (alive) setTestersMap({}); });
     api.getAbnormalFlags(ids, { includeRestricted: false })
       .then((map) => { if (alive) setAbnormalMap(map || {}); })
       .catch(() => { if (alive) setAbnormalMap({}); });
@@ -89,11 +89,11 @@ const LabApproval = () => {
     {
       key: "no",
       header: "เลขที่คำร้อง",
-      className: "font-semibold text-primary",
+      className: "w-28 align-top font-semibold text-primary",
       cell: (p) => (
         <div>
           <div className="flex items-center gap-1.5">
-            <span>{p.petitionNo}</span>
+            <span>{labLabelNumbersForItems(p, labApprovalItems(p)).join(", ") || "-"}</span>
             <UrgentBadge petition={p} />
             {returnedMap[p._id] && (
               <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
@@ -123,31 +123,47 @@ const LabApproval = () => {
       ),
     },
     {
-      key: "samples", header: "ชื่อยา / Batch / เลขที่ตัวอย่าง", className: "min-w-[260px] align-top",
-      cell: (p) => (p.items?.length ? (
+      key: "sampleNos", header: "เลขที่ตัวอย่าง", className: "w-28 align-top",
+      cell: (p) => (
         <div className="space-y-2">
-          {p.items.map((item) => (
-            <div key={item.seq}>
-              <div className="font-medium text-foreground">{item.sampleName || item.commonName || "-"}</div>
-              <div className="text-xs text-muted-foreground">Batch: {item.batchNo || "-"} · เลขที่ตัวอย่าง: {item.sampleId || "-"}</div>
+          {labApprovalItems(p).map((item) => (
+            <div key={item.seq} className="font-semibold text-primary">
+              {formatLabSampleNo(p, item.sampleId)}
             </div>
           ))}
         </div>
-      ) : "-"),
+      ),
     },
-    { key: "dept", header: "แผนก", cell: (p) => <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge> },
-    { key: "submitter", header: "ผู้นำส่ง", cell: (p) => p.submittedBy?.name ?? "-" },
     {
-      key: "testers", header: "ผู้ทดสอบ", className: "max-w-[200px] text-sm text-muted-foreground align-top",
-      cell: (p) => {
-        const t = testersMap[p._id] ?? [];
-        return t.length > 0 ? <div className="flex flex-col gap-0.5">{t.map((n) => <span key={n}>{n}</span>)}</div> : "-";
-      },
+      key: "samples", header: "ชื่อยา / Batch", className: "min-w-[260px] align-top",
+      cell: (p) => (
+        <div className="space-y-2">
+          {labApprovalItems(p).map((item) => (
+            <div key={item.seq}>
+              <div className="font-medium text-foreground">{item.sampleName || item.commonName || "-"}</div>
+              <div className="text-xs text-muted-foreground">Batch: {item.batchNo || "-"}</div>
+            </div>
+          ))}
+        </div>
+      ),
     },
-    { key: "count", header: "จำนวนรายการ", cell: (p) => `${p.items?.length ?? 0} รายการ` },
-    { key: "status", header: "สถานะ", cell: (p) => { const b = petitionStatusBadge(p); return <Badge variant={b.variant}>{b.label}</Badge>; } },
     {
-      key: "action", header: "การดำเนินการ", className: "text-right",
+      key: "deptSubmitter", header: "แผนก / ผู้นำส่ง", className: "min-w-40 align-top",
+      cell: (p) => (
+        <div className="space-y-2">
+          <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge>
+          <div>{p.submittedBy?.name ?? "-"}</div>
+        </div>
+      ),
+    },
+    {
+      key: "testers", header: "ผู้ทดสอบ", className: "min-w-36 max-w-[200px] align-top text-sm text-muted-foreground",
+      cell: labApprovalTesterName,
+    },
+    { key: "count", header: "จำนวนรายการ", className: "w-24 align-top", cell: (p) => `${labApprovalItems(p).length} รายการ` },
+    { key: "status", header: "สถานะ", className: "w-28 align-top", cell: (p) => { const b = petitionStatusBadge(p); return <Badge variant={b.variant}>{b.label}</Badge>; } },
+    {
+      key: "action", header: "การดำเนินการ", className: "w-28 align-top text-right",
       cell: (p) => (
         <div className="flex flex-col items-end gap-2">
           <Button size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/lab-approval/${p._id}`); }}>

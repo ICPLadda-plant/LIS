@@ -4,6 +4,7 @@ import {
   FORM_ENTRY_INDEX_KEY,
   findSgParameter,
   resolveSpecificGravity,
+  resolveSpecificGravityForItem,
 } from './formSpecificGravity';
 
 const sgParam = {
@@ -33,6 +34,22 @@ describe('findSgParameter', () => {
   it('ignores a matching field on a parameter not shared with lab', () => {
     const notShared = { ...sgParam, shareWithLab: false };
     expect(findSgParameter([notShared] as any)).toBeNull();
+  });
+
+  it('uses field-level collection config over legacy parameter-level manual config', () => {
+    const configured = {
+      ...sgParam,
+      specificGravitySource: { mode: 'manual' },
+      valueFields: [{
+        label: SG_FIELD_LABEL,
+        type: 'float',
+        requestValueSource: { mode: 'collection' },
+      }],
+    };
+    expect(findSgParameter([configured] as any)).toEqual({
+      parameterId: 'sg1',
+      fieldLabel: SG_FIELD_LABEL,
+    });
   });
 });
 
@@ -89,7 +106,7 @@ describe('resolveSpecificGravity', () => {
       { itemSeq: 1, parameterId: 'sg1', values: { [SG_FIELD_LABEL]: 1.1 } },
       { itemSeq: 2, parameterId: 'sg1', values: { [SG_FIELD_LABEL]: 2.2 } },
     ];
-    expect(resolveSpecificGravity(results as any, 2, matched)).toBe('2.2');
+    expect(resolveSpecificGravity(results as any, 2, matched)).toBe('2.200');
   });
 
   it('returns empty string when no result for the seq', () => {
@@ -104,5 +121,27 @@ describe('resolveSpecificGravity', () => {
   it('returns empty string when the chosen value is blank', () => {
     const results = [{ itemSeq: 1, parameterId: 'sg1', values: { [SG_FIELD_LABEL]: '' } }];
     expect(resolveSpecificGravity(results as any, 1, matched)).toBe('');
+  });
+});
+
+describe('resolveSpecificGravityForItem', () => {
+  it('uses the QC sibling value for the Lab item with the same batch and medicine', () => {
+    const items = [
+      { seq: 1, sampleName: 'Medicine A', commonName: 'Medicine A', batchNo: 'BATCH-001', sendToQc: true },
+      { seq: 2, sampleName: 'Medicine A', commonName: 'Medicine A', batchNo: 'BATCH-001', sendToLab: true },
+    ];
+    const results = [{
+      itemSeq: 1,
+      parameterId: 'sg1',
+      values: {},
+      entries: [{ [`${SG_FIELD_LABEL}::medicine-a`]: 1.066 }],
+    }];
+
+    expect(resolveSpecificGravityForItem(
+      results as any,
+      items as any,
+      2,
+      { parameterId: 'sg1', fieldLabel: SG_FIELD_LABEL },
+    )).toBe('1.066');
   });
 });
