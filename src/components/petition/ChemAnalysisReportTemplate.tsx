@@ -28,6 +28,8 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-sign { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 1.5mm; margin-top: 1.8mm; text-align: center; }
 .ca-sign .ca-val { flex: 0 1 48mm; min-width: 26mm; text-align: center; }
 .ca-sign > span { min-width: 0; overflow-wrap: anywhere; }
+.ca-sign-lab { display: grid; grid-template-columns: 40mm minmax(0, 54mm) minmax(0, 72mm); column-gap: 2mm; }
+.ca-sign-lab .ca-val { min-width: 0; }
 .ca-cb { display: inline-block; width: 3.4mm; height: 3.4mm; margin-right: 1.5mm; border: 0.8pt solid #000; vertical-align: -0.6mm; text-align: center; line-height: 3mm; font-weight: 700; }
 .ca-note { margin-top: 1mm; }
 .ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: right; font-size: 13pt !important; }
@@ -74,8 +76,8 @@ function Sheet({ sheet }: { sheet: ChemReportSheet }) {
         <div className="ca-line"><Field grow label="ชื่อผู้รับผลวิเคราะห์" value={customer.recipientName} /><Field label="หน่วยงาน" value={customer.department} /></div>
         <div className="ca-line"><Field grow label="ชื่อตัวอย่าง" value={customer.sampleName} /><Field label="จำนวนตัวอย่างที่ส่ง" value={customer.sampleCount} /></div>
         <div className="ca-line"><Field grow label="เลขที่ใบนำส่ง" value={customer.submissionNo} /><Field label="วันที่ส่งตัวอย่าง" value={customer.sentDate} /><Field label="เวลาส่งตัวอย่าง" value={customer.sentTime} /></div>
-        <div className="ca-line"><Field grow label="วันที่นำเข้า" value={customer.importDate} /><Field label="ทดสอบครั้งที่" value={customer.testRound} /></div>
-        <div className="ca-line"><Field grow label="แบชนัมเบอร์" value={customer.batchNo} /></div>
+        <div className="ca-line"><Field grow label="วันที่นำเข้า" value={customer.importDate} /><Field label="ทดสอบครั้งที่" /></div>
+        <div className="ca-line"><Field grow label="แบชนัมเบอร์" /></div>
         <div className="ca-line"><Field grow label="นำเข้ามาจาก" value={customer.importedFrom} /></div>
       </div>
 
@@ -100,8 +102,8 @@ function Sheet({ sheet }: { sheet: ChemReportSheet }) {
           </tbody>
         </table>
         <div className="ca-line"><Field grow label="เกณฑ์มาตรฐาน" value={lab.criteria} /></div>
-        <div className="ca-sign"><span>ผู้วิเคราะห์/ผู้รายงาน</span><span className="ca-val">{lab.analystName}</span><span>นักเคมี</span></div>
-        <div className="ca-sign"><span>ผู้ทบทวนและอนุมัติ</span><span className="ca-val">{lab.labHeadName}</span><span>หัวหน้าฝ่ายห้องปฏิบัติการเคมีวิเคราะห์</span></div>
+        <div className="ca-sign ca-sign-lab"><span>ผู้วิเคราะห์/ผู้รายงาน</span><span className="ca-val">{lab.analystName}</span><span>นักเคมี</span></div>
+        <div className="ca-sign ca-sign-lab"><span>ผู้ทบทวนและอนุมัติ</span><span className="ca-val">{lab.labHeadName}</span><span>หัวหน้าฝ่ายห้องปฏิบัติการเคมีวิเคราะห์</span></div>
       </div>
 
       <div className="ca-box">
