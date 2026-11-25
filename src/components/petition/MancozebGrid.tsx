@@ -16,7 +16,7 @@ export function MancozebGrid({ values, onChange, disabled, density }: Props) {
   );
 
   return (
-    <section className="space-y-3 rounded-lg border border-l-4 border-l-primary bg-card p-3 shadow-sm sm:col-span-6">
+    <section className="space-y-3 rounded-lg border border-border bg-card p-3 shadow-sm sm:col-span-6">
       <h4 className="text-base font-semibold text-foreground">ใบคำนวณ Mancozeb (ไทเทรต 0.1 N I2)</h4>
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label className="flex items-center gap-2"><span className="text-muted-foreground">Conc 0.1 N I2</span><span className="w-28">{input(MCZ_CONC, "Conc 0.1 N I2")}</span><span className="text-muted-foreground">N</span></label>
