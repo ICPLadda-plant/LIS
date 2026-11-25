@@ -938,9 +938,11 @@ export default function LabTestingDetailPage() {
   }
 
   // Keep routed Lab items visible even when their parameters are missing.
-  const allLabBatchItems = isResearchAndDevelopmentPetition(petition)
+  // Hide samples whose Lab label has not been scanned in yet (partial receipt).
+  const allLabBatchItems = (isResearchAndDevelopmentPetition(petition)
     ? (petition.items ?? [])
-    : (petition.items ?? []).filter((it) => shouldSendItemToLab(it));
+    : (petition.items ?? []).filter((it) => shouldSendItemToLab(it)))
+    .filter((it) => !isItemLabelPending(petition, it, 'lab'));
   const labItems = mergeQcLabDuplicateItems(petition, allLabBatchItems);
   const liveResultKeys = new Set([
     ...savedResults.map((result) => resultKey(result.itemSeq, result.parameterId)),
