@@ -41,12 +41,14 @@ import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
 import { itemSubmissionNoText } from '@/lib/petitionSampler';
+import { isItemLabelPending } from '@/lib/labelReceipt';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
 const LAB_PAGE_SIZE = 50;
 
 const labItemsFor = (petition: Petition) => (petition.items ?? []).filter(
-  (item) => isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(item),
+  (item) => (isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(item))
+    && !isItemLabelPending(petition, item, 'lab'),
 );
 
 export default function LabTestingPage() {

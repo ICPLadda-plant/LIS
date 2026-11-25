@@ -1,0 +1,40 @@
+name: Auto PR and Merge
+on:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-pr:
+    runs-on: [self-hosted, windows]
+    defaults:
+      run:
+        shell: powershell
+    env:
+      GH_TOKEN: ${{ secrets.AUTO_MERGE_TOKEN || github.token }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: หา GitHub CLI บนเครื่อง server
+        run: |
+          $ghDir = 'C:\Program Files\GitHub CLI'
+          if (Test-Path "$ghDir\gh.exe") { Add-Content -Path $env:GITHUB_PATH -Value $ghDir }
+          elseif (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+            Write-Error "GitHub CLI not found on server: run 'winget install GitHub.cli' then restart the runner"; exit 1
+          }
+
+      - name: เปิด PR เข้า main (ถ้ายังไม่มี PR ที่เปิดอยู่)
+        run: |
+          $open = gh pr list --repo $env:REPO --head $env:BRANCH --base main --state open --json number --jq '.[0].number'
+          if (-not $open) {
+            gh pr create --repo $env:REPO --base main --head $env:BRANCH --title "Merge $env:BRANCH into main" --body "Auto-created on push to $env:BRANCH"
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          }
+
+      - name: Merge เข้า main ถ้าไม่มี conflict
+        run: |
+          gh pr merge $env:BRANCH --repo $env:REPO --merge
+          if ($LASTEXITCODE -ne 0) { Write-Error "Merge failed (possible conflict). PR stays open for fixing."; exit 1 }
