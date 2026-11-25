@@ -4,27 +4,27 @@ import { CHEM_REPORT_SAMPLES_PER_SHEET, type ChemReportSample, type ChemReportSh
 import { A4_PRINT_FONT_FAMILY } from "@/lib/printConfig";
 
 export const CHEM_ANALYSIS_REPORT_CSS = `
-.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: 12pt; line-height: 1.25; }
-.ca-page { width: 210mm; height: 297mm; padding: 6mm 12mm 5mm; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
+.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: 13pt; line-height: 1.25; }
+.ca-page { width: 210mm; height: 297mm; padding: 5mm 8mm 4mm; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
 .ca-page + .ca-page { margin-top: 6mm; page-break-before: always; break-before: page; }
 .ca-head { display: flex; align-items: center; gap: 3mm; padding-bottom: 2mm; border-bottom: 0.8pt solid #000; }
-.ca-logo { height: 10mm; }
-.ca-company { font-weight: 700; font-size: 11pt !important; }
-.ca-title { margin-top: 2mm; text-align: center; font-weight: 700; font-size: 15pt !important; line-height: 1 !important; }
+.ca-logo { height: 11mm; }
+.ca-company { font-weight: 700; font-size: 12pt !important; }
+.ca-title { margin-top: 2mm; text-align: center; font-weight: 700; font-size: 16pt !important; line-height: 1 !important; }
 .ca-sub { text-align: center; font-weight: 700; }
-.ca-box { position: relative; margin-top: 3.5mm; padding: 3mm 3mm 2.2mm; border: 0.8pt solid #000; border-radius: 2mm; }
+.ca-box { position: relative; margin-top: 4mm; padding: 3.5mm 3.5mm 3mm; border: 0.8pt solid #000; border-radius: 2mm; }
 .ca-tag { position: absolute; top: -2.6mm; left: 4mm; padding: 0 2mm; background: #fff; font-weight: 700; }
 .ca-line { display: flex; flex-wrap: wrap; align-items: flex-end; column-gap: 2mm; row-gap: 0.8mm; margin-top: 1.2mm; }
 .ca-field { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 1mm; min-width: 0; max-width: 100%; }
 .ca-grow { flex: 1 1 45mm; }
 .ca-label { white-space: nowrap; }
-.ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 5.5mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; }
+.ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 6mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; }
 .ca-tbl { width: 100%; margin-top: 1.5mm; border-collapse: collapse; table-layout: fixed; }
-.ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; height: 6.5mm; padding: 0.8mm 0.5mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
+.ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; height: 7mm; padding: 1mm 0.6mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.1 !important; }
 .ca-tbl th { font-weight: 700; }
-.ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 10pt !important; overflow-wrap: normal; }
-.ca-tbl td.ca-cell { font-size: 9pt !important; overflow-wrap: anywhere; word-break: normal; }
-.ca-tbl td.ca-cell-long { font-size: 8pt !important; line-height: 1.05 !important; }
+.ca-tbl .ca-rowhead { text-align: left; padding-left: 1mm; font-size: 11pt !important; overflow-wrap: normal; }
+.ca-tbl td.ca-cell { font-size: 10pt !important; overflow-wrap: anywhere; word-break: normal; }
+.ca-tbl td.ca-cell-long { font-size: 9pt !important; line-height: 1.05 !important; }
 .ca-sign { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 1.5mm; margin-top: 2.5mm; text-align: center; }
 .ca-sign .ca-val { flex: 0 1 48mm; min-width: 26mm; text-align: center; }
 .ca-sign > span { min-width: 0; overflow-wrap: anywhere; }

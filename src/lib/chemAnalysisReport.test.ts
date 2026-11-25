@@ -69,5 +69,15 @@ describe("buildChemAnalysisSheets", () => {
     expect(sheet.qc.passBatches).toBe("");
     expect(sheet.qc.failBatches).toBe("");
   });
+
+  it("ใช้เวลาที่ Lab สแกนรับเป็นเวลาส่งตัวอย่างบนใบรายงาน", () => {
+    const p = {
+      ...petition(1),
+      sampleSentAt: "2026-11-02T08:15:00",
+      labReceivedAt: "2026-11-02T09:45:00",
+    } as unknown as Petition;
+    const [sheet] = buildChemAnalysisSheets(p, [page("B1", "35.1")]);
+    expect(sheet.customer.sentTime).toBe("09.45 น.");
+  });
 });
 

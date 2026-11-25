@@ -4,6 +4,7 @@ import { buddhistDate } from "@/lib/labReport";
 import { itemRequiresSide } from "@/lib/itemApprovals";
 import { mediaUrlsFromText } from "@/lib/mediaUrls";
 import { formatSpecificGravity } from "@/lib/formSpecificGravity";
+import { labReceivedAt } from "@/lib/receiveStatus";
 
 /** ฟอร์ม F-CHM-01-01 Rev 04 มีช่องตัวอย่าง 7 ช่องต่อหนึ่งใบ */
 export const CHEM_REPORT_SAMPLES_PER_SHEET = 7;
@@ -171,7 +172,7 @@ export function buildChemAnalysisSheets(petition: Petition, labPages: LabReportP
         sampleCount: String(chunk.length),
         submissionNo: unique(chunk.map(({ page }) => page.sample.submissionNo)).join(", "),
         sentDate: buddhistDate(petition.sampleSentAt),
-        sentTime: timeOf(petition.sampleSentAt),
+        sentTime: timeOf(labReceivedAt(petition)),
         importDate: petition.dept === "rm" ? buddhistDate(petition.receivedAt) : "",
         batchNo: unique(samples.map((sample) => sample.batchNo)).join(", "),
         testRound: unique(samples.map((sample) => sample.testRound)).join(", "),
