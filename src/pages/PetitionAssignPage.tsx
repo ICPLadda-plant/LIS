@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import LabFreeAssignControl from '@/components/petition/LabFreeAssignControl';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import { useAuth } from '@/hooks/useAuth';
@@ -188,6 +189,8 @@ export default function PetitionAssignPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
+  // เลือกคนแล้วแต่ยังไม่มีเลขตัวอย่าง: เปิดหน้ารับตัวอย่างให้ใส่เลข แล้ว assign ต่อให้อัตโนมัติ
+  const [pendingAssign, setPendingAssign] = useState<{ petitionId: string; petitionNo: string; employeeId: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -382,7 +385,8 @@ export default function PetitionAssignPage() {
     const petition = allPetitions.find((p) => p._id === petitionId);
     if (!petition) return;
     if (!hasValidLabSampleNumbers(petition)) {
-      toast.error('กรุณาใส่เลขตัวอย่างก่อน Assign');
+      toast.info('กรุณาใส่เลขตัวอย่างก่อน Assign');
+      setPendingAssign({ petitionId, petitionNo: petition.petitionNo, employeeId });
       return;
     }
     void assignPetition(petition, employeeId);
@@ -423,11 +427,19 @@ export default function PetitionAssignPage() {
   return (
     <AppLayout>
         <LabScanAcceptModal
-          open={scanOpen}
+          open={scanOpen || !!pendingAssign}
+          initialCode={pendingAssign?.petitionNo}
+          editSampleNumbers={!!pendingAssign}
           pendingPetitions={awaitingReceive}
-          onClose={() => setScanOpen(false)}
-          onAccepted={() => {
+          onClose={() => { setScanOpen(false); setPendingAssign(null); }}
+          onAccepted={(accepted?: Petition) => {
             setScanOpen(false);
+            const pending = pendingAssign;
+            setPendingAssign(null);
+            if (pending && accepted?._id === pending.petitionId && hasValidLabSampleNumbers(accepted)) {
+              void assignPetition(accepted, pending.employeeId);
+              return;
+            }
             refreshPetitions();
           }}
         />
@@ -639,10 +651,23 @@ function AssignBoard({
   // มือถือ/iPad ลากยาก: แตะการ์ดแล้วเลือกคนจากรายชื่อ 2 คอลัมน์แทน
   const isTouch = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches, []);
   const [pickingId, setPickingId] = useState<string | null>(null);
-  const renderPicker = (petition: Petition) => {
-    if (!isTouch || !canAssign || pickingId !== petition._id) return null;
+  const pickingPetition = pickingId ? petitions.find((p) => p._id === pickingId) : undefined;
+  const renderPicker = () => {
+    const petition = pickingPetition;
+    const sampleNos = petition
+      ? (groupsByPetition.get(petition._id) ?? []).map((g) => sampleSeqLabel(g)).filter(Boolean)
+      : [];
     return (
-      <div className="mt-2 grid grid-cols-2 gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <Dialog open={!!petition} onOpenChange={(open) => { if (!open) setPickingId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>เลือกผู้รับงาน</DialogTitle>
+            <DialogDescription>
+              {petition?.petitionNo} · เลขตัวอย่าง {sampleNos.length ? sampleNos.map((n) => '#' + n).join(', ') : 'ยังไม่ได้ใส่'}
+            </DialogDescription>
+          </DialogHeader>
+          {petition && (
+      <div className="grid grid-cols-2 gap-2">
         {columns.filter((c) => c.employeeId !== petition.assignedTo?.employeeId).map((c) => (
           <Button
             key={c.employeeId}
@@ -665,12 +690,14 @@ function AssignBoard({
           </Button>
         )}
       </div>
+          )}
+        </DialogContent>
+      </Dialog>
     );
   };
   const touchProps = (petition: Petition) => ({
     touchPick: isTouch && canAssign,
-    onTap: () => setPickingId((cur) => (cur === petition._id ? null : petition._id)),
-    picker: renderPicker(petition),
+    onTap: () => setPickingId(petition._id),
   });
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
@@ -768,6 +795,7 @@ function AssignBoard({
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)] items-start">
+      {isTouch && canAssign && renderPicker()}
       {/* Unassigned pool */}
       <div
         onDragOver={(e) => {
@@ -921,7 +949,6 @@ interface PetitionCardProps {
   /** อุปกรณ์จอสัมผัส: แตะการ์ดเพื่อเปิดรายชื่อแทนการลาก */
   touchPick?: boolean;
   onTap?: () => void;
-  picker?: React.ReactNode;
 }
 
 function PetitionCard({
@@ -938,7 +965,6 @@ function PetitionCard({
   assigned,
   touchPick = false,
   onTap,
-  picker,
 }: PetitionCardProps) {
   const statusCfg = labAssignBoardStatusBadge(petition, assigned);
   const showStatusBadge = hasLabTrack(petition);
@@ -952,7 +978,8 @@ function PetitionCard({
     .filter(Boolean) as string[];
   const blocked = groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode));
   // เปลี่ยนผู้รับงานแล้วคนใหม่ต้องกดเริ่มงานเอง
-  const canDrag = canDragRole && !touchPick;
+  // จอสัมผัส: ลากได้เหมือนคอม และแตะเพื่อเปิด popup เลือกคน
+  const canDrag = canDragRole;
 
   return (
     // admin คลิกขวาที่ตัวการ์ดเพื่อเปิดคำร้อง ส่วนคลิกซ้ายใช้ลาก; role อื่นเปิดจากปุ่มเลขคำร้อง
@@ -1063,7 +1090,7 @@ function PetitionCard({
             รับงาน
           </Button>
         )}
-      </div>{picker}
+      </div>
     </Card>
   );
 }
