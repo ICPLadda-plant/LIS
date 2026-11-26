@@ -40,7 +40,7 @@ import { isLabAwaitingSgConfirmation } from '@/lib/sgConfirmation';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
-import { itemSubmissionNoText } from '@/lib/petitionSampler';
+import { formatLabSampleNo, itemSubmissionNoText } from '@/lib/petitionSampler';
 import { isItemLabelPending } from '@/lib/labelReceipt';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
@@ -247,10 +247,11 @@ export default function LabTestingPage() {
       className: 'align-top',
       cell: (p) => {
         const labItems = labItemsFor(p);
+        const sampleNos = [...new Set(labItems.map((item) => (item as { sampleId?: string }).sampleId?.trim()).filter(Boolean).map((id) => formatLabSampleNo(p, id)))];
         return (
           <>
             <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-sky-600">{p.petitionNo}</span>
+              <span className="font-semibold text-sky-600">{sampleNos.length ? sampleNos.join(', ') : p.petitionNo}</span>
               <UrgentBadge petition={p} />
               {returnedMap[p._id] && (
                 <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
