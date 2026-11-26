@@ -2,7 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import {
-  ChevronDown, ChevronLeft, ChevronRight, Search,
+  BadgeCheck, Beaker, ChevronDown, ChevronLeft, ChevronRight, ClipboardCheck, ClipboardList, Clock,
+  Database, FileBarChart, FileCheck2, FileInput, FileSpreadsheet, FileText, FlaskConical, FlaskRound,
+  FolderOpen, Gauge, Home, LockKeyhole, Network, Package, PackageMinus, Scale, Search, ServerCog,
+  Settings, ShieldCheck, SlidersHorizontal, Stamp, TestTube, UserCheck, Wrench, type LucideIcon,
 } from "lucide-react";
 import { LAB_ASSIGN_PATH, NAV_ITEMS, type NavItem } from "@/lib/navItems";
 import { normalizeFavorites } from "@/lib/favorites";
@@ -45,6 +48,96 @@ const EMPTY_GROUPS: NavGroup[] = [];
 // AccessGroup id — see server/models/AccessGroup.js
 const FAVORITES_SECTION_ID = "__favorites";
 const NAV_PATHS = NAV_ITEMS.map((item) => item.path);
+
+/**
+ * ชื่อสั้น + ไอคอนที่ไม่ซ้ำกัน สำหรับแถบไอคอนมีชื่อ (iPad) และแถบเมนูล่างบนมือถือ
+ * รายการเต็มใน NAV_ITEMS ยังใช้ไอคอนเดิม เพื่อให้ desktop หน้าตาเหมือนเดิม
+ */
+const NAV_COMPACT_META: Record<string, { short: string; icon: LucideIcon }> = {
+  "/validation": { short: "Validation", icon: BadgeCheck },
+  "/home": { short: "หน้าแรก", icon: Home },
+  "/petition": { short: "คำร้อง", icon: FileText },
+  "/lab-send-conditions": { short: "ส่ง Lab", icon: FlaskRound },
+  "/record-results": { short: "ผลวิเคราะห์", icon: ClipboardList },
+  "/lab-results": { short: "ผล Lab", icon: ClipboardCheck },
+  "/coa": { short: "COA", icon: FileCheck2 },
+  "/blank-form": { short: "ฟอร์มเปล่า", icon: FileInput },
+  "/documents": { short: "เอกสาร", icon: FolderOpen },
+  "/stock-deduction": { short: "เบิก Stock", icon: PackageMinus },
+  "/daily-check": { short: "Daily Check", icon: Scale },
+  "/virtual-lab": { short: "Virtual Lab", icon: Network },
+  "/standard-time": { short: "Std Time", icon: Clock },
+  "/report": { short: "รายงาน", icon: FileBarChart },
+  "/qc-approval": { short: "อนุมัติ QC", icon: ShieldCheck },
+  "/lab-approval": { short: "อนุมัติ Lab", icon: Stamp },
+  "/qc-testing": { short: "ทดสอบ QC", icon: TestTube },
+  "/lab-testing": { short: "ทดสอบ Lab", icon: FlaskConical },
+  "/density-results": { short: "Density", icon: Gauge },
+  "/petition/assign": { short: "Assign", icon: UserCheck },
+  "/stock": { short: "Stock", icon: Package },
+  "/master-items": { short: "Master", icon: Database },
+  "/simple-method": { short: "Simple", icon: Beaker },
+  "/full-spec": { short: "Full spec", icon: FileSpreadsheet },
+  "/machines": { short: "เครื่อง", icon: Wrench },
+  "/admin-data": { short: "Admin", icon: ServerCog },
+  "/parameter-settings": { short: "พารามิเตอร์", icon: SlidersHorizontal },
+  "/access-control": { short: "สิทธิ์", icon: LockKeyhole },
+  "/settings": { short: "ตั้งค่า", icon: Settings },
+};
+
+export function navItemCompact(item: NavItem): { short: string; icon: LucideIcon } {
+  return NAV_COMPACT_META[item.path] ?? { short: item.label, icon: item.icon };
+}
+
+/**
+ * กติกาสิทธิ์เดียวกับรายการเมนูใน sidebar — MobileBottomNav ใช้ตัวนี้ เพื่อไม่แสดงเมนูที่ไม่มีสิทธิ์
+ */
+export function useNavItemAccess() {
+  const { user } = useAuth();
+  const roles = normalizeRoles(user);
+  const { data: accessControl } = useQuery({
+    queryKey: ACCESS_CONTROL_QUERY_KEY,
+    queryFn: async () => {
+      const res = await api.get<AccessControlState>("/access-control");
+      return res.data.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+  const navGroups = accessControl?.groups?.length ? accessControl.groups : EMPTY_GROUPS;
+  const effectiveUser = useMemo(
+    () =>
+      user
+        ? {
+            ...user,
+            roles,
+            permissions: unionPermissions(roles, accessControl?.permissions ?? {}),
+          }
+        : user,
+    [user, roles, accessControl?.permissions],
+  );
+  // Assign Lab เห็นได้เฉพาะหัวหน้า Lab / admin
+  const canSeeLabAssign = roles.some((r) => r === "admin" || r === "lab-head");
+  const isRoleVisible = useCallback(
+    (item: NavItem) => canSeeLabAssign || item.path !== LAB_ASSIGN_PATH,
+    [canSeeLabAssign],
+  );
+  const canAccess = useCallback(
+    (item: NavItem) =>
+      isRoleVisible(item) &&
+      ((DEV_MODE && item.path === "/validation") || userCanAccessPath(effectiveUser, item.path, navGroups)),
+    [isRoleVisible, effectiveUser, navGroups],
+  );
+  return { user, roles, navGroups, effectiveUser, isRoleVisible, canAccess };
+}
+
+/** หา path เมนูที่ตรงกับหน้าปัจจุบัน (prefix ที่ยาวที่สุด) */
+export function activeNavPath(pathname: string) {
+  const matches = NAV_ITEMS.filter(
+    (item) => pathname === item.path || pathname.startsWith(`${item.path}/`),
+  );
+  matches.sort((a, b) => b.path.length - a.path.length);
+  return matches[0]?.path;
+}
 
 export type AppSidebarVariant = "desktop" | "drawer";
 
@@ -89,40 +182,29 @@ interface AppSidebarProps {
   variant?: AppSidebarVariant;
   /** Called when the user picks a nav item — useful for the drawer to close itself. */
   onNavigate?: () => void;
+  /**
+   * แถบไอคอน (ตอนย่อ) แสดงชื่อสั้นใต้ไอคอน และใช้ไอคอนที่ไม่ซ้ำกัน
+   * ค่าเริ่มต้น = เปิดเฉพาะ iPad แนวตั้ง (768–1023) — desktop ที่ผู้ใช้ย่อเองยังเป็นไอคอนล้วนเหมือนเดิม
+   */
+  labeledRail?: boolean;
+  /**
+   * ย่อเป็นแถบไอคอนอัตโนมัติ (ผู้ใช้กดขยายชั่วคราวได้ในเซสชัน)
+   * ค่าเริ่มต้น = iPad แนวตั้ง; ข้อ 7 ส่ง true ช่วง 1024–1279 ได้ (ดู useIsTabletLandscape)
+   */
+  autoCollapse?: boolean;
 }
 
-const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
+const AppSidebar = ({ variant = "desktop", onNavigate, labeledRail, autoCollapse }: AppSidebarProps) => {
   const location = useLocation();
-  const { user } = useAuth();
   const queryClient = useQueryClient();
   const isTablet = useIsTablet();
+  const isAutoCollapse = autoCollapse ?? isTablet;
+  const showRailLabels = labeledRail ?? isTablet;
   const isDrawer = variant === "drawer";
   const navRef = useRef<HTMLElement | null>(null);
   const navScrollStorageKey = NAV_SCROLL_STORAGE_KEY[variant];
-  const roles = normalizeRoles(user);
   const { favorites, isFavorite, toggle: toggleFavoritePath, move: moveFavoritePath } = useFavorites(NAV_PATHS);
-
-  const { data: accessControl } = useQuery({
-    queryKey: ACCESS_CONTROL_QUERY_KEY,
-    queryFn: async () => {
-      const res = await api.get<AccessControlState>("/access-control");
-      return res.data.data;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const navGroups = accessControl?.groups?.length ? accessControl.groups : EMPTY_GROUPS;
-  const effectiveUser = useMemo(
-    () =>
-      user
-        ? {
-            ...user,
-            roles,
-            permissions: unionPermissions(roles, accessControl?.permissions ?? {}),
-          }
-        : user,
-    [user, roles, accessControl?.permissions],
-  );
+  const { navGroups, effectiveUser, isRoleVisible } = useNavItemAccess();
 
   const [storedCollapsed, setStoredCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -148,13 +230,13 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
   // Desktop variant: auto-collapse on tablet width unless user manually expanded this session
   const collapsed = isDrawer
     ? false
-    : isTablet
+    : isAutoCollapse
       ? !manualExpand
       : storedCollapsed;
 
   const toggleCollapsed = () => {
     if (isDrawer) return;
-    if (isTablet) {
+    if (isAutoCollapse) {
       setManualExpand((v) => !v);
       return;
     }
@@ -281,9 +363,7 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
   const favoritePaths = useMemo(() => normalizeFavorites(favorites, NAV_PATHS), [favorites]);
 
   const allSections = useMemo(() => {
-    // Assign Lab เห็นได้เฉพาะหัวหน้า Lab / admin
-    const canSeeLabAssign = roles.some((r) => r === "admin" || r === "lab-head");
-    const visible = (item: NavItem) => canSeeLabAssign || item.path !== LAB_ASSIGN_PATH;
+    const visible = isRoleVisible;
     const baseSections = sections
       .map((s) => ({ ...s, items: s.items.filter(visible) }))
       .filter((s) => s.items.length > 0);
@@ -293,20 +373,13 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
       .filter((item): item is NavItem => !!item && visible(item));
     if (items.length === 0) return baseSections;
     return [{ id: FAVORITES_SECTION_ID, label: "รายการโปรด", items }, ...baseSections];
-  }, [favoritePaths, sections, roles]);
+  }, [favoritePaths, sections, isRoleVisible]);
 
   // The active nav item is the one whose path is the longest prefix of the
   // current pathname — so /daily-check stays active on /daily-check/balance,
   // while /petitions/assign still wins over /petitions on its own page.
-  const activePath = useMemo(() => {
-    const matches = NAV_ITEMS.filter(
-      (item) =>
-        location.pathname === item.path ||
-        location.pathname.startsWith(`${item.path}/`),
-    );
-    matches.sort((a, b) => b.path.length - a.path.length);
-    return matches[0]?.path;
-  }, [location.pathname]);
+  const activePath = useMemo(() => activeNavPath(location.pathname), [location.pathname]);
+  const railWithLabels = collapsed && showRailLabels;
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -409,7 +482,7 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
                   type="button"
                   onClick={() => toggleGroup(section.id)}
                   aria-expanded={!isGroupCollapsed}
-                  className="group flex w-full items-center justify-between px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                  className="group flex w-full items-center justify-between px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors touch:min-h-11 touch:pb-0"
                 >
                   <span className="truncate">{section.label}</span>
                   <ChevronDown
@@ -431,6 +504,8 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
                   // ตำแหน่งอ้างจากรายการเต็มที่เก็บไว้ ไม่ใช่รายการที่ผ่านตัวกรอง —
                   // ไม่งั้นสิทธิ์/ช่องค้นหาจะทำให้ย้ายผิดตำแหน่ง
                   const favIndex = favoritePaths.indexOf(item.path);
+                  const compact = railWithLabels ? navItemCompact(item) : null;
+                  const ItemIcon = compact?.icon ?? item.icon;
                   const link = (
                     <Link
                       to={targetPath}
@@ -453,13 +528,22 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
                       }}
                       className={cn(
                         "flex items-center w-full rounded-lg text-sm font-medium transition-colors no-underline",
-                        collapsed ? "justify-center h-10 px-0" : "gap-3 px-3 py-2.5",
+                        railWithLabels
+                          ? "flex-col justify-center gap-1 min-h-14 px-1 py-2"
+                          : collapsed
+                            ? "justify-center h-10 px-0 touch:h-11"
+                            : "gap-3 px-3 py-2.5 touch:min-h-11",
                         isActive
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                       )}
                     >
-                      <item.icon className="w-5 h-5 shrink-0" />
+                      <ItemIcon className="w-5 h-5 shrink-0" />
+                      {compact && (
+                        <span className="line-clamp-2 w-full break-words text-center text-[11px] leading-tight">
+                          {compact.short}
+                        </span>
+                      )}
                       {!collapsed && <span className="truncate">{item.label}</span>}
                     </Link>
                   );
@@ -472,7 +556,7 @@ const AppSidebar = ({ variant = "desktop", onNavigate }: AppSidebarProps) => {
                       inFavorites={inFavorites}
                       canMoveUp={inFavorites && favIndex > 0}
                       canMoveDown={inFavorites && favIndex >= 0 && favIndex < favoritePaths.length - 1}
-                      tooltip={collapsed ? item.label : undefined}
+                      tooltip={collapsed && compact?.short !== item.label ? item.label : undefined}
                       onToggleFavorite={() => toggleFavoritePath(item.path)}
                       onMove={(direction) => moveFavoritePath(item.path, direction)}
                     >

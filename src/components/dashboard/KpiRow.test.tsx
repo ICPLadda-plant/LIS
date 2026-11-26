@@ -1,7 +1,7 @@
 import React from "react";
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import KpiRow from "./KpiRow";
 import type { MetricsCtx } from "@/lib/dashboardMetrics";
 import type { KpiId } from "@/lib/dashboardProfiles";
@@ -73,7 +73,8 @@ describe("KpiRow", () => {
       </MemoryRouter>,
     );
 
-    expect(container.firstElementChild).toHaveClass("grid-cols-2", gridClass);
+    // children[0] = แถวชิป (มือถือ), children[1] = grid การ์ด (>= 768px)
+    expect(container.children[1]).toHaveClass("hidden", "md:grid", "grid-cols-1", gridClass);
   });
 
   it("renders widget cards three per row and can place extra cards after the first KPI", () => {
@@ -95,7 +96,7 @@ describe("KpiRow", () => {
       </MemoryRouter>,
     );
 
-    const grid = container.firstElementChild;
+    const grid = container.children[1];
     expect(grid).toHaveClass("md:grid-cols-6");
     expect(grid).not.toHaveClass("md:grid-cols-4");
     expect(grid).not.toHaveClass("xl:grid-cols-8");
@@ -109,8 +110,10 @@ describe("KpiRow", () => {
     expect(childText[4]).toContain("รอรับ");
     expect(childText[5]).toContain("รอออกผล");
 
-    expect(grid?.children[0]).toHaveClass("md:col-span-2");
-    expect(grid?.children[0]).not.toHaveClass("col-span-2");
+    // การ์ด KPI ถูกห่อด้วย wrapper ที่ซ่อนบนมือถือ (md:contents) — class อยู่ที่การ์ดข้างใน
+    expect(grid?.children[0]).toHaveClass("hidden", "md:contents");
+    expect(grid?.children[0].firstElementChild).toHaveClass("md:col-span-2");
+    expect(grid?.children[0].firstElementChild).not.toHaveClass("col-span-2");
     expect(grid?.children[1]).toHaveClass("md:col-span-2");
     expect(grid?.children[1]).not.toHaveClass("col-span-2");
   });
@@ -127,9 +130,35 @@ describe("KpiRow", () => {
       </MemoryRouter>,
     );
 
-    const grid = container.firstElementChild;
+    const grid = container.children[1];
     expect(grid).toHaveClass("md:grid-cols-8");
     expect(grid).not.toHaveClass("md:grid-cols-4");
     expect(grid).not.toHaveClass("md:grid-cols-6");
+  });
+
+  it("shows KPI cards as filter chips on mobile that reuse the same click handler", () => {
+    const onKpiClick = vi.fn();
+    render(
+      <MemoryRouter>
+        <KpiRow
+          kpis={["assignedToMe", "inProgress"]}
+          ctx={ctx}
+          presentation="widgets"
+          activeKpi="inProgress"
+          onKpiClick={onKpiClick}
+        />
+      </MemoryRouter>,
+    );
+
+    const chipRow = screen.getByRole("group", { name: "ตัวกรองสรุป" });
+    expect(chipRow).toHaveClass("md:hidden", "overflow-x-auto");
+    const chips = within(chipRow).getAllByRole("button");
+    expect(chips).toHaveLength(2);
+    chips.forEach((chip) => expect(chip).toHaveClass("h-11"));
+    expect(chips[1]).toHaveAttribute("aria-pressed", "true");
+    expect(chips[0]).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(chips[0]);
+    expect(onKpiClick).toHaveBeenCalledWith("assignedToMe");
   });
 });

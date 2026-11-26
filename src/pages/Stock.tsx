@@ -9,6 +9,7 @@ import PageHeader from "@/components/lis/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ResponsiveDataTable, useViewportBand } from "@/components/lis/ResponsiveDataTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,21 @@ function canDeleteStockItems(user: RoleHolder | null | undefined) {
 type StockExportKind = "standard" | "solvent";
 type StockExportFormat = "xlsx" | "pdf";
 
+/** iPad แนวตั้ง (< 1024): ตรึงคอลัมน์คำสั่งไว้ขวา; ตั้งแต่ 1024 ขึ้นไปเหมือนเดิม */
+const STICKY_ACTION_CELL = "sticky right-0 z-[1] bg-card shadow-[-1px_0_0_0_hsl(var(--border))] lg:static lg:z-auto lg:bg-transparent lg:shadow-none";
+
+function StandardStatusBadges({ sum }: { sum: ReturnType<typeof summarizeStandard> }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {sum.usable === 0 && <Badge variant="red-soft" className="text-xs">หมด</Badge>}
+      {sum.expired > 0 && <Badge variant="red-soft" className="text-xs">หมดอายุ {sum.expired}</Badge>}
+      {sum.expiringSoon > 0 && <Badge variant="yellow-soft" className="text-xs">ใกล้หมดอายุ {sum.expiringSoon}</Badge>}
+      {sum.usable === 1 && sum.expired === 0 && sum.expiringSoon === 0 && <Badge variant="yellow-soft" className="text-xs">ใกล้หมด</Badge>}
+      {sum.usable >= 2 && sum.expired === 0 && sum.expiringSoon === 0 && <Badge variant="green-soft" className="text-xs">ปกติ</Badge>}
+    </div>
+  );
+}
+
 function localDateInputValue(date = new Date()) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 10);
@@ -122,6 +138,7 @@ function downloadStockExport(blob: Blob, filename: string) {
 // Standards Tab
 // ============================================================
 function StandardsTab() {
+  const band = useViewportBand();
   const qc = useQueryClient();
   const { user } = useAuth();
   const canDelete = canDeleteStockItems(user);
@@ -401,8 +418,71 @@ function StandardsTab() {
           </div>
         </CardHeader>
         <CardContent>
+          {band === "mobile" ? (
+            <ResponsiveDataTable
+              band="mobile"
+              data={filtered}
+              rowKey={(item) => item._id}
+              isLoading={isLoading}
+              emptyTitle="ไม่มีข้อมูล"
+              rowTitle={() => "คลิกเพื่อดูรายละเอียด"}
+              onRowClick={(item) => setDrawerId(item._id)}
+              columns={[
+                {
+                  key: "name",
+                  header: "ชื่อ",
+                  card: "title",
+                  cell: (item) => (
+                    <span>
+                      <span className="whitespace-nowrap font-semibold text-primary">{item.code}</span>{" "}
+                      {item.name}
+                    </span>
+                  ),
+                },
+                {
+                  key: "status",
+                  header: "สถานะ",
+                  card: "status",
+                  cell: (item) => (
+                    <StandardStatusBadges sum={summarizeStandard(unitsByCode.get(item.code) ?? [], new Date(now))} />
+                  ),
+                },
+                {
+                  key: "stock",
+                  header: "คงคลัง (ขวด)",
+                  cell: (item) => {
+                    const sum = summarizeStandard(unitsByCode.get(item.code) ?? [], new Date(now));
+                    const counts = usableByCode.get(item.code) ?? {};
+                    const parts = (["primary", "working", "supplier"] as const)
+                      .filter(t => (counts[t] ?? 0) > 0)
+                      .map(t => `${t} ${counts[t]}`);
+                    return `คงคลัง ${sum.usable} ขวด${parts.length > 0 ? ` (${parts.join(", ")})` : ""}`;
+                  },
+                },
+                { key: "frequency", header: "ความถี่", cell: (item) => item.frequency ? `ความถี่ ${item.frequency}` : null },
+                { key: "temp", header: "อุณหภูมิ", cell: (item) => item.storageTemp || null },
+                ...(canDelete
+                  ? [{
+                      key: "actions",
+                      header: "คำสั่ง",
+                      card: "actions" as const,
+                      cell: (item: (typeof filtered)[number]) => (
+                        <Button
+                          variant="outline"
+                          className="w-full gap-1.5 text-destructive"
+                          aria-label={`ลบ Standard ${item.name}`}
+                          onClick={(e) => { e.stopPropagation(); setDeleting(item); }}
+                        >
+                          <Trash2 className="w-4 h-4" /> ลบ
+                        </Button>
+                      ),
+                    }]
+                  : []),
+              ]}
+            />
+          ) : (
           <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-            <Table className="min-w-[700px]">
+            <Table className="lg:min-w-[700px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">Code</TableHead>
@@ -411,7 +491,7 @@ function StandardsTab() {
                   <TableHead className="hidden xl:table-cell">ความถี่/1 ครั้ง</TableHead>
                   <TableHead className="hidden xl:table-cell">อุณหภูมิ</TableHead>
                   <TableHead>สถานะ</TableHead>
-                  <TableHead className="w-12"><span className="sr-only">ลบ</span></TableHead>
+                  <TableHead className={`w-12 ${STICKY_ACTION_CELL}`}><span className="sr-only">ลบ</span></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -428,7 +508,7 @@ function StandardsTab() {
                       onDoubleClick={() => setDrawerId(item._id)}
                       title="คลิกเพื่อดูรายละเอียด"
                     >
-                      <TableCell className="font-semibold text-primary">{item.code}</TableCell>
+                      <TableCell className="whitespace-nowrap font-semibold text-primary">{item.code}</TableCell>
                       <TableCell className="font-medium">{item.name}</TableCell>
                       {(() => {
                         const sum = summarizeStandard(unitsByCode.get(item.code) ?? [], new Date(now));
@@ -448,20 +528,9 @@ function StandardsTab() {
                       <TableCell className="hidden xl:table-cell text-xs">{item.frequency || "-"}</TableCell>
                       <TableCell className="hidden xl:table-cell text-xs">{item.storageTemp || "-"}</TableCell>
                       <TableCell>
-                        {(() => {
-                          const sum = summarizeStandard(unitsByCode.get(item.code) ?? [], new Date(now));
-                          return (
-                            <div className="flex flex-wrap gap-1">
-                              {sum.usable === 0 && <Badge className="bg-destructive/15 text-destructive text-xs">หมด</Badge>}
-                              {sum.expired > 0 && <Badge className="bg-destructive/15 text-destructive text-xs">หมดอายุ {sum.expired}</Badge>}
-                              {sum.expiringSoon > 0 && <Badge className="bg-amber-100 text-amber-700 text-xs">ใกล้หมดอายุ {sum.expiringSoon}</Badge>}
-                              {sum.usable === 1 && sum.expired === 0 && sum.expiringSoon === 0 && <Badge className="bg-amber-100 text-amber-700 text-xs">ใกล้หมด</Badge>}
-                              {sum.usable >= 2 && sum.expired === 0 && sum.expiringSoon === 0 && <Badge className="bg-emerald-100 text-emerald-700 text-xs">ปกติ</Badge>}
-                            </div>
-                          );
-                        })()}
+                        <StandardStatusBadges sum={summarizeStandard(unitsByCode.get(item.code) ?? [], new Date(now))} />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={STICKY_ACTION_CELL}>
                         <div
                           className="flex justify-end"
                           onClick={e => e.stopPropagation()}
@@ -484,6 +553,7 @@ function StandardsTab() {
               </TableBody>
             </Table>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -607,6 +677,7 @@ function GlasswareDetailDrawer({
 // Solvents Tab
 // ============================================================
 function SolventsTab() {
+  const band = useViewportBand();
   const qc = useQueryClient();
   const { user } = useAuth();
   const canDelete = canDeleteStockItems(user);
@@ -683,16 +754,63 @@ function SolventsTab() {
           </div>
         </CardHeader>
         <CardContent>
+          {band === "mobile" ? (
+            <ResponsiveDataTable
+              band="mobile"
+              data={filtered}
+              rowKey={(item) => item._id}
+              isLoading={isLoading}
+              emptyTitle="ไม่มีข้อมูล"
+              rowTitle={() => "Open details"}
+              onRowClick={(item) => setDetailId(item._id)}
+              columns={[
+                { key: "name", header: "รายการ", card: "title", cell: (item) => item.name },
+                {
+                  key: "qty",
+                  header: "จำนวน (ขวด)",
+                  card: "status",
+                  cell: (item) => (
+                    <Badge variant={solventLevel(item.qty) === "ok" ? "primary-soft" : "red-soft"}>{item.qty} ขวด</Badge>
+                  ),
+                },
+                { key: "size", header: "ขนาด", cell: (item) => `ขนาด ${item.sizeLiter} ลิตร` },
+                { key: "price", header: "ราคา", cell: (item) => `${item.price.toLocaleString()} บาท` },
+                { key: "note", header: "หมายเหตุ", cell: (item) => item.note || null },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  card: "actions",
+                  cell: (item) => (
+                    <>
+                      <Button variant="outline" className="gap-1.5" onClick={(e) => { e.stopPropagation(); setEditing(item); }}>
+                        <Pencil className="w-4 h-4" /> แก้ไข
+                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="outline"
+                          className="gap-1.5 text-destructive"
+                          aria-label={`ลบสารเคมี ${item.name}`}
+                          onClick={(e) => { e.stopPropagation(); setDeleting(item); }}
+                        >
+                          <Trash2 className="w-4 h-4" /> ลบ
+                        </Button>
+                      )}
+                    </>
+                  ),
+                },
+              ]}
+            />
+          ) : (
           <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-          <Table className="min-w-[700px]">
+          <Table className="lg:min-w-[700px]">
             <TableHeader>
               <TableRow>
                 <TableHead>รายการ</TableHead>
                 <TableHead className="text-right">ขนาดล่าสุด (ลิตร)</TableHead>
                 <TableHead className="text-right">จำนวน (ขวด)</TableHead>
                 <TableHead className="text-right">ราคาล่าสุด (บาท)</TableHead>
-                <TableHead>หมายเหตุ</TableHead>
-                <TableHead className="w-40 text-right">Actions</TableHead>
+                <TableHead className="hidden lg:table-cell">หมายเหตุ</TableHead>
+                <TableHead className={`w-40 text-right ${STICKY_ACTION_CELL}`}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -716,8 +834,8 @@ function SolventsTab() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">{item.price.toLocaleString()}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{item.note}</TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{item.note}</TableCell>
+                  <TableCell className={STICKY_ACTION_CELL}>
                     <div
                       className="flex justify-end gap-1"
                       onClick={e => e.stopPropagation()}
@@ -736,6 +854,7 @@ function SolventsTab() {
             </TableBody>
           </Table>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -783,6 +902,7 @@ function SolventsTab() {
 // Glassware Tab
 // ============================================================
 function GlasswareTab() {
+  const band = useViewportBand();
   const qc = useQueryClient();
   const { user } = useAuth();
   const canDelete = canDeleteStockItems(user);
@@ -855,15 +975,64 @@ function GlasswareTab() {
           </div>
         </CardHeader>
         <CardContent>
+          {band === "mobile" ? (
+            <ResponsiveDataTable
+              band="mobile"
+              data={filtered}
+              rowKey={(item) => item._id}
+              isLoading={isLoading}
+              emptyTitle="ไม่มีข้อมูล"
+              rowTitle={() => "Open details"}
+              onRowClick={(item) => setDetailId(item._id)}
+              columns={[
+                { key: "name", header: "รายการ", card: "title", cell: (item) => item.name },
+                {
+                  key: "qty",
+                  header: "จำนวน (ชิ้น)",
+                  card: "status",
+                  cell: (item) => (
+                    <Badge variant={glasswareLevel(item.qty) === "out" ? "red-soft" : "primary-soft"}>{item.qty} ชิ้น</Badge>
+                  ),
+                },
+                { key: "price", header: "ราคา/ชิ้น", cell: (item) => `${item.pricePerPiece.toLocaleString()} บาท/ชิ้น` },
+                { key: "note", header: "หมายเหตุ", cell: (item) => item.note || null },
+                {
+                  key: "actions",
+                  header: "Actions",
+                  card: "actions",
+                  cell: (item) => (
+                    <>
+                      <Button variant="outline" className="gap-1.5" onClick={(e) => { e.stopPropagation(); setMoving({ item, mode: "receive" }); }}>
+                        <ArrowDownToLine className="w-4 h-4" /> รับเข้า
+                      </Button>
+                      <Button variant="outline" className="gap-1.5" onClick={(e) => { e.stopPropagation(); setEditing(item); }}>
+                        <Pencil className="w-4 h-4" /> แก้ไข
+                      </Button>
+                      {canDelete && (
+                        <Button
+                          variant="outline"
+                          className="gap-1.5 text-destructive"
+                          aria-label={`ลบเครื่องแก้ว ${item.name}`}
+                          onClick={(e) => { e.stopPropagation(); setDeleting(item); }}
+                        >
+                          <Trash2 className="w-4 h-4" /> ลบ
+                        </Button>
+                      )}
+                    </>
+                  ),
+                },
+              ]}
+            />
+          ) : (
           <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-          <Table className="min-w-[700px]">
+          <Table className="lg:min-w-[700px]">
             <TableHeader>
               <TableRow>
                 <TableHead>รายการ</TableHead>
                 <TableHead className="text-right">จำนวน (ชิ้น)</TableHead>
                 <TableHead className="text-right">ราคา/ชิ้น (บาท)</TableHead>
-                <TableHead>หมายเหตุ</TableHead>
-                <TableHead className="w-40 text-right">Actions</TableHead>
+                <TableHead className="hidden lg:table-cell">หมายเหตุ</TableHead>
+                <TableHead className={`w-40 text-right ${STICKY_ACTION_CELL}`}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -886,8 +1055,8 @@ function GlasswareTab() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">{item.pricePerPiece.toLocaleString()}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{item.note}</TableCell>
-                  <TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{item.note}</TableCell>
+                  <TableCell className={STICKY_ACTION_CELL}>
                     <div
                       className="flex justify-end gap-1"
                       onClick={e => e.stopPropagation()}
@@ -907,6 +1076,7 @@ function GlasswareTab() {
             </TableBody>
           </Table>
           </div>
+          )}
         </CardContent>
       </Card>
 
@@ -976,6 +1146,7 @@ function GlasswareTab() {
 // History Tab
 // ============================================================
 function HistoryTab() {
+  const band = useViewportBand();
   const [type, setType] = useState<string>("");
   const [action, setAction] = useState<string>("");
   const [exportOpen, setExportOpen] = useState(false);
@@ -1105,18 +1276,56 @@ function HistoryTab() {
           </div>
         </CardHeader>
         <CardContent>
+          {band === "mobile" ? (
+            <ResponsiveDataTable
+              band="mobile"
+              data={data}
+              rowKey={(t) => t._id}
+              isLoading={isLoading}
+              emptyTitle="ไม่มีประวัติ"
+              columns={[
+                {
+                  key: "item",
+                  header: "รายการ",
+                  card: "title",
+                  cell: (t) => (
+                    <span>
+                      {t.itemName || t.itemId}
+                      {t.itemCode && <span className="ml-1 text-xs font-normal text-muted-foreground">{t.itemCode}</span>}
+                      {t.tier && <Badge className="ml-1 text-xs" variant="outline">{t.tier}</Badge>}
+                    </span>
+                  ),
+                },
+                { key: "action", header: "Action", card: "status", cell: (t) => <ActionBadge action={t.action} /> },
+                { key: "time", header: "เวลา", cell: (t) => <span className="whitespace-nowrap">{formatDateTime(t.createdAt)}</span> },
+                { key: "type", header: "หมวด", cell: (t) => t.itemType },
+                {
+                  key: "qty",
+                  header: "คงเหลือ",
+                  cell: (t) => (
+                    <span>
+                      {t.delta != null && <span className="font-mono">{`${t.delta > 0 ? "+" : ""}${formatStockQuantity(t.delta)}`} </span>}
+                      ({formatStockQuantity(t.beforeQty)} → <strong>{formatStockQuantity(t.afterQty)}</strong> {t.unit || ""})
+                    </span>
+                  ),
+                },
+                { key: "user", header: "โดย", cell: (t) => t.userName || t.userEmail || null },
+                { key: "note", header: "หมายเหตุ", cell: (t) => t.note || null },
+              ]}
+            />
+          ) : (
           <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-          <Table className="min-w-[900px]">
+          <Table className="lg:min-w-[900px]">
             <TableHeader>
               <TableRow>
                 <TableHead>เวลา</TableHead>
-                <TableHead>หมวด</TableHead>
+                <TableHead className="hidden lg:table-cell">หมวด</TableHead>
                 <TableHead>รายการ</TableHead>
                 <TableHead>Action</TableHead>
                 <TableHead className="text-right">Δ qty</TableHead>
                 <TableHead>คงเหลือ</TableHead>
-                <TableHead>โดย</TableHead>
-                <TableHead>หมายเหตุ</TableHead>
+                <TableHead className="hidden lg:table-cell">โดย</TableHead>
+                <TableHead className="hidden lg:table-cell">หมายเหตุ</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1127,11 +1336,14 @@ function HistoryTab() {
               ) : data.map(t => (
                 <TableRow key={t._id}>
                   <TableCell className="text-xs whitespace-nowrap">{formatDateTime(t.createdAt)}</TableCell>
-                  <TableCell><Badge variant="outline">{t.itemType}</Badge></TableCell>
+                  <TableCell className="hidden lg:table-cell"><Badge variant="outline">{t.itemType}</Badge></TableCell>
                   <TableCell>
                     <div className="font-medium">{t.itemName || t.itemId}</div>
                     {t.itemCode && <div className="text-xs text-muted-foreground">{t.itemCode}</div>}
                     {t.tier && <Badge className="text-xs mt-1" variant="outline">{t.tier}</Badge>}
+                    <div className="text-xs text-muted-foreground lg:hidden">
+                      {[t.itemType, t.userName || t.userEmail, t.note].filter(Boolean).join(" · ")}
+                    </div>
                   </TableCell>
                   <TableCell><ActionBadge action={t.action} /></TableCell>
                   <TableCell className={`text-right font-mono ${t.delta != null && t.delta < 0 ? "text-destructive" : t.delta != null && t.delta > 0 ? "text-emerald-600" : ""}`}>
@@ -1140,13 +1352,14 @@ function HistoryTab() {
                   <TableCell className="text-sm">
                     {formatStockQuantity(t.beforeQty)} → <strong>{formatStockQuantity(t.afterQty)}</strong> {t.unit || ""}
                   </TableCell>
-                  <TableCell className="text-xs">{t.userName || t.userEmail || "-"}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{t.note || ""}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs">{t.userName || t.userEmail || "-"}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">{t.note || ""}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
           </div>
+          )}
         </CardContent>
       </Card>
 

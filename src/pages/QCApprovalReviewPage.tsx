@@ -430,7 +430,7 @@ export default function QCApprovalReviewPage() {
         )}
 
         {/* แผงตัดสิน — จุดเดียวที่ให้ผ่าน/ไม่ผ่าน (fixed bottom) */}
-        {showDecisionBar && (<div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] bg-background border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+        {showDecisionBar && (<div className="fixed bottom-[calc(var(--mobile-bottom-nav-h,0px)+0.75rem)] left-0 right-0 z-50 md:left-[var(--app-sidebar-w)] px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] bg-background border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="flex flex-wrap items-center justify-end gap-3">
             {decidableSides.length === 0 && (
               <span className="mr-auto text-sm text-muted-foreground">

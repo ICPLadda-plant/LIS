@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
@@ -153,5 +154,12 @@ export default {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [
+    tailwindcssAnimate,
+    // touch: = จอสัมผัส (นิ้ว), mouse: = เมาส์/ทัชแพด — ใช้ปรับจุดกดโดยไม่กระทบ desktop
+    plugin(({ addVariant }) => {
+      addVariant("touch", "@media (pointer: coarse)");
+      addVariant("mouse", "@media (pointer: fine)");
+    }),
+  ],
 } satisfies Config;

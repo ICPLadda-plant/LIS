@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import StatCard from "@/components/lis/StatCard";
 import KpiMetricWidgetCard from "@/components/dashboard/KpiMetricWidgetCard";
+import { Button } from "@/components/ui/button";
 import { KPI_META, type KpiId } from "@/lib/dashboardProfiles";
 import { computeKpi, type MetricsCtx } from "@/lib/dashboardMetrics";
 import type { ReactNode } from "react";
@@ -25,10 +26,11 @@ function usesThreeDesktopColumns(cardCount: number) {
 
 function gridClassFor(presentation: "default" | "widgets", cardCount: number) {
   const threeColumns = usesThreeDesktopColumns(cardCount);
+  // < 768px การ์ด KPI ถูกย่อเป็นชิป — grid เหลือเฉพาะ extraCards (คอลัมน์เดียว)
   if (presentation === "widgets") {
-    return threeColumns ? "grid-cols-2 md:grid-cols-6" : "grid-cols-2 md:grid-cols-8";
+    return threeColumns ? "grid-cols-1 md:grid-cols-6" : "grid-cols-1 md:grid-cols-8";
   }
-  return threeColumns ? "grid-cols-2 md:grid-cols-3" : "grid-cols-2 md:grid-cols-4";
+  return threeColumns ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-4";
 }
 
 function DeltaBadge({ delta }: { delta: number }) {
@@ -63,6 +65,7 @@ export default function KpiRow({
   presentation = "default",
 }: KpiRowProps) {
   const navigate = useNavigate();
+  const chips: ReactNode[] = [];
   const renderedKpis = kpis.map((id) => {
     const meta = KPI_META[id];
     const { value, delta } = computeKpi(id, ctx);
@@ -78,31 +81,61 @@ export default function KpiRow({
       : meta.drilldownPath
         ? () => navigate(meta.drilldownPath!)
         : undefined;
+    const active = activeKpi === id;
+    const chipContent = (
+      <>
+        {meta.label}
+        <span className="font-semibold tabular-nums">{displayValue}</span>
+      </>
+    );
+    chips.push(
+      handleClick ? (
+        <Button
+          key={id}
+          type="button"
+          variant={active ? "default" : "outline"}
+          aria-pressed={Boolean(active)}
+          onClick={handleClick}
+          className="h-11 shrink-0 rounded-full px-4"
+        >
+          {chipContent}
+        </Button>
+      ) : (
+        <div
+          key={id}
+          className="inline-flex h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-border bg-card px-4 text-sm font-medium text-foreground"
+        >
+          {chipContent}
+        </div>
+      ),
+    );
     if (presentation === "widgets") {
       return (
+        <div key={id} className="hidden md:contents">
         <KpiMetricWidgetCard
-          key={id}
           icon={meta.icon}
           value={displayValue}
           label={meta.label}
           variant={meta.variant}
           sublabel={sublabel}
-          active={activeKpi === id}
+          active={active}
           onClick={handleClick}
         />
+        </div>
       );
     }
     return (
+      <div key={id} className="hidden md:contents">
       <StatCard
-        key={id}
         icon={meta.icon}
         value={displayValue}
         label={meta.label}
         variant={meta.variant}
         sublabel={sublabel}
-        active={activeKpi === id}
+        active={active}
         onClick={handleClick}
       />
+      </div>
     );
   });
   const extraCardsIndex = extraCardsAfter === undefined
@@ -111,15 +144,25 @@ export default function KpiRow({
   const totalCards = renderedKpis.length + (extraCards ? 1 : 0);
 
   return (
-    <div
-      className={cn(
-        "mb-4 grid gap-3",
-        gridClassFor(presentation, totalCards),
-      )}
-    >
-      {renderedKpis.slice(0, extraCardsIndex)}
-      {extraCards}
-      {renderedKpis.slice(extraCardsIndex)}
-    </div>
+    <>
+      <div
+        role="group"
+        aria-label="ตัวกรองสรุป"
+        className={cn("-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 md:hidden", extraCards ? "mb-3" : "mb-4")}
+      >
+        {chips}
+      </div>
+      <div
+        className={cn(
+          "mb-4 gap-3",
+          extraCards ? "grid" : "hidden md:grid",
+          gridClassFor(presentation, totalCards),
+        )}
+      >
+        {renderedKpis.slice(0, extraCardsIndex)}
+        {extraCards}
+        {renderedKpis.slice(extraCardsIndex)}
+      </div>
+    </>
   );
 }

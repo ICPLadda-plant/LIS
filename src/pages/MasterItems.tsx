@@ -1361,15 +1361,15 @@ export default function MasterItems() {
             </div>
           ) : (
             <>
-              <Table className="min-w-[760px]" containerClassName="max-h-[calc(100vh-340px)]">
+              <Table className="lg:min-w-[760px]" containerClassName="max-h-[calc(100vh-340px)]">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="sticky top-0 z-10 bg-muted">รหัสสินค้า</TableHead>
+                    <TableHead className="sticky top-0 z-10 whitespace-nowrap bg-muted">รหัสสินค้า</TableHead>
                     <TableHead className="sticky top-0 z-10 bg-muted">รายละเอียดสินค้า</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-muted">ขนาดบรรจุ</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-muted text-right">จำนวนต่อลัง</TableHead>
-                    <TableHead className="sticky top-0 z-10 bg-muted text-right">น้ำหนักต่อลัง (kg)</TableHead>
-                    <TableHead className="sticky top-0 z-10 w-16 bg-muted text-right">จัดการ</TableHead>
+                    <TableHead className="sticky top-0 z-10 hidden bg-muted md:table-cell">ขนาดบรรจุ</TableHead>
+                    <TableHead className="sticky top-0 z-10 hidden bg-muted text-right lg:table-cell">จำนวนต่อลัง</TableHead>
+                    <TableHead className="sticky top-0 z-10 hidden bg-muted text-right lg:table-cell">น้ำหนักต่อลัง (kg)</TableHead>
+                    <TableHead className="sticky right-0 top-0 z-20 w-12 bg-muted text-right lg:static lg:z-10 lg:w-16">จัดการ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1404,7 +1404,7 @@ export default function MasterItems() {
                           onDoubleClick={() => openItemDetails({ item, originalItemNo, override })}
                           title="คลิกเพื่อดูรายละเอียด"
                         >
-                          <TableCell className="font-semibold text-primary">
+                          <TableCell className="whitespace-nowrap align-top font-semibold text-primary lg:align-middle">
                             {displayValue(firstValue(item, codeKeys))}
                           </TableCell>
                           <TableCell>
@@ -1455,24 +1455,28 @@ export default function MasterItems() {
                                     <span className="text-xs text-muted-foreground">ยังไม่จัดกลุ่ม</span>
                                   )}
                                 </div>
+                                <div className="mt-1 text-xs text-muted-foreground lg:hidden">
+                                  <span className="md:hidden">{formatPackSize(item)} · </span>
+                                  {displayValue(firstValue(item, unitsPerCartonKeys))} ต่อลัง · {displayValue(firstValue(item, weightKeys))} kg
+                                </div>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap text-sm">{formatPackSize(item)}</TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          <TableCell className="hidden whitespace-nowrap text-sm md:table-cell">{formatPackSize(item)}</TableCell>
+                          <TableCell className="hidden text-right tabular-nums lg:table-cell">
                             {displayValue(firstValue(item, unitsPerCartonKeys))}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
+                          <TableCell className="hidden text-right tabular-nums lg:table-cell">
                             {displayValue(firstValue(item, weightKeys))}
                           </TableCell>
                           <TableCell
-                            className="text-right"
+                            className="sticky right-0 z-[1] bg-card px-2 text-right shadow-[-1px_0_0_0_hsl(var(--border))] lg:static lg:px-4 lg:shadow-none"
                             onClick={(event) => event.stopPropagation()}
                             onDoubleClick={(event) => event.stopPropagation()}
                           >
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="เมนูจัดการ">
+                                <Button size="icon" variant="ghost" className="h-11 w-11 lg:h-8 lg:w-8" aria-label="เมนูจัดการ">
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -1628,7 +1632,7 @@ function MasterCommonNameItemsTab({
             {(error as Error).message}
           </div>
         ) : (
-          <Table className="min-w-[520px]" containerClassName="max-h-[calc(100vh-340px)]">
+          <Table className="md:min-w-[520px]" containerClassName="max-h-[calc(100vh-340px)]">
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="sticky top-0 z-10 bg-muted">ชื่อสามัญ</TableHead>
@@ -3252,11 +3256,11 @@ function MachinesTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>รหัส</TableHead>
-                  <TableHead>ประเภท</TableHead>
+                  <TableHead className="hidden md:table-cell">ประเภท</TableHead>
                   <TableHead>ชื่อเครื่องมือ</TableHead>
-                  <TableHead>สถานที่</TableHead>
+                  <TableHead className="hidden lg:table-cell">สถานที่</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead className="sticky right-0 w-24 bg-card text-right lg:static">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -3278,14 +3282,20 @@ function MachinesTab() {
                       onClick={() => setViewing(m)}
                       title="คลิกเพื่อดูรายละเอียด"
                     >
-                      <TableCell className="font-semibold text-primary">{m.code}</TableCell>
-                      <TableCell>{displayValue(m.type)}</TableCell>
-                      <TableCell className="min-w-52 font-medium">{m.name}</TableCell>
-                      <TableCell>{displayValue(m.location)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-semibold text-primary">{m.code}</TableCell>
+                      <TableCell className="hidden md:table-cell">{displayValue(m.type)}</TableCell>
+                      <TableCell className="font-medium lg:min-w-52">
+                        {m.name}
+                        <div className="text-xs font-normal text-muted-foreground lg:hidden">
+                          <span className="md:hidden">{displayValue(m.type)} · </span>
+                          {displayValue(m.location)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">{displayValue(m.location)}</TableCell>
                       <TableCell>
                         <Badge variant={m.status === "active" ? "default" : "secondary"}>{m.status ?? "active"}</Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="sticky right-0 bg-card lg:static lg:bg-transparent">
                         <div className="flex justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button size="icon" variant="ghost" onClick={() => setEditing(m)} title="แก้ไข">
                             <Pencil className="h-4 w-4" />

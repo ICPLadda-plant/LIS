@@ -49,7 +49,7 @@ export default function ActionQueue({ units }: { units: ExecWorkUnit[] }) {
                     onClick={() => navigate(to)}
                     className="cursor-pointer border-b transition-colors last:border-0 hover:bg-muted/50"
                   >
-                    <td className="py-2 font-medium">
+                    <td className="whitespace-nowrap py-2 font-medium">
                       <Link to={to} className="text-primary-500 hover:underline">
                         {u.petitionNo}
                       </Link>

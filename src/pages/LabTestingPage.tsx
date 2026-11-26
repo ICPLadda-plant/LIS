@@ -29,7 +29,8 @@ import {
 } from '@/components/ui/select';
 import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
-import { DataTable, type DataTableColumn } from '@/components/lis/DataTable';
+import { ResponsiveDataTable, type ResponsiveDataTableColumn } from '@/components/lis/ResponsiveDataTable';
+import StatusStepBadge from '@/components/lis/StatusStepBadge';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
 import { isLabWorkAccepted, labReceivedAt, labReceivedBy, labTrackStatusBadge, labWorkReceived } from '@/lib/receiveStatus';
 import { normalizeRoles } from '@/lib/roles';
@@ -240,11 +241,40 @@ export default function LabTestingPage() {
     return () => { alive = false; };
   }, [flaggableKey]);
 
-  const columns: DataTableColumn<SendDayPetition>[] = [
+  const sampleNosFor = (p: SendDayPetition) =>
+    [...new Set(labItemsFor(p).map((item) => (item as { sampleId?: string }).sampleId?.trim()).filter(Boolean).map((id) => formatLabSampleNo(p, id)))];
+
+  const petitionHeading = (p: SendDayPetition) => {
+    const sampleNos = sampleNosFor(p);
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        {sampleNos.length ? (
+          sampleNos.map((no, i) => (
+            <span key={no} className="whitespace-nowrap font-semibold text-primary">
+              {no}{i < sampleNos.length - 1 ? ',' : ''}
+            </span>
+          ))
+        ) : (
+          <span className="whitespace-nowrap font-semibold text-primary">{p.petitionNo}</span>
+        )}
+        <UrgentBadge petition={p} />
+        {returnedMap[p._id] && (
+          <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
+        )}
+        {abnormalMap[p._id] && (
+          <AlertTriangle className="h-4 w-4 text-destructive shrink-0" aria-label="พบค่าผิดปกติในผลทดสอบ" />
+        )}
+      </div>
+    );
+  };
+
+  const columns: ResponsiveDataTableColumn<SendDayPetition>[] = [
     {
       key: 'petition',
       header: 'เลขที่ตัวอย่าง',
       className: 'align-top',
+      card: 'title',
+      cardCell: petitionHeading,
       cell: (p) => {
         const labItems = labItemsFor(p);
         return (
@@ -269,15 +299,15 @@ export default function LabTestingPage() {
               โดย {p.submittedBy?.name ?? '-'} จาก {petitionDepartmentLabel(p)}
             </div>
             {p.sendDayKey && (
-              <div className="text-xs text-grey-500 mt-0.5">วันที่ส่ง {formatSendDayKey(p.sendDayKey)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">วันที่ส่ง {formatSendDayKey(p.sendDayKey)}</div>
             )}
             {(() => {
               const nos = [...new Set(labItems.map((item) => itemSubmissionNoText(p, item, 'lab')).filter(Boolean))];
-              return nos.length ? <div className="text-xs text-grey-500 mt-0.5">ใบนำส่ง {nos.join(', ')}</div> : null;
+              return nos.length ? <div className="text-xs text-muted-foreground mt-0.5">ใบนำส่ง {nos.join(', ')}</div> : null;
             })()}
-            <div className="text-xs text-grey-500 mt-0.5">{labItems.length} รายการ Lab</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{labItems.length} รายการ Lab</div>
             {labReceivedBy(p) && (
-              <div className="text-xs text-grey-400 mt-0.5">รับโดย {labReceivedBy(p)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">รับโดย {labReceivedBy(p)}</div>
             )}
           </>
         );
@@ -286,7 +316,25 @@ export default function LabTestingPage() {
     {
       key: 'items',
       header: 'รายการตัวอย่าง (Lab)',
-      className: 'max-w-[280px] text-sm text-grey-600 align-top',
+      className: 'max-w-[280px] text-sm text-muted-foreground align-top',
+      card: 'meta',
+      hideOnTablet: true,
+      // มือถือ: ข้อมูลรองบรรทัดเดียว (ผู้ส่ง · แผนก · จำนวนรายการ · ชื่อตัวอย่าง)
+      cardCell: (p) => {
+        const names = labItemsFor(p).map((it) => it.commonName || '-');
+        return (
+          <span className="block truncate">
+            {[p.submittedBy?.name ?? '-', petitionDepartmentLabel(p), `${names.length} รายการ`, names.join(', ')]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+        );
+      },
+      // iPad แนวตั้ง: รวมใต้คอลัมน์คำร้อง
+      metaText: (p) => {
+        const names = labItemsFor(p).map((it) => (it.batchNo ? `${it.commonName || '-'} (${it.batchNo})` : it.commonName || '-'));
+        return names.length ? names.join(', ') : null;
+      },
       cell: (p) => {
         const labItems = labItemsFor(p);
         return labItems.length > 0 ? (
@@ -311,11 +359,16 @@ export default function LabTestingPage() {
       key: 'status',
       header: 'สถานะ',
       className: 'align-top',
+      card: 'status',
+      cardCell: (p) => {
+        const b = labTrackStatusBadge(p);
+        return <StatusStepBadge label={b.label} variant={b.variant} status={p.status} />;
+      },
       cell: (p) => {
         const b = labTrackStatusBadge(p);
         return (
           <div className="space-y-1">
-            <Badge variant={b.variant}>{b.label}</Badge>
+            <StatusStepBadge label={b.label} variant={b.variant} status={p.status} />
             <PetitionStatusTimeline petition={p} compact track="lab" />
           </div>
         );
@@ -325,6 +378,7 @@ export default function LabTestingPage() {
       key: 'action',
       header: 'การดำเนินการ',
       className: 'text-right align-top',
+      card: 'actions',
       cell: (p) =>
         needsAccept(p) ? (
           <Button
@@ -365,7 +419,7 @@ export default function LabTestingPage() {
           </Button>
           </div>
         ) : (
-          <span className="text-xs text-grey-400">รอสแกนรับ</span>
+          <span className="text-xs text-muted-foreground">รอสแกนรับ</span>
         ),
     },
   ];
@@ -376,7 +430,7 @@ export default function LabTestingPage() {
         <PageHeader
           title={
             <span className="inline-flex items-center gap-2">
-              <FlaskConical className="h-6 w-6 text-sky-500" />
+              <FlaskConical className="h-6 w-6 text-primary" />
               การทดสอบ Lab
             </span>
           }
@@ -455,9 +509,13 @@ export default function LabTestingPage() {
                   className="rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate font-semibold text-primary">{p.petitionNo}</span>
+                    <span className="whitespace-nowrap font-semibold text-primary">{p.petitionNo}</span>
                     <UrgentBadge petition={p} />
-                    <Badge variant={labTrackStatusBadge(p).variant} className="ml-auto shrink-0">{labTrackStatusBadge(p).label}</Badge>
+                    <StatusStepBadge
+                      label={labTrackStatusBadge(p).label}
+                      variant={labTrackStatusBadge(p).variant}
+                      className="ml-auto shrink-0"
+                    />
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">
                     {p.submittedBy?.name ?? '-'} · {petitionDepartmentLabel(p)}
@@ -479,7 +537,7 @@ export default function LabTestingPage() {
 
         {labPager}
 
-        <DataTable
+        <ResponsiveDataTable
           columns={columns}
           data={petitions}
           rowKey={(p) => `${p._id}:${p.sendDayKey ?? ''}`}

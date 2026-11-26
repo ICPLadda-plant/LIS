@@ -397,20 +397,32 @@ describe('PetitionListPage action cues', () => {
 
     expect(await screen.findByText('P-2607-0001')).toBeInTheDocument();
 
-    const allCard = screen.getByText('ทั้งหมด').closest('[role="button"]');
-    const waitingCard = screen.getByText(/รอตรวจ/).closest('[role="button"]');
-    const inProgressCard = screen.getAllByText('กำลังดำเนินการ')[0].closest('[role="button"]');
-    const rejectedCard = screen.getAllByText(/ส่งกลับ/)[0].closest('[role="button"]');
+    const cardGrid = screen.getByText('คำร้องทั้งหมดในมุมมองนี้').closest('[role="button"]')!.parentElement as HTMLElement;
+    const allCard = within(cardGrid).getByText('ทั้งหมด').closest('[role="button"]');
+    const waitingCard = within(cardGrid).getByText(/รอตรวจ/).closest('[role="button"]');
+    const inProgressCard = within(cardGrid).getAllByText('กำลังดำเนินการ')[0].closest('[role="button"]');
+    const rejectedCard = within(cardGrid).getAllByText(/ส่งกลับ/)[0].closest('[role="button"]');
+
+    // ชิปกรองบนมือถือใช้ตัวเลขชุดเดียวกับการ์ด
+    const chipRow = screen.getByRole('group', { name: 'กรองตามสถานะ' });
+    const allChip = within(chipRow).getByRole('button', { name: /ทั้งหมด/ });
+    const waitingChip = within(chipRow).getByRole('button', { name: /รอรับ/ });
+    expect(allChip).toHaveTextContent('ทั้งหมด7');
+    expect(waitingChip).toHaveTextContent('รอรับ1');
+    expect(within(chipRow).getByRole('button', { name: /ดำเนินการ/ })).toHaveTextContent('ดำเนินการ2');
+    expect(within(chipRow).getByRole('button', { name: /ส่งกลับ/ })).toHaveTextContent('ส่งกลับ1');
+    expect(allChip).toHaveAttribute('aria-pressed', 'true');
 
     expect(allCard).toHaveTextContent('7');
     expect(waitingCard).toHaveTextContent('1');
     expect(inProgressCard).toHaveTextContent('2');
     expect(rejectedCard).toHaveTextContent('1');
 
-    fireEvent.click(screen.getByText(/รอตรวจ/));
+    fireEvent.click(waitingChip);
 
     expect(await screen.findByText('P-2607-0004')).toBeInTheDocument();
     expect(screen.queryByText('P-2607-0001')).not.toBeInTheDocument();
+    expect(waitingChip).toHaveAttribute('aria-pressed', 'true');
     expect(allCard).toHaveTextContent('7');
     expect(waitingCard).toHaveTextContent('1');
     expect(inProgressCard).toHaveTextContent('2');

@@ -21,6 +21,20 @@ import { formatLabSampleNo, labLabelNumbersForItems } from "@/lib/petitionSample
 export const labApprovalItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
 
+// ชื่อยาเดียวกัน (ตัดวงเล็บท้าย เช่น (GREEN)/(BLUE)) รวมเป็นแถวเดียว ไม่สน batch/คำร้อง
+export const labApprovalNameKey = (petition: Petition) => [...new Set(labApprovalItems(petition)
+  .map((item) => (item.sampleName || item.commonName || "").replace(/\s*\([^)]*\)\s*$/, "").trim().toUpperCase()))]
+  .sort().join("|") || petition._id;
+
+export function groupLabApprovalByName(petitions: Petition[]): Petition[][] {
+  const groups = new Map<string, Petition[]>();
+  for (const p of petitions) {
+    const key = labApprovalNameKey(p);
+    groups.set(key, [...(groups.get(key) ?? []), p]);
+  }
+  return [...groups.values()];
+}
+
 export const labApprovalTesterName = (petition: Petition) => fullThaiTitle(petition.labCompletedBy) || "-";
 
 function priorityScore(
@@ -85,7 +99,7 @@ const LabApproval = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [petitions.map((p) => p._id).join(",")]);
 
-  const columns: DataTableColumn<Petition>[] = [
+  const petitionColumns: DataTableColumn<Petition>[] = [
     {
       key: "no",
       header: "เลขที่คำร้อง",
@@ -209,6 +223,12 @@ const LabApproval = () => {
     },
   ];
 
+  const groups = groupLabApprovalByName(sortedPetitions);
+  const columns: DataTableColumn<Petition[]>[] = petitionColumns.map((c) => ({
+    ...c,
+    cell: (g) => <div className="space-y-3">{g.map((p) => <div key={p._id}>{c.cell(p)}</div>)}</div>,
+  }));
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -218,10 +238,10 @@ const LabApproval = () => {
         />
         <DataTable
           columns={columns}
-          data={sortedPetitions}
-          rowKey={(p) => p._id}
+          data={groups}
+          rowKey={(g) => g[0]._id}
           isLoading={loading}
-          onRowClick={(p) => navigate(`/lab-approval/${p._id}`)}
+          onRowClick={(g) => navigate(`/lab-approval/${g[0]._id}`)}
           emptyTitle="ไม่มีคำร้องที่รอออกผล Lab"
           tableClassName="min-w-[960px]"
         />
@@ -231,3 +251,4 @@ const LabApproval = () => {
 };
 
 export default LabApproval;
+

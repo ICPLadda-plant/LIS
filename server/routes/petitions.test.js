@@ -388,6 +388,35 @@ test('latestDeliverableRevision follows repeated rejected resubmissions', async 
 
 
 // Production แก้คำขอที่อยู่ใน LIS แล้วแบบเพิ่ม/ลดรายการ → บันทึกทับใบเดิม ไม่สร้างใบใหม่
+test('POST / refuses a second petition for a production request that is already in LIS', async () => {
+  const originals = { findOne: Petition.findOne, create: Petition.create };
+  let query;
+  let created = false;
+  try {
+    Petition.findOne = (q) => {
+      query = q;
+      return { select: () => ({ lean: async () => ({ _id: 'p179', petitionNo: 'P-2611-0179' }) }) };
+    };
+    Petition.create = async () => { created = true; };
+    const res = await invoke('/', 'post', {
+      body: {
+        dept: 'production',
+        submittedBy: { name: 'Prod', department: 'ผลิต 05' },
+        items: [{ seq: 1, sampleName: 'A', commonName: 'A', batchNo: 'B-1', productionDate: '2026-11-27', sendToQc: true, sendToLab: true }],
+        productionWorkflow: { requestNo: 'SA26112607033519' },
+      },
+    });
+    assert.equal(res.statusCode, 409);
+    assert.equal(res.body.existingPetitionNo, 'P-2611-0179');
+    assert.equal(created, false);
+    assert.equal(query['productionWorkflow.requestNo'], 'SA26112607033519');
+    assert.equal(query.deletedAt, null);
+  } finally {
+    Petition.findOne = originals.findOne;
+    Petition.create = originals.create;
+  }
+});
+
 test('POST / with replacePetitionNo overwrites the existing production petition instead of creating one', async () => {
   const LabRequest = require('../models/LabRequest');
   const originals = { findOne: Petition.findOne, findOneAndUpdate: Petition.findOneAndUpdate, create: Petition.create, labFindOne: LabRequest.findOne };

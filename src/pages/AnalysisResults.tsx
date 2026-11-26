@@ -6,6 +6,8 @@ import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { rankSearchResults } from "@/lib/searchRanking";
 import { formatDate } from "@/lib/dateTime";
 import type { Petition } from "@/types/petition.types";
+import { Badge } from "@/components/ui/badge";
+import { ResponsiveDataTable, useViewportBand, type ResponsiveDataTableColumn } from "@/components/lis/ResponsiveDataTable";
 
 type ConclusionKey = "pass" | "accepted-oos" | "returned-to-requester";
 
@@ -27,14 +29,35 @@ function petitionBatchNos(p: Petition): string[] {
   return [...new Set(nos)];
 }
 
-const CONCLUSION_META: Record<ConclusionKey, { label: string; cls: string }> = {
-  "pass": { label: "ผ่าน", cls: "border-green-200 bg-green-50 text-green-700 dark:border-green-500/30 dark:bg-green-500/15 dark:text-green-300" },
-  "accepted-oos": { label: "ยอมรับผลไม่ปกติ", cls: "border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/15 dark:text-yellow-300" },
-  "returned-to-requester": { label: "ส่งคืนผู้ส่ง", cls: "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-500/30 dark:bg-orange-500/15 dark:text-orange-300" },
+const CONCLUSION_META: Record<ConclusionKey, { label: string; variant: "green-soft" | "yellow-soft" | "red-soft" }> = {
+  "pass": { label: "ผ่าน", variant: "green-soft" },
+  "accepted-oos": { label: "ยอมรับผลไม่ปกติ", variant: "yellow-soft" },
+  "returned-to-requester": { label: "ส่งคืนผู้ส่ง", variant: "red-soft" },
 };
+
+type ResultRow = { p: Petition; conclusion: ConclusionKey };
+
+const doneAtOf = (p: Petition) => p.approvedAt || p.rejectedAt || p.completedAt;
+const joinOrDash = (values: string[]) => (values.length ? values.join(", ") : "-");
+
+// การ์ดบนมือถือ (< 768px): เลขคำร้อง + ผลสรุป, ข้อมูลรองบรรทัดเดียว
+const MOBILE_COLUMNS: ResponsiveDataTableColumn<ResultRow>[] = [
+  { key: "no", header: "เลขคำร้อง", card: "title", cell: ({ p }) => <span className="whitespace-nowrap">{p.petitionNo}</span> },
+  {
+    key: "conclusion",
+    header: "ผลสรุป",
+    card: "status",
+    cell: ({ conclusion }) => <Badge variant={CONCLUSION_META[conclusion].variant}>{CONCLUSION_META[conclusion].label}</Badge>,
+  },
+  { key: "common", header: "ชื่อสามัญ", cell: ({ p }) => joinOrDash(petitionCommonNames(p)) },
+  { key: "batch", header: "Batch", cell: ({ p }) => { const b = petitionBatchNos(p); return b.length ? `Batch ${b.join(", ")}` : "-"; } },
+  { key: "dept", header: "แผนก", cell: ({ p }) => petitionDepartmentLabel(p) },
+  { key: "doneAt", header: "วันที่จบ", cell: ({ p }) => formatDate(doneAtOf(p)) },
+];
 
 export default function AnalysisResults() {
   const navigate = useNavigate();
+  const band = useViewportBand();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | ConclusionKey>("all");
 
@@ -86,15 +109,26 @@ export default function AnalysisResults() {
           ))}
         </div>
 
+        {band === "mobile" ? (
+          <ResponsiveDataTable
+            band="mobile"
+            columns={MOBILE_COLUMNS}
+            data={rows}
+            rowKey={({ p }) => p._id}
+            isLoading={loading}
+            emptyTitle="ยังไม่มีประวัติ"
+            onRowClick={({ p }) => navigate(`/record-results/${p._id}`)}
+          />
+        ) : (
         <div className="overflow-x-auto rounded-lg border bg-card text-card-foreground shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-3 py-2">เลขคำร้อง</th>
                 <th className="px-3 py-2">Batch</th>
-                <th className="px-3 py-2">แผนก</th>
+                <th className="hidden px-3 py-2 lg:table-cell">แผนก</th>
                 <th className="px-3 py-2">ชื่อสามัญ</th>
-                <th className="px-3 py-2">วันที่จบ</th>
+                <th className="hidden px-3 py-2 lg:table-cell">วันที่จบ</th>
                 <th className="px-3 py-2">ผลสรุป</th>
               </tr>
             </thead>
@@ -107,7 +141,7 @@ export default function AnalysisResults() {
               )}
               {rows.map(({ p, conclusion }) => {
                 const meta = CONCLUSION_META[conclusion];
-                const doneAt = p.approvedAt || p.rejectedAt || p.completedAt;
+                const doneAt = doneAtOf(p);
                 const commonNames = petitionCommonNames(p);
                 const batchNos = petitionBatchNos(p);
                 return (
@@ -116,13 +150,18 @@ export default function AnalysisResults() {
                     onClick={() => navigate(`/record-results/${p._id}`)}
                     className="cursor-pointer border-t border-border hover:bg-accent/60"
                   >
-                    <td className="px-3 py-2 font-medium">{p.petitionNo}</td>
+                    <td className="px-3 py-2 font-medium">
+                      <span className="whitespace-nowrap">{p.petitionNo}</span>
+                      <div className="text-xs font-normal text-muted-foreground lg:hidden">
+                        {petitionDepartmentLabel(p)} · {formatDate(doneAt)}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 tabular-nums">{batchNos.length ? batchNos.join(", ") : "-"}</td>
-                    <td className="px-3 py-2">{petitionDepartmentLabel(p)}</td>
+                    <td className="hidden px-3 py-2 lg:table-cell">{petitionDepartmentLabel(p)}</td>
                     <td className="px-3 py-2">{commonNames.length ? commonNames.join(", ") : "-"}</td>
-                    <td className="px-3 py-2">{formatDate(doneAt)}</td>
+                    <td className="hidden px-3 py-2 lg:table-cell">{formatDate(doneAt)}</td>
                     <td className="px-3 py-2">
-                      <span className={`inline-block rounded-full border px-2 py-0.5 text-xs ${meta.cls}`}>{meta.label}</span>
+                      <Badge variant={meta.variant} className="whitespace-nowrap">{meta.label}</Badge>
                     </td>
                   </tr>
                 );
@@ -130,6 +169,7 @@ export default function AnalysisResults() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </AppLayout>
   );

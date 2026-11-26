@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
-import { printDocument } from "@/lib/print";
+import { printDocument, printPreviewBaseCss } from "@/lib/print";
 import {
   eligiblePrintersForDocument,
   getPrintDocType,
@@ -80,11 +80,13 @@ function getSheetSize(printEl: HTMLDivElement | null, contentEl: HTMLDivElement)
 function ScaledPreview({
   printRef,
   previewClassName,
+  baseCss,
   css,
   children,
 }: {
   printRef: React.RefObject<HTMLDivElement>;
   previewClassName?: string;
+  baseCss?: string;
   css?: string;
   children: React.ReactNode;
 }) {
@@ -250,8 +252,9 @@ function ScaledPreview({
               transformOrigin: "top left",
             }}
           >
+            {baseCss ? <style data-print-preview-base>{baseCss}</style> : null}
             {css ? <style data-print-preview-style>{css}</style> : null}
-            <div ref={printRef}>{children}</div>
+            <div ref={printRef} data-print-preview-root="">{children}</div>
           </div>
         </div>
       </div>
@@ -394,7 +397,12 @@ export default function PrintPreviewDialog({
           )}
         </DialogHeader>
 
-        <ScaledPreview printRef={printRef} previewClassName={docType === "coa" ? "bg-muted" : undefined} css={css}>
+        <ScaledPreview
+          printRef={printRef}
+          previewClassName={docType === "coa" ? "bg-muted" : undefined}
+          baseCss={printPreviewBaseCss(docType, "[data-print-preview-root]")}
+          css={css}
+        >
           {children}
         </ScaledPreview>
 
