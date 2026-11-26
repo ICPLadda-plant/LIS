@@ -1,8 +1,9 @@
 import { useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { PBZ_COLS, PBZ_DIL_SAMPLE, PBZ_DIL_STD, PBZ_ROWS, PBZ_STD_PCT, isPbzReadOnly, pbzKey, pbzMirrorKey } from "@/lib/paclobutrazolFields";
+import { PBZ_COLS, PBZ_DIL_SAMPLE, PBZ_DIL_STD, PBZ_ROWS, PBZ_STD_PCT, calculatePaclobutrazol, isPbzReadOnly, pbzFixed, pbzKey, pbzMirrorKey } from "@/lib/paclobutrazolFields";
 import { PaclobutrazolSheet, type PaclobutrazolSheetHeader } from "./PaclobutrazolSheet";
+import { LabCalcSampleStepper, type LabCalcStepResult } from "./LabCalcSampleStepper";
 
 type Props = {
   values: Record<string, unknown>;
@@ -12,11 +13,15 @@ type Props = {
   density?: number | null;
   header?: PaclobutrazolSheetHeader;
   analyst?: string;
+  /** ลำดับแถว (Std/Sample) ที่แสดงบนมือถือ (ควบคุมจากแถบล่างของหน้า) */
+  mobileIndex?: number;
+  onMobileIndexChange?: (index: number) => void;
+  mobileInlineNav?: boolean;
 };
 
 const DEFAULT_DILUTION = "50";
 
-export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, density, header, analyst }: Props) {
+export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, density, header, analyst, mobileIndex, onMobileIndexChange, mobileInlineNav }: Props) {
   const prefilled = useRef(false);
   const std1Key = pbzKey("Std 1", "wt/mg");
   const std2Key = pbzKey("Std 2", "wt/mg");
@@ -48,6 +53,7 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
     const mirror = pbzMirrorKey(key);
     if (mirror) onChange(mirror, val);
   };
+  const calc = calculatePaclobutrazol(values, density ?? null);
 
   const setting = (key: string, label: string, suffix?: string) => (
     <label className="flex items-center gap-2 text-sm">
@@ -61,12 +67,42 @@ export function PaclobutrazolGrid({ values, onChange, disabled, petitionId, dens
     <div className="space-y-4 sm:col-span-6">
     <section className="space-y-3 rounded-lg border border-indigo-200 border-l-4 border-l-indigo-400 bg-indigo-50 p-3 shadow-sm dark:bg-indigo-950/60">
     <h4 className="text-base font-semibold text-foreground">ตาราง Internal standard</h4>
-    <div className="flex flex-wrap gap-x-6 gap-y-2">
+    <div className="hidden md:flex flex-wrap gap-x-6 gap-y-2">
       {setting(PBZ_STD_PCT, "% Std =", "%")}
       {setting(PBZ_DIL_STD, "Dilution Std =")}
       {setting(PBZ_DIL_SAMPLE, "Dilution Sample =")}
     </div>
-    <div className="overflow-x-auto rounded-lg border border-indigo-200 bg-card shadow-sm">
+    <LabCalcSampleStepper
+      values={values}
+      onFieldChange={handle}
+      disabled={disabled}
+      index={mobileIndex}
+      onIndexChange={onMobileIndexChange}
+      inlineNav={mobileInlineNav}
+      settings={[
+        { key: PBZ_STD_PCT, label: "% Std", suffix: "%" },
+        { key: PBZ_DIL_STD, label: "Dilution Std" },
+        { key: PBZ_DIL_SAMPLE, label: "Dilution Sample" },
+      ]}
+      samples={PBZ_ROWS.map((row) => {
+        const results: LabCalcStepResult[] = [];
+        if (calc) {
+          if (row.startsWith("Std")) {
+            const s = calc.std[row === "Std 1" ? 0 : 1];
+            results.push({ label: "Conc", value: pbzFixed(s.conc, 4) }, ...s.inj.map((inj, i) => ({ label: "fi ครั้งที่ " + (i + 1), value: pbzFixed(inj.fi, 6) })));
+          } else {
+            const s = calc.sample[row === "Sample 1" ? 0 : 1];
+            results.push({ label: "Conc", value: pbzFixed(s.conc, 4) }, ...s.inj.map((inj, i) => ({ label: "%W/W ครั้งที่ " + (i + 1), value: pbzFixed(inj.content, 4) })), { label: "%W/W เฉลี่ย", value: pbzFixed(s.meanContent, 4), emphasis: true });
+          }
+        }
+        return {
+          name: row,
+          fields: PBZ_COLS.map((col) => ({ key: pbzKey(row, col), label: col, readOnly: isPbzReadOnly(row, col), hint: isPbzReadOnly(row, col) ? "ใช้ค่าเดียวกับครั้งที่ 1" : undefined })),
+          results,
+        };
+      })}
+    />
+    <div className="hidden md:block overflow-x-auto rounded-lg border border-indigo-200 bg-card shadow-sm">
       <table className="w-full text-sm">
         <thead className="bg-indigo-100 text-indigo-900 dark:bg-indigo-900/60 dark:text-indigo-100">
           <tr>
