@@ -2448,7 +2448,7 @@ export default function LabTestingDetailPage() {
 
         {/* Action buttons stay available until Lab approval. */}
         {hasActionBar && (
-          <div className="fixed bottom-[var(--mobile-bottom-nav-h,0px)] left-0 right-0 z-50 md:bottom-0 md:left-72 px-4 sm:px-6 py-3 border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          <div className="fixed bottom-[var(--mobile-bottom-nav-h,0px)] left-0 right-0 z-50 md:bottom-0 md:left-[var(--app-sidebar-w)] px-4 sm:px-6 py-3 border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             {showCalcNav && activeLabItem && (
               <Button
                 type="button"

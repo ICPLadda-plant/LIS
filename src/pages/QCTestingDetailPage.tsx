@@ -1867,7 +1867,7 @@ export default function QCTestingDetailPage() {
 
       {/* Action buttons stay available until final approval. */}
       {items.length > 0 && !isLocked && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 py-3 bg-white border-t shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        <div className="fixed bottom-[var(--mobile-bottom-nav-h,0px)] left-0 right-0 z-50 md:left-[var(--app-sidebar-w)] px-4 sm:px-6 py-3 bg-background border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex flex-wrap items-center justify-end gap-2 sm:gap-3">
           {qcReceivedAt(petition) && (
             <Button variant="outline" onClick={() => setAdditionalSampleOpen(true)} disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}>ขอตัวอย่างเพิ่ม</Button>
           )}
