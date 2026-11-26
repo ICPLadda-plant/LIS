@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import { startFirstWorkingCamera } from '@/lib/qrCameraFallback';
 import { AlertCircle, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Petition } from '@/types/petition.types';
@@ -134,9 +135,7 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
             if (active) setPhase('no-camera');
             return;
           }
-          const back = cameras.find((c) => /back|environment|rear|หลัง|后|背面/i.test(c.label));
-          const cam = back ?? (cameras.length > 1 ? cameras[cameras.length - 1] : cameras[0]);
-          await startWith(cam.id);
+          await startFirstWorkingCamera(cameras, (id) => startWith(id));
         }
         if (!active) { scanner.stop().catch(() => {}); return; }
         scannerRef.current = scanner;

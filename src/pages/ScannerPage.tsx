@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import { startFirstWorkingCamera } from '@/lib/qrCameraFallback';
 import {
   AlertCircle, CheckCircle2, QrCode,
   Package, Building2, X,
@@ -117,11 +118,7 @@ export default function ScannerPage() {
             if (active) setPhase('no-camera');
             return;
           }
-          const back = cameras.find((c) =>
-            /back|environment|rear|หลัง|后|背面/i.test(c.label),
-          );
-          const cam = back ?? (cameras.length > 1 ? cameras[cameras.length - 1] : cameras[0]);
-          await startWith(cam.id);
+          await startFirstWorkingCamera(cameras, (id) => startWith(id));
         }
 
         if (!active) { scanner.stop().catch(() => {}); return; }
@@ -341,8 +338,7 @@ export default function ScannerPage() {
             if (active) setAddItemPhase('no-camera');
             return;
           }
-          const back = cameras.find((camera) => /back|environment|rear|หลัง|后|背面/i.test(camera.label));
-          await startWith((back ?? (cameras.length > 1 ? cameras[cameras.length - 1] : cameras[0])).id);
+          await startFirstWorkingCamera(cameras, (id) => startWith(id));
         }
         if (!active) {
           scanner.stop().catch(() => {});
