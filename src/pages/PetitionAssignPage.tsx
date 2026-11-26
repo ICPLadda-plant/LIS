@@ -60,7 +60,7 @@ function sortAssignQueue(petitions: Petition[]): Petition[] {
 const formatThaiDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' })
     .format(new Date(iso));
-import { bangkokDayKey, isSendDateReached, isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
+import { bangkokDayKey, isSendDateReached, isVisibleInAssignQueue, withItemsDueBy } from '@/lib/petitionQueueVisibility';
 import { DEV_MODE, synthesizeDevAssignees } from '@/config/dev';
 import { isAssignedTo } from '@/lib/assignment';
 import { type MethodDoc } from '@/lib/methodRegistry';
@@ -250,7 +250,11 @@ export default function PetitionAssignPage() {
     ].forEach((petition) => {
       if (!byId.has(petition._id)) byId.set(petition._id, petition);
     });
-    return [...byId.values()].filter(
+    return [...byId.values()]
+      // batch ที่วันส่งยังไม่ถึง (เช่น ช่วง OT ส่งวันถัดไป) ยังไม่ขึ้นบอร์ด — re-check แสดงครบ
+      .map((petition) => (isLabRecheckPending(petition) ? petition : withItemsDueBy(petition, today)))
+      .filter((petition): petition is Petition => petition !== null)
+      .filter(
       (petition) =>
         isVisibleInAssignQueue(petition)
         // เจ้าหน้าที่กดเริ่มงาน/บันทึกผลแล้ว ไม่ต้องอยู่บนบอร์ด assign (ยกเว้น re-check ที่ต้องเปลี่ยนผู้รับงานได้)

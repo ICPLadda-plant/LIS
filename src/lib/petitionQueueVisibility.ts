@@ -70,6 +70,21 @@ export function petitionSendDayKey(petition: Petition): string | null {
 }
 
 /** งานรอมอบหมายแสดงเมื่อวันที่ส่งเลยมาแล้วหรือเป็นวันนี้ — ส่ง/รับตัวอย่างจริงแล้วแสดงเสมอ */
+/**
+ * ตัดรายการที่วันที่ส่งยังไม่ถึง (เช่น batch ช่วง OT ที่ส่งวันถัดไป) ออกจากบอร์ด assign
+ * คืน null ถ้าทุกรายการยังไม่ถึงวันส่ง; รายการที่ไม่มีวันที่ส่งแสดงตามปกติ
+ */
+export function withItemsDueBy(petition: Petition, now: Date = new Date()): Petition | null {
+  const items = petition.items ?? [];
+  const today = bangkokDayKey(now);
+  const due = items.filter((item) => {
+    const day = toDayKey(item.labelSampledDate);
+    return !day || day <= today;
+  });
+  if (due.length === items.length) return petition;
+  return due.length ? { ...petition, items: due } : null;
+}
+
 export function isSendDateReached(petition: Petition, now: Date = new Date()): boolean {
   if (petition.sampleSentAt || labReceivedAt(petition) || qcReceivedAt(petition)) return true;
   const day = petitionSendDayKey(petition);
