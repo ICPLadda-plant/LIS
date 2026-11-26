@@ -663,7 +663,6 @@ function AssignBoard({
             size="sm"
             variant="outline"
             className="h-10 justify-start truncate px-2 text-xs"
-            disabled={sampleNos.length === 0}
             onClick={() => { onDropPetition(petition._id, c.employeeId); setPickingId(null); }}
           >
             {c.name}
