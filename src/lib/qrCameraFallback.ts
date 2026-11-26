@@ -40,3 +40,14 @@ export function describeCameraError(err: unknown): string {
   return `เปิดกล้องไม่ได้ — ${reason}${code ? ` (${code})` : ''}`;
 }
 
+
+type ResettableScanner = { stop(): Promise<unknown>; clear(): void };
+
+/** ปล่อยกล้องที่อาจค้างจากการเปิดที่ล้ม แล้วคืน scanner ตัวใหม่บน element เดิม */
+export async function resetScanner<T extends ResettableScanner>(scanner: T): Promise<T> {
+  try { await scanner.stop(); } catch { /* ไม่ได้ scan อยู่ */ }
+  try { scanner.clear(); } catch { /* ignore */ }
+  const Ctor = scanner.constructor as new (id: string) => T;
+  const id = (scanner as unknown as { elementId?: string }).elementId;
+  return id ? new Ctor(id) : scanner;
+}

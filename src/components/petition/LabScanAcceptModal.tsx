@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { startFirstWorkingCamera, describeCameraError } from '@/lib/qrCameraFallback';
+import { startFirstWorkingCamera, describeCameraError, resetScanner } from '@/lib/qrCameraFallback';
 import { AlertCircle, Camera, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Petition } from '@/types/petition.types';
@@ -192,15 +192,22 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     let active = true;
 
     (async () => {
-      const scanner = new Html5Qrcode(READER_ID);
+      let scanner = new Html5Qrcode(READER_ID);
       const config = { fps: 15 };
       const onScan = (text: string) => {
         if (!active) return;
         fetchAndCheck(text);
       };
 
-      const startWith = (source: MediaTrackConstraints | string) =>
-        scanner.start(source, config, onScan, () => {});
+      const startWith = async (source: MediaTrackConstraints | string) => {
+        try {
+          await scanner.start(source, config, onScan, () => {});
+        } catch (startErr) {
+          // ครั้งที่ล้มอาจจับกล้องค้าง + ทำ instance พัง → ปล่อยกล้องแล้วสร้างใหม่ก่อนลองตัวถัดไป
+          scanner = await resetScanner(scanner);
+          throw startErr;
+        }
+        };
 
       try {
         try {

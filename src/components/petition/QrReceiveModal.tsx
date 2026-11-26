@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { startFirstWorkingCamera, describeCameraError } from '@/lib/qrCameraFallback';
+import { startFirstWorkingCamera, describeCameraError, resetScanner } from '@/lib/qrCameraFallback';
 import { AlertCircle, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Petition } from '@/types/petition.types';
@@ -116,15 +116,22 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
     let active = true;
 
     (async () => {
-      const scanner = new Html5Qrcode(READER_ID);
+      let scanner = new Html5Qrcode(READER_ID);
       const config = { fps: 10, qrbox: { width: 250, height: 250 } };
       const onScan = (text: string) => {
         if (!active) return;
         fetchAndConfirm(text);
       };
 
-      const startWith = (source: MediaTrackConstraints | string) =>
-        scanner.start(source, config, onScan, () => {});
+      const startWith = async (source: MediaTrackConstraints | string) => {
+        try {
+          await scanner.start(source, config, onScan, () => {});
+        } catch (startErr) {
+          // ครั้งที่ล้มอาจจับกล้องค้าง + ทำ instance พัง → ปล่อยกล้องแล้วสร้างใหม่ก่อนลองตัวถัดไป
+          scanner = await resetScanner(scanner);
+          throw startErr;
+        }
+        };
 
       try {
         try {
