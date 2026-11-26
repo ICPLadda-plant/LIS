@@ -243,15 +243,20 @@ export default function LabTestingPage() {
   const columns: DataTableColumn<SendDayPetition>[] = [
     {
       key: 'petition',
-      header: 'คำร้อง',
+      header: 'เลขที่ตัวอย่าง',
       className: 'align-top',
       cell: (p) => {
         const labItems = labItemsFor(p);
-        const sampleNos = [...new Set(labItems.map((item) => (item as { sampleId?: string }).sampleId?.trim()).filter(Boolean).map((id) => formatLabSampleNo(p, id)))];
         return (
           <>
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-sky-600">{sampleNos.length ? sampleNos.join(', ') : p.petitionNo}</span>
+            <div className="flex items-start gap-1.5">
+              <div className="space-y-0.5 font-semibold text-primary">
+                {labItems.some((item) => item.sampleId?.trim())
+                  ? labItems.filter((item) => item.sampleId?.trim()).map((item) => (
+                    <div key={item.seq}>{formatLabSampleNo(p, item.sampleId)}</div>
+                  ))
+                  : '-'}
+              </div>
               <UrgentBadge petition={p} />
               {returnedMap[p._id] && (
                 <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />

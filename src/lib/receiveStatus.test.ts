@@ -14,6 +14,7 @@ import {
 } from './receiveStatus';
 import type { Petition } from '@/types/petition.types';
 import { statusBadge } from './statusBadge';
+import { hasPartialLabelReceipt, isItemLabelPending } from './labelReceipt';
 
 const T1 = '2026-06-08T01:00:00.000Z';
 const T2 = '2026-06-10T02:00:00.000Z';
@@ -54,6 +55,27 @@ describe('receiveStatus', () => {
     expect(labReceivedBy(p)).toBe('Lab Tech');
     expect(qcReceivedBy(p)).toBe('QC Tech');
     expect(qcReceivedAt(p)).toBe(T2);
+  });
+});
+
+describe('partial label receipt', () => {
+  const petition = {
+    status: 'sampleSent',
+    items: [
+      { seq: 1, sampleName: 'A', batchNo: 'B1', sendToLab: true, labelQuantitySides: ['lab'] },
+      { seq: 2, sampleName: 'B', batchNo: 'B2', sendToLab: true, labelQuantitySides: ['lab'] },
+    ],
+    sampleLabelNumbers: { year: 2026, groups: [
+      { key: 'B1|', lab: '001' },
+      { key: 'B2|', lab: '002' },
+    ] },
+    labelReceipts: [{ key: 'B1|', side: 'lab', receivedAt: T1, receivedBy: 'Lab Tech' }],
+  } as Petition;
+
+  it('allows work on the received item while the other label is pending', () => {
+    expect(hasPartialLabelReceipt(petition, 'lab')).toBe(true);
+    expect(isItemLabelPending(petition, petition.items[0], 'lab')).toBe(false);
+    expect(isItemLabelPending(petition, petition.items[1], 'lab')).toBe(true);
   });
 });
 
