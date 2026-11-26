@@ -3,6 +3,7 @@ import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { ICP_LADDA_LOGO_URL } from "@/lib/branding";
 import AppSidebar from "@/components/lis/AppSidebar";
+import MobileBottomNav from "@/components/lis/MobileBottomNav";
 import NotificationBell from "@/components/lis/NotificationBell";
 import UserProfileMenu from "@/components/lis/UserProfileMenu";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ interface AppLayoutProps {
  *   <div className="flex min-h-screen"><AppSidebar /><main>...</main></div>
  *
  * - Desktop (>=md): static sidebar on the left
- * - Mobile (<md): hamburger topbar + Sheet drawer
+ * - Mobile (<md): hamburger topbar + Sheet drawer + แถบเมนูล่าง (MobileBottomNav)
  */
 const AppLayout = ({
   children,
@@ -61,7 +62,7 @@ const AppLayout = ({
             <button
               type="button"
               aria-label="เปิดเมนู"
-              className="inline-flex items-center justify-center h-10 w-10 rounded-md text-foreground hover:bg-accent transition-colors"
+              className="inline-flex items-center justify-center h-11 w-11 rounded-md text-foreground hover:bg-accent transition-colors"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -96,10 +97,11 @@ const AppLayout = ({
         </div>
       </header>
 
-      {/* Right column — desktop topbar + main; push down to clear the fixed mobile topbar */}
+      {/* Right column — desktop topbar + main; push down to clear the fixed mobile topbar
+          and up to clear the fixed mobile bottom nav (52px + safe area) */}
       <div
         className={cn(
-          "flex-1 min-w-0 flex flex-col pt-14 md:pt-0",
+          "flex-1 min-w-0 flex flex-col pt-14 pb-[calc(52px+env(safe-area-inset-bottom))] md:pt-0 md:pb-0 print:pb-0",
           fixedHeight && "overflow-hidden",
         )}
       >
@@ -119,6 +121,8 @@ const AppLayout = ({
           {children}
         </main>
       </div>
+
+      <MobileBottomNav onMore={() => setDrawerOpen(true)} moreOpen={drawerOpen} />
     </div>
   );
 };

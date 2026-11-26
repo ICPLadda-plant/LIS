@@ -191,6 +191,26 @@
   }
 
   /*
+    ขยายพื้นที่กดให้อย่างน้อย 44x44px เฉพาะจอสัมผัส (pointer: coarse)
+    ใช้ pseudo-element ที่มองไม่เห็น หน้าตาและ layout ไม่เปลี่ยน ทั้งบนจอสัมผัสและ desktop
+    element ที่ตั้ง position เองอยู่แล้ว (absolute/fixed/sticky) ไม่ถูกเปลี่ยนเป็น relative
+  */
+  @media (pointer: coarse) {
+    .touch-hit:where(:not(.absolute, .fixed, .sticky)) {
+      position: relative;
+    }
+    .touch-hit::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  /*
     Legacy dark-mode bridge:
     หลายหน้ารุ่นเก่ายังใช้สีคงที่เช่น bg-white, text-grey-* และ bg-slate-*.
     ใน dark mode ให้ map สีเหล่านี้กลับเข้า token กลาง เพื่อกันข้อความจาง/พื้นขาวหลุดธีมทุกหน้า.

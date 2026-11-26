@@ -19,12 +19,12 @@ const NotificationsPage = () => {
           actions={(
             <>
               {unreadCount > 0 && (
-                <Button variant="outline" size="sm" onClick={markAllRead}>
-                  <Check className="h-4 w-4" /> อ่านทั้งหมด
+                <Button variant="outline" size="sm" className="touch:h-11" onClick={markAllRead}>
+                  <Check className="h-4 w-4" /> อ่านแล้วทั้งหมด
                 </Button>
               )}
               {notifications.some(n => !n.pinned) && (
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={clearAll}>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive touch:h-11" onClick={clearAll}>
                   <Trash2 className="h-4 w-4" /> ล้าง
                 </Button>
               )}
@@ -39,6 +39,7 @@ const NotificationsPage = () => {
               if (n.link) navigate(n.link);
             }}
             onDismiss={dismiss}
+            categoryTabs
           />
         </div>
       </div>
