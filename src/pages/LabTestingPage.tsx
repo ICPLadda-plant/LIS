@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react';
-import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
+import { formatSendDayKey, isVisibleInAssignQueue, splitPetitionBySendDay, type SendDayPetition } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import LabStartWorkDialog from '@/components/petition/LabStartWorkDialog';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
@@ -184,7 +184,9 @@ export default function LabTestingPage() {
     }
   }
 
-  const petitions: Petition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
+  // คำร้องเดียวกันที่ส่งตัวอย่างคนละวันแยกเป็นคนละ card; ส่งวันเดียวกันรวม card เดียว
+  const petitions: SendDayPetition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
+    .flatMap(splitPetitionBySendDay)
     .filter((p) => !p.labApprovedAt)
     // ตัวอย่างกลุ่มน้ำที่ QC ยังไม่ยืนยันค่า ถพ. ยังไม่ปล่อยมาให้ Lab
     .filter((p) => !isLabAwaitingSgConfirmation(p))
@@ -238,7 +240,7 @@ export default function LabTestingPage() {
     return () => { alive = false; };
   }, [flaggableKey]);
 
-  const columns: DataTableColumn<Petition>[] = [
+  const columns: DataTableColumn<SendDayPetition>[] = [
     {
       key: 'petition',
       header: 'คำร้อง',
@@ -260,6 +262,9 @@ export default function LabTestingPage() {
             <div className="text-xs text-grey-500 mt-0.5">
               โดย {p.submittedBy?.name ?? '-'} จาก {petitionDepartmentLabel(p)}
             </div>
+            {p.sendDayKey && (
+              <div className="text-xs text-grey-500 mt-0.5">วันที่ส่ง {formatSendDayKey(p.sendDayKey)}</div>
+            )}
             {(() => {
               const nos = [...new Set(labItems.map((item) => itemSubmissionNoText(p, item, 'lab')).filter(Boolean))];
               return nos.length ? <div className="text-xs text-grey-500 mt-0.5">ใบนำส่ง {nos.join(', ')}</div> : null;
@@ -471,7 +476,7 @@ export default function LabTestingPage() {
         <DataTable
           columns={columns}
           data={petitions}
-          rowKey={(p) => p._id}
+          rowKey={(p) => `${p._id}:${p.sendDayKey ?? ''}`}
           isLoading={loading || !parametersLoaded}
           rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
           onRowClick={(p) => {
