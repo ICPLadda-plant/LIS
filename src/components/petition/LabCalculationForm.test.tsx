@@ -95,6 +95,18 @@ describe("LabCalculationForm", () => {
     expect(field(container, "sample-3")).toBe("30.89");
   });
 
+  it("prints Bromadiolone 0.005% Analytical Results with five decimals", () => {
+    const base = page([
+      row("% Sample 1", "0.005"),
+      row("% Sample 2", "0.00527"),
+      row("% Sample 3", "0.005"),
+      row("% Sample Average", "0.00509"),
+      row("% Sample %RSD", "3.32"),
+    ]);
+    const { container } = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, name: "BROMADIOLONE 0.005% W/W (PUBLIC HEALTH)" } }} />);
+    expect([0, 1, 2, 3, 4].map((index) => field(container, `sample-${index}`))).toEqual(["0.00500", "0.00527", "0.00500", "0.00509", "3.32000"]);
+  });
+
   it("calculates CCS % difference and Control result only from complete numbers", () => {
     expect(ccsDifference("0.5", "0.49")).toBe("-2.00");
     expect(ccsDifference("", "0.49")).toBe("");
