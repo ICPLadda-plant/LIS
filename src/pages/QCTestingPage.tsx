@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
-import { DataTable, type DataTableColumn } from '@/components/lis/DataTable';
+import { ResponsiveDataTable, type ResponsiveDataTableColumn } from '@/components/lis/ResponsiveDataTable';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
 import { qcReceivedAt, qcReceivedBy, qcTrackStatusBadge } from '@/lib/receiveStatus';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
@@ -163,23 +163,24 @@ export default function QCTestingPage() {
     return () => { alive = false; };
   }, [flaggableKey]);
 
-  const columns: DataTableColumn<SendDayPetition>[] = [
+  const columns: ResponsiveDataTableColumn<SendDayPetition>[] = [
     {
       key: 'petition',
       header: 'คำร้อง',
       className: 'align-top',
+      card: 'title',
       cell: (p) => {
         const items = p.items ?? [];
         return (
           <>
             <div className="flex items-center gap-1.5">
-              <span className="font-semibold text-primary-500">{p.petitionNo}</span>
+              <span className="whitespace-nowrap font-semibold text-primary-500">{p.petitionNo}</span>
               <UrgentBadge petition={p} />
               {returnedMap[p._id] && (
-                <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
+                <RotateCcw className="h-4 w-4 text-yellow-700 dark:text-yellow-300 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
               )}
               {abnormalMap[p._id] && (
-                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" aria-label="พบค่าผิดปกติในผลทดสอบ" />
+                <AlertTriangle className="h-4 w-4 text-destructive shrink-0" aria-label="พบค่าผิดปกติในผลทดสอบ" />
               )}
             </div>
             <div className="text-xs text-grey-500 mt-0.5">
@@ -197,6 +198,12 @@ export default function QCTestingPage() {
       key: 'items',
       header: 'รายการตัวอย่าง',
       className: 'max-w-[280px] text-sm text-grey-600 align-top',
+      card: 'body',
+      hideOnTablet: true,
+      metaText: (p) => {
+        const names = (p.items ?? []).map((it) => it.commonName || '-');
+        return names.length > 0 ? names.join(', ') : null;
+      },
       cell: (p) => {
         const items = p.items ?? [];
         return items.length > 0 ? (
@@ -221,6 +228,22 @@ export default function QCTestingPage() {
       key: 'status',
       header: 'สถานะ',
       className: 'align-top',
+      card: 'status',
+      cardCell: (p) => {
+        const b = qcTrackStatusBadge(p);
+        return (
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant={b.variant}>{b.label}</Badge>
+            {qcReceivedAt(p) ? (
+              <Badge variant="green-soft" className="font-normal">
+                รับโดย {qcReceivedBy(p) ?? '-'}
+              </Badge>
+            ) : (
+              <Badge variant="gray-soft" className="font-normal">QC ยังไม่รับ</Badge>
+            )}
+          </div>
+        );
+      },
       cell: (p) => {
         const b = qcTrackStatusBadge(p);
         return (
@@ -242,6 +265,22 @@ export default function QCTestingPage() {
       key: 'action',
       header: 'การดำเนินการ',
       className: 'text-right align-top',
+      card: 'actions',
+      cardCell: (p) =>
+        qcReceivedAt(p) ? (
+          <Button
+            size="sm"
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/qc-testing/${p._id}`);
+            }}
+          >
+            {p.qcCompletedAt ? 'แก้ไขผล QC' : 'เข้าตรวจ'}
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">รอสแกนรับ</span>
+        ),
       cell: (p) =>
         qcReceivedAt(p) ? (
           <Button
@@ -349,7 +388,7 @@ export default function QCTestingPage() {
         </TabsList>
       </Tabs>
 
-      <DataTable
+      <ResponsiveDataTable
         columns={columns}
         data={tabPetitions}
         rowKey={(p) => `${p._id}:${p.sendDayKey ?? ''}`}

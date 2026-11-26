@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { petitionExceptionScore, petitionStatusBadge } from "@/lib/statusBadge";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import PetitionStatusTimeline from "@/components/lis/PetitionStatusTimeline";
+import StatusStepBadge from "@/components/lis/StatusStepBadge";
 import type { Petition, StatusBadgeVariant } from "@/types/petition.types";
 
 const STATUS_BAR_CLASS: Record<StatusBadgeVariant, string> = {
@@ -25,6 +26,8 @@ const STATUS_BAR_CLASS: Record<StatusBadgeVariant, string> = {
   "blue-soft": "bg-primary-400",
   "gray": "bg-grey-500",
   "gray-soft": "bg-grey-300",
+  "purple": "bg-violet-500",
+  "purple-soft": "bg-violet-400",
 };
 
 interface PetitionDashboardTableProps {
@@ -144,7 +147,7 @@ export default function PetitionDashboardTable({
                       <TableCell className="relative">
                         <span className={cn("absolute left-0 top-1 bottom-1 w-[3px] rounded-r", barClass)} aria-hidden />
                         <div className="pl-2">
-                          <div className="font-semibold text-primary">{petition.petitionNo}</div>
+                          <div className="whitespace-nowrap font-semibold text-primary">{petition.petitionNo}</div>
                           <div className="text-[11px] text-muted-foreground">
                             {petitionDepartmentLabel(petition)}
                           </div>
@@ -166,7 +169,7 @@ export default function PetitionDashboardTable({
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <Badge variant={statusCfg.variant}>{statusCfg.label}</Badge>
+                          <StatusStepBadge label={statusCfg.label} variant={statusCfg.variant} status={petition.status} />
                           <PetitionStatusTimeline petition={petition} compact />
                         </div>
                       </TableCell>

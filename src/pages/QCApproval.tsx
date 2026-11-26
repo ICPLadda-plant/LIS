@@ -10,7 +10,7 @@ import type { Petition } from "@/types/petition.types";
 import { formatDateTime } from "@/lib/dateTime";
 import { api } from "@/lib/api";
 import PageHeader from "@/components/lis/PageHeader";
-import { DataTable, type DataTableColumn } from "@/components/lis/DataTable";
+import { ResponsiveDataTable, type ResponsiveDataTableColumn } from "@/components/lis/ResponsiveDataTable";
 import { getAiStatus, streamDraftNote } from "@/lib/aiApi";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
 import { isUrgentPetition } from "@/lib/urgentPetition";
@@ -121,21 +121,90 @@ const QCApproval = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [petitionIds]);
 
-  const columns: DataTableColumn<Petition>[] = [
+  const renderActions = (p: Petition, mobile: boolean) => (
+    <div className={mobile ? "flex w-full flex-col gap-2" : "flex flex-col items-end gap-2"}>
+      <Button
+        size="sm"
+        variant="primary"
+        className={mobile ? "w-full gap-1.5" : "gap-1.5"}
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate(detailPath(p));
+        }}
+      >
+        <Eye className="h-4 w-4" />
+        ดูรายละเอียด
+      </Button>
+
+      {ollamaAvailable && (
+        <div className="mt-1 space-y-2 w-full" onClick={(e) => e.stopPropagation()}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={draftingId === p._id}
+            onClick={async () => {
+              setDraftingId(p._id);
+              setDraftNotes((prev) => ({ ...prev, [p._id]: '' }));
+              try {
+                await streamDraftNote(p._id, (chunk) => {
+                  setDraftNotes((prev) => ({ ...prev, [p._id]: (prev[p._id] ?? '') + chunk }));
+                });
+              } catch {
+                setDraftNotes((prev) => ({ ...prev, [p._id]: '(เกิดข้อผิดพลาด — กรุณาลองใหม่)' }));
+              } finally {
+                setDraftingId(null);
+              }
+            }}
+            className={mobile ? "w-full gap-1.5" : "gap-1.5"}
+          >
+            {draftingId === p._id ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            Draft หมายเหตุ (AI)
+          </Button>
+
+          {draftNotes[p._id] && (
+            <textarea
+              value={draftNotes[p._id]}
+              onChange={(e) =>
+                setDraftNotes((prev) => ({ ...prev, [p._id]: e.target.value }))
+              }
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-1 focus:ring-ring"
+              placeholder="AI กำลังสร้าง draft..."
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const latestConfirmedAt = (p: Petition) => {
+    const times = visibleSides
+      .map((side) => (side === "qc" ? p.qcCompletedAt : p.labCompletedAt))
+      .filter((value): value is string => Boolean(value))
+      .sort();
+    return formatDateTime(times[times.length - 1]);
+  };
+
+  const columns: ResponsiveDataTableColumn<Petition>[] = [
     {
       key: "no",
       header: "เลขที่คำร้อง",
       className: "font-semibold text-primary",
+      card: "title",
       cell: (p) => (
         <div>
           <div className="flex items-center gap-1.5">
-            <span>{p.petitionNo}</span>
+            <span className="whitespace-nowrap">{p.petitionNo}</span>
             <UrgentBadge petition={p} />
             {returnedMap[p._id] && (
-              <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
+              <RotateCcw className="h-4 w-4 text-yellow-700 dark:text-yellow-300 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
             )}
             {abnormalMap[p._id] && (
-              <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" aria-label="พบค่าผิดปกติในผลทดสอบ" />
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0" aria-label="พบค่าผิดปกติในผลทดสอบ" />
             )}
           </div>
           <div className="flex items-center gap-1 mt-0.5 flex-wrap">
@@ -143,19 +212,19 @@ const QCApproval = () => {
               <Badge variant="blue-soft">Pre Result · รอออก Final Report</Badge>
             )}
             {abnormalMap[p._id] && (
-              <span className="inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+              <Badge variant="red-soft" className="px-1.5 text-[10px] font-medium">
                 ผิดปกติ
-              </span>
+              </Badge>
             )}
             {p.completedAt && Date.now() - new Date(p.completedAt).getTime() > 24 * 60 * 60 * 1000 && (
-              <span className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+              <Badge variant="yellow-soft" className="px-1.5 text-[10px] font-medium">
                 ⏰ เกิน 24h
-              </span>
+              </Badge>
             )}
             {returnedMap[p._id] && (
-              <span className="inline-flex items-center rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
+              <Badge variant="yellow-soft" className="px-1.5 text-[10px] font-medium">
                 🔄 Revision
-              </span>
+              </Badge>
             )}
           </div>
         </div>
@@ -164,86 +233,40 @@ const QCApproval = () => {
     {
       key: "dept",
       header: "แผนก",
+      hideOnTablet: true,
+      metaText: (p) => petitionDepartmentLabel(p),
       cell: (p) => <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge>,
     },
-    { key: "submitter", header: "ผู้นำส่ง", cell: (p) => p.submittedBy?.name ?? "-" },
-    ...visibleSides.map((side): DataTableColumn<Petition> => ({
+    { key: "submitter", header: "ผู้นำส่ง", hideOnTablet: true, cell: (p) => p.submittedBy?.name ?? "-" },
+    ...visibleSides.map((side): ResponsiveDataTableColumn<Petition> => ({
       key: `status-${side}`,
       header: side === "qc" ? "กายภาพ" : "AI",
+      card: "status",
       cell: (p) => <SideApprovalBadge state={sideApprovalState(p, side)} showApprover />,
+      cardCell: (p) => (
+        <div className="flex items-center gap-1 text-xs">
+          <span className="text-muted-foreground">{side === "qc" ? "กายภาพ" : "AI"}</span>
+          <SideApprovalBadge state={sideApprovalState(p, side)} />
+        </div>
+      ),
     })),
     {
       key: "submittedAt",
       header: "ยืนยันผลล่าสุด",
-      cell: (p) => {
-        const times = visibleSides
-          .map((side) => (side === "qc" ? p.qcCompletedAt : p.labCompletedAt))
-          .filter((value): value is string => Boolean(value))
-          .sort();
-        return formatDateTime(times[times.length - 1]);
+      hideOnTablet: true,
+      cell: (p) => latestConfirmedAt(p),
+      metaText: (p) => {
+        const value = latestConfirmedAt(p);
+        return value && value !== "-" ? `ยืนยัน ${value}` : null;
       },
     },
     {
       key: "action",
       header: "คำสั่ง",
       className: "text-right",
-      cell: (p) => (
-        <div className="flex flex-col items-end gap-2">
-          <Button
-            size="sm"
-            variant="primary"
-            className="gap-1.5"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(detailPath(p));
-            }}
-          >
-            <Eye className="h-4 w-4" />
-            ดูรายละเอียด
-          </Button>
-
-          {ollamaAvailable && (
-            <div className="mt-1 space-y-2 w-full" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                disabled={draftingId === p._id}
-                onClick={async () => {
-                  setDraftingId(p._id);
-                  setDraftNotes((prev) => ({ ...prev, [p._id]: '' }));
-                  try {
-                    await streamDraftNote(p._id, (chunk) => {
-                      setDraftNotes((prev) => ({ ...prev, [p._id]: (prev[p._id] ?? '') + chunk }));
-                    });
-                  } catch {
-                    setDraftNotes((prev) => ({ ...prev, [p._id]: '(เกิดข้อผิดพลาด — กรุณาลองใหม่)' }));
-                  } finally {
-                    setDraftingId(null);
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 rounded-md bg-violet-50 px-3 py-1.5 text-sm text-violet-700 hover:bg-violet-100 border border-violet-200 disabled:opacity-50"
-              >
-                {draftingId === p._id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                Draft หมายเหตุ (AI)
-              </button>
-
-              {draftNotes[p._id] && (
-                <textarea
-                  value={draftNotes[p._id]}
-                  onChange={(e) =>
-                    setDraftNotes((prev) => ({ ...prev, [p._id]: e.target.value }))
-                  }
-                  className="w-full rounded-md border border-violet-200 bg-white px-3 py-2 text-sm min-h-[100px] focus:outline-none focus:ring-1 focus:ring-violet-400"
-                  placeholder="AI กำลังสร้าง draft..."
-                />
-              )}
-            </div>
-          )}
-        </div>
-      ),
+      card: "actions",
+      cell: (p) => renderActions(p, false),
+      cardCell: (p) => renderActions(p, true),
     },
   ];
 
@@ -267,7 +290,7 @@ const QCApproval = () => {
           </TabsList>
         </Tabs>
 
-        <DataTable
+        <ResponsiveDataTable
           columns={columns}
           data={shownPetitions}
           rowKey={(p) => p._id}
