@@ -49,6 +49,18 @@ function printBaseCss(docType: PrintDocType): string {
   ].join("\n");
 }
 
+/** สไตล์ฟอนต์เดียวกับตอนพิมพ์ แต่จำกัดให้มีผลเฉพาะในกล่องตัวอย่างก่อนพิมพ์ */
+export function printPreviewBaseCss(docType: PrintDocType, scope: string): string {
+  const fontFamily = getPrintFontFamilyForDocType(docType);
+  const fontSize = getPrintFontSizeForDocType(docType);
+  const headingWeight = getPrintHeadingFontWeightForDocType(docType);
+  if (!fontFamily) return "";
+  return [
+    `${scope} { font-family: ${fontFamily}; font-size: ${fontSize}; }`,
+    `${scope} :is(h1, h2, h3, h4, h5, h6, th, .print-heading) { font-weight: ${headingWeight}; }`,
+  ].join("\n");
+}
+
 function documentHtml(docType: PrintDocType, el: HTMLElement | null, css?: string): string {
   const combinedCss = [collectDocumentCss(), PRINT_UNHIDE_CSS, printBaseCss(docType), css].filter(Boolean).join("\n");
   return serializeForPrint(el, combinedCss || undefined);
