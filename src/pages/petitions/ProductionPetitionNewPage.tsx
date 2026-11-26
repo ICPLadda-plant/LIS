@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import PageHeader from '@/components/lis/PageHeader';
 import PrintPreviewDialog from '@/components/lis/PrintPreviewDialog';
-import ItemsStep, { qcLabSampleTargets, type ItemRowValues } from '@/components/petition/wizard/ItemsStep';
+import ItemsStep, { minSampleQuantityForTargets, qcLabSampleTargets, type ItemRowValues } from '@/components/petition/wizard/ItemsStep';
 import { productionDateFromLotNo } from '@/lib/coaLot';
 import type { SubmitterValues } from '@/components/petition/wizard/SubmitterPicker';
 import LabRequestStep, { type LabRequestRowValues } from '@/components/petition/wizard/LabRequestStep';
@@ -516,6 +516,9 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
   const requestSendDate = getQueryValue(searchParams, ['requestDate', 'sendDate', 'sentDate']);
   const labelSendDate = (index: number, productionDate: string) =>
     valueAt(sendDates, index, false) || requestSendDate || productionDate;
+  const collectDates = getNestedSampleValues(searchParams, ['collectDate', 'sampledDate']);
+  const requestCollectDate = getQueryValue(searchParams, ['collectDate', 'sampledDate']);
+  const collectDateAt = (index: number) => valueAt(collectDates, index, false) || requestCollectDate || undefined;
   const packageUnits = getSampleOrQueryValues(searchParams, ['quantity', 'packageUnit', 'packSize', 'packsize']);
   const quantities = getSampleOrQueryValues(searchParams, ['qty', 'quantityValue', 'amount'], { splitComma: true });
   const quantityUnits = getSampleOrQueryValues(searchParams, ['unit', 'qtyUnit', 'quantityUnit'], { splitComma: true });
@@ -573,6 +576,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
       labelSampledDate: labelSendDate(0, productionDate),
+      collectDate: collectDateAt(0),
       submittedQuantity,
       submittedUnit,
     }, searchParams, 0, labQtys[0] ?? '', submittedUnit)];
@@ -613,6 +617,7 @@ export function makeInitialItemsFromQuery(searchParams: URLSearchParams): ItemRo
       labelQuantity,
       labelQuantities: labelQuantity ? [labelQuantity] : [],
       labelSampledDate: labelSendDate(i, productionDate),
+      collectDate: collectDateAt(i),
       submittedQuantity: valueAt(quantities, i, false),
       submittedUnit: valueAt(quantityUnits, i),
       ...productionLineFields(i),
@@ -972,6 +977,11 @@ export default function ProductionPetitionNewPage({
         }
         if (!Number.isInteger(it.sampleQuantity ?? 1) || (it.sampleQuantity ?? 1) < 1) {
           setStepError(`ตัวอย่างลำดับ ${it.seq}: กรุณากรอกจำนวนตัวอย่างเป็นเลขจำนวนเต็มตั้งแต่ 1 ขึ้นไป`);
+          return false;
+        }
+        const minSamples = deliveryAndBatchRequired && !splitQcLab ? minSampleQuantityForTargets(it) : 1;
+        if ((it.sampleQuantity ?? 1) < minSamples) {
+          setStepError(`ตัวอย่างลำดับ ${it.seq}: เลือกส่งวิเคราะห์ ${minSamples} ปลายทาง จำนวนตัวอย่างต้องไม่น้อยกว่า ${minSamples}`);
           return false;
         }
       }

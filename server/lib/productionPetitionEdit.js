@@ -95,6 +95,8 @@ function buildEditedItems(existingItems, rows, { note, priority, department, pet
       labelQuantitySides,
       // ว/ด/ป บนป้าย = วันที่ส่งของ Production; ไม่มีค่า (เวอร์ชันเดิม) ใช้วันที่ผลิต
       labelSampledDate: text(row.requestDate) || productionDate || '',
+      // วันที่เก็บตัวอย่าง (ว/ด/ป ผู้สุ่มบนป้าย + วันที่ผู้ส่งตัวอย่างในใบคำขอ)
+      collectDate: text(row.collectDate) || old.collectDate || undefined,
       // หมายเหตุแยกตามรายการ; Production รุ่นเดิมไม่ส่ง row.note จึงใช้หมายเหตุของคำขอ
       note: itemNoteWith(row.note !== undefined && row.note !== null ? row.note : note, [
         text(row.itemNo) ? `Item: ${text(row.itemNo)}` : '',

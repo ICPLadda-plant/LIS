@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { startFirstWorkingCamera } from '@/lib/qrCameraFallback';
+import { startFirstWorkingCamera, describeCameraError, resetScanner } from '@/lib/qrCameraFallback';
 import {
   AlertCircle, CheckCircle2, QrCode,
   Package, Building2, X,
@@ -98,7 +98,7 @@ export default function ScannerPage() {
     let active = true;
 
     (async () => {
-      const scanner = new Html5Qrcode(READER_ID);
+      let scanner = new Html5Qrcode(READER_ID);
       const config = { fps: 10, qrbox: { width: 250, height: 250 } };
       const onScan = (text: string) => {
         if (!active) return;
@@ -106,8 +106,15 @@ export default function ScannerPage() {
         fetchAndConfirm(text);
       };
 
-      const startWith = (source: MediaTrackConstraints | string) =>
-        scanner.start(source, config, onScan, () => {});
+      const startWith = async (source: MediaTrackConstraints | string) => {
+        try {
+          await scanner.start(source, config, onScan, () => {});
+        } catch (startErr) {
+          // ครั้งที่ล้มอาจจับกล้องค้าง + ทำ instance พัง → ปล่อยกล้องแล้วสร้างใหม่ก่อนลองตัวถัดไป
+          scanner = await resetScanner(scanner);
+          throw startErr;
+        }
+        };
 
       try {
         try {
@@ -123,11 +130,12 @@ export default function ScannerPage() {
 
         if (!active) { scanner.stop().catch(() => {}); return; }
         scannerRef.current = scanner;
-      } catch {
+      } catch (camErr) {
         // เปิดกล้องไม่ได้ (PC ไม่มีกล้อง / permission โดน block / enumerate ล้ม)
         // → fallback ไปกรอกเลขเอง แทนที่จะค้างหน้า error ทางตัน
         if (active) {
-          setErrorMsg('เปิดกล้องไม่ได้ — กรอกเลขคำร้องเองได้เลย');
+          console.warn('[QR camera]', camErr);
+          setErrorMsg(describeCameraError(camErr));
           setPhase('no-camera');
         }
       }
@@ -320,13 +328,20 @@ export default function ScannerPage() {
   useEffect(() => {
     if (!addItemOpen || addItemPhase !== 'scanning') return;
     let active = true;
-    const scanner = new Html5Qrcode(ADDITIONAL_READER_ID);
+    let scanner = new Html5Qrcode(ADDITIONAL_READER_ID);
     const config = { fps: 10, qrbox: { width: 250, height: 250 } };
     const onScan = (text: string) => {
       if (active) fetchAndConfirm(text, 'dialog');
     };
-    const startWith = (source: MediaTrackConstraints | string) =>
-      scanner.start(source, config, onScan, () => {});
+    const startWith = async (source: MediaTrackConstraints | string) => {
+      try {
+        await scanner.start(source, config, onScan, () => {});
+      } catch (startErr) {
+        // ครั้งที่ล้มอาจจับกล้องค้าง + ทำ instance พัง → ปล่อยกล้องแล้วสร้างใหม่ก่อนลองตัวถัดไป
+        scanner = await resetScanner(scanner);
+        throw startErr;
+      }
+      };
 
     (async () => {
       try {
@@ -343,9 +358,10 @@ export default function ScannerPage() {
         if (!active) {
           scanner.stop().catch(() => {});
         }
-      } catch {
+      } catch (camErr) {
         if (active) {
-          setAddItemError('เปิดกล้องไม่ได้ — กรอกเลขคำร้องเองได้เลย');
+          console.warn('[QR camera]', camErr);
+          setAddItemError(describeCameraError(camErr));
           setAddItemPhase('no-camera');
         }
       }

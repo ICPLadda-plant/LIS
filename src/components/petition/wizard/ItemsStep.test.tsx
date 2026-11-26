@@ -380,7 +380,7 @@ describe('ItemsStep production send targets', () => {
     expect(screen.getByText('ส่งวิเคราะห์')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: 'ส่งวิเคราะห์ Lab (AI) ตัวอย่างที่ 1' }));
 
-    expect(onChange).toHaveBeenCalledWith([{ ...productionItem, sendToLab: false, sendToQc: true }]);
+    expect(onChange).toHaveBeenCalledWith([{ ...productionItem, sendToLab: false, sendToQc: true, sampleQuantity: 1 }]);
   });
 
   it('lets production untick QC while keeping the Lab choice explicit', () => {
@@ -388,7 +388,16 @@ describe('ItemsStep production send targets', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'ส่งวิเคราะห์ QC ตัวอย่างที่ 1' }));
 
-    expect(onChange).toHaveBeenCalledWith([{ ...productionItem, sendToQc: false, sendToLab: true }]);
+    expect(onChange).toHaveBeenCalledWith([{ ...productionItem, sendToQc: false, sendToLab: true, sampleQuantity: 1 }]);
+  });
+
+  it('sets sample quantity to 2 when both QC and Lab (AI) are ticked', () => {
+    const item = { ...productionItem, sendToQc: true, sendToLab: false, sampleQuantity: 1 };
+    const { onChange } = renderStep({ showSendTargets: true, value: [item] });
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ส่งวิเคราะห์ Lab (AI) ตัวอย่างที่ 1' }));
+
+    expect(onChange).toHaveBeenCalledWith([{ ...item, sendToLab: true, sendToQc: true, sampleQuantity: 2 }]);
   });
 });
 

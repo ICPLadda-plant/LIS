@@ -109,10 +109,11 @@ function toArray<T extends string>(v: T | T[] | null | undefined): T[] {
   return Array.isArray(v) ? v : [v];
 }
 
-function PageOne({ lr, customerCode, yearShort }: { lr: LabRequest; customerCode: string; yearShort: string }) {
+function PageOne({ lr, customerCode, yearShort, sendDate }: { lr: LabRequest; customerCode: string; yearShort: string; sendDate?: string }) {
   const sa = lr.serviceAgreement;
   const lar = lr.labAgreementReview;
-  const createdDate = splitBuddhist(lr.createdAt);
+  // วันเดือนปีที่ลงชื่อผู้ขอรับบริการ = วันที่ส่งของ Production (คำขอเดิมไม่มีค่า ใช้วันที่สร้างคำขอ)
+  const createdDate = splitBuddhist(sendDate || lr.createdAt);
   const reviewedDate = splitBuddhist(lar?.reviewedAt);
   const requester = lr.requester;
 
@@ -610,7 +611,7 @@ function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgPa
               </div>
               <div className="pr-sig-row pr-mt-xs">
                 <span className="pr-sig-label">วันที่ </span>
-                <Line width="6cm" value={buddhistShort(petition.sampleSentAt)} />
+                <Line width="6cm" value={buddhistShort(petition.items?.find((it) => it.collectDate)?.collectDate || petition.sampleSentAt)} />
               </div>
             </div>
             <div className="pr-p2-sign-col">
@@ -694,6 +695,7 @@ export default function PetitionPrintTemplate({ labRequest, petition, qcResults 
               lr={labRequest}
               customerCode={customerCodeForPetition(labRequest.requester?.department, petition.submittedBy?.department, petition.dept)}
               yearShort={yearShort}
+              sendDate={petition.items?.find((it) => it.labelSampledDate)?.labelSampledDate}
             />
           );
           const pageTwos = sheets.map((rows, index) => (
