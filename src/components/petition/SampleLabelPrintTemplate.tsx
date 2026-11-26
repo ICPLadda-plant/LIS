@@ -318,7 +318,7 @@ function HazardLabelCard({ petition, item, yearShort, copyIndex, additionalSampl
           <div className="grid grid-cols-[1fr_1.4fr_1fr] gap-1.5">
             <Field label="ปริมาณ" value={labelQuantityText(item, copyIndex, additionalSampleRequest)} />
             <Field label="สุ่มโดย" value={labelSampledByName(petition, item)} valueClassName="leading-tight" multiline />
-            <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
+            <Field label="ว/ด/ป ที่สุ่ม" value={toBuddhistShort(item.collectDate || item.labelSampledDate)} />
           </div>
           <Field label="วันที่หมดอายุ" value="" />
           <Field
@@ -387,7 +387,7 @@ function LabelCard({ petition, item, yearShort, copyIndex, additionalSampleReque
           </div>
           <div className="grid grid-cols-[1.4fr_1fr] gap-1.5">
             <Field label="สุ่มโดย" value={sampledByName} valueClassName="leading-tight" multiline />
-            <Field label="ว/ด/ป" value={toBuddhistShort(item.labelSampledDate)} />
+            <Field label="ว/ด/ป ที่สุ่ม" value={toBuddhistShort(item.collectDate || item.labelSampledDate)} />
           </div>
         </div>
       </div>

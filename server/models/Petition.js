@@ -30,6 +30,7 @@ const PetitionItemSchema = new mongoose.Schema(
     lineRef: String,
     labelSampledBy: String,
     labelSampledDate: String,
+    collectDate: String,
     labelRemark: String,
     sampleId: String,
     // รหัส Master Item (item_no) ของแถวที่เลือก — คนละเรื่องกับ sampleId ซึ่งเป็น key
@@ -184,6 +185,11 @@ const PetitionSchema = new mongoose.Schema(
     // required track is done (QC always; Lab when there is a lab-batch item).
     labCompletedAt: Date,
     labCompletedBy: String,
+    // บันทึกผล Lab ทีละใบนำส่ง (L03/69 ...) — labCompletedAt ตั้งเมื่อครบทุกใบ
+    labCompletedSlips: {
+      type: [new mongoose.Schema({ slip: String, itemSeqs: [Number], completedAt: Date, completedBy: String }, { _id: false })],
+      default: undefined,
+    },
     qcCompletedAt: Date,
     qcCompletedBy: String,
     // คนที่ทำงานฝั่ง QC ของคำขอนี้ (รับตัวอย่าง/บันทึกผล/ยืนยันผล) — ใช้แจ้งเตือน "งานของตัวเอง"
@@ -199,6 +205,8 @@ const PetitionSchema = new mongoose.Schema(
     labRecheckRequestedAt: Date,
     labRecheckRequestedBy: String,
     labRecheckReason: String,
+    // ผลทบทวนคำขอของหัวหน้า Lab — ใช้เมื่อคำร้องไม่มีใบ L (ถ้ามีใบ L จะเขียนลงใบ L ด้วย)
+    labAgreementReview: { type: mongoose.Schema.Types.Mixed, default: undefined },
     labRecheckCount: { type: Number, default: 0 },
     // แก้ไขผล Lab ที่บันทึกแล้ว: snapshot ก่อนแก้ (ใช้คืนค่าตอนยกเลิก + เก็บ log ค่าเดิม)
     labEditSession: { type: mongoose.Schema.Types.Mixed, default: null },
@@ -330,4 +338,8 @@ PetitionSchema.index({ petitionNo: 1, deletedAt: 1 }, { unique: true });
 PetitionSchema.index({ 'additionalSampleRequests.qrCode': 1 }, { sparse: true });
 
 PetitionSchema.plugin(softDeletePlugin);
+// ล้างผล/ส่งกลับ/ขึ้น phase ใหม่ (labCompletedAt → null) ต้องเริ่มบันทึกรายใบนำส่งใหม่ด้วย
+PetitionSchema.pre('save', function resetLabSlips() {
+  if (this.isModified('labCompletedAt') && !this.labCompletedAt) this.labCompletedSlips = undefined;
+});
 module.exports = mongoose.model('Petition', PetitionSchema);

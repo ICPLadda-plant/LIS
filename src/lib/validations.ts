@@ -36,6 +36,7 @@ export const petitionItemSchema = z.object({
   lineRef: z.string().optional(),
   labelSampledBy: z.string().optional().default(''),
   labelSampledDate: z.string().optional().default(''),
+  collectDate: z.string().optional(),
   labelRemark: z.string().optional().default(''),
 });
 

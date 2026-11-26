@@ -33,7 +33,19 @@ export function isReviewFilled(r?: LabAgreementReview | null): boolean {
   return !!r && !!r.reviewedBy && !!r.reviewedAt;
 }
 
-/** Lab รับตัวอย่างได้เมื่อทุกใบ L ของคำร้องทบทวนแล้วและสรุปว่าพร้อมรับงาน (ไม่มีใบ L = ไม่ต้องทบทวน) */
-export function isReadyToReceive(requests: Pick<LabRequest, 'labAgreementReview'>[]): boolean {
-  return requests.every((r) => isReviewFilled(r.labAgreementReview) && r.labAgreementReview?.acceptable !== false);
+/** Lab รับตัวอย่างได้เมื่อทบทวนแล้วและสรุปว่าพร้อมรับงาน — ทุกใบ L ของคำร้อง หรือผลที่เก็บที่คำร้องเมื่อไม่มีใบ L */
+export function isReadyToReceive(
+  requests: Pick<LabRequest, 'labAgreementReview'>[],
+  petitionReview?: LabAgreementReview | null,
+): boolean {
+  const reviews = requests.length ? requests.map((r) => r.labAgreementReview) : [petitionReview];
+  return reviews.every((r) => isReviewFilled(r) && r?.acceptable !== false);
+}
+
+/** ผลทบทวนปัจจุบันของคำร้อง: ใบ L ใบแรก หรือผลที่เก็บที่คำร้องเมื่อไม่มีใบ L */
+export function currentAgreementReview(
+  requests: Pick<LabRequest, 'labAgreementReview'>[] | null | undefined,
+  petitionReview?: LabAgreementReview | null,
+): LabAgreementReview | null {
+  return (requests?.length ? requests[0]?.labAgreementReview : petitionReview) ?? null;
 }

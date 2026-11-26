@@ -31,7 +31,7 @@ import { DataTable, type DataTableColumn } from '@/components/lis/DataTable';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
 import { qcReceivedAt, qcReceivedBy, qcTrackStatusBadge } from '@/lib/receiveStatus';
 import { useArrivalFlashId } from '@/hooks/useArrivalFlash';
-import { isVisibleInQcTestingQueue } from '@/lib/petitionQueueVisibility';
+import { formatSendDayKey, isVisibleInQcTestingQueue, splitPetitionBySendDay, type SendDayPetition } from '@/lib/petitionQueueVisibility';
 import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { rankSearchResults } from '@/lib/searchRanking';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
@@ -102,12 +102,13 @@ export default function QCTestingPage() {
     limit: 50,
   });
 
-  const visiblePetitions: Petition[] = [
+  // คำร้องเดียวกันที่ส่งตัวอย่างคนละวันแยกเป็นคนละ card; ส่งวันเดียวกันรวม card เดียว
+  const visiblePetitions: SendDayPetition[] = [
     ...(isAdmin ? adminOnlyData?.items ?? [] : []),
     ...(data?.items ?? []),
     ...(staleReceivedData?.items ?? []),
-  ].filter(isVisibleInQcTestingQueue);
-  const petitions = prioritizeUrgentPetitions(rankSearchResults(visiblePetitions, search, (petition) => {
+  ].filter(isVisibleInQcTestingQueue).flatMap(splitPetitionBySendDay);
+  const petitions: SendDayPetition[] = prioritizeUrgentPetitions(rankSearchResults(visiblePetitions, search, (petition) => {
     const items = petition.items ?? [];
     const itemNos = items.map((item) => item.itemNo).filter((itemNo) => itemNo?.trim());
     return {
@@ -162,7 +163,7 @@ export default function QCTestingPage() {
     return () => { alive = false; };
   }, [flaggableKey]);
 
-  const columns: DataTableColumn<Petition>[] = [
+  const columns: DataTableColumn<SendDayPetition>[] = [
     {
       key: 'petition',
       header: 'คำร้อง',
@@ -184,6 +185,9 @@ export default function QCTestingPage() {
             <div className="text-xs text-grey-500 mt-0.5">
               โดย {p.submittedBy?.name ?? '-'} จาก {petitionDepartmentLabel(p)}
             </div>
+            {p.sendDayKey && (
+              <div className="text-xs text-grey-500 mt-0.5">วันที่ส่ง {formatSendDayKey(p.sendDayKey)}</div>
+            )}
             <div className="text-xs text-grey-500 mt-0.5">{items.length} รายการ</div>
           </>
         );
@@ -348,7 +352,7 @@ export default function QCTestingPage() {
       <DataTable
         columns={columns}
         data={tabPetitions}
-        rowKey={(p) => p._id}
+        rowKey={(p) => `${p._id}:${p.sendDayKey ?? ''}`}
         isLoading={loading || staleReceivedLoading}
         rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
         onRowClick={(p) => {

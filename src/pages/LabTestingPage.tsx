@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react';
-import { isVisibleInAssignQueue } from '@/lib/petitionQueueVisibility';
+import { formatSendDayKey, isVisibleInAssignQueue, splitPetitionBySendDay, type SendDayPetition } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import LabStartWorkDialog from '@/components/petition/LabStartWorkDialog';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
@@ -41,12 +41,14 @@ import { petitionDepartmentLabel } from '@/lib/petitionDepartment';
 import { prioritizeUrgentPetitions } from '@/lib/urgentPetition';
 import UrgentBadge from '@/components/lis/UrgentBadge';
 import { formatLabSampleNo, itemSubmissionNoText } from '@/lib/petitionSampler';
+import { isItemLabelPending } from '@/lib/labelReceipt';
 
 const FULL_ACCESS_ROLES = new Set(['admin', 'lab-head']);
 const LAB_PAGE_SIZE = 50;
 
 const labItemsFor = (petition: Petition) => (petition.items ?? []).filter(
-  (item) => isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(item),
+  (item) => (isResearchAndDevelopmentPetition(petition) || shouldSendItemToLab(item))
+    && !isItemLabelPending(petition, item, 'lab'),
 );
 
 export default function LabTestingPage() {
@@ -182,11 +184,14 @@ export default function LabTestingPage() {
     }
   }
 
-  const petitions: Petition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
+  // คำร้องเดียวกันที่ส่งตัวอย่างคนละวันแยกเป็นคนละ card; ส่งวันเดียวกันรวม card เดียว
+  const petitions: SendDayPetition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
+    .flatMap(splitPetitionBySendDay)
     .filter((p) => !p.labApprovedAt)
     // ตัวอย่างกลุ่มน้ำที่ QC ยังไม่ยืนยันค่า ถพ. ยังไม่ปล่อยมาให้ Lab
     .filter((p) => !isLabAwaitingSgConfirmation(p))
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
+    .filter((p) => labItemsFor(p).length > 0)
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
     // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
     .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p)));
@@ -235,7 +240,7 @@ export default function LabTestingPage() {
     return () => { alive = false; };
   }, [flaggableKey]);
 
-  const columns: DataTableColumn<Petition>[] = [
+  const columns: DataTableColumn<SendDayPetition>[] = [
     {
       key: 'petition',
       header: 'เลขที่ตัวอย่าง',
@@ -263,6 +268,9 @@ export default function LabTestingPage() {
             <div className="text-xs text-grey-500 mt-0.5">
               โดย {p.submittedBy?.name ?? '-'} จาก {petitionDepartmentLabel(p)}
             </div>
+            {p.sendDayKey && (
+              <div className="text-xs text-grey-500 mt-0.5">วันที่ส่ง {formatSendDayKey(p.sendDayKey)}</div>
+            )}
             {(() => {
               const nos = [...new Set(labItems.map((item) => itemSubmissionNoText(p, item, 'lab')).filter(Boolean))];
               return nos.length ? <div className="text-xs text-grey-500 mt-0.5">ใบนำส่ง {nos.join(', ')}</div> : null;
@@ -474,7 +482,7 @@ export default function LabTestingPage() {
         <DataTable
           columns={columns}
           data={petitions}
-          rowKey={(p) => p._id}
+          rowKey={(p) => `${p._id}:${p.sendDayKey ?? ''}`}
           isLoading={loading || !parametersLoaded}
           rowClassName={(p) => (p._id === flashId ? 'animate-flash-bg' : undefined)}
           onRowClick={(p) => {

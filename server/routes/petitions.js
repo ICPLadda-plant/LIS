@@ -40,7 +40,7 @@ const {
   validatePetitionSubmission,
 } = require('../lib/petitionSubmissionRules');
 const { canEditWholePetition } = require('../lib/productionPetitionEdit');
-const { assignMissingSampleLabelNumbers, planLabelReceipt } = require('../lib/sampleLabelNumber');
+const { assignMissingSampleLabelNumbers, planLabelReceipt, pendingSideLabels } = require('../lib/sampleLabelNumber');
 const { sendProductionCancel } = require('../lib/productionCallback');
 const { sampleIdsFromPetition, softDeletePetitionTree } = require('../lib/petitionSoftDelete');
 const { recordQcHandlerFromRequest } = require('../lib/qcHandlers');
@@ -898,6 +898,10 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
     const redoExplanation = String(req.body?.redoExplanation || '').trim();
     const additionalError = await additionalCompletionError(doc, [side]);
     if (additionalError) return res.status(409).json({ error: { message: additionalError } });
+    const pendingLabels = pendingSideLabels(doc, side);
+    if (pendingLabels.length) {
+      return res.status(409).json({ error: { message: `ยังไม่ได้รับป้าย ${pendingLabels.map((g) => g.label).join(', ')} ฝั่ง ${side === 'qc' ? 'QC' : 'Lab'} กรุณาสแกนรับให้ครบก่อนบันทึกผล` } });
+    }
     if (side === 'qc') {
       if (!requiresQcTrack(doc)) return badRequest(res, 'คำขอ R&D ไม่ต้องส่ง QC');
       if (doc.qcReturnNote && !redoExplanation) {
@@ -948,6 +952,33 @@ router.post('/:id/complete', serializePetitionWrite(async (req, res) => {
 }));
 
 // POST /api/petitions/:id/lab-approve  → หัวหน้า Lab ออกผล Lab. success เกิดเมื่อครบทุก track.
+// POST /api/petitions/:id/lab-slip-complete → บันทึกผล Lab เฉพาะใบนำส่งเดียว (ใบอื่นยังกรอกต่อได้)
+router.post('/:id/lab-slip-complete', serializePetitionWrite(async (req, res) => {
+  try {
+    const slip = String(req.body?.slip || '').trim();
+    const itemSeqs = (Array.isArray(req.body?.itemSeqs) ? req.body.itemSeqs : []).map(Number).filter(Number.isFinite);
+    if (!slip || !itemSeqs.length) return badRequest(res, 'ต้องระบุใบนำส่งและรายการ');
+    const doc = await Petition.findById(req.params.id);
+    if (!doc) return res.status(404).json({ error: { message: 'ไม่พบคำร้อง' } });
+    const actor = await additionalActor(req, res, doc, 'lab');
+    if (!actor) return;
+    if (['approved', 'rejected'].includes(doc.status) || doc.labCompletedAt) {
+      return res.status(409).json({ error: { message: 'บันทึกผล Lab ของคำร้องนี้แล้ว' } });
+    }
+    const slips = (doc.labCompletedSlips || []).filter((s) => s.slip !== slip);
+    slips.push({ slip, itemSeqs, completedAt: new Date(), completedBy: actor });
+    doc.labCompletedSlips = slips;
+    await doc.save();
+    logAudit(doc, {
+      event: 'updated', toStatus: doc.status, actor,
+      note: `Lab บันทึกผลใบนำส่ง ${slip}`, metadata: { side: 'lab', kind: 'labSlipCompleted', slip, itemSeqs },
+    });
+    res.json(doc);
+  } catch (err) {
+    res.status(400).json({ error: { message: err.message } });
+  }
+}));
+
 router.post('/:id/lab-approve', serializePetitionWrite(async (req, res) => {
   try {
     const doc = await Petition.findById(req.params.id);
@@ -1201,6 +1232,8 @@ router.post('/:id/lab-agreement-review', async (req, res) => {
       { petitionId: petition._id },
       { $set: { labAgreementReview: review } },
     );
+    // เก็บที่คำร้องด้วย เพื่อให้ตัวอย่างที่ไม่มีใบ L ต้องทบทวนก่อนรับงานเหมือนกัน
+    await Petition.updateOne({ _id: petition._id }, { $set: { labAgreementReview: review } });
     const updated = result.modifiedCount ?? result.nModified ?? 0;
     res.json({ updated, review });
   } catch (err) {
@@ -1568,7 +1601,12 @@ router.patch('/:id/lab-sample-numbers', serializePetitionWrite(async (req, res) 
 // คำร้องที่ไม่มีใบ L (เช่น QC อย่างเดียว / ข้อมูลเก่า) ไม่ต้องทบทวน
 async function labAgreementReviewError(petition) {
   const requests = await LabRequest.find({ petitionId: petition._id, deletedAt: null }, { labAgreementReview: 1 }).lean();
-  if (!requests?.length) return null;
+  if (!requests?.length) {
+    // ไม่มีใบ L ก็ต้องทบทวนคำขอก่อนรับงาน — ใช้ผลทบทวนที่เก็บไว้ที่คำร้อง
+    if (!petition.labAgreementReview?.reviewedAt) return 'กรุณาทบทวนคำขอก่อนรับงาน Lab';
+    if (petition.labAgreementReview.acceptable === false) return 'ผลทบทวนคำขอคือ "ไม่พร้อมรับงาน" จึงรับตัวอย่างไม่ได้';
+    return null;
+  }
   if (requests.some((request) => !request.labAgreementReview?.reviewedAt)) return 'กรุณาทบทวนคำขอก่อนรับงาน Lab';
   if (requests.some((request) => request.labAgreementReview.acceptable === false)) {
     return 'ผลทบทวนคำขอคือ "ไม่พร้อมรับงาน" จึงรับตัวอย่างไม่ได้';

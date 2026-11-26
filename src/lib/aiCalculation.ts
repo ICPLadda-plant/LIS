@@ -1,4 +1,5 @@
 import { calculatePaclobutrazol } from './paclobutrazolFields';
+import { calculateMancozeb } from './mancozebFields';
 export type AiCalculationResult = {
   areaAverage: number | null;
   sampleAverage: number | null;
@@ -87,6 +88,11 @@ const valuesForSubstance = (values: Record<string, unknown>, substance: string) 
 };
 
 export function calculateAi(values: Record<string, unknown>, density: number | null = null, substance = ''): AiCalculationResult {
+  // MANCOZEB (ไทเทรต 0.1 N I2): %AI = Report จากใบคำนวณ
+  if (Object.keys(values).some((key) => key.startsWith('MCZ '))) {
+    const mcz = calculateMancozeb(values, density != null && Number(density) > 0 ? Number(density) : null);
+    return { areaAverage: null, sampleAverage: mcz.average, areaRsd: null, sampleRsd: null, ai: mcz.report == null ? null : Number(mcz.report.toFixed(2)) };
+  }
   // PACLOBUTRAZOL (Internal standard): %AI = Report %W/V จากใบคำนวณ
   // ใช้ค่าทั้งหมด (Std / %Std / Dilution) — valuesForSubstance เก็บไว้เฉพาะคีย์ Area Inj / Sample
   if (Object.keys(values).some((key) => key.startsWith('PBZ '))) {

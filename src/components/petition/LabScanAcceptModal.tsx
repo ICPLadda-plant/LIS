@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import { startFirstWorkingCamera, describeCameraError, resetScanner } from '@/lib/qrCameraFallback';
 import { AlertCircle, Camera, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Petition } from '@/types/petition.types';
@@ -19,7 +20,7 @@ import PendingPetitionSelect from '@/components/petition/PendingPetitionSelect';
 import LabelReceiptPicker from '@/components/petition/LabelReceiptPicker';
 import LabAgreementReviewDialog from '@/components/review/LabAgreementReviewDialog';
 import { fetchLabRequestsByPetition, saveLabAgreementReview } from '@/hooks/usePetition';
-import { isReadyToReceive } from '@/lib/labAgreementReview';
+import { currentAgreementReview, isReadyToReceive } from '@/lib/labAgreementReview';
 import type { LabAgreementReview, LabRequest } from '@/types/labRequest.types';
 import { toast } from 'sonner';
 import { readPetitionLabelCodeFromImage } from '@/lib/aiApi';
@@ -165,7 +166,10 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       }
       if (labelPick && 'labels' in labelPick) {
         setLabelChoices(labelPick.labels);
-        setLabelKeys(labelPick.keys);
+        // หัวหน้ากรอกเลขตัวอย่างครบทุกรายการในรอบเดียว → เลือกทุกป้ายที่ค้างไว้ก่อน (เอาออกได้)
+        setLabelKeys(!request && isFullAccess
+          ? labelPick.labels.filter((label) => !label.received).map((label) => label.key)
+          : labelPick.keys);
       }
 
       setLabRequests(request || found.labReceivedAt ? [] : await fetchLabRequestsByPetition(found._id).catch(() => []));
@@ -188,36 +192,43 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     let active = true;
 
     (async () => {
-      const scanner = new Html5Qrcode(READER_ID);
+      let scanner = new Html5Qrcode(READER_ID);
       const config = { fps: 15 };
       const onScan = (text: string) => {
         if (!active) return;
         fetchAndCheck(text);
       };
 
-      const startWith = (source: MediaTrackConstraints | string) =>
-        scanner.start(source, config, onScan, () => {});
+      const startWith = async (source: MediaTrackConstraints | string) => {
+        try {
+          await scanner.start(source, config, onScan, () => {});
+        } catch (startErr) {
+          // ครั้งที่ล้มอาจจับกล้องค้าง + ทำ instance พัง → ปล่อยกล้องแล้วสร้างใหม่ก่อนลองตัวถัดไป
+          scanner = await resetScanner(scanner);
+          throw startErr;
+        }
+        };
 
       try {
         try {
-          await startWith({ facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } });
+          // html5-qrcode รับ cameraIdOrConfig ได้แค่ 1 key — ใส่ width/height ด้วยจะ error ทันที
+          await startWith({ facingMode: 'environment' });
         } catch {
           const cameras = await Html5Qrcode.getCameras();
           if (cameras.length === 0) {
             if (active) setPhase('no-camera');
             return;
           }
-          const back = cameras.find((c) => /back|environment|rear|หลัง|后|背面/i.test(c.label));
-          const cam = back ?? (cameras.length > 1 ? cameras[cameras.length - 1] : cameras[0]);
-          await startWith({ deviceId: { exact: cam.id }, width: { ideal: 1920 }, height: { ideal: 1080 } });
+          await startFirstWorkingCamera(cameras, (id) => startWith(id));
         }
         if (!active) { scanner.stop().catch(() => {}); return; }
         scannerRef.current = scanner;
-      } catch {
+      } catch (camErr) {
         // เปิดกล้องไม่ได้ (PC ไม่มีกล้อง / permission โดน block / enumerate ล้ม)
         // → fallback ไปกรอกเลขเอง แทนที่จะค้างหน้า error ทางตัน
         if (active) {
-          setErrorMsg('เปิดกล้องไม่ได้ — กรอกเลขคำร้องเองได้เลย');
+          console.warn('[QR camera]', camErr);
+          setErrorMsg(describeCameraError(camErr));
           setPhase('no-camera');
         }
       }
@@ -306,7 +317,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     }
   }
 
-  const reviewRequired = !additionalRequest && !petition?.labReceivedAt && labRequests.length > 0 && !isReadyToReceive(labRequests);
+  // ทุกตัวอย่างต้องทบทวนคำขอก่อนรับงาน แม้คำร้องไม่มีใบ L (ใช้ผลที่เก็บที่คำร้องแทน)
+  const reviewRequired = !!petition && !additionalRequest && !petition.labReceivedAt
+    && !isReadyToReceive(labRequests, petition.labAgreementReview);
 
   function handleAcceptClick() {
     if (!reviewRequired) { void confirmAccept(); return; }
@@ -319,6 +332,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     try {
       const { review } = await saveLabAgreementReview(petition._id, draft, user?.name || user?.email || 'system');
       setLabRequests((prev) => prev.map((request) => ({ ...request, labAgreementReview: review })));
+      setPetition((prev) => (prev ? { ...prev, labAgreementReview: review } : prev));
       reviewOutcomeRef.current = { accept: review.acceptable !== false, reason: review.notAcceptableReason };
     } catch {
       toast.error('บันทึกการทบทวนไม่สำเร็จ');
@@ -469,7 +483,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
                 {petition.assignedTo && (
                   <p>มอบหมายให้: <span className="font-medium text-primary">{petition.assignedTo.name}</span></p>
                 )}
-                {labRequests.length > 0 && (
+                {!additionalRequest && !petition.labReceivedAt && (
                   <p>ทบทวนคำขอ: <span className="text-foreground">{reviewRequired ? 'ต้องทบทวนก่อนรับงาน' : 'พร้อมรับงาน'}</span></p>
                 )}
               </div>
@@ -533,7 +547,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       <LabAgreementReviewDialog
         open={reviewOpen}
         onOpenChange={handleReviewOpenChange}
-        initial={labRequests[0]?.labAgreementReview ?? null}
+        initial={currentAgreementReview(labRequests, petition?.labAgreementReview)}
         onSave={handleSaveReview}
         testMethod={labRequests[0]?.serviceAgreement?.testMethod}
       />

@@ -92,6 +92,7 @@ export interface PetitionItem {
   lineRef?: string;
   labelSampledBy?: string;
   labelSampledDate?: string;
+  collectDate?: string;
   labelRemark?: string;
   sampleId?: string;
   // รหัสสินค้าจาก Master Item (item_no) ของแถวที่เลือก — คนละเรื่องกับ sampleId
@@ -292,6 +293,8 @@ interface PetitionBase {
   labRecheckRequestedAt?: string | null;
   labRecheckRequestedBy?: string;
   labRecheckReason?: string;
+  /** ผลทบทวนคำขอ — ใช้เมื่อคำร้องไม่มีใบ L */
+  labAgreementReview?: import('./labRequest.types').LabAgreementReview;
   labRecheckCount?: number;
   /** เวลาที่คาดว่าจะได้รับผล Lab — บันทึกตอนกด "เริ่มงาน" / เปลี่ยนเครื่อง / Re-check */
   labExpected?: {
@@ -303,6 +306,7 @@ interface PetitionBase {
   } | null;
   /** มีค่าเมื่อผู้รับผิดชอบกด "แก้ไข" ผล Lab ที่บันทึกแล้วและยังไม่กดบันทึก/ยกเลิก */
   labEditSession?: { startedAt: string; startedBy?: string; reason: string } | null;
+  labCompletedSlips?: { slip: string; itemSeqs: number[]; completedAt: string; completedBy?: string }[];
   labReturnNote?: string;
   qcReturnNote?: string;
   labRedoExplanation?: string;

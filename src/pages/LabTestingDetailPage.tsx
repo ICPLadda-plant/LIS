@@ -43,6 +43,8 @@ import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, c
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
 import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
+import { isMancozebItem } from '@/lib/mancozebFields';
+import { MancozebGrid } from '@/components/petition/MancozebGrid';
 import { DailyCalibrationPrefill, DAILY_CALIBRATION_LABELS } from '@/components/petition/DailyCalibrationPrefill';
 import { matchSubstanceKey } from '@/lib/substances';
 import { standardNumbersForSubstance } from '@/lib/standardInUse';
@@ -772,8 +774,17 @@ export default function LabTestingDetailPage() {
         && matchLabParametersForItem(petition, candidate, allParameters, groupMembership.get(itemGroupKey(candidate)) ?? [], densitySources)
           .some((candidateParam) => candidateParam._id === param._id),
       );
-      const isFirstSameDrugItem = sameDrugItems[0]?.seq === item.seq;
-      const targets = isFirstSameDrugItem && isSharedDailyAiField(fieldLabel) ? sameDrugItems.slice(1) : [];
+      // กรอกจากตัวอย่างไหนก็ได้ แล้วเติมให้ตัวอย่างยาชื่อเดียวกันที่ยังว่าง หรือยังมีค่าเท่ากับค่าเดิมที่เคยเติมร่วมกัน
+      const currentValues = phase === 2 ? valuesPhase2 : values;
+      const previousVal = currentValues[resultKey(item.seq, param._id!)]?.[fieldLabel];
+      const isBlank = (v: unknown) => v == null || String(v).trim() === '';
+      const targets = isSharedDailyAiField(fieldLabel)
+        ? sameDrugItems.filter((candidate) => {
+            if (candidate.seq === item.seq) return false;
+            const existing = currentValues[resultKey(candidate.seq, param._id!)]?.[fieldLabel];
+            return isBlank(existing) || String(existing) === String(previousVal ?? '');
+          })
+        : [];
       const writes = [item, ...targets].map((target) => ({ item: target, key: resultKey(target.seq, param._id!) }));
 
       setValuesFn((prev) => Object.fromEntries([
@@ -827,7 +838,7 @@ export default function LabTestingDetailPage() {
         }
       }, write.key));
     },
-    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity, allParameters, densitySources, groupMembership],
+    [user, advanceToInProgress, autosaves, additionalSampleOpen, submitting, pendingDensity, allParameters, densitySources, groupMembership, values, valuesPhase2],
   );
 
   // multiEntry write: field write into entry `entryIndex` of a multiEntry param.
@@ -936,9 +947,11 @@ export default function LabTestingDetailPage() {
   }
 
   // Keep routed Lab items visible even when their parameters are missing.
-  const allLabBatchItems = isResearchAndDevelopmentPetition(petition)
+  // Hide samples whose Lab label has not been scanned in yet (partial receipt).
+  const allLabBatchItems = (isResearchAndDevelopmentPetition(petition)
     ? (petition.items ?? [])
-    : (petition.items ?? []).filter((it) => shouldSendItemToLab(it));
+    : (petition.items ?? []).filter((it) => shouldSendItemToLab(it)))
+    .filter((it) => !isItemLabelPending(petition, it, 'lab'));
   const labItems = mergeQcLabDuplicateItems(petition, allLabBatchItems);
   const liveResultKeys = new Set([
     ...savedResults.map((result) => resultKey(result.itemSeq, result.parameterId)),
@@ -1107,9 +1120,9 @@ export default function LabTestingDetailPage() {
   const abnormalCount = countAbnormal();
 
   // Validate the currently-active phase only — Phase 2 submit doesn't require Phase 1 re-edit.
-  const validate = (): string[] => {
+  const validate = (items: PetitionItem[] = labItems): string[] => {
     const missing: string[] = [];
-    labItems.forEach((item) => {
+    items.forEach((item) => {
       const phaseToCheck = effectivePhaseForItem(item);
       const phaseValues = valuesForPhase(phaseToCheck);
       const matched = matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources);
@@ -1164,6 +1177,38 @@ export default function LabTestingDetailPage() {
 
   // required ครบทุกช่องของ phase ปัจจุบัน → ปุ่มเปลี่ยนจาก "บันทึกแบบร่าง" เป็น "บันทึก" (ปิด track)
   const isComplete = hasAllLabOwnedParams && validate().length === 0;
+
+  // บันทึกทีละใบนำส่ง: คำร้องที่มีหลายใบ (เช่น L03/69, L04/69) ปิดผลใบที่กรอกครบก่อนได้
+  const slipOf = (item: PetitionItem) => itemSubmissionNoText(petition, item, 'lab') || `รายการที่ ${item.seq}`;
+  const savedSlips = new Set((petition.labCompletedSlips ?? []).map((s) => s.slip));
+  const isSlipSaved = (item: PetitionItem) => !petition.labCompletedAt && savedSlips.has(slipOf(item));
+  const multiSlip = new Set(labItems.map(slipOf)).size > 1;
+  const activeLabItem = labItems.find((it) => it.seq === activeItemSeq) ?? labItems[0];
+  const activeSlip = activeLabItem ? slipOf(activeLabItem) : '';
+  const activeSlipItems = labItems.filter((it) => slipOf(it) === activeSlip);
+  const canSaveSlip = multiSlip && !isComplete && !petition.labCompletedAt && !!activeLabItem && !savedSlips.has(activeSlip)
+    && activeSlipItems.every((item) => matchLabParametersForItem(petition, item, allParameters, idsFor(item), densitySources).some((p) => p.scope === 'lab'))
+    && validate(activeSlipItems).length === 0;
+
+  const handleSaveSlip = async () => {
+    if (pendingSample || submitting || !canSaveSlip) return;
+    const ok = await confirm({
+      title: `ยืนยันบันทึกผลใบนำส่ง ${activeSlip}`,
+      description: 'หลังบันทึกแล้วจะแก้ไขผลของใบนี้ไม่ได้ ใบนำส่งอื่นยังกรอกต่อได้ตามปกติ',
+    });
+    if (!ok) return;
+    setSubmitting(true);
+    try {
+      await autosaves.flush();
+      const updated = await api.completeLabSlip(petition._id, activeSlip, activeSlipItems.map((it) => it.seq), user?.name ?? 'system');
+      setRequestedPetition(updated);
+      toast.success(`บันทึกผลใบนำส่ง ${activeSlip} เรียบร้อย`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'บันทึกผลไม่สำเร็จ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleSaveDraft = async () => {
     if (pendingSample || submitting) return;
@@ -1450,6 +1495,7 @@ export default function LabTestingDetailPage() {
                 onClick={() => setActiveItemSeq(item.seq)}
               >
                 {/^\d+$/.test(item.sampleId || '') ? `${item.sampleId}/${String((petition.sampleLabelNumbers?.year ?? new Date().getFullYear() + 543) % 100).padStart(2, '0')}` : item.sampleId || `รายการที่ ${item.seq}`}
+                {multiSlip && <span className="ml-1 text-xs opacity-80">· {slipOf(item)}{isSlipSaved(item) ? ' ✓' : ''}</span>}
               </Button>
             ))}
           </div>
@@ -1473,6 +1519,11 @@ export default function LabTestingDetailPage() {
               <CardHeader className="bg-muted pb-3">
                 <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                   <span>รายการที่ {item.seq}: {item.commonName || item.sampleName || '-'}</span>
+                  {multiSlip && (
+                    <Badge variant={isSlipSaved(item) ? 'green-soft' : 'gray-soft'} className="font-normal">
+                      ใบนำส่ง {slipOf(item)}{isSlipSaved(item) ? ' · บันทึกผลแล้ว' : ''}
+                    </Badge>
+                  )}
                   {item.batchNo && (
                     <Badge variant="blue-soft" className="font-normal">
                       Batch: {item.batchNo}
@@ -1577,7 +1628,7 @@ export default function LabTestingDetailPage() {
                             )}
                           </div>
                           {(() => {
-                            const fieldDisabled = isLocked || viewOnly || phaseLocked || labelPending || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
+                            const fieldDisabled = isLocked || viewOnly || isSlipSaved(item) || phaseLocked || labelPending || additionalSampleOpen || submitting || loadedResultsKey !== resultsKey;
 
                             // Render a single editable render-unit. `srcValues` is the
                             // value-object to read/display from; `onUnitChange` persists a
@@ -1830,6 +1881,46 @@ export default function LabTestingDetailPage() {
                                 return units.map((unit) => renderEditUnit(unit, srcValues, onUnitChange, saveInfoSrc, scalarExtras));
                               };
                               const aiSubstances = isAiParameter ? aiSubstancesForItem(item.commonName) : [];
+                              if (isAiParameter && isMancozebItem(item.commonName)) {
+                                // MANCOZEB: ใบคำนวณไทเทรต 0.1 N I2 แทนชุด Area Inj / % Sample
+                                const mczNext: Record<string, unknown> = { ...srcValues };
+                                const onMczChange = (key: string, val: unknown) => {
+                                  onUnitChange(key, val);
+                                  mczNext[key] = val;
+                                  fields.forEach((candidate) => {
+                                    if (calculatedAiFieldKind(candidate.label) !== 'ai') return;
+                                    expandAiAwareFieldForItem(candidate, item.commonName, { category: petitionCategory }, true).forEach((derivedUnit) => {
+                                      const substance = aiSubstanceFromKey(derivedUnit.key);
+                                      onUnitChange(derivedUnit.key, formatCalculatedAi(calculateAi(mczNext, aiDensity(mczNext, condCtx, substance, densityEntries, hasSgParam), substance).ai));
+                                    });
+                                  });
+                                };
+                                const mczAiOnly = (field: ParameterValueField) => field.type !== 'reference' && calculatedAiFieldKind(field.label) === 'ai';
+                                const mczAiFields = fields.filter(mczAiOnly);
+                                const mczOther = fields.filter((field) => (field.type === 'reference' || !isAiSetFieldLabel(field.label)) && !mczAiOnly(field));
+                                return (
+                                  <div className="space-y-4 pl-2">
+                                    {mczOther.length > 0 && (
+                                      <section className="space-y-3 rounded-lg border border-border bg-card p-3">
+                                        <h4 className="text-base font-semibold text-foreground">ข้อมูลเพิ่มเติม</h4>
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">{mczOther.map(renderField)}</div>
+                                      </section>
+                                    )}
+                                    <MancozebGrid
+                                      values={srcValues}
+                                      onChange={onMczChange}
+                                      disabled={fieldDisabled}
+                                      density={aiDensity(srcValues, condCtx, 'mancozeb', densityEntries, hasSgParam)}
+                                    />
+                                    {mczAiFields.length > 0 && (
+                                      <section className="space-y-3 rounded-lg border border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 p-3 shadow-sm dark:bg-teal-950/60">
+                                        <h4 className="text-base font-semibold text-foreground">ผลวิเคราะห์</h4>
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">{mczAiFields.map(renderField)}</div>
+                                      </section>
+                                    )}
+                                  </div>
+                                );
+                              }
                               if (isAiParameter && isPaclobutrazolItem(item.commonName)) {
                                 // PACLOBUTRAZOL: ตาราง Internal standard แทนชุด Area Inj / % Sample
                                 // %AI = Report %W/V ของใบคำนวณ — คำนวณใหม่ทุกครั้งที่แก้ค่าในตาราง
@@ -2052,7 +2143,7 @@ export default function LabTestingDetailPage() {
                           })()}
                           <ParameterRemarkField
                             value={remarkOf(item, param)}
-                            disabled={isLocked || viewOnly || submitting}
+                            disabled={isLocked || viewOnly || isSlipSaved(item) || submitting}
                             onSave={(remark) => saveRemark(item, param, remark)}
                           />
                         </div>
@@ -2365,6 +2456,13 @@ export default function LabTestingDetailPage() {
                 </Button>
               </>
             ) : (
+              <>
+              {canSaveSlip && (
+                <Button variant="primary" onClick={handleSaveSlip} disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey} className="gap-2">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  บันทึกใบนำส่ง {activeSlip}
+                </Button>
+              )}
               <Button
                 variant={isComplete ? 'primary' : 'outline'}
                 onClick={isComplete ? handleSubmitResult : handleSaveDraft}
@@ -2374,6 +2472,7 @@ export default function LabTestingDetailPage() {
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isComplete ? <Send className="h-4 w-4" /> : <Save className="h-4 w-4" />}
                 {isComplete ? 'บันทึก' : 'บันทึกแบบร่าง'}
               </Button>
+              </>
             )}
           </div>
         )}
