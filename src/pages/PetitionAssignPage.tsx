@@ -103,7 +103,8 @@ export default function PetitionAssignPage() {
   const canClaimRole = canManage || userRoles.includes('lab-analyze');
   // Admin สลับไปดูคำร้องเฉพาะ Admin — มอบหมายได้เฉพาะผู้ใช้ที่เป็น Admin
   const isAdmin = userRoles.includes('admin');
-  const [adminOnlyMode, setAdminOnlyMode] = useState(false);
+  // ปุ่มสลับไปดูคำร้องเฉพาะ Admin ถูกเอาออกแล้ว หน้านี้แสดงเฉพาะคำร้องปกติ
+  const adminOnlyMode = false;
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -440,14 +441,6 @@ export default function PetitionAssignPage() {
                 : 'ดูการมอบหมายงาน Lab ได้อย่างเดียว หัวหน้า Lab เป็นผู้มอบหมายงาน'}
             actions={
               <div className="flex flex-wrap items-center gap-2">
-                {isAdmin && (
-                  <Button
-                    variant={adminOnlyMode ? 'primary' : 'outline'}
-                    onClick={() => setAdminOnlyMode((on) => !on)}
-                  >
-                    {adminOnlyMode ? 'กลับไปคำร้องปกติ' : 'คำร้องเฉพาะ Admin'}
-                  </Button>
-                )}
                 {canManage && (
                   <Button variant="primary" className="gap-2" onClick={() => setScanOpen(true)}>
                     <QrCode className="h-4 w-4" />
