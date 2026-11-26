@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import LabFreeAssignControl from '@/components/petition/LabFreeAssignControl';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
 import { useAuth } from '@/hooks/useAuth';
@@ -639,16 +640,30 @@ function AssignBoard({
   // มือถือ/iPad ลากยาก: แตะการ์ดแล้วเลือกคนจากรายชื่อ 2 คอลัมน์แทน
   const isTouch = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches, []);
   const [pickingId, setPickingId] = useState<string | null>(null);
-  const renderPicker = (petition: Petition) => {
-    if (!isTouch || !canAssign || pickingId !== petition._id) return null;
+  const pickingPetition = pickingId ? petitions.find((p) => p._id === pickingId) : undefined;
+  const renderPicker = () => {
+    const petition = pickingPetition;
+    const sampleNos = petition
+      ? (groupsByPetition.get(petition._id) ?? []).map((g) => sampleSeqLabel(g)).filter(Boolean)
+      : [];
     return (
-      <div className="mt-2 grid grid-cols-2 gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <Dialog open={!!petition} onOpenChange={(open) => { if (!open) setPickingId(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>เลือกผู้รับงาน</DialogTitle>
+            <DialogDescription>
+              {petition?.petitionNo} · เลขตัวอย่าง {sampleNos.length ? sampleNos.map((n) => '#' + n).join(', ') : 'ยังไม่ได้ใส่'}
+            </DialogDescription>
+          </DialogHeader>
+          {petition && (
+      <div className="grid grid-cols-2 gap-2">
         {columns.filter((c) => c.employeeId !== petition.assignedTo?.employeeId).map((c) => (
           <Button
             key={c.employeeId}
             size="sm"
             variant="outline"
             className="h-10 justify-start truncate px-2 text-xs"
+            disabled={sampleNos.length === 0}
             onClick={() => { onDropPetition(petition._id, c.employeeId); setPickingId(null); }}
           >
             {c.name}
@@ -665,12 +680,14 @@ function AssignBoard({
           </Button>
         )}
       </div>
+          )}
+        </DialogContent>
+      </Dialog>
     );
   };
   const touchProps = (petition: Petition) => ({
     touchPick: isTouch && canAssign,
-    onTap: () => setPickingId((cur) => (cur === petition._id ? null : petition._id)),
-    picker: renderPicker(petition),
+    onTap: () => setPickingId(petition._id),
   });
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
@@ -768,6 +785,7 @@ function AssignBoard({
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)] items-start">
+      {isTouch && canAssign && renderPicker()}
       {/* Unassigned pool */}
       <div
         onDragOver={(e) => {
@@ -921,7 +939,6 @@ interface PetitionCardProps {
   /** อุปกรณ์จอสัมผัส: แตะการ์ดเพื่อเปิดรายชื่อแทนการลาก */
   touchPick?: boolean;
   onTap?: () => void;
-  picker?: React.ReactNode;
 }
 
 function PetitionCard({
@@ -938,7 +955,6 @@ function PetitionCard({
   assigned,
   touchPick = false,
   onTap,
-  picker,
 }: PetitionCardProps) {
   const statusCfg = labAssignBoardStatusBadge(petition, assigned);
   const showStatusBadge = hasLabTrack(petition);
@@ -1063,7 +1079,7 @@ function PetitionCard({
             รับงาน
           </Button>
         )}
-      </div>{picker}
+      </div>
     </Card>
   );
 }
