@@ -225,6 +225,13 @@ export default function LabResultDetailPage() {
           <div className="flex items-center justify-center py-16 text-grey-400">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" /> กำลังโหลด…
           </div>
+        ) : calcPages.length > 0 ? (
+          // ponytail: แสดงเฉพาะรายการที่มีค่าคำนวณจริง (Area Inj / % Sample) ในรูปใบคำนวณ; รายการที่มีแค่ ถพ. ถูกรวมเข้าใบคำนวณแล้ว
+          <div className="space-y-6 overflow-x-auto">
+            {calcPages.map((page, i) => (
+              <LabCalculationForm key={`${page.reportNo}-${i}`} page={page} standardOptions={standardNumbersForSubstance(standardsInUse, page.sample.name)} />
+            ))}
+          </div>
         ) : groups.length === 0 ? (
           <div className="py-12 text-center text-grey-400">ไม่มีรายการทดสอบ</div>
         ) : (
