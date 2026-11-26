@@ -4,23 +4,23 @@ import { CHEM_REPORT_SAMPLES_PER_SHEET, type ChemReportSheet } from "@/lib/chemA
 import { A4_PRINT_FONT_FAMILY } from "@/lib/printConfig";
 
 export const CHEM_ANALYSIS_REPORT_CSS = `
-.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: 13pt; line-height: 1.15; }
+.ca-root, .ca-root * { box-sizing: border-box; color: #000; font-family: ${A4_PRINT_FONT_FAMILY}; font-size: 14pt; line-height: 1.15; }
 .ca-page { width: 210mm; height: 297mm; padding: 8mm 16mm 7mm; background: #fff; display: flex; flex-direction: column; overflow: hidden; }
 .ca-page + .ca-page { margin-top: 6mm; page-break-before: always; break-before: page; }
-.ca-head { display: grid; grid-template-columns: 50mm 1fr; align-items: center; min-height: 23mm; }
-.ca-brand { text-align: center; }
-.ca-logo { display: block; width: 40mm; height: auto; margin: 0 auto; }
-.ca-brand-name { margin-top: 1mm; font-size: 10pt !important; }
-.ca-company { padding-left: 10mm; text-align: left; font-size: 15pt !important; }
-.ca-title { margin-top: 0.5mm; text-align: center; font-weight: 700; font-size: 18pt !important; line-height: 1 !important; }
-.ca-sub { margin-top: 1mm; text-align: right; font-size: 11pt !important; }
+.ca-head { display: grid; grid-template-columns: 35mm 1fr; align-items: center; min-height: 23mm; }
+.ca-brand { text-align: left; }
+.ca-logo { display: block; width: 27mm; height: auto; margin: 0; }
+.ca-brand-name { width: 35mm; margin-top: 1mm; white-space: nowrap; text-align: center; font-size: 9pt !important; }
+.ca-company { text-align: left; font-size: 16pt !important; }
+.ca-title { margin-top: 0.5mm; text-align: center; font-weight: 700; font-size: 19pt !important; line-height: 1 !important; }
+.ca-sub { margin-top: 1mm; text-align: right; font-size: 12pt !important; }
 .ca-box { position: relative; margin-top: 3mm; padding: 3mm 2.5mm 2mm; border: 0.8pt solid #000; }
-.ca-tag { position: absolute; top: -2.4mm; left: 4mm; padding: 0 1.5mm; background: #fff; font-size: 11pt !important; font-style: italic; }
-.ca-line { display: flex; align-items: flex-end; column-gap: 2mm; margin-top: 1.5mm; }
+.ca-tag { position: absolute; top: -2.4mm; left: 4mm; padding: 0 1.5mm; background: #fff; font-size: 12pt !important; font-style: italic; }
+.ca-line { display: flex; align-items: flex-end; column-gap: 1mm; margin-top: 1.5mm; }
 .ca-field { display: flex; flex: 0 0 auto; align-items: flex-end; gap: 1mm; min-width: 0; max-width: 100%; }
 .ca-grow { flex: 1 1 45mm; }
-.ca-label { white-space: nowrap; font-size: 12pt !important; }
-.ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 5.5mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; font-size: 12pt !important; }
+.ca-label { white-space: nowrap; font-size: 13pt !important; }
+.ca-val { flex: 1 1 auto; min-width: 22mm; min-height: 5.5mm; padding: 0 1mm; border-bottom: 0.8pt dotted #000; overflow-wrap: anywhere; font-size: 11.5pt !important; }
 .ca-lab { position: relative; margin-top: 4mm; }
 .ca-tbl { width: 100%; margin-top: 1.5mm; border-collapse: collapse; table-layout: fixed; }
 .ca-tbl th, .ca-tbl td { border: 0.8pt solid #000; height: 7mm; padding: 0.7mm 0.5mm; text-align: center; vertical-align: middle; overflow-wrap: anywhere; line-height: 1.05 !important; }
@@ -29,31 +29,33 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-diagonal-line { position: absolute; inset: 0; width: 100%; height: 100%; }
 .ca-diagonal-top { position: absolute; top: 1.5mm; left: 2mm; }
 .ca-diagonal-bottom { position: absolute; right: 8mm; bottom: 1.5mm; }
-.ca-tbl .ca-group { width: 12mm; padding: 1mm 0; font-size: 11pt !important; font-weight: 400; writing-mode: vertical-rl; transform: rotate(180deg); }
-.ca-tbl .ca-rowhead { text-align: left; padding-left: 2mm; font-size: 12pt !important; overflow-wrap: normal; }
-.ca-tbl td.ca-cell { font-size: 11pt !important; overflow-wrap: anywhere; word-break: normal; }
-.ca-tbl td.ca-cell-long { font-size: 10pt !important; line-height: 1 !important; }
+.ca-tbl .ca-group { width: 12mm; padding: 1mm 0; font-size: 12pt !important; font-weight: 400; writing-mode: vertical-rl; transform: rotate(180deg); }
+.ca-tbl .ca-rowhead { text-align: left; padding-left: 2mm; font-size: 13pt !important; overflow-wrap: normal; }
+.ca-tbl td.ca-cell { font-size: 12pt !important; overflow-wrap: anywhere; word-break: normal; }
+.ca-tbl td.ca-cell-long { font-size: 8.5pt !important; line-height: 1 !important; }
 .ca-ai-row td { height: 8mm; }
 .ca-sign { display: flex; align-items: flex-end; justify-content: center; gap: 1.5mm; margin-top: 2.5mm; text-align: center; }
 .ca-sign .ca-val { flex: 0 1 48mm; min-width: 26mm; text-align: center; }
-.ca-sign > span { min-width: 0; overflow-wrap: anywhere; font-size: 12pt !important; }
-.ca-sign-lab { display: grid; grid-template-columns: 35mm minmax(0, 48mm) minmax(0, 72mm); column-gap: 2mm; }
+.ca-sign > span { min-width: 0; overflow-wrap: anywhere; font-size: 13pt !important; }
+.ca-sign-lab { display: grid; grid-template-columns: 42mm minmax(0, 48mm) minmax(0, 72mm); column-gap: 2mm; }
 .ca-sign-lab .ca-val { min-width: 0; }
+.ca-sign-lab > span:first-child { white-space: nowrap; }
 .ca-sign-lab > span:last-child { text-align: left; }
 .ca-qc { position: relative; margin-top: 4mm; padding: 5mm 2.5mm 0; border-top: 0.8pt solid #000; }
-.ca-qc-tag { position: absolute; top: 1mm; right: 3mm; font-size: 9pt !important; font-style: italic; }
+.ca-qc-tag { position: absolute; top: 1mm; right: 3mm; font-size: 10pt !important; font-style: italic; }
+.ca-qc .ca-sign .ca-val { flex: 0 0 58mm; }
 .ca-cb { display: inline-block; width: 5mm; height: 5mm; margin-right: 1.5mm; border: 0.8pt solid #000; vertical-align: -1mm; text-align: center; line-height: 4.5mm; font-weight: 700; }
-.ca-check-row { display: grid; grid-template-columns: 20mm 5mm 25mm minmax(0, 1fr); align-items: end; column-gap: 1.5mm; margin-top: 1.2mm; }
+.ca-check-row { display: grid; grid-template-columns: 20mm 5mm 30mm minmax(0, 1fr); align-items: end; column-gap: 1.5mm; margin-top: 1.2mm; }
 .ca-check-row-simple { grid-template-columns: 5mm 25mm minmax(0, 1fr); }
-.ca-check-heading { align-self: center; white-space: nowrap; font-size: 12pt !important; }
+.ca-check-heading { align-self: center; white-space: nowrap; font-size: 13pt !important; }
 .ca-check-row .ca-cb { margin-right: 0; align-self: center; }
 .ca-check-row .ca-val { width: 100%; }
-.ca-note { display: flex; justify-content: center; gap: 3mm; margin-top: 3mm; font-size: 12pt !important; }
+.ca-note { display: flex; justify-content: center; gap: 3mm; margin-top: 3mm; font-size: 13pt !important; }
 .ca-note-mark { font-size: 15pt !important; line-height: 0.8; }
 .ca-final { padding-top: 3mm; }
-.ca-final .ca-tag { width: 100%; top: 0; left: 0; padding: 0.5mm 1mm; border-bottom: 0.8pt solid #000; text-align: center; font-size: 11pt !important; font-weight: 700; font-style: italic; }
+.ca-final .ca-tag { width: 100%; top: 0; left: 0; padding: 0.5mm 1mm; border-bottom: 0.8pt solid #000; text-align: center; font-size: 12pt !important; font-weight: 700; font-style: italic; }
 .ca-final-body { padding-top: 5mm; }
-.ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: left; font-size: 8pt !important; }
+.ca-foot { margin-top: auto; padding-top: 1.5mm; text-align: left; font-size: 9pt !important; }
 @media screen { .ca-page { margin: 0 auto; box-shadow: 0 0 0 1px #ddd; } }
 @media print { .ca-box, .ca-lab, .ca-qc, .ca-tbl tr { break-inside: avoid; page-break-inside: avoid; } }
 `;
