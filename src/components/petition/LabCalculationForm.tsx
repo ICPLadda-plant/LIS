@@ -43,9 +43,9 @@ ${MCZ_PRINT_CSS}`;
 
 const BLANK = /^[-–—]?$/;
 const fmtDensity = (v?: string) => (v && Number.isFinite(Number(v)) ? Number(v).toFixed(3) : v || "");
-const fmtPrintDecimal = (value: string) => {
+const fmtPrintDecimal = (value: string, digits = 3) => {
   const number = Number(value.replace(/,/g, ""));
-  return value && Number.isFinite(number) ? number.toFixed(3) : value;
+  return value && Number.isFinite(number) ? number.toFixed(digits) : value;
 };
 
 function values(page: LabReportPage, pattern: RegExp): string[] {
@@ -194,6 +194,7 @@ export default function LabCalculationForm({ page, variant = "default", standard
   };
   const controlRange = control.low && control.high ? `${control.low} - ${control.high}` : control.low || control.high;
   const testedDate = name(page.sample.testedDate);
+  const analyticalDigits = /^BROMADIOLONE\s+0\.005%(?:\s|$)/i.test(page.sample.name ?? "") ? 5 : 3;
   const isWW = isGrWpSpCommonName(page.sample.name) || /\bPREMIX\b|\bW\s*\/\s*W\b/i.test(page.sample.name ?? "");
   const densityValue = isWW
     ? "-"
@@ -220,10 +221,10 @@ export default function LabCalculationForm({ page, variant = "default", standard
         </div>
 
         <div className="brom-form-bar">System Suitability Test</div>
-        <Columns labels={["Area Inj. 1", "Area Inj. 2", "Area Inj. 3", "Average", "%RSD (ไม่เกิน 2%)"]} items={area.map(fmtPrintDecimal)} field="area" />
+        <Columns labels={["Area Inj. 1", "Area Inj. 2", "Area Inj. 3", "Average", "%RSD (ไม่เกิน 2%)"]} items={area.map((value) => fmtPrintDecimal(value))} field="area" />
 
         <div className="brom-form-bar">Continuing Calibration Standard Test ; CCS</div>
-        <Columns labels={["Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", "% Difference", "Result"]} items={[ccs.mid, ccs.conc, ccs.diff].map(fmtPrintDecimal).concat(ccs.result)} field="ccs" />
+        <Columns labels={["Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", "% Difference", "Result"]} items={[ccs.mid, ccs.conc, ccs.diff].map((value) => fmtPrintDecimal(value)).concat(ccs.result)} field="ccs" />
 
         <div className="brom-form-bar" style={{ marginTop: "4mm" }}>
           <span style={{ width: "30mm" }}>Solvent Blank</span>
@@ -239,7 +240,7 @@ export default function LabCalculationForm({ page, variant = "default", standard
         </div>
 
         <div className="brom-form-bar">Analytical Results</div>
-        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample.map(fmtPrintDecimal)} field="sample" />
+        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample.map((value) => fmtPrintDecimal(value, analyticalDigits))} field="sample" />
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>
