@@ -271,7 +271,7 @@ export default function LabTestingPage() {
   const columns: ResponsiveDataTableColumn<SendDayPetition>[] = [
     {
       key: 'petition',
-      header: 'คำร้อง',
+      header: 'เลขที่ตัวอย่าง',
       className: 'align-top',
       card: 'title',
       cardCell: petitionHeading,
@@ -279,8 +279,23 @@ export default function LabTestingPage() {
         const labItems = labItemsFor(p);
         return (
           <>
-            {petitionHeading(p)}
-            <div className="text-xs text-muted-foreground mt-0.5">
+            <div className="flex items-start gap-1.5">
+              <div className="space-y-0.5 font-semibold text-primary">
+                {labItems.some((item) => item.sampleId?.trim())
+                  ? labItems.filter((item) => item.sampleId?.trim()).map((item) => (
+                    <div key={item.seq}>{formatLabSampleNo(p, item.sampleId)}</div>
+                  ))
+                  : '-'}
+              </div>
+              <UrgentBadge petition={p} />
+              {returnedMap[p._id] && (
+                <RotateCcw className="h-4 w-4 text-orange-500 shrink-0" aria-label="ส่งกลับมาบันทึกผลใหม่" />
+              )}
+              {abnormalMap[p._id] && (
+                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" aria-label="พบค่าผิดปกติในผลทดสอบ" />
+              )}
+            </div>
+            <div className="text-xs text-grey-500 mt-0.5">
               โดย {p.submittedBy?.name ?? '-'} จาก {petitionDepartmentLabel(p)}
             </div>
             {p.sendDayKey && (

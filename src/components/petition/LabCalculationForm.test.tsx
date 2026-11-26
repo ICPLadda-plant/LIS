@@ -102,14 +102,23 @@ describe("LabCalculationForm", () => {
     expect(controlResult("0.25", "", "0.27")).toBe("");
   });
 
-  it("uses the recorded Density and reports the unit by formulation", () => {
+  it("uses the recorded Density for W/V products", () => {
     const base = page([row("Density", "1")]);
     const liquid = render(<LabCalculationForm page={base} />);
     expect(field(liquid.container, "density")).toBe("1.000");
     expect(liquid.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/V");
-
-    const granule = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, name: "FIPRONIL 0.3% GR" } }} />);
-    expect(field(granule.container, "density")).toBe("1.000");
-    expect(granule.container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/W");
+    expect(liquid.container.querySelector('[data-field="report"]')).not.toHaveClass("brom-form-line--highlight");
   });
+
+  it.each(["FIPRONIL 0.3% GR", "FIPRONIL Premix", "FIPRONIL 0.3% W/W"])(
+    "omits Density and highlights a W/W report for %s",
+    (sampleName) => {
+      const base = page([row("Density", "1"), row("% AI", "0.3")]);
+      const { container } = render(<LabCalculationForm page={{ ...base, sample: { ...base.sample, name: sampleName } }} />);
+      expect(field(container, "density")).toBe("-");
+      expect(field(container, "report")).toBe("0.3");
+      expect(container.querySelector('[data-field="report"]')).toHaveClass("brom-form-line--highlight");
+      expect(container.querySelector('[data-field="report"]')?.nextSibling?.textContent).toBe("%W/W");
+    },
+  );
 });

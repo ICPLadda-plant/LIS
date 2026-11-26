@@ -22,12 +22,14 @@ const mocks = vi.hoisted(() => {
     },
     labReceivedAt: '2026-09-16T02:30:00.000Z',
     labReceivedBy: 'Dev Lab Analyst',
+    sampleLabelNumbers: { year: 2569 },
     items: [
       {
         seq: 1,
         sampleName: 'ตัวอย่าง Lab',
         commonName: 'ABAMECTIN 1.8% W/V EC',
         batchNo: 'A1',
+        sampleId: '3450',
         sendToLab: true,
       },
     ],
@@ -114,7 +116,8 @@ describe('LabTestingPage assignment visibility', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('P-LAB-ASSIGNED')).toBeInTheDocument();
+    expect(await screen.findByText('เลขที่ตัวอย่าง')).toBeInTheDocument();
+    expect(screen.getByText('3450/69')).toBeInTheDocument();
   });
 
   it('hides assigned Lab petitions without a matching Lab parameter', async () => {
@@ -126,7 +129,7 @@ describe('LabTestingPage assignment visibility', () => {
     );
 
     expect(await screen.findByText('ไม่มีคำร้อง Lab ที่รอตรวจ')).toBeInTheDocument();
-    expect(screen.queryByText('P-LAB-ASSIGNED')).not.toBeInTheDocument();
+    expect(screen.queryByText('3450/69')).not.toBeInTheDocument();
   });
 
   it.each(['lab-analyze', 'lab-head', 'admin'])(
@@ -142,7 +145,7 @@ describe('LabTestingPage assignment visibility', () => {
         </MemoryRouter>,
       );
 
-      await waitFor(() => expect(screen.queryByText('P-LAB-ASSIGNED')).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.queryByText('3450/69')).not.toBeInTheDocument());
       expect(screen.queryByText(/ผล Lab ออกแล้ว/)).not.toBeInTheDocument();
     },
   );
