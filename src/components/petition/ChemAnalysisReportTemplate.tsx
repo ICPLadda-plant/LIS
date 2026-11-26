@@ -108,8 +108,8 @@ function Sheet({ sheet }: { sheet: ChemReportSheet }) {
           </tbody>
         </table>
         <div className="ca-line"><Field grow label="เกณฑ์มาตรฐาน" value={lab.criteria} /></div>
-        <div className="ca-sign ca-sign-lab"><span>ผู้วิเคราะห์/ผู้รายงาน</span><span className="ca-val">{lab.analystName}</span><span>นักเคมี</span></div>
-        <div className="ca-sign ca-sign-lab"><span>ผู้ทบทวนและอนุมัติ</span><span className="ca-val">{lab.labHeadName}</span><span>หัวหน้าฝ่ายห้องปฏิบัติการเคมีวิเคราะห์</span></div>
+        <div className="ca-sign ca-sign-lab"><span>ผู้วิเคราะห์/ผู้รายงาน</span><span className="ca-val" /><span>นักเคมี</span></div>
+        <div className="ca-sign ca-sign-lab"><span>ผู้ทบทวนและอนุมัติ</span><span className="ca-val" /><span>หัวหน้าฝ่ายห้องปฏิบัติการเคมีวิเคราะห์</span></div>
       </div>
 
       <div className="ca-box">
