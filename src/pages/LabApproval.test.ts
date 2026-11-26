@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Petition } from "@/types/petition.types";
 import { formatLabSampleNo } from "@/lib/petitionSampler";
-import { labApprovalItems, labApprovalTesterName } from "./LabApproval";
+import { groupLabApprovalByName, labApprovalItems, labApprovalTesterName } from "./LabApproval";
 
 const petition = {
   sampleLabelNumbers: { year: 2569 },
@@ -13,6 +13,16 @@ const petition = {
 } as Petition;
 
 describe("LabApproval list", () => {
+  it("รวมแถวที่ชื่อยาเหมือนกัน ไม่สนสีในวงเล็บ/batch", () => {
+    const mk = (id: string, name: string) => ({ _id: id, items: [{ seq: 1, sampleName: name, sendToLab: true, sampleId: id }] }) as Petition;
+    const groups = groupLabApprovalByName([
+      mk("a", "GLUFOSINATE-AMMONIUM 15% W/V SL (GREEN)"),
+      mk("b", "GLUFOSINATE-AMMONIUM 15% W/V SL (BLUE)"),
+      mk("c", "MANCOZEB 80% WP"),
+    ]);
+    expect(groups.map((g) => g.map((p) => p._id))).toEqual([["a", "b"], ["c"]]);
+  });
+
   it("แสดงเฉพาะรายการที่ส่ง Lab และรับตัวอย่างแล้ว", () => {
     expect(labApprovalItems(petition).map((item) => item.seq)).toEqual([3]);
   });
