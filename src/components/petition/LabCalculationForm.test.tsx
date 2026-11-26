@@ -51,8 +51,8 @@ describe("LabCalculationForm", () => {
       row("Control ช่วงต่ำสุด", "0.24692"),
       row("Control ช่วงสูงสุด", "0.27363"),
     ])} />);
-    expect(field(container, "controlValue")).toBe("0.24949");
-    expect(field(container, "controlRange")).toBe("0.24692 - 0.27363");
+    expect(field(container, "controlValue")).toBe("0.25");
+    expect(field(container, "controlRange")).toBe("0.25 - 0.27");
     expect(field(container, "controlResult")).toBe("Pass");
   });
 
@@ -91,8 +91,8 @@ describe("LabCalculationForm", () => {
     expect(field(container, "area-3")).toBe("153.840");
     expect(field(container, "ccs-0")).toBe("97.352");
     expect(field(container, "ccs-1")).toBe("99.179");
-    expect(field(container, "sample-0")).toBe("45.999");
-    expect(field(container, "sample-3")).toBe("30.890");
+    expect(field(container, "sample-0")).toBe("46.00");
+    expect(field(container, "sample-3")).toBe("30.89");
   });
 
   it("calculates CCS % difference and Control result only from complete numbers", () => {

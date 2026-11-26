@@ -47,6 +47,11 @@ const fmtPrintDecimal = (value: string) => {
   const number = Number(value.replace(/,/g, ""));
   return value && Number.isFinite(number) ? number.toFixed(3) : value;
 };
+// ส่วน Control sample / Analytical Results / Report ใช้ทศนิยม 2 ตำแหน่ง ยกเว้น BROMADIOLONE คงรูปแบบเดิม
+const fmtResultDecimal = (value: string) => {
+  const number = Number(value.replace(/,/g, ""));
+  return value && Number.isFinite(number) ? number.toFixed(2) : value;
+};
 
 function values(page: LabReportPage, pattern: RegExp): string[] {
   return (page.rows ?? [])
@@ -195,6 +200,9 @@ export default function LabCalculationForm({ page, variant = "default", standard
   const controlRange = control.low && control.high ? `${control.low} - ${control.high}` : control.low || control.high;
   const testedDate = name(page.sample.testedDate);
   const isWW = isGrWpSpCommonName(page.sample.name);
+  const isBroma = /BROMADIOLONE/i.test(page.sample.name ?? "");
+  const fmtResult = isBroma ? (value: string) => value : fmtResultDecimal;
+  const controlRangeText = isBroma ? controlRange : [control.low, control.high].filter(Boolean).map(fmtResultDecimal).join(" - ");
   const densityValue = fmtDensity(firstValue(page, /density|ถ\.?\s*พ\.?/i) || (page.rows ?? []).map((row) => /Density\s*:\s*([\d.]+)/i.exec(row.result ?? "")?.[1]).find(Boolean)) || (isWW ? "-" : "");
 
   return (
@@ -231,18 +239,18 @@ export default function LabCalculationForm({ page, variant = "default", standard
 
         <div className="brom-form-bar">Control sample Test</div>
         <div className="brom-form-row">
-          <Field grow label="%Ai (W/W)" value={control.value} field="controlValue" />
-          <Field grow label="ช่วงเกณฑ์การยอมรับ" value={controlRange} field="controlRange" />
+          <Field grow label="%Ai (W/W)" value={fmtResult(control.value)} field="controlValue" />
+          <Field grow label="ช่วงเกณฑ์การยอมรับ" value={controlRangeText} field="controlRange" />
           <Field label="Result" value={firstValue(page, /^control\s*result/i) || controlResult(control.value, control.low, control.high)} field="controlResult" />
         </div>
 
         <div className="brom-form-bar">Analytical Results</div>
-        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample.map(fmtPrintDecimal)} field="sample" />
+        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample.map(isBroma ? fmtPrintDecimal : fmtResultDecimal)} field="sample" />
 
         <div className="brom-form-summary">
-          <span>Average</span><span className="brom-form-line" data-field="average">{sampleAverage}</span><span>%W/W</span>
+          <span>Average</span><span className="brom-form-line" data-field="average">{fmtResult(sampleAverage)}</span><span>%W/W</span>
           <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className="brom-form-line" data-field="density">{densityValue}</span><span>g/cm<sup style={{ fontSize: "6pt" }}>3</sup></span>
-          <span>Report</span><span className={`brom-form-line${isWW ? " brom-form-line--na" : ""}`} data-field="report">{aiResult}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
+          <span>Report</span><span className={`brom-form-line${isWW ? " brom-form-line--na" : ""}`} data-field="report">{fmtResult(aiResult)}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
         </div>
 
         <div className="brom-form-signatures">
