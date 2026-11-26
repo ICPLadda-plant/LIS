@@ -211,16 +211,15 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
 
       try {
         try {
-          await startWith({ facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } });
+          // html5-qrcode รับ cameraIdOrConfig ได้แค่ 1 key — ใส่ width/height ด้วยจะ error ทันที
+          await startWith({ facingMode: 'environment' });
         } catch {
           const cameras = await Html5Qrcode.getCameras();
           if (cameras.length === 0) {
             if (active) setPhase('no-camera');
             return;
           }
-          await startFirstWorkingCamera(cameras, (id) =>
-            startWith({ deviceId: { exact: id }, width: { ideal: 1920 }, height: { ideal: 1080 } }),
-          );
+          await startFirstWorkingCamera(cameras, (id) => startWith(id));
         }
         if (!active) { scanner.stop().catch(() => {}); return; }
         scannerRef.current = scanner;
