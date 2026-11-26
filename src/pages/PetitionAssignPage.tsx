@@ -429,6 +429,7 @@ export default function PetitionAssignPage() {
         <LabScanAcceptModal
           open={scanOpen || !!pendingAssign}
           initialCode={pendingAssign?.petitionNo}
+          editSampleNumbers={!!pendingAssign}
           pendingPetitions={awaitingReceive}
           onClose={() => { setScanOpen(false); setPendingAssign(null); }}
           onAccepted={(accepted?: Petition) => {

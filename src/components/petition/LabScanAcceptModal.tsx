@@ -45,6 +45,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onAccepted: (petition?: Petition) => void;
+  /** เปิดเพื่อใส่/แก้เลขตัวอย่าง แม้ Lab รับตัวอย่างแล้ว */
+  editSampleNumbers?: boolean;
   /** โหมดกรอกเลขคำร้องอย่างเดียว (ไม่เปิดกล้อง) — ใช้กับปุ่ม "กรอกเลขรับงาน" */
   manualOnly?: boolean;
   /** ช่วงมอบหมายอิสระ: รับตัวอย่างแล้ว assign งานให้คนที่กดรับทันที */
@@ -55,7 +57,7 @@ interface Props {
   pendingPetitions?: Petition[];
 }
 
-export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOnly = false, claimOnReceive = false, initialCode, pendingPetitions }: Props) {
+export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOnly = false, claimOnReceive = false, initialCode, pendingPetitions, editSampleNumbers = false }: Props) {
   const { user } = useAuth();
   const isFullAccess = normalizeRoles(user).some((r) => FULL_ACCESS_ROLES.has(r));
 
@@ -153,7 +155,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       }
 
       // Already received by Lab
-      if (!request && found.labReceivedAt && !(claimOnReceive && !found.assignedTo)) {
+      if (!request && found.labReceivedAt && !editSampleNumbers && !(claimOnReceive && !found.assignedTo)) {
         onAccepted();
         return;
       }
@@ -180,7 +182,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       setErrorMsg(apiErrorMessage(err, 'ไม่พบข้อมูลคำร้อง'));
       setPhase('error');
     }
-  }, [claimOnReceive, isFullAccess, onAccepted, user]);
+  }, [claimOnReceive, editSampleNumbers, isFullAccess, onAccepted, user]);
 
   useEffect(() => {
     if (open && initialCode) void fetchAndCheck(initialCode);
