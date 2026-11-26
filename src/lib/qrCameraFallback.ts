@@ -26,3 +26,17 @@ export async function startFirstWorkingCamera<T extends CameraInfo>(
   }
   throw lastError;
 }
+
+/** แปลง error จากกล้องเป็นข้อความที่ผู้ใช้เข้าใจ พร้อมรหัสไว้ไล่ปัญหา */
+export function describeCameraError(err: unknown): string {
+  const name = (err as { name?: string })?.name || '';
+  const msg = String((err as { message?: string })?.message ?? err ?? '');
+  const code = name || msg.slice(0, 60);
+  let reason = 'กรอกเลขคำร้องเองได้เลย';
+  if (typeof window !== 'undefined' && !window.isSecureContext) reason = 'หน้าเว็บต้องเปิดผ่าน https';
+  else if (/NotAllowed|Permission|denied/i.test(name + msg)) reason = 'เบราว์เซอร์บล็อกสิทธิ์กล้อง กดไอคอนแม่กุญแจ/กล้องที่ช่อง URL แล้วเลือก "อนุญาต"';
+  else if (/NotReadable|TrackStart|in use|Could not start/i.test(name + msg)) reason = 'กล้องถูกโปรแกรมอื่นใช้อยู่ (เช่น Teams/Zoom/LINE) ปิดโปรแกรมนั้นแล้วลองใหม่';
+  else if (/NotFound|no camera|DevicesNotFound/i.test(name + msg)) reason = 'ไม่พบกล้องในเครื่องนี้';
+  return `เปิดกล้องไม่ได้ — ${reason}${code ? ` (${code})` : ''}`;
+}
+

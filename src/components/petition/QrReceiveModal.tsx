@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
-import { startFirstWorkingCamera } from '@/lib/qrCameraFallback';
+import { startFirstWorkingCamera, describeCameraError } from '@/lib/qrCameraFallback';
 import { AlertCircle, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Petition } from '@/types/petition.types';
@@ -139,11 +139,12 @@ export default function QrReceiveModal({ open, onClose, onReceived, manualOnly =
         }
         if (!active) { scanner.stop().catch(() => {}); return; }
         scannerRef.current = scanner;
-      } catch {
+      } catch (camErr) {
         // เปิดกล้องไม่ได้ (PC ไม่มีกล้อง / permission โดน block / enumerate ล้ม)
         // → fallback ไปกรอกเลขเอง แทนที่จะค้างหน้า error ทางตัน
         if (active) {
-          setErrorMsg('เปิดกล้องไม่ได้ — กรอกเลขคำร้องเองได้เลย');
+          console.warn('[QR camera]', camErr);
+          setErrorMsg(describeCameraError(camErr));
           setPhase('no-camera');
         }
       }
