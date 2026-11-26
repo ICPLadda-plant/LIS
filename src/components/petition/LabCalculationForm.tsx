@@ -21,7 +21,7 @@ export const LAB_CALCULATION_CSS = `
 .brom-form-row { display: flex; align-items: flex-end; gap: 3mm; margin-top: 2mm; padding: 0 1mm; }
 .brom-form-label { white-space: nowrap; }
 .brom-form-line { display: block; min-height: 5.5mm; padding: 0 1mm 0.6mm; border-bottom: .6pt solid #000; text-align: center; overflow-wrap: anywhere; }
-.brom-form-line--na { background: #e4e6ea; color: #6b7280; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.brom-form-line--highlight { background: #f3f4f6; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .brom-form-row .brom-form-line { flex: 0 0 38mm; }
 .brom-form-row .brom-form-grow { flex: 1 1 auto; }
 .brom-form-grid { display: grid; column-gap: 12mm; margin-top: 2mm; }
@@ -250,7 +250,7 @@ export default function LabCalculationForm({ page, variant = "default", standard
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{fmtResult(sampleAverage)}</span><span>%W/W</span>
           <span>Density (T<sub style={{ fontSize: "6pt" }}>30°C</sub>)</span><span className="brom-form-line" data-field="density">{densityValue}</span><span>g/cm<sup style={{ fontSize: "6pt" }}>3</sup></span>
-          <span>Report</span><span className={`brom-form-line${isWW ? " brom-form-line--na" : ""}`} data-field="report">{fmtResult(aiResult)}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
+          <span>Report</span><span className={`brom-form-line${isWW ? " brom-form-line--highlight" : ""}`} data-field="report">{aiResult}</span><span>{isWW ? "%W/W" : "%W/V"}</span>
         </div>
 
         <div className="brom-form-signatures">

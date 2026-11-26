@@ -162,9 +162,10 @@ describe("PrintPreviewDialog auto print", () => {
   it("prints locally after choosing this machine", async () => {
     apiMock.getPrinterConfigs.mockResolvedValue([]);
     printDocumentMock.mockResolvedValue({ printer: "เครื่องนี้", copies: 1 });
+    const onOpenChange = vi.fn();
 
     renderDialog(
-      <PrintPreviewDialog open onOpenChange={vi.fn()} docType="coa">
+      <PrintPreviewDialog open onOpenChange={onOpenChange} docType="coa">
         <div>coa html</div>
       </PrintPreviewDialog>,
     );
@@ -177,5 +178,6 @@ describe("PrintPreviewDialog auto print", () => {
       expect.any(HTMLDivElement),
       expect.objectContaining({ outputMode: "local", printerConfigId: undefined }),
     ));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
