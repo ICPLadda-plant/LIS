@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import { startFirstWorkingCamera } from '@/lib/qrCameraFallback';
 import { AlertCircle, Camera, CheckCircle2, Keyboard, QrCode, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Petition } from '@/types/petition.types';
@@ -210,9 +211,9 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
             if (active) setPhase('no-camera');
             return;
           }
-          const back = cameras.find((c) => /back|environment|rear|หลัง|后|背面/i.test(c.label));
-          const cam = back ?? (cameras.length > 1 ? cameras[cameras.length - 1] : cameras[0]);
-          await startWith({ deviceId: { exact: cam.id }, width: { ideal: 1920 }, height: { ideal: 1080 } });
+          await startFirstWorkingCamera(cameras, (id) =>
+            startWith({ deviceId: { exact: id }, width: { ideal: 1920 }, height: { ideal: 1080 } }),
+          );
         }
         if (!active) { scanner.stop().catch(() => {}); return; }
         scannerRef.current = scanner;
