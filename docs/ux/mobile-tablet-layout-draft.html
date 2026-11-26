@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ร่างปรับ layout LIS สำหรับมือถือและ iPad</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--p:#1f6fc6;--pd:#16528f;--pl:#e8f1fb;--bd:#e2e8f0;--mut:#475569;--bad:#b91c1c;--ok:#15803d;--warn:#92400e}
+*{box-sizing:border-box}body{margin:0;font-family:Kanit,sans-serif;background:#f5f7fa;color:#0f172a;font-weight:300}
+header{background:var(--p);color:#fff;padding:24px 32px}header h1{margin:0;font-weight:500;font-size:24px}header p{margin:6px 0 0}
+main{max-width:1280px;margin:0 auto;padding:24px}
+section{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:20px 24px;margin-bottom:24px}
+h2{margin:0 0 4px;font-weight:500;font-size:20px;color:var(--pd)}.lead{color:var(--mut);margin:0 0 16px}
+table.sum{width:100%;border-collapse:collapse;font-size:14px}table.sum th,table.sum td{border-bottom:1px solid var(--bd);padding:8px;text-align:left;vertical-align:top}table.sum th{background:var(--pl);font-weight:500}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:24px}.col h3{margin:0 0 8px;font-weight:500;font-size:15px}.now h3{color:var(--bad)}.new h3{color:var(--ok)}
+.devs{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+.phone{width:260px;height:520px;border:8px solid #1e293b;border-radius:28px;overflow:hidden;background:#f8fafc;position:relative;font-size:12px;display:flex;flex-direction:column}
+.ipad{width:420px;height:320px;border:8px solid #1e293b;border-radius:18px;overflow:hidden;background:#f8fafc;position:relative;font-size:12px;display:flex}
+.ipad.land{width:520px;height:340px}
+.lbl{font-size:12px;color:var(--mut);margin-top:4px;text-align:center}
+.bar{background:#fff;border-bottom:1px solid var(--bd);padding:8px 10px;display:flex;align-items:center;gap:8px;font-weight:500}
+.body{flex:1;overflow:hidden;padding:8px;display:flex;flex-direction:column;gap:6px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:8px;padding:8px}
+.btn{background:var(--p);color:#fff;border-radius:6px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;min-height:32px;font-weight:400}
+.btn.o{background:#fff;color:var(--p);border:1px solid var(--p)}
+.badge{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11px;background:var(--pl);color:var(--pd)}
+.badge.w{background:#fef3c7;color:var(--warn)}.badge.g{background:#dcfce7;color:#166534}
+.tbl{border-collapse:collapse;font-size:11px;white-space:nowrap}.tbl td,.tbl th{border:1px solid var(--bd);padding:4px 6px;background:#fff}.tbl th{background:#f1f5f9}
+.over{overflow:hidden;position:relative}.over:after{content:"ตกขอบจอ →";position:absolute;right:0;top:40%;background:var(--bad);color:#fff;padding:2px 6px;border-radius:4px;font-size:11px}
+.bad{outline:2px dashed var(--bad);outline-offset:1px}
+.tabbar{display:flex;border-top:1px solid var(--bd);background:#fff;padding:0 8px}.tabbar div{flex:1;text-align:center;padding:6px 0 8px;min-height:52px;font-size:11px;color:var(--mut)}.tabbar div b{display:block;font-size:18px;font-weight:400}.tabbar .on{color:var(--p);font-weight:500}
+.rail{width:44px;background:#fff;border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:10px;font-size:16px;color:var(--mut)}
+.rail2{width:76px;background:#fff;border-right:1px solid var(--bd);display:flex;flex-direction:column;gap:2px;padding:8px 4px}.rail2 div{text-align:center;padding:6px 2px;border-radius:8px;font-size:11px;color:var(--mut)}.rail2 div b{display:block;font-size:16px;font-weight:400}.rail2 .on{background:var(--pl);color:var(--pd);font-weight:500}
+.side{width:110px;background:#fff;border-right:1px solid var(--bd);padding:8px;font-size:11px;color:var(--mut);display:flex;flex-direction:column;gap:6px}
+.chips{display:flex;gap:4px;flex-wrap:nowrap;overflow:hidden}.chip{border:1px solid var(--bd);border-radius:999px;padding:4px 10px;background:#fff;white-space:nowrap;min-height:30px;display:inline-flex;align-items:center}.chip.on{background:var(--p);color:#fff;border-color:var(--p)}
+.steps{display:flex;gap:3px;align-items:center}.steps i{width:16px;height:4px;border-radius:2px;background:#cbd5e1}.steps i.d{background:var(--p)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:6px}.mut{color:var(--mut)}
+.field{border:1px solid var(--bd);border-radius:6px;padding:8px 10px;min-height:40px;display:flex;align-items:center;justify-content:space-between;background:#fff;font-size:12px}
+.tiny{display:inline-block;width:24px;height:16px;border:1px solid var(--bd);background:#fff;vertical-align:middle}
+.stick{position:sticky;right:0;box-shadow:-4px 0 6px rgba(0,0,0,.06)}
+.note{font-size:13px;margin:12px 0 0;padding:10px 12px;background:var(--pl);border-radius:8px}
+ol.plan li{margin-bottom:8px}
+@media(max-width:900px){.cmp{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>ร่างปรับหน้าจอ LIS ให้ใช้ง่ายบนมือถือและ iPad</h1><p>วัดจากหน้าจริง 19 หน้า ที่ขนาดมือถือ 390×844 · iPad แนวตั้ง 820×1180 · iPad แนวนอน 1180×820</p></header>
+<main>
+
+<section><h2>สรุปจุดที่ใช้ยาก</h2><p class="lead">เรียงจากกระทบงานมากไปน้อย</p>
+<table class="sum"><tr><th>#</th><th>ปัญหา</th><th>หน้าที่เจอ</th><th>มือถือ</th><th>iPad</th><th>วิธีแก้</th></tr>
+<tr><td>1</td><td>ตารางกว้างกว่าจอ ปุ่มคำสั่งท้ายแถวตกขอบ เลขคำร้องหัก 2–3 บรรทัด</td><td>ออก Final Result, Stock, การทดสอบ Lab/QC, ผลวิเคราะห์, Daily Check, Master Item, Access Control</td><td>หนัก</td><td>แนวตั้งเกินจอ (Final Result, Master Item)</td><td>มือถือแสดงเป็นการ์ด · iPad ซ่อนคอลัมน์รอง ตรึงคอลัมน์คำสั่งไว้ขวา</td></tr>
+<tr><td>2</td><td>หาเมนูยาก</td><td>ทุกหน้า</td><td>มีแค่ ☰ ที่มี ~25 รายการ</td><td>แนวตั้งเหลือไอคอนไม่มีชื่อ หลายอันหน้าตาเหมือนกัน</td><td>แถบเมนูล่าง 5 ปุ่มตามบทบาท · iPad ไอคอนมีชื่อกำกับ</td></tr>
+<tr><td>3</td><td>ใบคำนวณผลแล็บกรอกแทบไม่ได้</td><td>รายละเอียดการทดสอบ Lab</td><td>ช่องกรอกกว้าง ~26px คอลัมน์ %W/W อยู่นอกจอ</td><td>พอใช้ได้</td><td>มือถือกรอกเป็นการ์ดทีละ Sample แป้นตัวเลข ปุ่ม ‹ › สลับ Sample</td></tr>
+<tr><td>4</td><td>การ์ดสรุปตัวเลขเรียงทีละใบ ต้องเลื่อน ~900px กว่าจะเจอรายการ</td><td>หน้าแรก, รายการคำร้อง</td><td>หนัก</td><td>เล็กน้อย</td><td>รวมเป็นชิปกรองแถวเดียว กดแล้วกรองรายการทันที</td></tr>
+<tr><td>5</td><td>ปุ่มเล็กเกินนิ้ว</td><td>การแจ้งเตือน (ปุ่มลบ 23×16px 73 อัน), คำขอแผนกผลิต, Daily Check</td><td>หนัก</td><td>หนัก</td><td>จุดกดอย่างน้อย 44px · ย้าย "ลบ" ไปเมนู ⋯ · แยกแจ้งเตือนระบบออกจากงาน</td></tr>
+<tr><td>6</td><td>ป้ายสถานะยาวหักทีละคำ</td><td>การทดสอบ Lab</td><td>หนัก</td><td>ปานกลาง</td><td>ใช้ป้ายสั้น + จุดขั้นตอน แสดงคำเต็มในรายละเอียด</td></tr>
+<tr><td>7</td><td>เมนูข้างกว้าง 285px และไม่มีการแบ่งจอ</td><td>หน้ารายการ + รายละเอียด</td><td>–</td><td>แนวนอนเสียพื้นที่</td><td>แบ่งจอรายการซ้าย รายละเอียดขวา</td></tr>
+</table></section>
+
+<section><h2>1. ตาราง → การ์ด (มือถือ) และตารางย่อ (iPad)</h2><p class="lead">ตัวอย่างหน้า ออก Final Result</p>
+<div class="cmp"><div class="col now"><h3>ตอนนี้</h3><div class="devs"><div><div class="phone"><div class="bar">☰ ออก Final Result</div><div class="body"><div class="over"><table class="tbl"><tr><th>เลขคำร้อง</th><th>ลูกค้า</th><th>สินค้า</th><th>สถานะ</th><th>วันที่</th><th>ผู้ตรวจ</th><th>คำสั่ง</th></tr><tr><td>REQ-<br>2026-<br>0012</td><td>บ.เอ</td><td>ปุ๋ย A</td><td>รออนุมัติ</td><td>26/11</td><td>สมชาย</td><td>อนุมัติ</td></tr><tr><td>REQ-<br>2026-<br>0013</td><td>บ.บี</td><td>ปุ๋ย B</td><td>รออนุมัติ</td><td>26/11</td><td>สมหญิง</td><td>อนุมัติ</td></tr></table></div><p class="mut">เห็น 4 จาก 7 คอลัมน์ ต้องปัดข้างเพื่อหาปุ่มอนุมัติ</p></div></div><div class="lbl">มือถือ</div></div></div></div>
+<div class="col new"><h3>เสนอ</h3><div class="devs"><div><div class="phone"><div class="bar">ออก Final Result</div><div class="body">
+<div class="card"><div class="row"><b>REQ-2026-0012</b><span class="badge w">รออนุมัติ</span></div><div class="mut">บ.เอ · ปุ๋ย A · 26/11 · สมชาย</div><div class="row" style="margin-top:6px"><span class="btn o" style="flex:1;min-height:44px">ดูผล</span><span class="btn" style="flex:1;min-height:44px">อนุมัติ</span></div></div>
+<div class="card"><div class="row"><b>REQ-2026-0013</b><span class="badge w">รออนุมัติ</span></div><div class="mut">บ.บี · ปุ๋ย B · 26/11 · สมหญิง</div><div class="row" style="margin-top:6px"><span class="btn o" style="flex:1;min-height:44px">ดูผล</span><span class="btn" style="flex:1;min-height:44px">อนุมัติ</span></div></div>
+</div></div><div class="lbl">มือถือ: ข้อมูลรองรวมเป็นบรรทัดเดียว ปุ่มเต็มความกว้าง</div></div>
+<div><div class="ipad"><div class="body"><table class="tbl" style="width:100%"><tr><th>เลขคำร้อง</th><th>ลูกค้า / สินค้า</th><th>สถานะ</th><th class="stick">คำสั่ง</th></tr><tr><td>REQ-2026-0012</td><td>บ.เอ · ปุ๋ย A</td><td><span class="badge w">รออนุมัติ</span></td><td class="stick"><span class="btn">อนุมัติ</span></td></tr><tr><td>REQ-2026-0013</td><td>บ.บี · ปุ๋ย B</td><td><span class="badge w">รออนุมัติ</span></td><td class="stick"><span class="btn">อนุมัติ</span></td></tr></table></div></div><div class="lbl">iPad แนวตั้ง: รวมคอลัมน์ เลขคำร้องไม่หัก ปุ่มตรึงขวา</div></div></div></div></div>
+<p class="note">ใช้รูปแบบเดียวกันกับ Stock, การทดสอบ Lab/QC, ผลวิเคราะห์, Master Item, Access Control และ Daily Check โดยทำเป็นตัวแสดงผลกลางตัวเดียว แต่ละหน้าเลือกแค่ว่าคอลัมน์ไหนเป็นหัวการ์ด คอลัมน์ไหนเป็นข้อมูลรอง</p></section>
+
+<section><h2>2. การนำทาง</h2><p class="lead">มือถือใช้แถบเมนูล่าง ส่วน iPad แนวตั้งใช้ไอคอนที่มีชื่อกำกับ</p>
+<div class="cmp"><div class="col now"><h3>ตอนนี้</h3><div class="devs"><div><div class="phone"><div class="bar"><span class="bad">☰</span> LIS</div><div class="body"><div class="card mut">เมนูทั้งหมด ~25 รายการ ซ่อนอยู่หลัง ☰<br>หัวกลุ่มเมนูสูง 23px</div></div></div><div class="lbl">มือถือ</div></div><div><div class="ipad" style="width:200px"><div class="rail"><span>▦</span><span>▦</span><span>⚗</span><span>⚗</span><span>▤</span><span>▤</span></div><div class="body mut">ไอคอนไม่มีชื่อ<br>หลายอันเหมือนกัน</div></div><div class="lbl">iPad แนวตั้ง</div></div></div></div>
+<div class="col new"><h3>เสนอ</h3><div class="devs"><div><div class="phone"><div class="bar">งานของฉัน</div><div class="body"><div class="card">งานรอทำ 5 รายการ</div></div><div class="tabbar"><div class="on"><b>⌂</b>หน้าแรก</div><div><b>☑</b>งานของฉัน</div><div><b>⚗</b>ทดสอบ</div><div><b>🔔</b>แจ้งเตือน</div><div><b>⋯</b>เพิ่มเติม</div></div></div><div class="lbl">5 ปุ่มล่างเปลี่ยนตามบทบาท ที่เหลืออยู่ใน "เพิ่มเติม"</div></div>
+<div><div class="ipad" style="width:240px"><div class="rail2"><div class="on"><b>⌂</b>หน้าแรก</div><div><b>☑</b>คำร้อง</div><div><b>⚗</b>ทดสอบ Lab</div><div><b>✓</b>QC</div><div><b>▤</b>Stock</div></div><div class="body"></div></div><div class="lbl">iPad แนวตั้ง: ไอคอน + ชื่อสั้น</div></div></div></div></div></section>
+
+<section><h2>3. ใบคำนวณผลแล็บบนมือถือ</h2><p class="lead">หน้ารายละเอียดการทดสอบ Lab</p>
+<div class="cmp"><div class="col now"><h3>ตอนนี้</h3><div class="devs"><div><div class="phone"><div class="bar">‹ การทดสอบ</div><div class="body"><div class="chips"><span class="chip bad" style="min-height:22px">N</span><span class="chip" style="min-height:22px">P</span><span class="chip" style="min-height:22px">K</span><span class="chip" style="min-height:22px">…</span></div><div class="over"><table class="tbl"><tr><th>Sam<br>ple</th><th>น้ำ<br>หนัก</th><th>ปริ<br>มาตร</th><th>%W/W</th></tr><tr><td>S1</td><td><span class="tiny bad"></span></td><td><span class="tiny"></span></td><td>–</td></tr><tr><td>S2</td><td><span class="tiny"></span></td><td><span class="tiny"></span></td><td>–</td></tr></table></div><p class="mut">ช่องกรอกกว้าง ~26px หัวคอลัมน์หักทีละคำ</p></div></div><div class="lbl">มือถือ</div></div></div></div>
+<div class="col new"><h3>เสนอ</h3><div class="devs"><div><div class="phone"><div class="bar">‹ N (ไนโตรเจน)</div><div class="body"><div class="row"><b>Sample S1</b><span class="mut">1 / 6</span></div><div class="mut">น้ำหนักตัวอย่าง (g)</div><div class="field">1.0250 <span class="mut">แป้นตัวเลข</span></div><div class="mut">ปริมาตรที่ใช้ (ml)</div><div class="field">12.40</div><div class="card row"><span>%W/W</span><b style="color:var(--p);font-size:16px">4.23</b></div></div><div class="tabbar" style="padding:6px;gap:6px"><span class="btn o" style="min-height:44px;flex:1">‹ S0</span><span class="btn" style="min-height:44px;flex:2">บันทึก</span><span class="btn o" style="min-height:44px;flex:1">S2 ›</span></div></div><div class="lbl">กรอกทีละ Sample ผลคำนวณแสดงทันที</div></div></div></div></div></section>
+
+<section><h2>4. การ์ดสรุปตัวเลข → ชิปกรอง และสถานะแบบจุดขั้นตอน</h2><p class="lead">หน้าแรก และรายการคำร้อง</p>
+<div class="cmp"><div class="col now"><h3>ตอนนี้</h3><div class="devs"><div><div class="phone"><div class="bar">☰ รายการคำร้อง</div><div class="body"><div class="card" style="height:70px">ทั้งหมด<br><b style="font-size:20px">128</b></div><div class="card" style="height:70px">รอดำเนินการ<br><b style="font-size:20px">12</b></div><div class="card" style="height:70px">กำลังวิเคราะห์<br><b style="font-size:20px">30</b></div><div class="card" style="height:70px">เสร็จสิ้น<br><b style="font-size:20px">86</b></div><p class="mut">…ต้องเลื่อน ~900px กว่าจะเจอรายการ</p><div class="card"><span class="badge">เจ้าหน้าที่<br>กำลัง<br>ดำเนินการ<br>วิเคราะห์</span></div></div></div><div class="lbl">มือถือ</div></div></div></div>
+<div class="col new"><h3>เสนอ</h3><div class="devs"><div><div class="phone"><div class="bar">รายการคำร้อง</div><div class="body"><div class="chips"><span class="chip on">ทั้งหมด 128</span><span class="chip">รอ 12</span><span class="chip">วิเคราะห์ 30</span></div>
+<div class="card"><div class="row"><b>REQ-2026-0012</b><span class="badge">วิเคราะห์</span></div><div class="steps" style="margin-top:6px"><i class="d"></i><i class="d"></i><i class="d"></i><i></i><i></i><span class="mut">&nbsp;ขั้น 3/5</span></div></div>
+<div class="card"><div class="row"><b>REQ-2026-0013</b><span class="badge g">เสร็จสิ้น</span></div><div class="steps" style="margin-top:6px"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><span class="mut">&nbsp;ขั้น 5/5</span></div></div>
+<div class="card"><div class="row"><b>REQ-2026-0014</b><span class="badge w">รอรับ</span></div><div class="steps" style="margin-top:6px"><i class="d"></i><i></i><i></i><i></i><i></i><span class="mut">&nbsp;ขั้น 1/5</span></div></div></div></div><div class="lbl">ตัวเลขอยู่ในชิป กดแล้วกรอง รายการเห็นได้ทันที</div></div></div></div></div></section>
+
+<section><h2>5. จุดกดให้พอดีนิ้ว</h2><p class="lead">หน้าการแจ้งเตือน (ใช้กฎเดียวกันกับ checkbox และแท็บ)</p>
+<div class="cmp"><div class="col now"><h3>ตอนนี้</h3><div class="devs"><div><div class="phone"><div class="bar">☰ การแจ้งเตือน</div><div class="body"><div class="card row"><span>ระบบตอบกลับ 503</span><span class="bad" style="font-size:11px;color:var(--bad)">ลบ</span></div><div class="card row"><span>คำร้อง REQ-0012 รออนุมัติ</span><span class="bad" style="font-size:11px;color:var(--bad)">ลบ</span></div><div class="card row"><span>ระบบตอบกลับ 401</span><span class="bad" style="font-size:11px;color:var(--bad)">ลบ</span></div><p class="mut">ปุ่มลบ 23×16px 73 อัน แจ้งเตือนระบบปนกับงาน</p></div></div><div class="lbl">มือถือ</div></div></div></div>
+<div class="col new"><h3>เสนอ</h3><div class="devs"><div><div class="phone"><div class="bar">การแจ้งเตือน</div><div class="body"><div class="chips"><span class="chip on" style="min-height:44px">งานของฉัน 8</span><span class="chip" style="min-height:44px">ระบบ 65</span></div><div class="card row" style="min-height:56px"><span>คำร้อง REQ-0012 รออนุมัติ</span><span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:18px">⋯</span></div><div class="card row" style="min-height:56px"><span>ผล REQ-0009 อนุมัติแล้ว</span><span style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:18px">⋯</span></div><span class="btn o" style="min-height:44px">อ่านแล้วทั้งหมด</span></div></div><div class="lbl">ทุกจุดกด ≥ 44px · "ลบ" อยู่ในเมนู ⋯ หรือปัดซ้าย</div></div></div></div></div>
+<p class="note">กฎกลางสำหรับจอสัมผัส: ปุ่ม แท็บ checkbox หัวกลุ่มเมนู และไอคอนกด ต้องมีพื้นที่กดอย่างน้อย 44×44px (ตัวไอคอนเล็กได้ แต่พื้นที่กดต้องครบ) ปรับที่ Button, Tabs, Checkbox ตัวกลางครั้งเดียวแล้วทุกหน้าได้ผลตาม</p></section>
+
+<section><h2>6. iPad แนวนอน: แบ่งจอรายการกับรายละเอียด</h2><p class="lead">ใช้กับการทดสอบ Lab, QC, คำร้อง</p>
+<div class="cmp"><div class="col now"><h3>ตอนนี้</h3><div class="devs"><div><div class="ipad land"><div class="side bad"><b>เมนู 285px</b><span>หน้าแรก</span><span>คำร้อง</span><span>ทดสอบ Lab</span><span>QC</span><span>Stock</span></div><div class="body"><div class="card">รายการเต็มจอ กดแล้วเปลี่ยนหน้า<br>กลับมาต้องหาตำแหน่งเดิมใหม่</div></div></div><div class="lbl">iPad แนวนอน 1180×820</div></div></div></div>
+<div class="col new"><h3>เสนอ</h3><div class="devs"><div><div class="ipad land"><div class="rail2" style="width:60px"><div class="on"><b>⚗</b>Lab</div><div><b>✓</b>QC</div><div><b>☑</b>คำร้อง</div></div><div style="width:170px;border-right:1px solid var(--bd);padding:6px;display:flex;flex-direction:column;gap:4px"><div class="card" style="border-color:var(--p);background:var(--pl)"><b>REQ-0012</b><br><span class="mut">N, P, K</span></div><div class="card"><b>REQ-0013</b><br><span class="mut">pH</span></div><div class="card"><b>REQ-0014</b><br><span class="mut">ความชื้น</span></div></div><div class="body"><div class="row"><b>REQ-0012 · N</b><span class="badge">วิเคราะห์</span></div><table class="tbl" style="width:100%"><tr><th>Sample</th><th>น้ำหนัก</th><th>ปริมาตร</th><th>%W/W</th></tr><tr><td>S1</td><td>1.0250</td><td>12.40</td><td>4.23</td></tr><tr><td>S2</td><td>1.0110</td><td>12.10</td><td>4.19</td></tr></table><span class="btn" style="min-height:40px">บันทึกผล</span></div></div><div class="lbl">เมนูย่อเป็นไอคอนมีชื่อ · รายการซ้าย รายละเอียดขวา</div></div></div></div></div></section>
+
+<section><h2>ลำดับการทำ</h2>
+<ol class="plan">
+<li><b>รอบ 1 – แก้ทั้งระบบครั้งเดียว:</b> ขยายจุดกดเป็น 44px ที่ Button, Tabs, Checkbox กลาง · เพิ่มแถบเมนูล่างบนมือถือ · ไอคอนมีชื่อบน iPad แนวตั้ง</li>
+<li><b>รอบ 2 – ตาราง:</b> ทำตัวแสดงผลตาราง/การ์ดกลาง แล้วเปลี่ยนหน้าออก Final Result, การทดสอบ Lab/QC, Stock ก่อน ตามด้วยหน้าที่เหลือ</li>
+<li><b>รอบ 3 – หน้างานหลัก:</b> ใบคำนวณทีละ Sample บนมือถือ · ชิปกรองแทนการ์ดสรุป · ป้ายสถานะสั้น + จุดขั้นตอน · แยกแจ้งเตือนระบบ</li>
+<li><b>รอบ 4 – iPad แนวนอน:</b> แบ่งจอรายการกับรายละเอียดในหน้าการทดสอบและคำร้อง</li>
+</ol></section>
+</main></body></html>
+
