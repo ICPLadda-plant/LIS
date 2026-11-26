@@ -189,6 +189,8 @@ export default function PetitionAssignPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
+  // เลือกคนแล้วแต่ยังไม่มีเลขตัวอย่าง: เปิดหน้ารับตัวอย่างให้ใส่เลข แล้ว assign ต่อให้อัตโนมัติ
+  const [pendingAssign, setPendingAssign] = useState<{ petitionId: string; petitionNo: string; employeeId: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -383,7 +385,8 @@ export default function PetitionAssignPage() {
     const petition = allPetitions.find((p) => p._id === petitionId);
     if (!petition) return;
     if (!hasValidLabSampleNumbers(petition)) {
-      toast.error('กรุณาใส่เลขตัวอย่างก่อน Assign');
+      toast.info('กรุณาใส่เลขตัวอย่างก่อน Assign');
+      setPendingAssign({ petitionId, petitionNo: petition.petitionNo, employeeId });
       return;
     }
     void assignPetition(petition, employeeId);
@@ -424,11 +427,18 @@ export default function PetitionAssignPage() {
   return (
     <AppLayout>
         <LabScanAcceptModal
-          open={scanOpen}
+          open={scanOpen || !!pendingAssign}
+          initialCode={pendingAssign?.petitionNo}
           pendingPetitions={awaitingReceive}
-          onClose={() => setScanOpen(false)}
-          onAccepted={() => {
+          onClose={() => { setScanOpen(false); setPendingAssign(null); }}
+          onAccepted={(accepted?: Petition) => {
             setScanOpen(false);
+            const pending = pendingAssign;
+            setPendingAssign(null);
+            if (pending && accepted?._id === pending.petitionId && hasValidLabSampleNumbers(accepted)) {
+              void assignPetition(accepted, pending.employeeId);
+              return;
+            }
             refreshPetitions();
           }}
         />

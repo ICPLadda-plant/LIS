@@ -44,7 +44,7 @@ type Phase = 'scanning' | 'confirming' | 'loading' | 'success' | 'error' | 'no-c
 interface Props {
   open: boolean;
   onClose: () => void;
-  onAccepted: () => void;
+  onAccepted: (petition?: Petition) => void;
   /** โหมดกรอกเลขคำร้องอย่างเดียว (ไม่เปิดกล้อง) — ใช้กับปุ่ม "กรอกเลขรับงาน" */
   manualOnly?: boolean;
   /** ช่วงมอบหมายอิสระ: รับตัวอย่างแล้ว assign งานให้คนที่กดรับทันที */
@@ -310,7 +310,7 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
       }
       setPetition(updated);
       setPhase('success');
-      onAccepted();
+      onAccepted(updated);
     } catch (err: unknown) {
       setErrorMsg(apiErrorMessage(err, 'เกิดข้อผิดพลาด กรุณาลองใหม่'));
       setPhase('error');
