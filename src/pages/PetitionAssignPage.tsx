@@ -978,7 +978,8 @@ function PetitionCard({
     .filter(Boolean) as string[];
   const blocked = groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode));
   // เปลี่ยนผู้รับงานแล้วคนใหม่ต้องกดเริ่มงานเอง
-  const canDrag = canDragRole && !touchPick;
+  // จอสัมผัส: ลากได้เหมือนคอม และแตะเพื่อเปิด popup เลือกคน
+  const canDrag = canDragRole;
 
   return (
     // admin คลิกขวาที่ตัวการ์ดเพื่อเปิดคำร้อง ส่วนคลิกซ้ายใช้ลาก; role อื่นเปิดจากปุ่มเลขคำร้อง
