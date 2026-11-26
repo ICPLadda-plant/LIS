@@ -28,12 +28,12 @@ function Tile({ label, value, icon: Icon, tone, to }: {
   label: string; value: number; icon: LucideIcon; tone: keyof typeof TONE; to: string;
 }) {
   return (
-    <Link to={to} className="flex-1 min-w-[140px]">
-      <Card className={cn("flex items-center gap-3 border p-3 transition hover:shadow-md", TONE[tone])}>
-        <Icon className="h-5 w-5 shrink-0" />
-        <div className="min-w-0">
-          <div className="text-2xl font-semibold leading-none">{value}</div>
-          <div className="truncate text-xs">{label}</div>
+    <Link to={to} className="shrink-0 md:flex-1 md:min-w-[140px]">
+      <Card className={cn("flex min-h-11 items-center gap-2 rounded-full border px-3 py-1.5 transition hover:shadow-md md:gap-3 md:rounded-lg md:p-3", TONE[tone])}>
+        <Icon className="h-4 w-4 shrink-0 md:h-5 md:w-5" />
+        <div className="flex min-w-0 items-baseline gap-1.5 md:block">
+          <div className="text-base font-semibold leading-none md:text-2xl">{value}</div>
+          <div className="whitespace-nowrap text-xs md:truncate">{label}</div>
         </div>
       </Card>
     </Link>
@@ -45,7 +45,7 @@ export default function AlertStrip({
   urgentIds = [], abnormalIds = [], unassignedIds = [],
 }: Props) {
   return (
-    <div className="mb-4 flex flex-wrap gap-3">
+    <div className="no-scrollbar -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:gap-3 md:px-0">
       <Tile label="งานทั้งหมด" value={counts.total} icon={ClipboardList} tone="neutral" to={highlightPath(totalIds)} />
       <Tile label="งานด่วน" value={counts.urgent} icon={Flame} tone="red" to={highlightPath(urgentIds)} />
       <Tile label="เกินเวลา" value={counts.overdue} icon={Clock} tone="red" to={highlightPath(overdueIds)} />
