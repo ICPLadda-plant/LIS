@@ -607,11 +607,11 @@ function PageTwo({ lr, petition, printRows, sheetNo, sheetCount, qcResults, sgPa
             <div className="pr-p2-sign-col">
               <div className="pr-sig-row">
                 <span className="pr-sig-label">ผู้ส่งตัวอย่าง </span>
-                <Line width="6cm" value={requester?.fullName ?? ''} />
+                <Line width="6cm" value={petition.submittedBy?.name || requester?.fullName || ''} />
               </div>
               <div className="pr-sig-row pr-mt-xs">
                 <span className="pr-sig-label">วันที่ </span>
-                <Line width="6cm" value={buddhistShort(petition.items?.find((it) => it.collectDate)?.collectDate || petition.sampleSentAt)} />
+                <Line width="6cm" value={buddhistShort(petition.sampleSentAt || petition.submittedBy?.submittedAt)} />
               </div>
             </div>
             <div className="pr-p2-sign-col">
