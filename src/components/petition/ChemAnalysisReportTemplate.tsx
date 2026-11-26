@@ -11,9 +11,9 @@ export const CHEM_ANALYSIS_REPORT_CSS = `
 .ca-brand { text-align: center; }
 .ca-logo { display: block; width: 40mm; height: auto; margin: 0 auto; }
 .ca-brand-name { margin-top: 1mm; font-size: 10pt !important; }
-.ca-company { text-align: center; font-size: 15pt !important; }
+.ca-company { padding-left: 10mm; text-align: left; font-size: 15pt !important; }
 .ca-title { margin-top: 0.5mm; text-align: center; font-weight: 700; font-size: 18pt !important; line-height: 1 !important; }
-.ca-sub { margin-top: 1mm; text-align: center; font-size: 11pt !important; }
+.ca-sub { margin-top: 1mm; text-align: right; font-size: 11pt !important; }
 .ca-box { position: relative; margin-top: 3mm; padding: 3mm 2.5mm 2mm; border: 0.8pt solid #000; }
 .ca-tag { position: absolute; top: -2.4mm; left: 4mm; padding: 0 1.5mm; background: #fff; font-size: 11pt !important; font-style: italic; }
 .ca-line { display: flex; align-items: flex-end; column-gap: 2mm; margin-top: 1.5mm; }
