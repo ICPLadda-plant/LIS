@@ -90,3 +90,32 @@ export function isSendDateReached(petition: Petition, now: Date = new Date()): b
   const day = petitionSendDayKey(petition);
   return !day || day <= bangkokDayKey(now);
 }
+
+export type SendDayPetition = Petition & { sendDayKey?: string };
+
+/**
+ * แยกคำร้องเป็นหลาย card ตามวันที่ส่งตัวอย่าง: ตัวอย่างที่ส่งวันเดียวกันรวมใน card เดียว
+ * ส่งคนละวันแยก card (เรียงวันจากเก่าไปใหม่) — รายการที่ไม่มีวันที่ส่งรวมกับวันแรก
+ */
+export function splitPetitionBySendDay(petition: Petition): SendDayPetition[] {
+  const items = petition.items ?? [];
+  const byDay = new Map<string, typeof items>();
+  items.forEach((item) => {
+    const day = toDayKey(item.labelSampledDate) ?? '';
+    byDay.set(day, [...(byDay.get(day) ?? []), item]);
+  });
+  const days = [...byDay.keys()].filter(Boolean).sort();
+  if (days.length <= 1) return [petition];
+  const undated = byDay.get('') ?? [];
+  return days.map((day, index) => ({
+    ...petition,
+    items: index === 0 ? [...undated, ...byDay.get(day)!].sort((a, b) => a.seq - b.seq) : byDay.get(day)!,
+    sendDayKey: day,
+  }));
+}
+
+/** "2026-11-26" → "26/11/2026" สำหรับป้ายวันที่ส่งบน card */
+export function formatSendDayKey(day: string): string {
+  const [y, m, d] = day.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : day;
+}
