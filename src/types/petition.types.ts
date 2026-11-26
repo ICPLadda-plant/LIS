@@ -92,6 +92,7 @@ export interface PetitionItem {
   lineRef?: string;
   labelSampledBy?: string;
   labelSampledDate?: string;
+  collectDate?: string;
   labelRemark?: string;
   sampleId?: string;
   // รหัสสินค้าจาก Master Item (item_no) ของแถวที่เลือก — คนละเรื่องกับ sampleId

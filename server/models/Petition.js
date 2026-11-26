@@ -30,6 +30,7 @@ const PetitionItemSchema = new mongoose.Schema(
     lineRef: String,
     labelSampledBy: String,
     labelSampledDate: String,
+    collectDate: String,
     labelRemark: String,
     sampleId: String,
     // รหัส Master Item (item_no) ของแถวที่เลือก — คนละเรื่องกับ sampleId ซึ่งเป็น key

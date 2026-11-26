@@ -117,6 +117,11 @@ function sampleQuantityInputCount(value: number | undefined): number {
   return value ?? 1;
 }
 
+/** จำนวนตัวอย่างขั้นต่ำ = จำนวนปลายทางที่ติ๊ก (QC / Lab (AI)) อย่างน้อย 1 */
+export function minSampleQuantityForTargets(item: Pick<ItemRowValues, 'sendToQc' | 'sendToLab'>): number {
+  return Math.max(1, (item.sendToQc !== false ? 1 : 0) + (item.sendToLab === true ? 1 : 0));
+}
+
 function splitLabelQuantity(value: string | undefined): string[] {
   return String(value ?? '')
     .split(/[\n,;|]+/)
@@ -409,7 +414,11 @@ export default function ItemsStep({
                       <label className="flex items-center gap-2 text-sm">
                         <Checkbox
                           checked={it.sendToQc !== false}
-                          onCheckedChange={(checked) => setItem(idx, { sendToQc: checked === true, sendToLab: lab })}
+                          onCheckedChange={(checked) => setItem(idx, {
+                            sendToQc: checked === true,
+                            sendToLab: lab,
+                            sampleQuantity: minSampleQuantityForTargets({ sendToQc: checked === true, sendToLab: lab }),
+                          })}
                           disabled={itemsReadOnly}
                           aria-label={`ส่งวิเคราะห์ QC ตัวอย่างที่ ${it.seq}`}
                         />
@@ -418,7 +427,11 @@ export default function ItemsStep({
                       <label className="flex items-center gap-2 text-sm">
                         <Checkbox
                           checked={lab}
-                          onCheckedChange={(checked) => setItem(idx, { sendToLab: checked === true, sendToQc: it.sendToQc !== false })}
+                          onCheckedChange={(checked) => setItem(idx, {
+                            sendToLab: checked === true,
+                            sendToQc: it.sendToQc !== false,
+                            sampleQuantity: minSampleQuantityForTargets({ sendToQc: it.sendToQc !== false, sendToLab: checked === true }),
+                          })}
                           disabled={itemsReadOnly}
                           aria-label={`ส่งวิเคราะห์ Lab (AI) ตัวอย่างที่ ${it.seq}`}
                         />
@@ -481,11 +494,16 @@ export default function ItemsStep({
                   <Input
                     id={`sample-quantity-${idx}`}
                     type="number"
-                    min={1}
+                    min={showSendTargets ? minSampleQuantityForTargets({ sendToQc: it.sendToQc, sendToLab: lab }) : 1}
                     step={1}
                     inputMode="numeric"
                     value={splitQcLab ? 2 : it.sampleQuantity ?? ''}
                     onChange={(e) => setItem(idx, { sampleQuantity: parseSampleQuantityInput(e.target.value) })}
+                    onBlur={() => {
+                      if (!showSendTargets || splitQcLab) return;
+                      const min = minSampleQuantityForTargets({ sendToQc: it.sendToQc, sendToLab: lab });
+                      if (!it.sampleQuantity || it.sampleQuantity < min) setItem(idx, { sampleQuantity: min });
+                    }}
                     disabled={itemsReadOnly || splitQcLab}
                   />
                   {splitQcLab && (
