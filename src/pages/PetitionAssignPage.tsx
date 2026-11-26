@@ -60,7 +60,8 @@ function sortAssignQueue(petitions: Petition[]): Petition[] {
 const formatThaiDate = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Bangkok', day: '2-digit', month: '2-digit', year: 'numeric' })
     .format(new Date(iso));
-import { bangkokDayKey, isSendDateReached, isVisibleInAssignQueue, withItemsDueBy } from '@/lib/petitionQueueVisibility';
+import { bangkokDayKey, isSendDateReached, isVisibleInAssignQueue, petitionSendDayKey, withItemsDueBy } from '@/lib/petitionQueueVisibility';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DEV_MODE, synthesizeDevAssignees } from '@/config/dev';
 import { isAssignedTo } from '@/lib/assignment';
 import { type MethodDoc } from '@/lib/methodRegistry';
@@ -240,6 +241,8 @@ export default function PetitionAssignPage() {
   const todayKey = bangkokDayKey(now);
   const queuePetitions = useMemo(() => {
     const today = new Date(`${todayKey}T12:00:00+07:00`);
+    // แสดงงานล่วงหน้าถึงพรุ่งนี้ เพื่อแยกเป็น tab วันนี้ / พรุ่งนี้ / ค้าง
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
     // งาน re-check ที่ยัง inProgress ซ้ำกับ inProgressData — กันการ์ดซ้ำด้วย _id
     const byId = new Map<string, Petition>();
     [
@@ -252,7 +255,7 @@ export default function PetitionAssignPage() {
     });
     return [...byId.values()]
       // batch ที่วันส่งยังไม่ถึง (เช่น ช่วง OT ส่งวันถัดไป) ยังไม่ขึ้นบอร์ด — re-check แสดงครบ
-      .map((petition) => (isLabRecheckPending(petition) ? petition : withItemsDueBy(petition, today)))
+      .map((petition) => (isLabRecheckPending(petition) ? petition : withItemsDueBy(petition, tomorrow)))
       .filter((petition): petition is Petition => petition !== null)
       .filter(
       (petition) =>
@@ -260,7 +263,7 @@ export default function PetitionAssignPage() {
         // เจ้าหน้าที่กดเริ่มงาน/บันทึกผลแล้ว ไม่ต้องอยู่บนบอร์ด assign (ยกเว้น re-check ที่ต้องเปลี่ยนผู้รับงานได้)
         && (isLabRecheckPending(petition) || !isLabWorkAccepted(petition))
         // งานรอมอบหมาย: แสดงเฉพาะใบที่วันที่ส่ง <= วันนี้ (ใบที่มอบหมายแล้วยังอยู่ในคอลัมน์ผู้รับงาน)
-        && (Boolean(petition.assignedTo) || isSendDateReached(petition, today))
+        && (Boolean(petition.assignedTo) || isSendDateReached(petition, tomorrow))
         && hasAssignableLabParameter(petition, labParameters, groupMembership),
     );
   }, [inProgressData?.items, pendingData?.items, staleReceivedData?.items, recheckData?.items, labParameters, groupMembership, todayKey]);
@@ -642,8 +645,20 @@ function AssignBoard({
   const [overPool, setOverPool] = useState(false);
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
-  // แสดงทุกใบในคิว แต่ตรวจว่าต้องส่งตัวอย่างแล้วเมื่อผู้ใช้เริ่มมอบหมาย
-  const readyToAssign = unassigned;
+  // แบ่ง tab ตามวันที่ส่ง: วันนี้ / พรุ่งนี้ / ค้าง (ตั้งแต่เมื่อวานลงไป)
+  const [poolTab, setPoolTab] = useState<'today' | 'tomorrow' | 'overdue'>('today');
+  const poolByTab = useMemo(() => {
+    const todayKey = bangkokDayKey(new Date());
+    const groups = { today: [] as Petition[], tomorrow: [] as Petition[], overdue: [] as Petition[] };
+    unassigned.forEach((p) => {
+      const day = petitionSendDayKey(p);
+      if (day && day > todayKey) groups.tomorrow.push(p);
+      else if (day && day < todayKey) groups.overdue.push(p);
+      else groups.today.push(p);
+    });
+    return groups;
+  }, [unassigned]);
+  const readyToAssign = poolByTab[poolTab];
 
   const renderPoolCard = (petition: Petition) => (
     <PetitionCard
@@ -750,9 +765,16 @@ function AssignBoard({
           <Inbox className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold text-foreground">งานรอมอบหมาย</span>
           <Badge variant="gray-soft" className="ml-auto font-normal">
-            {readyToAssign.length}
+            {unassigned.length}
           </Badge>
         </div>
+        <Tabs value={poolTab} onValueChange={(v) => setPoolTab(v as typeof poolTab)} className="mb-2">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="today" className="text-xs">วันนี้ ({poolByTab.today.length})</TabsTrigger>
+            <TabsTrigger value="tomorrow" className="text-xs">พรุ่งนี้ ({poolByTab.tomorrow.length})</TabsTrigger>
+            <TabsTrigger value="overdue" className="text-xs">ค้าง ({poolByTab.overdue.length})</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="max-h-[72vh] space-y-2 overflow-y-auto pr-0.5">
           {readyToAssign.length === 0 ? (
             <div className="rounded-md border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
