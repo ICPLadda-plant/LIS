@@ -120,7 +120,11 @@ function openLocalPrintWindow(title: string, html: string, docType: PrintDocType
     window.setTimeout(() => iframe.remove(), 500);
   };
 
+  // Chrome ยิง load สองครั้ง (ตอนแปะ iframe เปล่า และหลัง doc.close) — กันไม่ให้ print dialog เปิดซ้ำ
+  let printStarted = false;
   iframe.onload = () => {
+    if (printStarted) return;
+    printStarted = true;
     const printWindow = iframe.contentWindow;
     if (!printWindow) {
       cleanup();
