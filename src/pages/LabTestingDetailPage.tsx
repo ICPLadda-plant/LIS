@@ -14,9 +14,12 @@ import {
   ShieldAlert,
   Printer,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
+import SplitPetitionList from '@/components/lis/SplitPetitionList';
 import LabReasonDialog from '@/components/petition/LabReasonDialog';
 import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
@@ -41,9 +44,9 @@ import { ReferenceFieldDisplay } from '@/components/lis/ReferenceFieldDisplay';
 import { getPetitionCategory, itemGroupKey, matchParametersForItem, visibleEnumOptions } from '@/lib/petitionTestItems';
 import { aiGridClass, aiSubstanceFromKey, calculateAi, calculateCcsFromValues, calculatedAiFieldKind, calculatedCcsFieldKind, findAiDensity, formatCalculatedAi, isSharedDailyAiField, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, STANDARD_NO_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL, CONTROL_LABELS } from '@/lib/aiCalculation';
 import { aiSubstancesForItem, expandAiAwareFieldForItem, isAiParameterFields, isAiSetFieldLabel, stripAiSubstanceSuffix } from '@/lib/aiSubstanceFields';
-import { isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
+import { PBZ_ROWS, isPaclobutrazolItem } from '@/lib/paclobutrazolFields';
 import { PaclobutrazolGrid } from '@/components/petition/PaclobutrazolGrid';
-import { isMancozebItem } from '@/lib/mancozebFields';
+import { MCZ_SAMPLES, isMancozebItem } from '@/lib/mancozebFields';
 import { MancozebGrid } from '@/components/petition/MancozebGrid';
 import { DailyCalibrationPrefill, DAILY_CALIBRATION_LABELS } from '@/components/petition/DailyCalibrationPrefill';
 import { matchSubstanceKey } from '@/lib/substances';
@@ -533,6 +536,8 @@ export default function LabTestingDetailPage() {
   const [additionalSampleOpen, setAdditionalSampleOpen] = useState(false);
   const [calculationVariant, setCalculationVariant] = useState<LabCalculationVariant | null>(null);
   const [activeItemSeq, setActiveItemSeq] = useState<number | null>(null);
+  // มือถือ: ลำดับ Sample ที่แสดงในใบคำนวณของแต่ละรายการ (ค่าที่กรอกยังอยู่ใน values เดิม)
+  const [calcSampleIndex, setCalcSampleIndex] = useState<Record<number, number>>({});
   const pendingSample = pendingAdditionalSample(petition, 'lab');
   const roundsKey = JSON.stringify(petition?.additionalSampleRequests ?? []);
   const roundRequests = useMemo(() => JSON.parse(roundsKey) as AdditionalSampleRequest[], [roundsKey]);
@@ -1312,6 +1317,13 @@ export default function LabTestingDetailPage() {
   const labHeadOverride = isFullAccess && !!petition.labCompletedAt && petition.status !== 'rejected';
   const isLocked = (!labHeadOverride && (['approved', 'rejected'].includes(petition.status) || !!petition.labApprovedAt)) || !isAssigned || !!pendingSample || pendingDensity;
   const clearLocked = ['approved', 'rejected', 'success'].includes(petition.status) || !!petition.labApprovedAt;
+  const hasActionBar = hasLabOwnedParams && !isLocked;
+  const calcSampleCount = activeLabItem
+    ? isMancozebItem(activeLabItem.commonName) ? MCZ_SAMPLES.length : isPaclobutrazolItem(activeLabItem.commonName) ? PBZ_ROWS.length : 0
+    : 0;
+  const activeCalcIndex = activeLabItem ? Math.min(calcSampleIndex[activeLabItem.seq] ?? 0, Math.max(calcSampleCount - 1, 0)) : 0;
+  const setCalcIndexFor = (seq: number) => (index: number) => setCalcSampleIndex((prev) => (prev[seq] === index ? prev : { ...prev, [seq]: index }));
+  const showCalcNav = hasActionBar && calcSampleCount > 1;
   const hasSubmittedLab = !!petition.labCompletedAt;
   const isEditingSubmitted = hasSubmittedLab && !!petition.labEditSession;
   // บันทึกผลแล้ว = ดูอย่างเดียว จนกว่าจะกด "แก้ไข"
@@ -1350,7 +1362,7 @@ export default function LabTestingDetailPage() {
   );
 
   return (
-    <AppLayout title={petition.petitionNo}>
+    <AppLayout title={petition.petitionNo} splitList={<SplitPetitionList title="การทดสอบ Lab" basePath="/lab-testing" status="sampleSent,pendingReview,inProgress,success" labPending />}>
       <div className={`space-y-6 pb-20 ${flashClass}`}>
         {/* Header */}
         <PageHeader
@@ -1452,7 +1464,7 @@ export default function LabTestingDetailPage() {
                     type="button"
                     onClick={() => navigate(`/lab-testing/${p._id}`, { state: { petition: p } })}
                     className={cn(
-                      'shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border transition-colors',
+                      'shrink-0 inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-1 text-sm border transition-colors md:min-h-0 md:px-3 md:text-xs',
                       isActive
                         ? 'bg-primary text-primary-foreground border-primary cursor-default'
                         : 'bg-card text-card-foreground border-border hover:border-primary/40 hover:bg-accent',
@@ -1491,6 +1503,7 @@ export default function LabTestingDetailPage() {
                 type="button"
                 role="tab"
                 size="sm"
+                className="h-11 md:h-9"
                 variant={item.seq === (activeItemSeq ?? labItems[0].seq) ? 'default' : 'outline'}
                 onClick={() => setActiveItemSeq(item.seq)}
               >
@@ -1911,6 +1924,9 @@ export default function LabTestingDetailPage() {
                                       onChange={onMczChange}
                                       disabled={fieldDisabled}
                                       density={aiDensity(srcValues, condCtx, 'mancozeb', densityEntries, hasSgParam)}
+                                      mobileIndex={calcSampleIndex[item.seq] ?? 0}
+                                      onMobileIndexChange={setCalcIndexFor(item.seq)}
+                                      mobileInlineNav={!hasActionBar}
                                     />
                                     {mczAiFields.length > 0 && (
                                       <section className="space-y-3 rounded-lg border border-teal-200 border-l-4 border-l-teal-400 bg-teal-50 p-3 shadow-sm dark:bg-teal-950/60">
@@ -1961,6 +1977,9 @@ export default function LabTestingDetailPage() {
                                       petitionId={String(petition._id ?? '')}
                                       density={aiDensity(srcValues, condCtx, 'paclobutrazol', densityEntries, hasSgParam)}
                                       analyst={user?.name}
+                                      mobileIndex={calcSampleIndex[item.seq] ?? 0}
+                                      onMobileIndexChange={setCalcIndexFor(item.seq)}
+                                      mobileInlineNav={!hasActionBar}
                                       header={{
                                         sampleNo: itemSubmissionNoText(petition, item, 'lab') || petition.petitionNo,
                                         tradeName: item.sampleName,
@@ -2429,8 +2448,34 @@ export default function LabTestingDetailPage() {
         )}
 
         {/* Action buttons stay available until Lab approval. */}
-        {hasLabOwnedParams && !isLocked && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 py-3 border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+        {hasActionBar && (
+          <div className="fixed bottom-[var(--mobile-bottom-nav-h,0px)] left-0 right-0 z-50 md:bottom-0 md:left-[var(--app-sidebar-w)] px-4 sm:px-6 py-3 border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+            {showCalcNav && activeLabItem && (
+              <Button
+                type="button"
+                variant="outline"
+                className="order-first flex-1 gap-1 px-2 md:hidden"
+                aria-label="Sample ก่อนหน้า"
+                disabled={activeCalcIndex === 0}
+                onClick={() => setCalcIndexFor(activeLabItem.seq)(activeCalcIndex - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span className="truncate"><span className="hidden min-[430px]:inline">Sample </span>ก่อนหน้า</span>
+              </Button>
+            )}
+            {showCalcNav && activeLabItem && (
+              <Button
+                type="button"
+                variant="outline"
+                className="order-last flex-1 gap-1 px-2 md:hidden"
+                aria-label="Sample ถัดไป"
+                disabled={activeCalcIndex >= calcSampleCount - 1}
+                onClick={() => setCalcIndexFor(activeLabItem.seq)(activeCalcIndex + 1)}
+              >
+                <span className="truncate"><span className="hidden min-[430px]:inline">Sample </span>ถัดไป</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            )}
             {abnormalCount > 0 && labReceivedAt(petition) && (
               <Button variant="outline" onClick={() => setAdditionalSampleOpen(true)} disabled={submitting || additionalSampleOpen || loadedResultsKey !== resultsKey}>ขอตัวอย่างเพิ่ม</Button>
             )}

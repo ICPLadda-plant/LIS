@@ -9,6 +9,10 @@ vi.mock("@/components/lis/AppSidebar", () => ({
   default: () => <aside data-testid="app-sidebar" />,
 }));
 
+vi.mock("@/components/lis/MobileBottomNav", () => ({
+  default: () => <nav data-testid="mobile-bottom-nav" />,
+}));
+
 vi.mock("@/components/lis/NotificationBell", () => ({
   default: () => <button type="button" aria-label="Notifications" />,
 }));

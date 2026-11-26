@@ -191,6 +191,26 @@
   }
 
   /*
+    ขยายพื้นที่กดให้อย่างน้อย 44x44px เฉพาะจอสัมผัส (pointer: coarse)
+    ใช้ pseudo-element ที่มองไม่เห็น หน้าตาและ layout ไม่เปลี่ยน ทั้งบนจอสัมผัสและ desktop
+    element ที่ตั้ง position เองอยู่แล้ว (absolute/fixed/sticky) ไม่ถูกเปลี่ยนเป็น relative
+  */
+  @media (pointer: coarse) {
+    .touch-hit:where(:not(.absolute, .fixed, .sticky)) {
+      position: relative;
+    }
+    .touch-hit::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  /*
     Legacy dark-mode bridge:
     หลายหน้ารุ่นเก่ายังใช้สีคงที่เช่น bg-white, text-grey-* และ bg-slate-*.
     ใน dark mode ให้ map สีเหล่านี้กลับเข้า token กลาง เพื่อกันข้อความจาง/พื้นขาวหลุดธีมทุกหน้า.
@@ -336,3 +356,11 @@
   .doc-page, .doc-page * { visibility: visible; }
   .doc-page { position: absolute; left: 0; top: 0; background-image: none; }
 }
+
+/* ponytail: sidebar widths mirror AppSidebar (rail 80px <1024, 288px >=1024); move to AppLayout state if widths become dynamic */
+:root { --mobile-bottom-nav-h: calc(52px + env(safe-area-inset-bottom)); --app-sidebar-w: 0px; }
+@media (min-width: 768px) { :root { --mobile-bottom-nav-h: 0px; --app-sidebar-w: 80px; } }
+@media (min-width: 1280px) { :root { --app-sidebar-w: 18rem; } }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+

@@ -309,14 +309,15 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
 
 // GET /api/qc-results/daily-calibration
 // ค่า r / Mid-level Standard / CCS Conc. ที่กรอกไว้แล้วในวันนี้ (เวลาไทย) — ครั้งแรกของวันต้องกรอกเอง
-// คืน { [label]: { any, bySubstance: { [สาร]: ค่า } } } โดยเลือกค่าล่าสุด
+// คืน { [label]: { any, bySubstance: { [สาร]: ค่า } } } โดยเลือกค่าแรกของวัน (ผลที่เริ่มกรอกวันนี้ เรียงเก่าสุดก่อน)
 router.get("/daily-calibration", async (req, res) => {
   try {
     const AREA_LABELS = ["Area Inj.1", "Area Inj.2", "Area Inj.3"];
     const LABELS = ["ค่า Correlation coefficient ( r ) ที่ได้", "Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", ...AREA_LABELS];
     const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
     const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
-    const docs = await QCTestResult.find({ updatedAt: { $gte: dayStart } }).sort({ updatedAt: -1 }).select("values commonName petitionId itemSeq").limit(300).lean();
+    // ใช้ enteredAt: ผลเก่าที่แค่ถูกแก้วันนี้ (updatedAt) ต้องไม่ถูกนับเป็นค่าของวันนี้
+    const docs = await QCTestResult.find({ enteredAt: { $gte: dayStart } }).sort({ enteredAt: 1 }).select("values commonName petitionId itemSeq").limit(300).lean();
     // ผลฝั่ง Lab มักไม่ได้บันทึก commonName → ดึงจากรายการในคำร้องแทน
     const missingIds = [...new Set(docs.filter((d) => !d.commonName && d.petitionId).map((d) => String(d.petitionId)))]
       .filter((id) => mongoose.Types.ObjectId.isValid(id));

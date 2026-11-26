@@ -636,6 +636,42 @@ function AssignBoard({
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overEmployee, setOverEmployee] = useState<string | null>(null);
   const [overPool, setOverPool] = useState(false);
+  // มือถือ/iPad ลากยาก: แตะการ์ดแล้วเลือกคนจากรายชื่อ 2 คอลัมน์แทน
+  const isTouch = useMemo(() => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches, []);
+  const [pickingId, setPickingId] = useState<string | null>(null);
+  const renderPicker = (petition: Petition) => {
+    if (!isTouch || !canAssign || pickingId !== petition._id) return null;
+    return (
+      <div className="mt-2 grid grid-cols-2 gap-1.5" onClick={(e) => e.stopPropagation()}>
+        {columns.filter((c) => c.employeeId !== petition.assignedTo?.employeeId).map((c) => (
+          <Button
+            key={c.employeeId}
+            size="sm"
+            variant="outline"
+            className="h-10 justify-start truncate px-2 text-xs"
+            onClick={() => { onDropPetition(petition._id, c.employeeId); setPickingId(null); }}
+          >
+            {c.name}
+          </Button>
+        ))}
+        {petition.assignedTo && !petition.assignedTo.acceptedAt && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="col-span-2 h-10 text-xs"
+            onClick={() => { onUnassignPetition(petition._id); setPickingId(null); }}
+          >
+            คืนไปงานรอมอบหมาย
+          </Button>
+        )}
+      </div>
+    );
+  };
+  const touchProps = (petition: Petition) => ({
+    touchPick: isTouch && canAssign,
+    onTap: () => setPickingId((cur) => (cur === petition._id ? null : petition._id)),
+    picker: renderPicker(petition),
+  });
 
   const unassigned = useMemo(() => sortAssignQueue(petitions.filter((p) => !p.assignedTo)), [petitions]);
   // แบ่ง tab ตามวันที่ส่ง: วันนี้ / พรุ่งนี้ / ค้าง (ตั้งแต่เมื่อวานลงไป)
@@ -666,6 +702,7 @@ function AssignBoard({
       onDragEnd={() => setDraggingId(null)}
       onClick={() => onPetitionClick(petition._id)}
       openOnCardClick={openCardOnClick}
+      {...touchProps(petition)}
     />
   );
 
@@ -837,7 +874,7 @@ function AssignBoard({
                         isOver ? 'border-primary/50 text-primary' : 'border-border text-muted-foreground',
                       )}
                     >
-                      {canAssign ? 'ลากงานมาวางที่นี่' : 'ยังไม่มีงาน'}
+                      {canAssign ? (isTouch ? 'แตะการ์ดงานเพื่อเลือกคน' : 'ลากงานมาวางที่นี่') : 'ยังไม่มีงาน'}
                     </div>
                   ) : (
                     assigned.map((petition) => (
@@ -853,6 +890,7 @@ function AssignBoard({
                         onClick={() => onPetitionClick(petition._id)}
                         openOnCardClick={openCardOnClick}
                         assigned
+                        {...touchProps(petition)}
                       />
                     ))
                   )}
@@ -880,6 +918,10 @@ interface PetitionCardProps {
   onClick: () => void;
   openOnCardClick?: boolean;
   assigned?: boolean;
+  /** อุปกรณ์จอสัมผัส: แตะการ์ดเพื่อเปิดรายชื่อแทนการลาก */
+  touchPick?: boolean;
+  onTap?: () => void;
+  picker?: React.ReactNode;
 }
 
 function PetitionCard({
@@ -894,6 +936,9 @@ function PetitionCard({
   onClick,
   openOnCardClick = false,
   assigned,
+  touchPick = false,
+  onTap,
+  picker,
 }: PetitionCardProps) {
   const statusCfg = labAssignBoardStatusBadge(petition, assigned);
   const showStatusBadge = hasLabTrack(petition);
@@ -907,12 +952,13 @@ function PetitionCard({
     .filter(Boolean) as string[];
   const blocked = groups.length === 0 || groups.some((g) => groupHasUnassignable(g, methodByCode));
   // เปลี่ยนผู้รับงานแล้วคนใหม่ต้องกดเริ่มงานเอง
-  const canDrag = canDragRole;
+  const canDrag = canDragRole && !touchPick;
 
   return (
     // admin คลิกขวาที่ตัวการ์ดเพื่อเปิดคำร้อง ส่วนคลิกซ้ายใช้ลาก; role อื่นเปิดจากปุ่มเลขคำร้อง
     <Card
       draggable={canDrag}
+      onClick={touchPick ? onTap : undefined}
       onContextMenu={openOnCardClick ? (e) => { e.preventDefault(); onClick(); } : undefined}
       onDragStart={(e) => {
         if (!canDrag) { e.preventDefault(); return; }
@@ -924,11 +970,12 @@ function PetitionCard({
       className={cn(
         'group rounded-lg border-border bg-card p-2.5 text-card-foreground shadow-sm transition hover:border-primary/40 hover:bg-accent/40 hover:shadow',
         canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-default',
+        touchPick && 'cursor-pointer',
         dragging && 'opacity-40',
       )}
     >
       <div className="flex items-start gap-1.5">
-        {canDragRole && (
+        {canDrag && (
           <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
         )}
         <div className="min-w-0 flex-1">
@@ -1016,7 +1063,7 @@ function PetitionCard({
             รับงาน
           </Button>
         )}
-      </div>
+      </div>{picker}
     </Card>
   );
 }

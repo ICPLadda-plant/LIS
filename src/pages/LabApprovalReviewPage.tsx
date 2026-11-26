@@ -234,7 +234,7 @@ export default function LabApprovalReviewPage() {
 
         {/* แผงตัดสิน — fixed bottom (เฉพาะผู้มีสิทธิ์ออกผล Lab) */}
         {canApproveLab && abnormalLoaded && (
-          <div className="fixed bottom-3 left-0 right-0 z-50 md:left-72 px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
+          <div className="fixed bottom-[calc(var(--mobile-bottom-nav-h,0px)+0.75rem)] left-0 right-0 z-50 md:left-[var(--app-sidebar-w)] px-4 sm:px-6 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] border-t border-border bg-background/95 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] backdrop-blur">
             <div className="flex flex-wrap items-center justify-end gap-3">
               {isOwnAnalysis && (
                 <span className="mr-auto text-sm text-muted-foreground">

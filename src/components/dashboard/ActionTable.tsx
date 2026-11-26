@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { StatusStepBadge } from "@/components/lis/StatusStepBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle } from "lucide-react";
@@ -88,11 +88,11 @@ export default function ActionTable({
                     onClick={() => navigate(`${actionPathPrefix}/${p._id}`)}
                   >
                     <TableCell>
-                      <div className="font-semibold text-primary">{p.petitionNo}</div>
+                      <div className="font-semibold text-primary whitespace-nowrap">{p.petitionNo}</div>
                       <div className="text-[11px] text-muted-foreground">{petitionDepartmentLabel(p)}</div>
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-sm">{p.submittedBy?.name ?? "-"}</TableCell>
-                    <TableCell><Badge variant={status?.variant ?? "gray-soft"}>{status?.label}</Badge></TableCell>
+                    <TableCell><StatusStepBadge label={status?.label ?? "-"} variant={status?.variant ?? "gray-soft"} status={p.status} /></TableCell>
                     <TableCell>
                       {urgent
                         ? <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600"><AlertTriangle className="h-3.5 w-3.5" /> ด่วน</span>

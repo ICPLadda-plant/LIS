@@ -8,12 +8,49 @@ import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import type { Petition } from "@/types/petition.types";
 import { fullThaiTitle } from "@/lib/labReport";
 import { formatLabSampleNo, labLabelNumbersForItems } from "@/lib/petitionSampler";
+import { ResponsiveDataTable, useViewportBand, type ResponsiveDataTableColumn } from "@/components/lis/ResponsiveDataTable";
 
 const resultItems = (petition: Petition) => (petition.items ?? [])
   .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
 
+// การ์ดบนมือถือ (< 768px): เลขที่คำร้อง + จำนวน, แผนก · ผู้นำส่ง · ผู้ทดสอบ, แล้วรายการตัวอย่าง
+const MOBILE_COLUMNS: ResponsiveDataTableColumn<Petition>[] = [
+  {
+    key: "no",
+    header: "เลขที่คำร้อง",
+    card: "title",
+    cell: (p) => <span className="whitespace-nowrap">{labLabelNumbersForItems(p, resultItems(p)).join(", ") || "-"}</span>,
+  },
+  {
+    key: "count",
+    header: "จำนวนรายการ",
+    card: "status",
+    cell: (p) => <span className="whitespace-nowrap text-xs text-muted-foreground">{resultItems(p).length} รายการ</span>,
+  },
+  { key: "dept", header: "แผนก", cell: (p) => petitionDepartmentLabel(p) },
+  { key: "submitter", header: "ผู้นำส่ง", cell: (p) => p.submittedBy?.name || "-" },
+  { key: "tester", header: "ผู้ทดสอบ", cell: (p) => fullThaiTitle(p.labCompletedBy) || "-" },
+  {
+    key: "samples",
+    header: "ตัวอย่าง",
+    card: "body",
+    cell: (p) => (
+      <div className="space-y-2">
+        {resultItems(p).map((item) => (
+          <div key={item.seq} className="min-w-0">
+            <div className="font-semibold text-primary">{formatLabSampleNo(p, item.sampleId)}</div>
+            <div className="break-words font-medium text-foreground">{item.sampleName || item.commonName || "-"}</div>
+            <div className="text-xs text-muted-foreground">Batch: {item.batchNo || "-"}</div>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+];
+
 export default function LabResults() {
   const navigate = useNavigate();
+  const band = useViewportBand();
   const [search, setSearch] = useState("");
 
   // คำร้องฝั่ง Lab ที่หัวหน้าห้องปฏิบัติการออกผลแล้ว
@@ -53,6 +90,17 @@ export default function LabResults() {
           />
         </div>
 
+        {band === "mobile" ? (
+          <ResponsiveDataTable
+            band="mobile"
+            columns={MOBILE_COLUMNS}
+            data={rows}
+            rowKey={(p) => p._id}
+            isLoading={loading}
+            emptyTitle="ยังไม่มีคำร้องที่หัวหน้า Lab ออกผล"
+            onRowClick={(p) => navigate(`/lab-results/${p._id}`)}
+          />
+        ) : (
         <div className="overflow-x-auto rounded-lg border bg-card text-card-foreground shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-muted text-left text-xs text-muted-foreground">
@@ -61,8 +109,8 @@ export default function LabResults() {
                 <th className="px-3 py-2">เลขที่ตัวอย่าง</th>
                 <th className="px-3 py-2">ชื่อยา / Batch</th>
                 <th className="px-3 py-2">แผนก / ผู้นำส่ง</th>
-                <th className="px-3 py-2">ผู้ทดสอบ</th>
-                <th className="px-3 py-2">จำนวนรายการ</th>
+                <th className="hidden px-3 py-2 lg:table-cell">ผู้ทดสอบ</th>
+                <th className="hidden px-3 py-2 lg:table-cell">จำนวนรายการ</th>
               </tr>
             </thead>
             <tbody>
@@ -78,7 +126,12 @@ export default function LabResults() {
                   onClick={() => navigate(`/lab-results/${p._id}`)}
                   className="cursor-pointer border-t border-border hover:bg-accent/60"
                 >
-                  <td className="px-3 py-2 font-medium">{labLabelNumbersForItems(p, resultItems(p)).join(", ") || "-"}</td>
+                  <td className="px-3 py-2 align-top font-medium">
+                    <span className="whitespace-nowrap">{labLabelNumbersForItems(p, resultItems(p)).join(", ") || "-"}</span>
+                    <div className="text-xs font-normal text-muted-foreground lg:hidden">
+                      {resultItems(p).length} รายการ · {fullThaiTitle(p.labCompletedBy) || "-"}
+                    </div>
+                  </td>
                   <td className="px-3 py-2 align-top">
                     <div className="space-y-2">
                       {resultItems(p).map((item) => (
@@ -86,7 +139,7 @@ export default function LabResults() {
                       ))}
                     </div>
                   </td>
-                  <td className="min-w-[260px] px-3 py-2 align-top">
+                  <td className="px-3 py-2 align-top lg:min-w-[260px]">
                     <div className="space-y-2">
                       {resultItems(p).map((item) => (
                         <div key={item.seq}>
@@ -100,13 +153,14 @@ export default function LabResults() {
                     <div>{petitionDepartmentLabel(p)}</div>
                     <div className="text-muted-foreground">{p.submittedBy?.name || "-"}</div>
                   </td>
-                  <td className="px-3 py-2">{fullThaiTitle(p.labCompletedBy) || "-"}</td>
-                  <td className="px-3 py-2">{resultItems(p).length} รายการ</td>
+                  <td className="hidden px-3 py-2 lg:table-cell">{fullThaiTitle(p.labCompletedBy) || "-"}</td>
+                  <td className="hidden px-3 py-2 lg:table-cell">{resultItems(p).length} รายการ</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </AppLayout>
   );

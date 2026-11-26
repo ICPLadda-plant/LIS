@@ -15,6 +15,7 @@ import AppLayout from '@/components/lis/AppLayout';
 import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
 import PetitionStatusTimeline from '@/components/lis/PetitionStatusTimeline';
+import StatusStepBadge from '@/components/lis/StatusStepBadge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,18 +77,21 @@ const PULL_TO_REFRESH_THRESHOLD_PX = 72;
 const SUMMARY_STATUS_GROUPS: Array<{
   key: string;
   label: string;
+  /** ป้ายสั้นบนชิปกรองมือถือ */
+  chipLabel: string;
   hint: string;
   statuses: Petition['status'][];
 }> = [
-  { key: '', label: 'ทั้งหมด', hint: 'คำร้องทั้งหมดในมุมมองนี้', statuses: [] },
-  { key: 'sampleSent', label: 'รอตรวจรับ', hint: 'งานที่ต้องรับเข้ากระบวนการ', statuses: ['sampleSent'] },
+  { key: '', label: 'ทั้งหมด', chipLabel: 'ทั้งหมด', hint: 'คำร้องทั้งหมดในมุมมองนี้', statuses: [] },
+  { key: 'sampleSent', label: 'รอตรวจรับ', chipLabel: 'รอรับ', hint: 'งานที่ต้องรับเข้ากระบวนการ', statuses: ['sampleSent'] },
   {
     key: 'pendingReview,inProgress',
     label: 'กำลังดำเนินการ',
+    chipLabel: 'ดำเนินการ',
     hint: 'งานที่กำลังตรวจวิเคราะห์',
     statuses: ['pendingReview', 'inProgress'],
   },
-  { key: 'rejected', label: 'ส่งกลับแก้ไข', hint: 'คำร้องที่รอผู้ยื่นแก้ไข', statuses: ['rejected'] },
+  { key: 'rejected', label: 'ส่งกลับแก้ไข', chipLabel: 'ส่งกลับ', hint: 'คำร้องที่รอผู้ยื่นแก้ไข', statuses: ['rejected'] },
 ];
 
 export function canUserCreatePetition(
@@ -1022,9 +1026,9 @@ export default function PetitionListPage({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-base font-semibold text-primary-500">{petition.petitionNo}</p>
+              <p className="whitespace-nowrap text-base font-semibold text-primary-500">{petition.petitionNo}</p>
               <UrgentBadge petition={petition} />
-              <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
+              <StatusStepBadge label={statusBadge.label} variant={statusBadge.variant} status={petition.status} />
               <Badge variant="blue-soft">{petitionDepartmentLabel(petition)}</Badge>
             </div>
 
@@ -1113,7 +1117,27 @@ export default function PetitionListPage({
           </div>
 
           <TabsContent value="petitions" className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div
+          role="group"
+          aria-label="กรองตามสถานะ"
+          className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-1 md:hidden"
+        >
+          {summaryCards.map((card) => (
+            <Button
+              key={card.label}
+              type="button"
+              variant={card.active ? 'default' : 'outline'}
+              aria-pressed={card.active}
+              title={card.hint}
+              onClick={() => updateParams({ status: card.key || undefined, page: undefined })}
+              className="h-11 shrink-0 rounded-full px-4"
+            >
+              {card.chipLabel}
+              <span className="font-semibold tabular-nums">{card.count}</span>
+            </Button>
+          ))}
+        </div>
+        <div className="hidden gap-3 md:grid md:grid-cols-2 lg:grid-cols-4">
           {summaryCards.map((card) => (
             <Card
               key={card.label}

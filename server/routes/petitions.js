@@ -1323,6 +1323,22 @@ router.post('/', async (req, res) => {
       adminCreator = await currentUser(req).catch(() => null);
     }
     if (body.replacePetitionNo) return await replaceProductionPetition(body, res);
+    // กันคำขอผลิตเดียวกันถูกส่งเข้า LIS ซ้ำ (เปิดลิงก์เดิม/กดย้อนกลับแล้วบันทึกอีกครั้ง) จนได้เลขคำร้องใหม่ซ้อน
+    const productionRequestNo = String(body.productionWorkflow?.requestNo || '').trim();
+    if (productionRequestNo) {
+      const duplicate = await Petition.findOne({
+        'productionWorkflow.requestNo': productionRequestNo,
+        deletedAt: null,
+        status: { $ne: 'rejected' },
+      }).select('_id petitionNo').lean();
+      if (duplicate) {
+        return res.status(409).json({
+          error: { message: `คำขอผลิต ${productionRequestNo} ส่งเข้า LIS แล้วเป็นคำร้อง ${duplicate.petitionNo} ไม่สร้างคำร้องซ้ำ` },
+          existingPetitionId: String(duplicate._id),
+          existingPetitionNo: duplicate.petitionNo,
+        });
+      }
+    }
     let revisionOf = null;
     if (body.revisionOf) {
       if (!mongoose.Types.ObjectId.isValid(body.revisionOf)) {

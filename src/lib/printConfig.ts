@@ -5,7 +5,8 @@ export type PrintOutputMode = "server" | "local";
 
 export const PAPER_SIZES: PaperSize[] = ["A4", "label-100x50", "label-65x25"];
 
-export const A4_PRINT_FONT_FAMILY = "'Sarabun', 'TH SarabunPSK', 'TH Sarabun New', 'Angsana New', 'Cordia New', Tahoma, sans-serif";
+// Angsana New ส่งไฟล์มากับระบบ (index.css) จึงแสดงเหมือนกันทั้งหน้าตัวอย่าง, Chrome และ Server
+export const A4_PRINT_FONT_FAMILY = "'Angsana New', 'TH SarabunPSK', 'TH Sarabun New', 'Cordia New', Tahoma, sans-serif";
 export const A4_PRINT_FONT_SIZE = "16pt";
 export const A4_PRINT_HEADING_FONT_WEIGHT = "700";
 
