@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
+import SplitPetitionList from '@/components/lis/SplitPetitionList';
 import LabReasonDialog from '@/components/petition/LabReasonDialog';
 import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
@@ -1361,7 +1362,7 @@ export default function LabTestingDetailPage() {
   );
 
   return (
-    <AppLayout title={petition.petitionNo}>
+    <AppLayout title={petition.petitionNo} splitList={<SplitPetitionList title="การทดสอบ Lab" basePath="/lab-testing" status="sampleSent,pendingReview,inProgress,success" labPending />}>
       <div className={`space-y-6 pb-20 ${flashClass}`}>
         {/* Header */}
         <PageHeader

@@ -7,6 +7,7 @@ import MobileBottomNav from "@/components/lis/MobileBottomNav";
 import NotificationBell from "@/components/lis/NotificationBell";
 import UserProfileMenu from "@/components/lis/UserProfileMenu";
 import { cn } from "@/lib/utils";
+import { useIsTabletLandscape } from "@/hooks/use-mobile";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -18,6 +19,8 @@ interface AppLayoutProps {
   mainClassName?: string;
   /** Use `h-screen` (fixed height) instead of `min-h-screen` — for pages that manage their own internal scroll */
   fixedHeight?: boolean;
+  /** รายการฝั่งซ้ายของ split view — แสดงเฉพาะ iPad แนวนอน (1024–1279) */
+  splitList?: ReactNode;
 }
 
 /**
@@ -33,8 +36,12 @@ const AppLayout = ({
   className,
   mainClassName,
   fixedHeight = false,
+  splitList,
 }: AppLayoutProps) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // iPad แนวนอน: ย่อเมนูข้างเป็น rail มีชื่อ เพื่อเหลือที่ให้ split view
+  const isTabletLandscape = useIsTabletLandscape();
+  const showSplit = isTabletLandscape && !!splitList;
 
   return (
     <div
@@ -52,7 +59,7 @@ const AppLayout = ({
           the toggle button's overhang — making the arrow look "sunk". Keep
           overflow visible so the overhanging round toggle is not clipped. */}
       <div className="hidden md:flex print:hidden sticky top-0 z-40 h-dvh self-start overflow-visible">
-        <AppSidebar variant="desktop" />
+        <AppSidebar variant="desktop" {...(isTabletLandscape ? { labeledRail: true, autoCollapse: true } : {})} />
       </div>
 
       {/* Mobile topbar — fixed at top, only on <md */}
@@ -111,9 +118,16 @@ const AppLayout = ({
           <UserProfileMenu />
         </header>
 
+        {showSplit && (
+          <aside className="hidden lg:flex print:hidden fixed top-12 bottom-0 left-20 z-20 w-80 flex-col border-r border-border bg-card">
+            {splitList}
+          </aside>
+        )}
+
         <main
           className={cn(
             "flex-1 min-w-0",
+            showSplit && "lg:ml-80",
             fixedHeight && "flex flex-col overflow-hidden",
             mainClassName ?? "p-4 sm:p-6 overflow-auto",
           )}

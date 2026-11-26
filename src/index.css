@@ -360,7 +360,7 @@
 /* ponytail: sidebar widths mirror AppSidebar (rail 80px <1024, 288px >=1024); move to AppLayout state if widths become dynamic */
 :root { --mobile-bottom-nav-h: calc(52px + env(safe-area-inset-bottom)); --app-sidebar-w: 0px; }
 @media (min-width: 768px) { :root { --mobile-bottom-nav-h: 0px; --app-sidebar-w: 80px; } }
-@media (min-width: 1024px) { :root { --app-sidebar-w: 18rem; } }
+@media (min-width: 1280px) { :root { --app-sidebar-w: 18rem; } }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 

@@ -4,6 +4,7 @@ import { useParams, useNavigate, Navigate, useLocation, useSearchParams } from '
 import { FlaskConical, CheckCircle2, Loader2, AlertCircle, AlertTriangle, RotateCcw, Save, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import AppLayout from '@/components/lis/AppLayout';
+import SplitPetitionList from '@/components/lis/SplitPetitionList';
 import { mergeQcLabDuplicateItems, qcSideItems } from '@/lib/petitionRouting';
 import PageHeader from '@/components/lis/PageHeader';
 import { usePetition, usePetitionList } from '@/hooks/usePetition';
@@ -1149,7 +1150,7 @@ export default function QCTestingDetailPage() {
   const hasSubmittedQc = !!petition.qcCompletedAt;
 
   return (
-    <AppLayout title={petition.petitionNo}>
+    <AppLayout title={petition.petitionNo} splitList={<SplitPetitionList title="การทดสอบ QC" basePath="/qc-testing" status="sampleSent,pendingReview,inProgress,success" />}>
     <div className={`space-y-6 pb-20 ${flashClass}`}>
       {/* Header */}
       <PageHeader

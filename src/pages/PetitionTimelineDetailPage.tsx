@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Activity, CalendarClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileCheck2, FileText, FlaskConical, ImageIcon, ListTodo, Printer, RefreshCw, UserRound } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
+import SplitPetitionList from "@/components/lis/SplitPetitionList";
 import PageHeader from "@/components/lis/PageHeader";
 import PrintPreviewDialog from "@/components/lis/PrintPreviewDialog";
 import LabResultReportTemplate, { LAB_REPORT_CSS } from "@/components/petition/LabResultReportTemplate";
@@ -550,7 +551,7 @@ export default function PetitionTimelineDetailPage() {
     if (await loadDocumentData()) setOpen(true);
   }
 
-  return <AppLayout title={`Timeline ${petition.petitionNo}`}><div className="space-y-4">
+  return <AppLayout title={`Timeline ${petition.petitionNo}`} splitList={<SplitPetitionList title="รายการคำร้อง" basePath="/petition" />}><div className="space-y-4">
     <style>{`@keyframes timeline-shimmer{0%{transform:translateX(-120%)}100%{transform:translateX(220%)}}`}</style>
     <PageHeader title="" onBack={() => navigate("/petition")} actions={<Button variant="primary-outline" size="sm" onClick={refreshTimeline}><RefreshCw className="h-4 w-4" />รีเฟรช</Button>} />
 
