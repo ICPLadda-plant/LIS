@@ -1,0 +1,30 @@
+name: Sync main into branches
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest   # ใช้ self-hosted ได้ถ้าต้องการ
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge main into every branch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          for b in $(git branch -r | grep -v 'origin/main' | grep -v HEAD | sed 's|origin/||'); do
+            echo "== $b =="
+            git checkout -B "$b" "origin/$b"
+            if git merge --no-edit origin/main; then
+              git push origin "$b"
+            else
+              echo "Conflict on $b, skipping"
+              git merge --abort
+            fi
+          done
