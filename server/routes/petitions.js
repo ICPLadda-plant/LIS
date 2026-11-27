@@ -1737,7 +1737,8 @@ router.patch('/:id/assign', serializePetitionWrite(async (req, res) => {
       }
     }
 
-    await setLabSampleNumbers(doc, req.body?.sampleNumbers);
+    // เลขตัวอย่างเลือกตอนสแกนรับ — assign ก่อนได้
+    if (req.body?.sampleNumbers) await setLabSampleNumbers(doc, req.body.sampleNumbers);
 
     await applyLabAssignment(doc, { employeeId, name, department, position }, machines, {
       actor: user.name || user.email,
@@ -1794,6 +1795,9 @@ router.post('/:id/accept', serializePetitionWrite(async (req, res) => {
     if (assignee.acceptedAt) return res.json(doc);
     if (labNotReceived(doc)) {
       return res.status(409).json({ error: { message: 'Lab ต้องรับตัวอย่างก่อนจึงจะเริ่มงานได้' } });
+    }
+    if (labItems(doc).some((item) => !isValidLabSampleNumber(String(item.sampleId || '').trim(), doc.adminOnly))) {
+      return res.status(409).json({ error: { message: 'กรุณาสแกนรับตัวอย่างและเลือกเลขตัวอย่างก่อนเริ่มงาน' } });
     }
     const name = user.name || user.email;
     const employeeId = user.employeeId || (!user._id ? String(req.body?.employeeId || '').trim() : '');
@@ -1884,7 +1888,7 @@ router.post('/:id/claim', serializePetitionWrite(async (req, res) => {
       return res.status(409).json({ error: { message: `มีผู้รับงานนี้แล้ว (${doc.assignedTo.name})` } });
     }
 
-    await setLabSampleNumbers(doc, req.body?.sampleNumbers);
+    if (req.body?.sampleNumbers) await setLabSampleNumbers(doc, req.body.sampleNumbers);
 
     const name = user.name || user.email;
     await applyLabAssignment(doc, {

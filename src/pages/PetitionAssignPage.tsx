@@ -41,10 +41,6 @@ function isValidLabSampleNumber(sampleId: string | undefined, adminOnly?: boolea
   return /^\d+$/.test(value) && Number(value) >= 3450;
 }
 
-function hasValidLabSampleNumbers(petition: Petition) {
-  return (petition.items ?? []).filter(shouldSendItemToLab).every((item) => isValidLabSampleNumber(item.sampleId, petition.adminOnly));
-}
-
 /** คิวรอมอบหมาย: งานด่วน/Re-check ขึ้นก่อน แล้วเรียงตามวันที่สร้างคำขอ (ใหม่ → เก่า) */
 function sortAssignQueue(petitions: Petition[]): Petition[] {
   return [...petitions].sort((a, b) => {
@@ -190,7 +186,6 @@ export default function PetitionAssignPage() {
   const [search, setSearch] = useState('');
   const [scanOpen, setScanOpen] = useState(false);
   // เลือกคนแล้วแต่ยังไม่มีเลขตัวอย่าง: เปิดหน้ารับตัวอย่างให้ใส่เลข แล้ว assign ต่อให้อัตโนมัติ
-  const [pendingAssign, setPendingAssign] = useState<{ petitionId: string; petitionNo: string; employeeId: string } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -384,11 +379,6 @@ export default function PetitionAssignPage() {
     if (savingId) return;
     const petition = allPetitions.find((p) => p._id === petitionId);
     if (!petition) return;
-    if (!hasValidLabSampleNumbers(petition)) {
-      toast.info('กรุณาใส่เลขตัวอย่างก่อน Assign');
-      setPendingAssign({ petitionId, petitionNo: petition.petitionNo, employeeId });
-      return;
-    }
     void assignPetition(petition, employeeId);
   }
 
@@ -396,10 +386,6 @@ export default function PetitionAssignPage() {
     if (savingId) return;
     const petition = allPetitions.find((p) => p._id === petitionId);
     if (!petition) return;
-    if (!hasValidLabSampleNumbers(petition)) {
-      toast.error('กรุณาใส่เลขตัวอย่างก่อนรับงาน');
-      return;
-    }
     void assignPetition(petition, selfEmployee?.employeeId ?? '', true);
   }
 
@@ -427,19 +413,11 @@ export default function PetitionAssignPage() {
   return (
     <AppLayout>
         <LabScanAcceptModal
-          open={scanOpen || !!pendingAssign}
-          initialCode={pendingAssign?.petitionNo}
-          editSampleNumbers={!!pendingAssign}
+          open={scanOpen}
           pendingPetitions={awaitingReceive}
-          onClose={() => { setScanOpen(false); setPendingAssign(null); }}
-          onAccepted={(accepted?: Petition) => {
+          onClose={() => setScanOpen(false)}
+          onAccepted={() => {
             setScanOpen(false);
-            const pending = pendingAssign;
-            setPendingAssign(null);
-            if (pending && accepted?._id === pending.petitionId && hasValidLabSampleNumbers(accepted)) {
-              void assignPetition(accepted, pending.employeeId);
-              return;
-            }
             refreshPetitions();
           }}
         />
@@ -447,7 +425,7 @@ export default function PetitionAssignPage() {
           <PageHeader
             title={adminOnlyMode ? 'Assign คำร้องเฉพาะ Admin' : 'Assign คำร้องให้เจ้าหน้าที่'}
             description={canManage
-              ? 'รับตัวอย่างและเลือกเลขตัวอย่าง จากนั้นลากคำร้องไปวางบนเจ้าหน้าที่'
+              ? 'ลากคำร้องไปวางบนเจ้าหน้าที่ได้เลย เลขตัวอย่างเลือกตอนสแกนรับตัวอย่าง'
               : canClaim
                 ? 'ช่วงมอบหมายอิสระ: กด "รับงาน" ที่คำร้องเพื่อรับงานนั้นเป็นของคุณ แล้วเลือกเครื่องตอนกดเริ่มงาน'
                 : 'ดูการมอบหมายงาน Lab ได้อย่างเดียว หัวหน้า Lab เป็นผู้มอบหมายงาน'}
