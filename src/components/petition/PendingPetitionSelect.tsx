@@ -4,7 +4,7 @@ import type { SampleLabelSide } from '@/lib/petitionSampler';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Props {
-  /** คำร้องที่ยังรอรับ — เรียงตามลำดับที่ต้องการแสดง (งานด่วนก่อน) */
+  /** คำร้องที่ยังรอรับ — component เรียงงานที่มาล่าสุดขึ้นก่อนเอง */
   petitions: Petition[];
   onPick: (petitionNo: string) => void;
   placeholder?: string;
@@ -23,7 +23,8 @@ function batchInfo(p: Petition, key: string): string {
 
 /** Dropdown เลือกงานที่รอรับ ใช้คู่กับช่องพิมพ์เลขและการสแกน QR ใน popup รับงาน */
 export default function PendingPetitionSelect({ petitions, onPick, placeholder, side }: Props) {
-  const options = petitions.flatMap((p) => {
+  const newestFirst = [...petitions].sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')));
+  const options = newestFirst.flatMap((p) => {
     const labels = side ? pendingSideLabels(p, side) : [];
     if (!labels.length) return [{ key: p._id, value: p.petitionNo, title: p.petitionNo, info: batchInfo(p, '') }];
     return labels.map((label) => ({ key: p._id + ':' + label.label, value: label.label, title: label.label, info: batchInfo(p, label.key) }));
