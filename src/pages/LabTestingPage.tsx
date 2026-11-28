@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react';
-import { formatSendDayKey, isVisibleInAssignQueue, splitPetitionBySendDay, type SendDayPetition } from '@/lib/petitionQueueVisibility';
+import { formatSendDayKey, isVisibleInAssignQueue, petitionSendDayKey, splitPetitionBySendDay, type SendDayPetition } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import LabStartWorkDialog from '@/components/petition/LabStartWorkDialog';
 import { isFreeAssignActive, type LabFreeAssignState } from '@/lib/labFreeAssign';
@@ -61,6 +61,7 @@ export default function LabTestingPage() {
   const assignedToNames = !isFullAccess ? assigneeNamesForUser(user) : undefined;
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState<PetitionDept | ''>('');
+  const [sendDate, setSendDate] = useState('');
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [search, dept]);
   const [labParameters, setLabParameters] = useState<Awaited<ReturnType<typeof api.getParameters>>>([]);
@@ -193,6 +194,7 @@ export default function LabTestingPage() {
     .filter((p) => !isLabAwaitingSgConfirmation(p))
     .filter((p) => hasAssignableLabParameter(p, labParameters, groupMembership))
     .filter((p) => labItemsFor(p).length > 0)
+    .filter((p) => !sendDate || (p.sendDayKey ?? petitionSendDayKey(p)) === sendDate)
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
     // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
     .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p)));
@@ -478,6 +480,14 @@ export default function LabTestingPage() {
             placeholder: 'ค้นหาเลขที่คำร้อง / ชื่อตัวอย่าง...',
           }}
           filters={
+            <>
+            <input
+              type="date"
+              value={sendDate}
+              onChange={(e) => setSendDate(e.target.value)}
+              aria-label="กรองตามวันที่ส่งตัวอย่าง"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            />
             <Select value={dept || 'all'} onValueChange={(v) => setDept(v === 'all' ? '' : (v as PetitionDept))}>
               <SelectTrigger className="w-44">
                 <SelectValue placeholder="ทุกแผนก" />
@@ -489,6 +499,7 @@ export default function LabTestingPage() {
                 <SelectItem value="fg">{PETITION_DEPT_LABELS.fg}</SelectItem>
               </SelectContent>
             </Select>
+            </>
           }
         />
 
