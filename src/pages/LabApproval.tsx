@@ -16,10 +16,16 @@ import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import { fullThaiTitle } from "@/lib/labReport";
-import { formatLabSampleNo, labLabelNumbersForItems } from "@/lib/petitionSampler";
+import { formatLabSampleNo, itemSampleLabelNumbers, labLabelNumbersForItems } from "@/lib/petitionSampler";
 
 export const labApprovalItems = (petition: Petition) => (petition.items ?? [])
-  .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
+  .filter((item) => shouldSendItemToLab(item));
+
+// ใบเก่าที่ยังไม่มีเลขตัวอย่าง Lab ให้แสดงเลขใบนำส่ง เช่น L20/69 แทน
+export const labApprovalSampleNo = (petition: Petition, item: Petition["items"][number]) =>
+  item.sampleId?.trim()
+    ? formatLabSampleNo(petition, item.sampleId)
+    : itemSampleLabelNumbers(petition, item, ["lab"])[0] ?? "-";
 
 // ชื่อยาเดียวกัน (ตัดวงเล็บท้าย เช่น (GREEN)/(BLUE)) รวมเป็นแถวเดียว ไม่สน batch/คำร้อง
 export const labApprovalNameKey = (petition: Petition) => [...new Set(labApprovalItems(petition)
@@ -142,7 +148,7 @@ const LabApproval = () => {
         <div className="space-y-2">
           {labApprovalItems(p).map((item) => (
             <div key={item.seq} className="font-semibold text-primary">
-              {formatLabSampleNo(p, item.sampleId)}
+              {labApprovalSampleNo(p, item)}
             </div>
           ))}
         </div>
