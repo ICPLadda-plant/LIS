@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +46,13 @@ const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
   updatedDate: config.updatedDate,
   brand: config.brand,
   model: config.model,
+});
+const emptyForm = (): FormState => ({
+  baselineValues: Array(20).fill(""),
+  nominal: "",
+  updatedDate: "",
+  brand: "",
+  model: "",
 });
 
 /** "" → null, ข้อความที่ไม่ใช่ตัวเลข → NaN (ให้ validate แจ้งเตือน) */
@@ -129,6 +136,7 @@ export default function BalanceControlConfigDialog({
     }
     mutation.mutate(input);
   };
+  const handleClear = () => setForm(emptyForm());
 
   const setBaselineValue = (index: number) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({
@@ -220,6 +228,10 @@ export default function BalanceControlConfigDialog({
         </div>
 
         <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" className="gap-2" onClick={handleClear} disabled={mutation.isPending}>
+            <Trash2 className="h-4 w-4" />
+            ล้างค่าทั้งหมด
+          </Button>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
             ยกเลิก
           </Button>

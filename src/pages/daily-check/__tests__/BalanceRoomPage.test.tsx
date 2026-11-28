@@ -267,6 +267,34 @@ describe("BalanceRoomPage", () => {
     expect(input.sd).toBeGreaterThan(0);
   });
 
+  it("clears every control field", async () => {
+    apiMock.getBalanceControlConfigs.mockResolvedValue([{
+      scaleId: "scale-1",
+      brand: "Sartorius",
+      model: "CPA225D",
+      weightCode: "",
+      nominal: 10,
+      mean: 10,
+      sd: 0.001,
+      baselineValues: Array(20).fill(10),
+      updatedDate: "2026-11-18",
+    }]);
+    renderPage();
+    await screen.findByText("Sartorius");
+    fireEvent.click(screen.getByRole("button", { name: "แก้ไขค่า Control" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "ล้างค่าทั้งหมด" }));
+
+    Array.from({ length: 20 }, (_, index) =>
+      expect(screen.getByLabelText(`ค่าบันทึกที่ ${index + 1}`)).toHaveValue(""),
+    );
+    ["น้ำหนักตุ้ม Daily check (g)", "วันที่ปรับปรุงค่า Control", "ยี่ห้อ", "รุ่น"].forEach((label) =>
+      expect(screen.getByLabelText(label)).toHaveValue(""),
+    );
+    ["Mean (g)", "STD (g)"].forEach((label) => expect(screen.getByLabelText(label)).toHaveValue("—"));
+    localStorage.removeItem("balance-control-draft:scale-1:10");
+  });
+
   it("shows recorded values before control limits are configured", async () => {
     apiMock.getDailyChecks.mockImplementation((params?: { from?: string }) =>
       Promise.resolve(params?.from ? [{
