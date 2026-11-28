@@ -455,12 +455,12 @@ export default function PetitionAssignPage() {
               </CardHeader>
               <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
                 <div className="rounded-xl bg-muted px-3 py-3">
-                  <p className="font-medium text-foreground">1. รับตัวอย่าง Lab</p>
-                  <p className="mt-1 text-xs">สแกน QR หรืออ่านเลขใต้ QR แล้วเลือกเลขตัวอย่างในหน้ารับงาน</p>
+                  <p className="font-medium text-foreground">1. เลือกผู้รับงาน</p>
+                  <p className="mt-1 text-xs">ลากคำร้องไปวางบนการ์ดเจ้าหน้าที่ได้ทันที ไม่ต้องรอรับตัวอย่าง</p>
                 </div>
                 <div className="rounded-xl bg-muted px-3 py-3">
-                  <p className="font-medium text-foreground">2. เลือกผู้รับงาน</p>
-                  <p className="mt-1 text-xs">ลากคำร้องที่รับตัวอย่างแล้วไปวางบนการ์ดเจ้าหน้าที่</p>
+                  <p className="font-medium text-foreground">2. รับตัวอย่าง Lab</p>
+                  <p className="mt-1 text-xs">สแกน QR หรืออ่านเลขใต้ QR แล้วเลือกเลขตัวอย่างในหน้ารับงาน</p>
                 </div>
                 <div className="rounded-xl bg-muted px-3 py-3">
                   <p className="font-medium text-foreground">3. เริ่มงานและเลือกเครื่อง</p>

@@ -140,14 +140,15 @@ function withCurrentStep(steps: PetitionStatusStep[]): PetitionStatusStep[] {
 
 /**
  * Timeline เฉพาะ track Lab สำหรับหน้า /lab-testing:
- *   รับตัวอย่าง → Assign → Lab → ออกผล Lab
+ *   Assign → รับตัวอย่าง → Lab → ออกผล Lab
+ * มอบหมายงานได้ก่อนรับตัวอย่าง (เลือกเลขตัวอย่างตอนสแกนรับ) จึงวาง Assign ไว้ก่อน
  * step กลางนับ done เมื่อ field ตัวเองมีหรือใบปิดแล้ว; step ออกผลผูกกับ labApprovedAt ล้วน
  */
 export function labTrackStatusSteps(petition: Petition): PetitionStatusStep[] {
   const closed = isClosedStatus(petition.status);
   return withCurrentStep([
-    { key: 'received', label: 'รับตัวอย่าง', done: !!labReceivedAt(petition) || closed },
     { key: 'assigned', label: 'Assign', done: !!petition.assignedTo || closed },
+    { key: 'received', label: 'รับตัวอย่าง', done: !!labReceivedAt(petition) || closed },
     { key: 'lab', label: 'Lab', done: !!petition.labCompletedAt || closed },
     { key: 'lab-approval', label: 'ออกผล Lab', done: !!petition.labApprovedAt },
   ]);
