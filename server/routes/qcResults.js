@@ -313,7 +313,8 @@ router.get("/paclobutrazol-std-weights", async (req, res) => {
 router.get("/daily-calibration", async (req, res) => {
   try {
     const AREA_LABELS = ["Area Inj.1", "Area Inj.2", "Area Inj.3"];
-    const LABELS = ["ค่า Correlation coefficient ( r ) ที่ได้", "Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", ...AREA_LABELS];
+    const CONTROL_LABELS = ["Control Sample", "Control ช่วงต่ำสุด", "Control ช่วงสูงสุด"];
+    const LABELS = ["ค่า Correlation coefficient ( r ) ที่ได้", "Mid-level Standard Conc. (mg/mL)", "CCS Conc. (mg/mL)", ...AREA_LABELS, ...CONTROL_LABELS];
     const bkkNow = new Date(Date.now() + 7 * 3600 * 1000);
     const dayStart = new Date(Date.UTC(bkkNow.getUTCFullYear(), bkkNow.getUTCMonth(), bkkNow.getUTCDate()) - 7 * 3600 * 1000);
     // ใช้ enteredAt: ผลเก่าที่แค่ถูกแก้วันนี้ (updatedAt) ต้องไม่ถูกนับเป็นค่าของวันนี้
@@ -335,7 +336,7 @@ router.get("/daily-calibration", async (req, res) => {
         const label = LABELS.find((l) => l.toLowerCase() === base.trim().toLowerCase());
         if (!label) continue;
         const slot = (out[label] ??= { bySubstance: {} });
-        const isArea = AREA_LABELS.includes(label);
+        const isArea = AREA_LABELS.includes(label) || CONTROL_LABELS.includes(label);
         // Area Inj ต่างกันตามสาร → ไม่มีค่า any ใช้ได้เฉพาะสาร/ชื่อสามัญเดียวกัน
         if (!isArea) slot.any ??= value;
         const sub = (substance.trim() || (isArea ? String(doc.commonName ?? "").trim() : "")).toLowerCase();

@@ -199,11 +199,11 @@ export default function LabCalculationForm({ page, variant = "default", standard
   };
   const controlRange = control.low && control.high ? `${control.low} - ${control.high}` : control.low || control.high;
   const testedDate = name(page.sample.testedDate);
-  const isWW = isGrWpSpCommonName(page.sample.name);
+  const isWW = isGrWpSpCommonName(page.sample.name) || /\bW\s*\/\s*W\b|premix/i.test(page.sample.name ?? "");
   const isBroma = /BROMADIOLONE/i.test(page.sample.name ?? "");
   const fmtResult = isBroma ? (value: string) => value : fmtResultDecimal;
   const controlRangeText = isBroma ? controlRange : [control.low, control.high].filter(Boolean).map(fmtResultDecimal).join(" - ");
-  const densityValue = fmtDensity(firstValue(page, /density|ถ\.?\s*พ\.?/i) || (page.rows ?? []).map((row) => /Density\s*:\s*([\d.]+)/i.exec(row.result ?? "")?.[1]).find(Boolean)) || (isWW ? "-" : "");
+  const densityValue = isWW ? "-" : fmtDensity(firstValue(page, /density|ถ\.?\s*พ\.?/i) || (page.rows ?? []).map((row) => /Density\s*:\s*([\d.]+)/i.exec(row.result ?? "")?.[1]).find(Boolean));
 
   return (
     <div className="brom-form-root">
@@ -245,7 +245,7 @@ export default function LabCalculationForm({ page, variant = "default", standard
         </div>
 
         <div className="brom-form-bar">Analytical Results</div>
-        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample.map(isBroma ? fmtPrintDecimal : fmtResultDecimal)} field="sample" />
+        <Columns labels={[...sampleNos.map((n) => `%Sample ${n}`), "Average", "%RSD (ไม่เกิน 5)"]} items={sample.map((value) => isBroma ? fmtPrintDecimal(value, 5) : fmtResultDecimal(value))} field="sample" />
 
         <div className="brom-form-summary">
           <span>Average</span><span className="brom-form-line" data-field="average">{fmtResult(sampleAverage)}</span><span>%W/W</span>

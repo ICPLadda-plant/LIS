@@ -1,9 +1,12 @@
 import { useEffect, useRef } from "react";
 import { api } from "@/lib/api";
-import { aiSubstanceFromKey, calculateAi, calculateCcsFromValues, formatCalculatedAi, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL } from "@/lib/aiCalculation";
+import { aiSubstanceFromKey, calculateAi, calculateCcsFromValues, formatCalculatedAi, CCS_CONC_LABEL, CCS_DIFFERENCE_LABEL, CCS_RESULT_LABEL, CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL } from "@/lib/aiCalculation";
 
 const AREA_LABELS = ["Area Inj.1", "Area Inj.2", "Area Inj.3"];
-export const DAILY_CALIBRATION_LABELS = [CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, ...AREA_LABELS];
+const CONTROL_LABELS_LIST = [CONTROL_SAMPLE_LABEL, CONTROL_LOW_LABEL, CONTROL_HIGH_LABEL];
+// Area Inj และ Control Sample ต่างกันตามสาร จึงใช้ค่าแรกของวันเฉพาะสารเดียวกันเท่านั้น
+const SUBSTANCE_ONLY_LABELS = [...AREA_LABELS, ...CONTROL_LABELS_LIST];
+export const DAILY_CALIBRATION_LABELS = [CORRELATION_LABEL, MID_LEVEL_STANDARD_LABEL, CCS_CONC_LABEL, ...AREA_LABELS, ...CONTROL_LABELS_LIST];
 
 type Props = {
   keys: string[];
@@ -31,7 +34,7 @@ export function DailyCalibrationPrefill({ keys, values, onChange, commonName = "
       const next = { ...values };
       const filled = missing.filter((key) => {
         const slot = daily?.[baseLabel(key)];
-        const isArea = AREA_LABELS.includes(baseLabel(key));
+        const isArea = SUBSTANCE_ONLY_LABELS.includes(baseLabel(key));
         // ลองชื่อสารจาก key ก่อน แล้วค่อยใช้ชื่อสามัญเต็ม (ผล Lab ที่ไม่ได้แยกช่องตามสารจะถูกเก็บด้วยชื่อสามัญ)
         const candidates = [aiSubstanceFromKey(key), isArea ? commonName.trim().toLowerCase() : ""].filter(Boolean);
         const value = candidates.map((name) => slot?.bySubstance?.[name]).find(Boolean) ?? (isArea ? undefined : slot?.any);
