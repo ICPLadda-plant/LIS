@@ -187,6 +187,10 @@ export default function LabTestingPage() {
   }
 
   // คำร้องเดียวกันที่ส่งตัวอย่างคนละวันแยกเป็นคนละ card; ส่งวันเดียวกันรวม card เดียว
+  // เรียงจากวันที่ส่งล่าสุดไปไกลสุด (วันเดียวกันดูเวลาสร้างคำร้องล่าสุดก่อน) แล้วดันงานด่วนขึ้นบน
+  const newestFirst = (a: SendDayPetition, b: SendDayPetition) =>
+    (b.sendDayKey ?? petitionSendDayKey(b) ?? '').localeCompare(a.sendDayKey ?? petitionSendDayKey(a) ?? '')
+    || String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''));
   const petitions: SendDayPetition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
     .flatMap(splitPetitionBySendDay)
     .filter((p) => !p.labApprovedAt)
@@ -197,7 +201,8 @@ export default function LabTestingPage() {
     .filter((p) => !sendDate || (p.sendDayKey ?? petitionSendDayKey(p)) === sendDate)
     .filter((p) => isFullAccess || isAssignedTo(p.assignedTo, user))
     // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
-    .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p)));
+    .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p))
+    .sort(newestFirst));
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   // ยังวิเคราะห์อยู่ (เริ่มงานแล้ว ยังไม่ส่งผล) เปลี่ยนเครื่องได้
