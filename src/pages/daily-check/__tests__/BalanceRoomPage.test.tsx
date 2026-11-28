@@ -349,6 +349,9 @@ describe("BalanceRoomPage", () => {
     fireEvent.click(screen.getByText(/^LD-021 -/).closest("button")!);
 
     expect(await screen.findAllByRole("cell", { name: "99.9999" })).toHaveLength(4);
+    fireEvent.click(screen.getByRole("button", { name: /Print/ }));
+    const preview = await screen.findByTestId("print-preview");
+    expect(within(preview).getAllByRole("cell", { name: "99.9999" })).toHaveLength(4);
   });
 
   it("loads the selected scale records for the current month", async () => {

@@ -124,7 +124,7 @@ export default function BalanceControlChart({
   className,
 }: BalanceControlChartProps) {
   const palette = fixed ? PRINT_CHART_PALETTE : SCREEN_CHART_PALETTE;
-  const data: ChartDatum[] = series.map((point) => ({
+  const data: ChartDatum[] = series.filter((point) => point.value != null).map((point) => ({
     day: point.day,
     date: point.date,
     value: point.value,

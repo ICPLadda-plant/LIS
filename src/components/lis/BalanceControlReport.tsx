@@ -96,6 +96,7 @@ export default function BalanceControlReport({
   holidayNotes,
 }: BalanceControlReportProps) {
   const printedDate = printedAt ? `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}` : "";
+  const weightDecimals = config.nominal === 10 ? scale.decimals : scale.weights100Decimals ?? scale.decimals;
   const table = (points: MonthlyPoint<DailyCheckRecord>[]) => (
     <table className="bcr-table">
       <colgroup>
@@ -138,10 +139,10 @@ export default function BalanceControlReport({
           return (
             <tr key={point.date}>
               <td>{ddmmBE(point.date)}</td>
-              <td>{weightText(weights, 0, scale.decimals)}</td>
-              <td>{weightText(weights, 1, scale.decimals)}</td>
-              <td>{weightText(weights, 2, scale.decimals)}</td>
-              <td>{record ? formatControlNumber(config.nominal === 10 ? record.avg10 : record.avg100, scale.decimals) : ""}</td>
+              <td>{weightText(weights, 0, weightDecimals)}</td>
+              <td>{weightText(weights, 1, weightDecimals)}</td>
+              <td>{weightText(weights, 2, weightDecimals)}</td>
+              <td>{record ? formatControlNumber(config.nominal === 10 ? record.avg10 : record.avg100, weightDecimals) : ""}</td>
               <td>{resultMark(record, config.nominal)}</td>
               <td />
               <td>{firstNameOnly(record?.recorder ?? "")}</td>
