@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Petition } from "@/types/petition.types";
 import { formatLabSampleNo } from "@/lib/petitionSampler";
-import { groupLabApprovalByName, labApprovalItems, labApprovalTesterName } from "./LabApproval";
+import { groupLabApprovalByName, labApprovalItems, labApprovalSampleNo, labApprovalTesterName } from "./LabApproval";
 
 const petition = {
   sampleLabelNumbers: { year: 2569 },
@@ -23,8 +23,16 @@ describe("LabApproval list", () => {
     expect(groups.map((g) => g.map((p) => p._id))).toEqual([["a", "b"], ["c"]]);
   });
 
-  it("แสดงเฉพาะรายการที่ส่ง Lab และรับตัวอย่างแล้ว", () => {
-    expect(labApprovalItems(petition).map((item) => item.seq)).toEqual([3]);
+  it("แสดงเฉพาะรายการที่ส่ง Lab", () => {
+    expect(labApprovalItems(petition).map((item) => item.seq)).toEqual([1, 3]);
+  });
+
+  it("ไม่มีเลขตัวอย่างให้แสดงเลขใบนำส่ง L", () => {
+    const legacy = {
+      sampleLabelNumbers: { year: 2569, groups: [{ key: "B1|", lab: "L20" }] },
+      items: [{ seq: 1, batchNo: "B1", sendToLab: true }],
+    } as Petition;
+    expect(labApprovalSampleNo(legacy, legacy.items[0])).toBe("L20/69");
   });
 
   it("แสดงเลขที่ตัวอย่างพร้อมปีสองหลัก", () => {

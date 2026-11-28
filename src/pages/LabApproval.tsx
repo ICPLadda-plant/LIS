@@ -12,14 +12,19 @@ import { DataTable, type DataTableColumn } from "@/components/lis/DataTable";
 import { petitionStatusBadge } from "@/lib/statusBadge";
 import { getAiStatus, streamDraftNote } from "@/lib/aiApi";
 import { petitionDepartmentLabel } from "@/lib/petitionDepartment";
-import { isUrgentPetition } from "@/lib/urgentPetition";
 import UrgentBadge from "@/components/lis/UrgentBadge";
 import { shouldSendItemToLab } from "@/lib/petitionRouting";
 import { fullThaiTitle } from "@/lib/labReport";
-import { formatLabSampleNo, labLabelNumbersForItems } from "@/lib/petitionSampler";
+import { formatLabSampleNo, itemSampleLabelNumbers, labLabelNumbersForItems } from "@/lib/petitionSampler";
 
 export const labApprovalItems = (petition: Petition) => (petition.items ?? [])
-  .filter((item) => shouldSendItemToLab(item) && item.sampleId?.trim());
+  .filter((item) => shouldSendItemToLab(item));
+
+// ใบเก่าที่ยังไม่มีเลขตัวอย่าง Lab ให้แสดงเลขใบนำส่ง เช่น L20/69 แทน
+export const labApprovalSampleNo = (petition: Petition, item: Petition["items"][number]) =>
+  item.sampleId?.trim()
+    ? formatLabSampleNo(petition, item.sampleId)
+    : itemSampleLabelNumbers(petition, item, ["lab"])[0] ?? "-";
 
 // ชื่อยาเดียวกัน (ตัดวงเล็บท้าย เช่น (GREEN)/(BLUE)) รวมเป็นแถวเดียว ไม่สน batch/คำร้อง
 export const labApprovalNameKey = (petition: Petition) => [...new Set(labApprovalItems(petition)
@@ -37,22 +42,16 @@ export function groupLabApprovalByName(petitions: Petition[]): Petition[][] {
 
 export const labApprovalTesterName = (petition: Petition) => fullThaiTitle(petition.labCompletedBy) || "-";
 
-function priorityScore(
-  petition: Petition,
-  abnormalMap: Record<string, boolean>,
-  returnedMap: Record<string, boolean>,
-): number {
-  const deptScore = petition.dept === "rm" ? 5 : petition.dept === "fg" ? 3 : 1;
-  const isOverdue = petition.labCompletedAt
-    ? Date.now() - new Date(petition.labCompletedAt).getTime() > 24 * 60 * 60 * 1000
-    : false;
-  return (
-    (abnormalMap[petition._id] ? 30 : 0) +
-    (isOverdue ? 20 : 0) +
-    (returnedMap[petition._id] ? 10 : 0) +
-    deptScore
-  );
-}
+// วันที่ส่งตัวอย่าง (ถ้าไม่มีใช้วันที่สร้างคำร้อง) เป็น timestamp สำหรับเรียงใหม่ → เก่า
+const sampleSentTime = (petition: Petition) => {
+  const t = new Date(petition.sampleSentAt || petition.createdAt || 0).getTime();
+  return Number.isFinite(t) ? t : 0;
+};
+
+const formatSentDate = (petition: Petition) => {
+  const value = petition.sampleSentAt || petition.createdAt;
+  return value ? new Date(value).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }) : "-";
+};
 
 const LabApproval = () => {
   const navigate = useNavigate();
@@ -69,12 +68,8 @@ const LabApproval = () => {
     () =>
       [...petitions]
         .filter((petition) => labApprovalItems(petition).length > 0)
-        .sort(
-          (a, b) =>
-            Number(isUrgentPetition(b)) - Number(isUrgentPetition(a)) ||
-            priorityScore(b, abnormalMap, returnedMap) - priorityScore(a, abnormalMap, returnedMap),
-        ),
-    [petitions, abnormalMap, returnedMap],
+        .sort((a, b) => sampleSentTime(b) - sampleSentTime(a)),
+    [petitions],
   );
 
   useEffect(() => {
@@ -142,7 +137,7 @@ const LabApproval = () => {
         <div className="space-y-2">
           {labApprovalItems(p).map((item) => (
             <div key={item.seq} className="font-semibold text-primary">
-              {formatLabSampleNo(p, item.sampleId)}
+              {labApprovalSampleNo(p, item)}
             </div>
           ))}
         </div>
@@ -167,6 +162,7 @@ const LabApproval = () => {
         <div className="space-y-2">
           <Badge variant="blue-soft">{petitionDepartmentLabel(p)}</Badge>
           <div>{p.submittedBy?.name ?? "-"}</div>
+          <div className="text-xs text-muted-foreground">ส่งตัวอย่าง {formatSentDate(p)}</div>
         </div>
       ),
     },
@@ -223,7 +219,8 @@ const LabApproval = () => {
     },
   ];
 
-  const groups = groupLabApprovalByName(sortedPetitions);
+  // หนึ่งคำร้องต่อหนึ่งแถว เพื่อให้ทุกคอลัมน์ของคำร้องเดียวกันอยู่แนวเดียวกัน
+  const groups = sortedPetitions.map((p) => [p]);
   const columns: DataTableColumn<Petition[]>[] = petitionColumns.map((c) => ({
     ...c,
     cell: (g) => <div className="space-y-3">{g.map((p) => <div key={p._id}>{c.cell(p)}</div>)}</div>,

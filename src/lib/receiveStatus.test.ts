@@ -291,3 +291,13 @@ describe('qcTrackStatusSteps', () => {
     expect(qcTrackStatusSteps(p).every((s) => s.done)).toBe(true);
   });
 });
+
+import { isLabWorkAccepted } from './receiveStatus';
+describe('isLabWorkAccepted', () => {
+  it('assign แล้วแต่ยังไม่กดเริ่มงาน ไม่นับ firstResultAt', () => {
+    expect(isLabWorkAccepted({ assignedTo: { employeeId: 'E1', name: 'A' } as never, firstResultAt: '2026-11-28' } as never)).toBe(false);
+  });
+  it('กดเริ่มงานแล้วนับว่ารับงาน', () => {
+    expect(isLabWorkAccepted({ assignedTo: { employeeId: 'E1', name: 'A', acceptedAt: '2026-11-28' } as never } as never)).toBe(true);
+  });
+});

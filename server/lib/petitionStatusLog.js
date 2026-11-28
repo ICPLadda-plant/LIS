@@ -171,8 +171,10 @@ function buildCurrent(petition, qc, fieldLabels, labDone) {
       labReceived, isAssignee: assigneeSide === 'lab', assignee, started, labDone,
       labCompleted: !!petition.labCompletedAt,
       // งานเก่าก่อนมีปุ่มรับงาน: เริ่มตรวจ/บันทึกผลไปแล้วถือว่ารับงานแล้ว
-      accepted: !!assignee?.acceptedAt || !!petition.firstResultAt || !!petition.labCompletedAt
-        || (petition.reviewHistory ?? []).some((r) => r.action === 'startTesting'),
+      accepted: (assignee?.employeeId || assignee?.name)
+        ? !!assignee.acceptedAt || !!petition.labCompletedAt
+        : !!petition.firstResultAt || !!petition.labCompletedAt
+          || (petition.reviewHistory ?? []).some((r) => r.action === 'startTesting'),
       labApproved: !!petition.labApprovedAt,
       sgPending: isLabAwaitingSgConfirmation(petition),
     })
