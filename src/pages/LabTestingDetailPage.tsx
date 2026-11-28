@@ -1472,7 +1472,9 @@ export default function LabTestingDetailPage() {
                     disabled={isActive}
                   >
                     <span className={cn('h-2 w-2 rounded-full', p.status === 'inProgress' ? 'bg-amber-400' : 'bg-blue-400')} />
-                    <span className="font-semibold">{p.petitionNo}</span>
+                    <span className="font-semibold">
+                      {[...new Set((p.items ?? []).filter(shouldSendItemToLab).map((item) => itemSubmissionNoText(p, item, 'lab')).filter(Boolean))].join(', ') || p.petitionNo}
+                    </span>
                   </button>
               );
             })}
