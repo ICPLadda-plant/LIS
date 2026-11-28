@@ -304,6 +304,11 @@ router.get('/', async (req, res) => {
           { 'productionWorkflow.lisPetitionNo': rx },
           { 'submittedBy.name': rx },
           { 'items.batchNo': rx },
+          { 'items.sampleId': rx },
+          { 'items.itemNo': rx },
+          { 'items.lotNo': rx },
+          { 'items.sampleName': rx },
+          { 'items.commonName': rx },
         ],
       });
     }
@@ -384,7 +389,7 @@ router.get('/', async (req, res) => {
           { $match: { ...q, deletedAt: null } },
           ...buildSearchRankingStages(search, {
             primary: ['petitionNo'],
-            secondary: ['prodOrderNos', 'productionWorkflow.requestNo', 'productionWorkflow.lisPetitionNo', 'submittedBy.name', 'items.batchNo'],
+            secondary: ['prodOrderNos', 'productionWorkflow.requestNo', 'productionWorkflow.lisPetitionNo', 'submittedBy.name', 'items.batchNo', 'items.sampleId', 'items.itemNo', 'items.lotNo', 'items.sampleName', 'items.commonName'],
           }, { createdAt: -1 }),
           { $skip: (page - 1) * limit },
           { $limit: limit },
