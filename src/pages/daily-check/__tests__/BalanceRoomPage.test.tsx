@@ -163,6 +163,24 @@ describe("BalanceRoomPage", () => {
     expect(input).toHaveValue("99.9999");
   });
 
+  it.each([
+    ["LD-021", "scale-3"],
+    ["LD-047", "scale-4"],
+  ])("limits %s 100 g control values to four decimals", (code, scaleId) => {
+    localStorage.removeItem(`balance-control-draft:${scaleId}:100`);
+    renderPage();
+    fireEvent.click(screen.getByText(new RegExp(`^${code} -`)).closest("button")!);
+    fireEvent.click(screen.getByRole("button", { name: "ตั้งค่า 100 g" }));
+
+    const input = screen.getByLabelText("ค่าบันทึกที่ 1");
+    fireEvent.change(input, { target: { value: "99.99999" } });
+    expect(input).toHaveValue("99.9999");
+    fireEvent.blur(input);
+    expect(input).toHaveValue("99.9999");
+    expect(screen.getByLabelText("น้ำหนักตุ้ม Daily check (g)")).toHaveValue("100.0000");
+    localStorage.removeItem(`balance-control-draft:${scaleId}:100`);
+  });
+
   it("fills the selected weight with the value read from a photo", async () => {
     const { container } = renderPage();
     fireEvent.click(screen.getByRole("button", { name: "ถ่ายรูปอ่านค่าน้ำหนัก 500 กรัม ครั้งที่ 1" }));

@@ -71,21 +71,29 @@ export default function BalanceControlConfigDialog({
 }: BalanceControlConfigDialogProps) {
   const queryClient = useQueryClient();
   const storageKey = draftStorageKey(scale.id, config.nominal);
-  const [form, setForm] = useState<FormState>(() => toForm(config, scale.decimals));
+  const controlDecimals = config.nominal === scale.primaryCalibrationWeight
+    ? scale.weights100Decimals ?? scale.decimals
+    : scale.decimals;
+  const [form, setForm] = useState<FormState>(() => toForm(config, controlDecimals));
 
   useEffect(() => {
     if (!open) return;
     const saved = localStorage.getItem(storageKey);
     if (saved) {
       try {
-        setForm(JSON.parse(saved) as FormState);
+        const savedForm = JSON.parse(saved) as FormState;
+        setForm({
+          ...savedForm,
+          baselineValues: savedForm.baselineValues.map((value) => normalizedNumberText(value, controlDecimals)),
+          nominal: normalizedNumberText(savedForm.nominal, controlDecimals),
+        });
         return;
       } catch {
         localStorage.removeItem(storageKey);
       }
     }
-    setForm(toForm(config, scale.decimals));
-  }, [open, config, scale.decimals, storageKey]);
+    setForm(toForm(config, controlDecimals));
+  }, [open, config, controlDecimals, storageKey]);
 
   useEffect(() => {
     if (open) localStorage.setItem(storageKey, JSON.stringify(form));
@@ -119,7 +127,7 @@ export default function BalanceControlConfigDialog({
   const setField = (field: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   const normalizeField = (field: "nominal") => () =>
-    setForm((prev) => ({ ...prev, [field]: normalizedNumberText(prev[field], scale.decimals) }));
+    setForm((prev) => ({ ...prev, [field]: normalizedNumberText(prev[field], controlDecimals) }));
 
   const handleSave = () => {
     const error = validateBalanceControlInput(input);
@@ -138,12 +146,12 @@ export default function BalanceControlConfigDialog({
   const setBaselineValue = (index: number) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({
       ...prev,
-      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? limitDecimalPlaces(event.target.value, scale.decimals) : value),
+      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? limitDecimalPlaces(event.target.value, controlDecimals) : value),
     }));
   const normalizeBaselineValue = (index: number) => () =>
     setForm((prev) => ({
       ...prev,
-      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? normalizedNumberText(value, scale.decimals) : value),
+      baselineValues: prev.baselineValues.map((value, itemIndex) => itemIndex === index ? normalizedNumberText(value, controlDecimals) : value),
     }));
 
   const previewItems = [
