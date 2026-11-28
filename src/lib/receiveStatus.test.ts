@@ -77,6 +77,10 @@ describe('partial label receipt', () => {
     expect(isItemLabelPending(petition, petition.items[0], 'lab')).toBe(false);
     expect(isItemLabelPending(petition, petition.items[1], 'lab')).toBe(true);
   });
+
+  it('keeps the received state when a send-day card contains one received label', () => {
+    expect(hasPartialLabelReceipt({ ...petition, items: [petition.items[0]] }, 'lab')).toBe(true);
+  });
 });
 
 describe('labTrackStatusBadge', () => {

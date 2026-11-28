@@ -45,7 +45,7 @@ export function labelReceiptProgress(petition: Petition, side: SampleLabelSide):
 
 /** รับป้ายของฝั่งนี้ไปแล้วอย่างน้อยหนึ่งป้าย (ยังไม่ครบ) — เปิดงานกรอกผลของป้ายที่รับแล้วได้ */
 export function hasPartialLabelReceipt(petition: Petition, side: SampleLabelSide): boolean {
-  return !!labelReceiptProgress(petition, side)?.received;
+  return sideLabels(petition, side).some((label) => label.received);
 }
 
 /** ตัวอย่างรายการนี้ยังรอสแกนรับป้ายของฝั่งนี้ → ยังกรอกผลไม่ได้ */
