@@ -38,6 +38,8 @@ interface NotificationListProps {
   listClassName?: string;
   /** แสดงแท็บ "งานของฉัน" / "ระบบ" (ค่าเริ่มต้นเป็นงานของฉัน) — ใช้ในหน้าการแจ้งเตือนเต็ม */
   categoryTabs?: boolean;
+  /** แจ้งเมื่อสลับแท็บประเภท */
+  onCategoryChange?: (category: NotificationCategory) => void;
 }
 
 const NotificationList = ({
@@ -48,6 +50,7 @@ const NotificationList = ({
   onSeeAll,
   listClassName,
   categoryTabs = false,
+  onCategoryChange,
 }: NotificationListProps) => {
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [category, setCategory] = useState<NotificationCategory>("mine");
@@ -81,7 +84,9 @@ const NotificationList = ({
   };
 
   const changeCategory = (next: string) => {
-    setCategory(next === "system" ? "system" : "mine");
+    const value = next === "system" ? "system" : "mine";
+    setCategory(value);
+    onCategoryChange?.(value);
     setVisibleCount(pageSize ?? Infinity);
   };
 
@@ -231,3 +236,4 @@ const NotificationList = ({
 };
 
 export default NotificationList;
+

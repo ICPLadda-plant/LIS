@@ -1,14 +1,17 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Trash2 } from "lucide-react";
 import AppLayout from "@/components/lis/AppLayout";
-import NotificationList from "@/components/lis/NotificationList";
+import NotificationList, { type NotificationCategory } from "@/components/lis/NotificationList";
 import PageHeader from "@/components/lis/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/context/NotificationContext";
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markRead, markAllRead, dismiss, clearAll } = useNotifications();
+  const [category, setCategory] = useState<NotificationCategory>("mine");
+  const inCategory = (n: { group?: string }) => (category === "system") === (n.group === "system");
+  const { notifications, unreadCount, markRead, markAllRead, dismiss, clearWhere } = useNotifications();
 
   return (
     <AppLayout title="การแจ้งเตือน">
@@ -23,8 +26,8 @@ const NotificationsPage = () => {
                   <Check className="h-4 w-4" /> อ่านแล้วทั้งหมด
                 </Button>
               )}
-              {notifications.some(n => !n.pinned) && (
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive touch:h-11" onClick={clearAll}>
+              {notifications.some(n => !n.pinned && inCategory(n)) && (
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive touch:h-11" onClick={() => clearWhere(inCategory)}>
                   <Trash2 className="h-4 w-4" /> ล้าง
                 </Button>
               )}
@@ -40,6 +43,7 @@ const NotificationsPage = () => {
             }}
             onDismiss={dismiss}
             categoryTabs
+            onCategoryChange={setCategory}
           />
         </div>
       </div>
@@ -48,3 +52,4 @@ const NotificationsPage = () => {
 };
 
 export default NotificationsPage;
+
