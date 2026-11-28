@@ -72,6 +72,8 @@ function waitingReceiveBadge(p: ReceiveFields, side: 'qc' | 'lab'): StatusBadge 
 export function isLabWorkAccepted(
   p: Pick<Petition, 'assignedTo' | 'firstResultAt' | 'labCompletedAt'> & Partial<Pick<Petition, 'reviewHistory'>>,
 ): boolean {
+  // งานที่ assign แล้ว ต้องกดเริ่มงาน (acceptedAt) เอง; firstResultAt อาจมาจากการบันทึกผลฝั่ง QC/ผลทางกายภาพ จึงไม่นับ
+  if (p.assignedTo?.employeeId || p.assignedTo?.name) return !!(p.assignedTo.acceptedAt || p.labCompletedAt);
   return !!(p.assignedTo?.acceptedAt || p.firstResultAt || p.labCompletedAt)
     || (p.reviewHistory ?? []).some((r) => r.action === 'startTesting');
 }
