@@ -5,7 +5,7 @@ import { chartDomain, computeLimits, displayDigits } from "@/lib/balanceControlC
 
 // LD-005 ละเอียด 2 ตำแหน่ง → ทั้งจุดและ tick แกน Y ต้องแสดง 2 ตำแหน่ง
 describe("BalanceControlChart", () => {
-  it("shows every day at equal spacing and leaves missing days disconnected", () => {
+  it("removes days without readings and connects the remaining points", () => {
     const series = Array.from({ length: 31 }, (_, index) => ({
       day: index + 1,
       date: `2026-01-${String(index + 1).padStart(2, "0")}`,
@@ -18,8 +18,8 @@ describe("BalanceControlChart", () => {
 
     const xTicks = Array.from(container.querySelectorAll(".recharts-xAxis .recharts-cartesian-axis-tick-value"))
       .map((node) => node.textContent);
-    expect(xTicks).toEqual(Array.from({ length: 31 }, (_, index) => String(index + 1)));
-    expect(container.querySelector(".recharts-line-curve")?.getAttribute("d")?.match(/M/g)).toHaveLength(2);
+    expect(xTicks).toEqual(["1", "3"]);
+    expect(container.querySelector(".recharts-line-curve")?.getAttribute("d")?.match(/M/g)).toHaveLength(1);
   });
 
   it("adds axis decimals until every control line reads differently", () => {

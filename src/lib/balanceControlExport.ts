@@ -188,10 +188,11 @@ export function buildBalanceChartSvg(
   const right = W - 56;
   const top = 52;
   const bottom = 420;
-  const days = Math.max(series.length, 1);
+  const points = series.filter((point): point is MonthlyPoint & { value: number } => isNum(point.value));
+  const days = Math.max(points.length, 1);
   const [low, high] = domain;
   const span = high - low || 1;
-  const x = (day: number) => (days > 1 ? left + ((day - 1) / (days - 1)) * (right - left) : (left + right) / 2);
+  const x = (index: number) => (days > 1 ? left + (index / (days - 1)) * (right - left) : (left + right) / 2);
   const y = (value: number) => top + ((high - value) / span) * (bottom - top);
   const c = CHART_COLORS;
   const parts: string[] = [];
@@ -213,11 +214,11 @@ export function buildBalanceChartSvg(
 
   parts.push(`<line x1="${left}" y1="${top}" x2="${left}" y2="${bottom}" stroke="${c.axis}"/>`);
   parts.push(`<line x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" stroke="${c.axis}"/>`);
-  for (const point of series) {
-    const xx = x(point.day).toFixed(1);
+  points.forEach((point, index) => {
+    const xx = x(index).toFixed(1);
     parts.push(`<line x1="${xx}" y1="${bottom}" x2="${xx}" y2="${bottom + 5}" stroke="${c.axis}"/>`);
     parts.push(`<text x="${xx}" y="${bottom + 20}" text-anchor="middle" font-size="12" fill="${c.axis}">${point.day}</text>`);
-  }
+  });
   parts.push(
     `<text x="${(left + right) / 2}" y="${bottom + 42}" text-anchor="middle" font-size="13" fill="${c.axis}">วันที่</text>`,
   );
@@ -237,19 +238,18 @@ export function buildBalanceChartSvg(
     parts.push(`<text x="${right + 6}" y="${Number(yy) + 4}" font-size="12" fill="${stroke}">${label}</text>`);
   }
 
-  const points = series.filter((point): point is MonthlyPoint & { value: number } => isNum(point.value));
   if (points.length > 1) {
-    const path = points.map((point) => `${x(point.day).toFixed(1)},${y(point.value).toFixed(1)}`).join(" ");
+    const path = points.map((point, index) => `${x(index).toFixed(1)},${y(point.value).toFixed(1)}`).join(" ");
     parts.push(`<polyline points="${path}" fill="none" stroke="${c.value}" stroke-width="2"/>`);
   }
-  for (const point of points) {
+  points.forEach((point, index) => {
     const status = classifyPoint(point.value, limits);
     const fill = status === "out" ? c.outDot : status === "warning" ? c.warningDot : c.value;
     const radius = status === "in" ? 3.5 : 5;
     parts.push(
-      `<circle cx="${x(point.day).toFixed(1)}" cy="${y(point.value).toFixed(1)}" r="${radius}" fill="${fill}" stroke="#ffffff" stroke-width="1"/>`,
+      `<circle cx="${x(index).toFixed(1)}" cy="${y(point.value).toFixed(1)}" r="${radius}" fill="${fill}" stroke="#ffffff" stroke-width="1"/>`,
     );
-  }
+  });
 
   const legend: Array<{ label: string; stroke?: string; dash?: string; dot?: string }> = [
     { label: "ค่าที่ได้ (ค่าเฉลี่ยรายวัน)", stroke: c.value, dot: c.value },
@@ -316,7 +316,7 @@ function buildFormSheet(workbook: Workbook, input: BalanceControlExportInput, lo
     headerFooter: { oddFooter: `&L${BALANCE_FORM_CODE} P1/1` },
   });
   ws.columns = [13.44, 9.44, 9.44, 9.44, 9.44, 9.11, 9.11, 9.11, 9.11, 9.11].map((width) => ({ width }));
-  const valueFmt = numFmtFor(scale.decimals);
+  const valueFmt = numFmtFor(scale.controlWeight === 10 ? scale.decimals : scale.weights100Decimals ?? scale.decimals);
 
   // หัวฟอร์ม
   ws.getRow(1).height = 20.25;
@@ -478,7 +478,7 @@ function buildControlSheet(workbook: Workbook, input: BalanceControlExportInput)
   ws.getColumn("I").width = 14.55;
 
   const center = (options: CellOptions = {}): CellOptions => ({ horizontal: "center", ...options });
-  const valueFmt = numFmtFor(Math.max(scale.decimals, 5));
+  const valueFmt = numFmtFor(scale.controlWeight === 10 ? scale.decimals : scale.weights100Decimals ?? scale.decimals);
   const limitFmt = numFmtFor(displayDigits(scale.decimals, limits?.sd ?? config.sd));
   const mean = limits?.mean ?? config.mean;
   const sd = limits?.sd ?? config.sd;

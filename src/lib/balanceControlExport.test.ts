@@ -85,7 +85,7 @@ describe("balanceControlExport", () => {
     expect(ws.getCell("A37").value).toBe("30/09/2569");
     expect(ws.getCell("A11").value).toBe("04/09/2569");
     expect(ws.getCell("B11").value).toBe(100.0001);
-    expect(ws.getCell("D11").numFmt).toBe("0.00000");
+    expect(ws.getCell("D11").numFmt).toBe("0.0000");
     expect(ws.getCell("E11").value).toEqual({ formula: 'IFERROR(AVERAGE(B11:D11),"")', result: 100.0002 });
     expect(ws.getCell("F11").value).toBe("∕");
     expect(ws.getCell("F12").value).toBe("X");
@@ -116,6 +116,7 @@ describe("balanceControlExport", () => {
     expect(ws.getCell("A9").value).toBe(" ซ้ำที่");
     expect(ws.getCell("A10").value).toBe(1);
     expect(ws.getCell("B10").value).toBe(100.0002);
+    expect(ws.getCell("B10").numFmt).toBe("0.0000");
     expect(ws.getCell("B11").value).toBe(100.001);
     expect(ws.getCell("G10").value).toMatchObject({ formula: "B$7" });
   });
@@ -133,5 +134,8 @@ describe("balanceControlExport", () => {
     expect(svg).toContain("Quality Control Chart For Balance Daliy Check");
     for (const label of ["UCL", "UWL", "Mean", "LWL", "LCL"]) expect(svg).toContain(`>${label}<`);
     expect(svg).toContain("<polyline");
+    expect(svg).not.toContain(">1</text>");
+    expect(svg).toContain(">4</text>");
+    expect(svg).toContain(">5</text>");
   });
 });

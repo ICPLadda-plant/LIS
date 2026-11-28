@@ -815,7 +815,7 @@ const BalanceRoomPage = () => {
                 <RotateCcw className="h-4 w-4" /> บันทึกซ้ำ
               </Button>
             ) : (
-              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight}>
+              <Button className="w-full gap-2" onClick={() => handleCheck(scale.id)} disabled={createMutation.isPending || hasInvalidWeight || hasMeanOutOfControl}>
                 <CheckCircle2 className="h-4 w-4" />
                 {savingThisScale ? "กำลังบันทึก..." : "บันทึกผล Calibrate"}
               </Button>

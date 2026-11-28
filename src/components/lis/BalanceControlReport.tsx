@@ -39,6 +39,7 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-table tr.bcr-off td { background: #e5e5e5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .bcr .bcr-table tr.bcr-off td.bcr-off-note { text-align: left; padding-left: 6px; font-size: 11pt; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
+.bcr .bcr-table th.bcr-nowrap { white-space: nowrap; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
 .bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 420px; padding: 6px 4px 4px; }
@@ -96,6 +97,7 @@ export default function BalanceControlReport({
   holidayNotes,
 }: BalanceControlReportProps) {
   const printedDate = printedAt ? `${fmtDate(printedAt.slice(0, 10))} ${fmtTime(printedAt)}` : "";
+  const weightDecimals = config.nominal === 10 ? scale.decimals : scale.weights100Decimals ?? scale.decimals;
   const table = (points: MonthlyPoint<DailyCheckRecord>[]) => (
     <table className="bcr-table">
       <colgroup>
@@ -114,7 +116,7 @@ export default function BalanceControlReport({
           <th colSpan={3}>ครั้งที่</th>
           <th rowSpan={2}>Mean</th>
           <th rowSpan={2}>Result *</th>
-          <th rowSpan={2}>หมายเหตุ</th>
+          <th className="bcr-nowrap" rowSpan={2}>หมายเหตุ</th>
           <th rowSpan={2}>ผู้บันทึก</th>
         </tr>
         <tr><th>1</th><th>2</th><th>3</th></tr>
@@ -138,10 +140,10 @@ export default function BalanceControlReport({
           return (
             <tr key={point.date}>
               <td>{ddmmBE(point.date)}</td>
-              <td>{weightText(weights, 0, scale.decimals)}</td>
-              <td>{weightText(weights, 1, scale.decimals)}</td>
-              <td>{weightText(weights, 2, scale.decimals)}</td>
-              <td>{record ? formatControlNumber(config.nominal === 10 ? record.avg10 : record.avg100, scale.decimals) : ""}</td>
+              <td>{weightText(weights, 0, weightDecimals)}</td>
+              <td>{weightText(weights, 1, weightDecimals)}</td>
+              <td>{weightText(weights, 2, weightDecimals)}</td>
+              <td>{record ? formatControlNumber(config.nominal === 10 ? record.avg10 : record.avg100, weightDecimals) : ""}</td>
               <td>{resultMark(record, config.nominal)}</td>
               <td />
               <td>{firstNameOnly(record?.recorder ?? "")}</td>
