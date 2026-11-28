@@ -42,6 +42,8 @@ interface NotificationContextType {
   /** เปิดกระดิ่งแล้ว: ตัวเลขหาย แต่รายการยังคงเป็น "ยังไม่ได้อ่าน" */
   markAllSeen: () => void;
   clearAll: () => void;
+  /** ล้างเฉพาะรายการทั่วไปที่ตรงเงื่อนไข (เช่น เฉพาะแท็บที่เปิดอยู่) */
+  clearWhere: (predicate: (n: AppNotification) => boolean) => void;
   /** แทนที่รายการ pinned ทั้งหมด; markUnread = รอบเตือนใหม่ ให้กลับมาเป็นยังไม่อ่านและยกเลิกการปิดชั่วคราว */
   syncPinned: (items: PinnedNotificationInput[], options?: { markUnread?: boolean }) => void;
 }
@@ -186,6 +188,11 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
 
   // "ล้าง" ลบเฉพาะรายการทั่วไป — งานด่วนที่ปักไว้หายเองเมื่อบันทึกผลแล้วเท่านั้น
   const clearAll = useCallback(() => setState(prev => ({ ...prev, notifications: [] })), []);
+  const clearWhere = useCallback(
+    (predicate: (n: AppNotification) => boolean) =>
+      setState(prev => ({ ...prev, notifications: prev.notifications.filter(n => n.pinned || !predicate(n)) })),
+    [],
+  );
 
   const now = Date.now();
   const visiblePinned = pinned.filter(n => !n.snoozedUntil || n.snoozedUntil <= now);
@@ -204,6 +211,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     markAllRead,
     markAllSeen,
     clearAll,
+    clearWhere,
     syncPinned,
   };
 
@@ -213,3 +221,4 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     </NotificationContext.Provider>
   );
 };
+
