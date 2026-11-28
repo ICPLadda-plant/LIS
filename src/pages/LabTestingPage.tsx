@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FlaskConical, AlertTriangle, RotateCcw, QrCode, PackageOpen, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { deletePetition } from '@/hooks/usePetition';
 import { formatSendDayKey, isVisibleInAssignQueue, petitionSendDayKey, splitPetitionBySendDay, type SendDayPetition } from '@/lib/petitionQueueVisibility';
 import LabScanAcceptModal from '@/components/petition/LabScanAcceptModal';
 import LabStartWorkDialog from '@/components/petition/LabStartWorkDialog';
@@ -169,6 +170,22 @@ export default function LabTestingPage() {
     && (isFullAccess || isAssignedTo(p.assignedTo, user));
 
   // ผู้กดเริ่มงานเป็นคนเลือกเครื่องที่ใช้ (หัวหน้า assign แค่ผู้รับงาน)
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  async function deleteAdminPetition(p: Petition) {
+    if (deletingId || !window.confirm('ลบคำร้องนี้ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้')) return;
+    setDeletingId(p._id);
+    try {
+      await deletePetition(p._id, user?.name || user?.email);
+      toast.success('ลบคำร้องแล้ว');
+      refresh();
+      refreshAdminOnly();
+    } catch (err: unknown) {
+      toast.error((err as Error)?.message || 'ลบคำร้องไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function acceptPetition(p: Petition, machines: PetitionAssignedMachine[]) {
     if (acceptingId) return;
     setAcceptingId(p._id);
@@ -386,7 +403,30 @@ export default function LabTestingPage() {
       header: 'การดำเนินการ',
       className: 'text-right align-top',
       card: 'actions',
-      cell: (p) =>
+      cell: (p) => (
+        <div className="flex flex-col items-end gap-2">
+        {actionCell(p)}
+        {isAdmin && p.adminOnly && (
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={deletingId === p._id}
+            onClick={(e) => {
+              e.stopPropagation();
+              void deleteAdminPetition(p);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+            {deletingId === p._id ? 'กำลังลบ...' : 'ลบคำร้อง'}
+          </Button>
+        )}
+        </div>
+      ),
+    },
+  ];
+
+  function actionCell(p: SendDayPetition) {
+    return (
         needsAccept(p) ? (
           <Button
             size="sm"
@@ -427,9 +467,9 @@ export default function LabTestingPage() {
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">รอสแกนรับ</span>
-        ),
-    },
-  ];
+        )
+    );
+  }
 
   return (
     <AppLayout title="การทดสอบ Lab">
