@@ -221,12 +221,13 @@ router.post('/sso', async (req, res) => {
 router.get('/session', async (req, res) => {
   try {
     const userId = getLisSessionUserId(req);
-    if (!userId) return res.status(401).json({ error: 'ไม่มี session ของ LIS' });
+    // ยังไม่มี session ถือเป็นเรื่องปกติตอนเปิดหน้า login จึงตอบ 200 + null แทน 401
+    if (!userId) return res.json(null);
 
     const user = await User.findById(userId);
     if (!user || user.status === 'inactive') {
       clearLisSessionCookie(res, req);
-      return res.status(401).json({ error: 'session ของ LIS ไม่ถูกต้อง' });
+      return res.json(null);
     }
 
     if (!user.employeeId) {

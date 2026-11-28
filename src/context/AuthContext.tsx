@@ -328,6 +328,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .then((res) => {
         if (!active) return;
         const nextUser = res.data.data;
+        if (!nextUser) return;
         storeProductionUser(nextUser);
         setProductionUser(nextUser);
       })
