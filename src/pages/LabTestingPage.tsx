@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import PageHeader from '@/components/lis/PageHeader';
 import PageToolbar from '@/components/lis/PageToolbar';
 import { ResponsiveDataTable, type ResponsiveDataTableColumn } from '@/components/lis/ResponsiveDataTable';
@@ -64,7 +65,8 @@ export default function LabTestingPage() {
   const [dept, setDept] = useState<PetitionDept | ''>('');
   const [sendDate, setSendDate] = useState('');
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, dept]);
+  const [tab, setTab] = useState<'active' | 'done'>('active');
+  useEffect(() => { setPage(1); }, [search, dept, tab]);
   const [labParameters, setLabParameters] = useState<Awaited<ReturnType<typeof api.getParameters>>>([]);
   const [parametersLoaded, setParametersLoaded] = useState(false);
   const [parametersError, setParametersError] = useState(false);
@@ -208,7 +210,7 @@ export default function LabTestingPage() {
   const newestFirst = (a: SendDayPetition, b: SendDayPetition) =>
     (b.sendDayKey ?? petitionSendDayKey(b) ?? '').localeCompare(a.sendDayKey ?? petitionSendDayKey(a) ?? '')
     || String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''));
-  const petitions: SendDayPetition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
+  const allPetitions: SendDayPetition[] = prioritizeUrgentPetitions([...(isAdmin ? adminOnlyData?.items ?? [] : []), ...(data?.items ?? [])]
     .flatMap(splitPetitionBySendDay)
     .filter((p) => !p.labApprovedAt)
     // ตัวอย่างกลุ่มน้ำที่ QC ยังไม่ยืนยันค่า ถพ. ยังไม่ปล่อยมาให้ Lab
@@ -220,6 +222,8 @@ export default function LabTestingPage() {
     // ช่วงมอบหมายอิสระ งานที่ยังไม่รับตัวอย่างไปอยู่ในกล่อง "รอรับตัวอย่าง" แล้ว
     .filter((p) => !canReceiveAndClaim || p.assignedTo || labWorkReceived(p))
     .sort(newestFirst));
+  const doneCount = allPetitions.filter((p) => !!p.labCompletedAt).length;
+  const petitions = allPetitions.filter((p) => (tab === "done") === !!p.labCompletedAt);
 
   const [abnormalMap, setAbnormalMap] = useState<Record<string, boolean>>({});
   // ยังวิเคราะห์อยู่ (เริ่มงานแล้ว ยังไม่ส่งผล) เปลี่ยนเครื่องได้
@@ -527,6 +531,13 @@ export default function LabTestingPage() {
             onClose={() => setChangeTarget(null)}
           />
         )}
+
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'active' | 'done')}>
+          <TabsList>
+            <TabsTrigger value="active">ดำเนินการ ({allPetitions.length - doneCount})</TabsTrigger>
+            <TabsTrigger value="done">เสร็จแล้ว ({doneCount})</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <PageToolbar
           search={{
