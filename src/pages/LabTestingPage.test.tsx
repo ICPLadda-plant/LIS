@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import LabTestingPage from './LabTestingPage';
@@ -64,6 +64,12 @@ vi.mock('@/components/lis/AppLayout', () => ({
   default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
 }));
 
+vi.mock('@/components/petition/LabScanAcceptModal', () => ({
+  default: ({ open, initialCode }: { open: boolean; initialCode?: string }) => open
+    ? <div>หน้ารับตัวอย่าง {initialCode}</div>
+    : null,
+}));
+
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: mocks.user }),
 }));
@@ -104,6 +110,8 @@ vi.mock('@/lib/api', () => ({
 describe('LabTestingPage assignment visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.assignedPetition.labReceivedAt = '2026-09-16T02:30:00.000Z';
+    mocks.assignedPetition.labReceivedBy = 'Dev Lab Analyst';
     mocks.assignedPetition.labCompletedAt = undefined;
     mocks.assignedPetition.labApprovedAt = undefined;
     mocks.user.roles = ['lab-analyze'];
@@ -118,6 +126,20 @@ describe('LabTestingPage assignment visibility', () => {
 
     expect(await screen.findByText('เลขที่ตัวอย่าง')).toBeInTheDocument();
     expect(screen.getByText('3450/69')).toBeInTheDocument();
+  });
+
+  it('opens receipt for an assigned petition before showing Start work', async () => {
+    mocks.assignedPetition.labReceivedAt = undefined;
+    mocks.assignedPetition.labReceivedBy = undefined;
+
+    render(
+      <MemoryRouter>
+        <LabTestingPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'รับตัวอย่าง' }));
+    expect(screen.getByText('หน้ารับตัวอย่าง P-LAB-ASSIGNED')).toBeInTheDocument();
   });
 
   it('hides assigned Lab petitions without a matching Lab parameter', async () => {

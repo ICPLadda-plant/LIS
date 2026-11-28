@@ -419,7 +419,17 @@ export default function LabTestingPage() {
           </Button>
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">รอสแกนรับ</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={(e) => {
+              e.stopPropagation();
+              setScanCode(p.petitionNo);
+              setScanOpen(true);
+            }}
+          >
+            รับตัวอย่าง
+          </Button>
         ),
     },
   ];
