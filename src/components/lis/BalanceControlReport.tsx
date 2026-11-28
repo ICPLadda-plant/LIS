@@ -39,6 +39,7 @@ body { font-family: ${A4_PRINT_FONT_FAMILY}; margin: 0; color: #000; }
 .bcr .bcr-table tr.bcr-off td { background: #e5e5e5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .bcr .bcr-table tr.bcr-off td.bcr-off-note { text-align: left; padding-left: 6px; font-size: 11pt; }
 .bcr .bcr-table th { font-size: 10pt; font-weight: 400; white-space: normal; overflow: hidden; text-overflow: clip; }
+.bcr .bcr-table th.bcr-nowrap { white-space: nowrap; }
 .bcr .bcr-table thead tr:first-child th { border-top: 2px solid #000; }
 .bcr .bcr-note { display: flex; gap: 22px; margin: 6px 0 4px 28px; font-size: 11pt; }
 .bcr .bcr-chart { border: 1px solid #000; flex: 1; min-height: 420px; padding: 6px 4px 4px; }
@@ -115,7 +116,7 @@ export default function BalanceControlReport({
           <th colSpan={3}>ครั้งที่</th>
           <th rowSpan={2}>Mean</th>
           <th rowSpan={2}>Result *</th>
-          <th rowSpan={2}>หมายเหตุ</th>
+          <th className="bcr-nowrap" rowSpan={2}>หมายเหตุ</th>
           <th rowSpan={2}>ผู้บันทึก</th>
         </tr>
         <tr><th>1</th><th>2</th><th>3</th></tr>
