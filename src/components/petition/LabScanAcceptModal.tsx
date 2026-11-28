@@ -285,13 +285,24 @@ export default function LabScanAcceptModal({ open, onClose, onAccepted, manualOn
     setPhase('loading');
     try {
       let updated = petition as Petition;
+      const shouldReceive = additionalRequest || !petition?.labReceivedAt;
+      const receiveBeforeSampleNumbers = needsSampleNumbers && shouldReceive && !petition?.sampleSentAt;
+      if (receiveBeforeSampleNumbers) {
+        const received = await api.patch<Petition>(`/petitions/${id}/receive`, {
+          actor: user?.name || user?.email,
+          side: 'lab',
+          ...additionalSamplePayload(additionalRequest),
+          ...(labelChoices ? { labelKeys } : {}),
+        });
+        updated = received.data.data;
+      }
       if (needsSampleNumbers) {
         const saved = await api.patch<Petition>(`/petitions/${id}/lab-sample-numbers`, {
           sampleNumbers: sampleItems.map((item) => ({ itemSeq: item.seq, sampleId: sampleNumbers[item.seq].trim() })),
         });
         updated = saved.data.data;
       }
-      if (additionalRequest || !petition?.labReceivedAt) {
+      if (shouldReceive && !receiveBeforeSampleNumbers) {
         const received = await api.patch<Petition>(`/petitions/${id}/receive`, {
           actor: user?.name || user?.email,
           side: 'lab',

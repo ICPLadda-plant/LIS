@@ -34,6 +34,7 @@ const petition = {
   petitionNo: 'P-2611-0001',
   dept: 'production',
   status: 'sampleSent',
+  sampleSentAt: '2026-11-10T00:00:00.000Z',
   submittedBy: { name: 'ผู้ส่ง' },
   items: [{ seq: 1, sampleName: 'ตัวอย่าง A', sendToLab: true }],
 };
@@ -116,5 +117,26 @@ describe('LabScanAcceptModal ทบทวนคำขอก่อนรับง
       ['/petitions/pet1/receive', expect.objectContaining({ side: 'lab' })],
     ]);
     expect(screen.queryByRole('button', { name: /บันทึกการทบทวน/ })).not.toBeInTheDocument();
+  });
+
+  it('ไม่มีเวลาส่งตัวอย่าง → รับตัวอย่างให้ backend เติมเวลาก่อนบันทึกเลขตัวอย่าง', async () => {
+    const legacyPetition = { ...petition, sampleSentAt: undefined, labAgreementReview: reviewed(true) };
+    vi.mocked(api.get).mockImplementation(async (url) => ({
+      data: { data: url.includes('lab-sample-number-options') ? ['3450'] : legacyPetition },
+    }) as never);
+    vi.mocked(api.patch).mockImplementation(async (url) => ({
+      data: { data: url.endsWith('/receive') ? { ...legacyPetition, sampleSentAt: '2026-11-28T01:00:00.000Z', labReceivedAt: '2026-11-28T01:00:00.000Z' } : legacyPetition },
+    }) as never);
+    vi.mocked(fetchLabRequestsByPetition).mockResolvedValue([]);
+    renderModal();
+
+    await selectSampleNumber();
+    fireEvent.click(screen.getByRole('button', { name: 'รับงาน' }));
+
+    await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.patch).mock.calls).toEqual([
+      ['/petitions/pet1/receive', expect.objectContaining({ side: 'lab' })],
+      ['/petitions/pet1/lab-sample-numbers', { sampleNumbers: [{ itemSeq: 1, sampleId: '3450' }] }],
+    ]);
   });
 });
