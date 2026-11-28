@@ -34,7 +34,7 @@ import { labReceivedAt, labReceivedBy, labWorkReceived } from '@/lib/receiveStat
 import { isItemLabelPending } from '@/lib/labelReceipt';
 import { useConfirm } from '@/context/ConfirmDialog';
 import { isFieldAbnormal, expandFieldForItem, resolveFieldStandard, resolveStandard, getEntryValues, optionOutputText, enumNormalValues, resolveConditionalOutput, isConditionalOutputAbnormal, resolveLabelTolerance, resolveLabLabelTolerance, isLabLabelToleranceAbnormal } from '@/lib/parameterValidation';
-import { SG_FIELD_LABEL, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue, findSgParameter, resolveSpecificGravity } from '@/lib/formSpecificGravity';
+import { SG_FIELD_LABEL, formatSpecificGravity, FORM_ENTRY_INDEX_KEY, readSpecificGravityEntryValue, findSgParameter, resolveSpecificGravity } from '@/lib/formSpecificGravity';
 import type { ConditionContext, ResolvedOutput, RenderFieldUnit } from '@/lib/parameterValidation';
 import { describeResolvedStandard, formatLabelToleranceRange, labelToleranceBadge } from '@/lib/standardOperators';
 import { cn } from '@/lib/utils';
@@ -2285,7 +2285,7 @@ export default function LabTestingDetailPage() {
                                     field={effectiveField}
                                     item={item}
                                     itemGroupIds={idsFor(item)}
-                                    value={srcValues[unit.key] ?? ''}
+                                    value={unit.field.label === SG_FIELD_LABEL ? formatSpecificGravity(srcValues[unit.key]) : srcValues[unit.key] ?? ''}
                                     noteValue={srcValues[noteLabel] ?? ''}
                                     saveInfo={saveInfoSrc?.[unit.key]}
                                     noteSaveInfo={saveInfoSrc?.[noteLabel]}
