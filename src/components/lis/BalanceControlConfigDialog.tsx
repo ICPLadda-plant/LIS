@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { todayStr } from "@/lib/chemicalRequisition";
 import {
   computeLimits,
   formatControlNumber,
@@ -47,14 +48,6 @@ const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
   brand: config.brand,
   model: config.model,
 });
-const emptyForm = (): FormState => ({
-  baselineValues: Array(20).fill(""),
-  nominal: "",
-  updatedDate: "",
-  brand: "",
-  model: "",
-});
-
 /** "" → null, ข้อความที่ไม่ใช่ตัวเลข → NaN (ให้ validate แจ้งเตือน) */
 const parseOptional = (text: string) => (text.trim() === "" ? null : Number(text));
 
@@ -136,7 +129,11 @@ export default function BalanceControlConfigDialog({
     }
     mutation.mutate(input);
   };
-  const handleClear = () => setForm(emptyForm());
+  const handleClear = () => setForm((prev) => ({
+    ...prev,
+    baselineValues: Array(20).fill(""),
+    updatedDate: todayStr(),
+  }));
 
   const setBaselineValue = (index: number) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({

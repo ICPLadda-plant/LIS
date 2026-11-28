@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import BalanceRoomPage from "../BalanceRoomPage";
 import { currentMonthStr, monthRange } from "@/lib/balanceControlChart";
+import { todayStr } from "@/lib/chemicalRequisition";
 
 const state = vi.hoisted(() => ({
   user: { name: "Dev Administrator", id: "dev", email: "dev@example.com" },
@@ -267,7 +268,7 @@ describe("BalanceRoomPage", () => {
     expect(input.sd).toBeGreaterThan(0);
   });
 
-  it("clears every control field", async () => {
+  it("clears only baseline values and updates the control date", async () => {
     apiMock.getBalanceControlConfigs.mockResolvedValue([{
       scaleId: "scale-1",
       brand: "Sartorius",
@@ -288,9 +289,10 @@ describe("BalanceRoomPage", () => {
     Array.from({ length: 20 }, (_, index) =>
       expect(screen.getByLabelText(`ค่าบันทึกที่ ${index + 1}`)).toHaveValue(""),
     );
-    ["น้ำหนักตุ้ม Daily check (g)", "วันที่ปรับปรุงค่า Control", "ยี่ห้อ", "รุ่น"].forEach((label) =>
-      expect(screen.getByLabelText(label)).toHaveValue(""),
-    );
+    expect(screen.getByLabelText("น้ำหนักตุ้ม Daily check (g)")).toHaveValue("10.00");
+    expect(screen.getByLabelText("วันที่ปรับปรุงค่า Control")).toHaveValue(todayStr());
+    expect(screen.getByLabelText("ยี่ห้อ")).toHaveValue("Sartorius");
+    expect(screen.getByLabelText("รุ่น")).toHaveValue("CPA225D");
     ["Mean (g)", "STD (g)"].forEach((label) => expect(screen.getByLabelText(label)).toHaveValue("—"));
     localStorage.removeItem("balance-control-draft:scale-1:10");
   });
