@@ -194,14 +194,23 @@ describe('qcTrackStatusBadge', () => {
 });
 
 describe('labTrackStatusSteps', () => {
-  it('4 steps in Lab-only order: รับตัวอย่าง → Assign → Lab → ออกผล Lab', () => {
+  it('4 steps in Lab-only order: Assign → รับตัวอย่าง → Lab → ออกผล Lab', () => {
     const steps = labTrackStatusSteps({ status: 'sampleSent' } as Petition);
-    expect(steps.map((s) => s.label)).toEqual(['รับตัวอย่าง', 'Assign', 'Lab', 'ออกผล Lab']);
+    expect(steps.map((s) => s.label)).toEqual(['Assign', 'รับตัวอย่าง', 'Lab', 'ออกผล Lab']);
   });
 
-  it('nothing done → receive is the current step', () => {
+  it('nothing done → assign is the current step', () => {
     const steps = labTrackStatusSteps({ status: 'sampleSent' } as Petition);
     expect(steps.every((s) => !s.done)).toBe(true);
+    expect(steps.find((s) => s.current)?.key).toBe('assigned');
+  });
+
+  it('assigned before receive → receive is the current step', () => {
+    const steps = labTrackStatusSteps({
+      status: 'sampleSent',
+      assignedTo: { employeeId: 'u1', name: 'Analyst' },
+    } as unknown as Petition);
+    expect(steps.filter((s) => s.done).map((s) => s.key)).toEqual(['assigned']);
     expect(steps.find((s) => s.current)?.key).toBe('received');
   });
 
@@ -222,7 +231,7 @@ describe('labTrackStatusSteps', () => {
       labCompletedAt: T2,
     } as unknown as Petition;
     const steps = labTrackStatusSteps(p);
-    expect(steps.filter((s) => s.done).map((s) => s.key)).toEqual(['received', 'assigned', 'lab']);
+    expect(steps.filter((s) => s.done).map((s) => s.key)).toEqual(['assigned', 'received', 'lab']);
     expect(steps.find((s) => s.current)?.key).toBe('lab-approval');
   });
 
