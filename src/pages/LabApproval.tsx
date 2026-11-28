@@ -229,7 +229,8 @@ const LabApproval = () => {
     },
   ];
 
-  const groups = groupLabApprovalByName(sortedPetitions);
+  // หนึ่งคำร้องต่อหนึ่งแถว เพื่อให้ทุกคอลัมน์ของคำร้องเดียวกันอยู่แนวเดียวกัน
+  const groups = sortedPetitions.map((p) => [p]);
   const columns: DataTableColumn<Petition[]>[] = petitionColumns.map((c) => ({
     ...c,
     cell: (g) => <div className="space-y-3">{g.map((p) => <div key={p._id}>{c.cell(p)}</div>)}</div>,
