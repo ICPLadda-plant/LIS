@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/lib/api";
+import { todayStr } from "@/lib/chemicalRequisition";
 import {
   computeLimits,
   formatControlNumber,
@@ -47,7 +48,6 @@ const toForm = (config: BalanceControlConfig, digits: number): FormState => ({
   brand: config.brand,
   model: config.model,
 });
-
 /** "" → null, ข้อความที่ไม่ใช่ตัวเลข → NaN (ให้ validate แจ้งเตือน) */
 const parseOptional = (text: string) => (text.trim() === "" ? null : Number(text));
 
@@ -129,6 +129,11 @@ export default function BalanceControlConfigDialog({
     }
     mutation.mutate(input);
   };
+  const handleClear = () => setForm((prev) => ({
+    ...prev,
+    baselineValues: Array(20).fill(""),
+    updatedDate: todayStr(),
+  }));
 
   const setBaselineValue = (index: number) => (event: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({
@@ -220,6 +225,10 @@ export default function BalanceControlConfigDialog({
         </div>
 
         <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" className="gap-2" onClick={handleClear} disabled={mutation.isPending}>
+            <Trash2 className="h-4 w-4" />
+            ล้างค่าทั้งหมด
+          </Button>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
             ยกเลิก
           </Button>
